@@ -1,0 +1,105 @@
+plugins {
+    id 'com.android.library'
+    id 'kotlin-android'
+    id 'maven-publish'
+}
+
+android {
+    namespace 'dev.rusto'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "0.1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles "consumer-rules.pro"
+
+        ndk {
+            // Multi-arch support: ARMv7, ARM64, x86, x86_64
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    sourceSets {
+        main {
+            // Prebuilt native libraries location
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+    
+    publishing {
+        singleVariant('release') {
+            withSourcesJar()
+            withJavadocJar()
+        }
+    }
+}
+
+dependencies {
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.20'
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                
+                groupId = 'dev.rusto'
+                artifactId = 'rusto-android'
+                version = '0.1.0'
+                
+                pom {
+                    name = 'RustO! Android'
+                    description = 'RustO! - Pure Rust OCR library for Android'
+                    url = 'https://github.com/yourusername/rusto-rs'
+                    
+                    licenses {
+                        license {
+                            name = 'MIT License'
+                            url = 'https://opensource.org/licenses/MIT'
+                        }
+                    }
+                    
+                    developers {
+                        developer {
+                            id = 'rusto'
+                            name = 'RustO Contributors'
+                        }
+                    }
+                    
+                    scm {
+                        connection = 'scm:git:git://github.com/yourusername/rusto-rs.git'
+                        developerConnection = 'scm:git:ssh://github.com/yourusername/rusto-rs.git'
+                        url = 'https://github.com/yourusername/rusto-rs'
+                    }
+                }
+            }
+        }
+    }
+}

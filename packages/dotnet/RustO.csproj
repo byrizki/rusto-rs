@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>RustO</RootNamespace>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>RustO</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>RustO Contributors</Authors>
+    <Description>RustO! - Pure Rust OCR library based on RapidOCR with PaddleOCR engine</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/yourusername/rusto-rs</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/yourusername/rusto-rs</PackageProjectUrl>
+    <PackageTags>OCR;TextRecognition;ComputerVision;Rust;PaddleOCR;ONNX</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="runtimes\**\*" Pack="true" PackagePath="runtimes\" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

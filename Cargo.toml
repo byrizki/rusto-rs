@@ -1,0 +1,50 @@
+[package]
+name = "rusto-rs"
+version = "0.1.0"
+edition = "2021"
+description = "RustO! - Pure Rust OCR library based on RapidOCR with PaddleOCR engine"
+license = "MIT"
+repository = "https://github.com/yourusername/rusto-rs"
+keywords = ["ocr", "paddle", "onnx", "computer-vision", "text-recognition"]
+categories = ["computer-vision", "text-processing"]
+
+[lib]
+name = "rusto"
+path = "src/lib.rs"
+
+[dependencies]
+ort = { version = "1.16", features = ["download-binaries"] }
+ndarray = "0.15"
+thiserror = "1.0"
+geo-clipper = "0.9"
+geo-types = "0.7"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+
+# Pure Rust image processing (default)
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+nalgebra = "0.33"
+
+# Optional OpenCV backend
+opencv = { version = "0.97.2", optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[features]
+default = []
+use-opencv = ["opencv"]
+ffi = []  # Enable C FFI bindings
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = false

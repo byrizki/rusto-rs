@@ -1,0 +1,10 @@
+models/
+target/
+build
+output
+*.nupkg
+*.xcframework
+*.aar
+*.tar.gz
+bin
+obj
