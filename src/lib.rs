@@ -1,7 +1,7 @@
 //! # RustO! - Pure Rust OCR Library
 //!
-//! RustO! is a high-performance OCR library written in pure Rust, based on RapidOCR
-//! and powered by PaddleOCR models with ONNX Runtime inference.
+//! RustO! is a high-performance OCR library written in pure Rust,
+//! powered by PaddleOCR models with ONNX Runtime inference.
 //!
 //! ## Features
 //!
@@ -14,15 +14,15 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use rusto::{RapidOCR, RapidOCRConfig};
+//! use rusto::{RustO, RustOConfig};
 //!
-//! let config = RapidOCRConfig {
+//! let config = RustOConfig {
 //!     det_model_path: "models/det.onnx".to_string(),
 //!     rec_model_path: "models/rec.onnx".to_string(),
 //!     dict_path: "models/dict.txt".to_string(),
 //! };
 //!
-//! let ocr = RapidOCR::new(config)?;
+//! let ocr = RustO::new(config)?;
 //! let results = ocr.ocr("image.jpg")?;
 //!
 //! for result in results {
@@ -39,7 +39,7 @@ mod postprocess;
 mod preprocess;
 mod det;
 mod rec;
-mod rapid_ocr;
+mod rusto_ocr;
 mod cal_rec_boxes;
 mod types;
 mod cls;
@@ -52,22 +52,22 @@ mod contours;
 pub mod ffi;
 
 // Public API exports
-pub use crate::rapid_ocr::RapidOcr;
+pub use crate::rusto_ocr::RustO as RapidOcr;
 pub use crate::types::{DetConfig, GlobalConfig, RecConfig};
 
 // Re-export for easier access
 use crate::engine::EngineError;
 use std::path::Path;
 
-/// Configuration for RapidOCR
+/// Configuration for RustO
 #[derive(Debug, Clone)]
-pub struct RapidOCRConfig {
+pub struct RustOConfig {
     pub det_model_path: String,
     pub rec_model_path: String,
     pub dict_path: String,
 }
 
-impl Default for RapidOCRConfig {
+impl Default for RustOConfig {
     fn default() -> Self {
         Self {
             det_model_path: String::new(),
@@ -86,15 +86,15 @@ pub struct TextResult {
     pub box_points: [(f32, f32); 4],
 }
 
-/// Main RapidOCR interface
-pub struct RapidOCR {
+/// Main RustO interface
+pub struct RustO {
     inner: RapidOcr,
 }
 
-impl RapidOCR {
-    /// Create a new RapidOCR instance
-    pub fn new(config: RapidOCRConfig) -> Result<Self, EngineError> {
-        let inner = RapidOcr::new_ppv5(
+impl RustO {
+    /// Create a new RustO instance
+    pub fn new(config: RustOConfig) -> Result<Self, EngineError> {
+        let inner = crate::rusto_ocr::RustO::new_ppv5(
             &config.det_model_path,
             &config.rec_model_path,
             &config.dict_path,
@@ -104,7 +104,7 @@ impl RapidOCR {
     }
 
     /// Run OCR on an image file
-    pub fn ocr<P: AsRef<Path>>(&self, image_path: P) -> Result<Vec<TextResult>, EngineError> {
+    pub fn ocr<P: AsRef<Path>>(&mut self, image_path: P) -> Result<Vec<TextResult>, EngineError> {
         let results = self.inner.run(image_path)?;
         
         // Convert RapidOcrOutput to Vec<TextResult>
@@ -123,7 +123,7 @@ impl RapidOCR {
     }
 
     /// Run OCR on image data in memory
-    pub fn ocr_from_bytes(&self, image_data: &[u8]) -> Result<Vec<TextResult>, EngineError> {
+    pub fn ocr_from_bytes(&mut self, image_data: &[u8]) -> Result<Vec<TextResult>, EngineError> {
         // Load image from bytes using image crate
         use image::ImageReader;
         use std::io::Cursor;
@@ -135,7 +135,7 @@ impl RapidOCR {
             .map_err(|e| EngineError::ImageError(e.to_string()))?;
         
         // Save to temp file and process
-        let temp_path = std::env::temp_dir().join(format!("rapidocr_{}.jpg", std::process::id()));
+        let temp_path = std::env::temp_dir().join(format!("rusto_{}.jpg", std::process::id()));
         img.save(&temp_path)
             .map_err(|e| EngineError::ImageError(e.to_string()))?;
         

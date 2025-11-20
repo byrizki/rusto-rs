@@ -36,7 +36,7 @@ impl TextDetector {
         })
     }
 
-    pub fn run(&self, img: &Mat) -> Result<TextDetOutput, EngineError> {
+    pub fn run(&mut self, img: &Mat) -> Result<TextDetOutput, EngineError> {
         let start = Instant::now();
 
         let ori_h = img.rows();

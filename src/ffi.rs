@@ -2,11 +2,11 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int};
 use std::slice;
-use crate::{RapidOCR, RapidOCRConfig, TextResult};
+use crate::{RustO, RustOConfig, TextResult};
 
-/// Opaque handle to RapidOCR instance
+/// Opaque handle to RustO instance
 pub struct ROCRHandle {
-    inner: RapidOCR,
+    inner: RustO,
 }
 
 /// C-compatible text result structure
@@ -24,7 +24,7 @@ pub struct CTextResult {
     pub box_y4: c_float,
 }
 
-/// Create a new RapidOCR instance
+/// Create a new RustO instance
 ///
 /// # Safety
 /// All string pointers must be valid null-terminated UTF-8 strings
@@ -53,14 +53,14 @@ pub unsafe extern "C" fn rocr_new(
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let config = RapidOCRConfig {
+    let config = RustOConfig {
         det_model_path: det_model,
         rec_model_path: rec_model,
         dict_path: dict,
         ..Default::default()
     };
 
-    match RapidOCR::new(config) {
+    match RustO::new(config) {
         Ok(ocr) => Box::into_raw(Box::new(ROCRHandle { inner: ocr })),
         Err(_) => std::ptr::null_mut(),
     }
@@ -156,7 +156,7 @@ pub unsafe extern "C" fn rocr_free_results(results: *mut CTextResult, count: usi
     }
 }
 
-/// Free a RapidOCR instance
+/// Free a RustO instance
 ///
 /// # Safety
 /// handle must be a valid pointer returned from rocr_new

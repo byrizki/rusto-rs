@@ -1,19 +1,17 @@
 use std::path::Path;
-use std::sync::Arc;
 
-use ndarray::{ArrayD, CowArray, IxDyn};
-use ort::environment::Environment;
-use ort::session::Session;
-use ort::tensor::OrtOwnedTensor;
-use ort::value::Value;
-use ort::{GraphOptimizationLevel, OrtError, SessionBuilder};
+use ndarray::ArrayD;
+use ort::{
+    session::{builder::GraphOptimizationLevel, Session},
+    value::Tensor,
+};
 
 use crate::types::{DetConfig, EngineConfig, RecConfig};
 
 #[derive(thiserror::Error, Debug)]
 pub enum EngineError {
     #[error("ORT error: {0}")]
-    Ort(#[from] OrtError),
+    Ort(#[from] ort::Error),
 
     #[cfg(feature = "use-opencv")]
     #[error("OpenCV error: {0}")]
@@ -36,8 +34,6 @@ impl From<Box<dyn std::error::Error>> for EngineError {
 }
 
 pub struct OrtSession {
-    #[allow(dead_code)]
-    env: Arc<Environment>,
     session: Session,
 }
 
@@ -50,43 +46,39 @@ impl OrtSession {
         Self::from_path(&cfg.model_path, &cfg.engine_cfg)
     }
 
-    fn from_path(model_path: &Path, engine_cfg: &EngineConfig) -> Result<Self, EngineError> {
-        let env = Environment::builder()
-            .with_name("rapidocr")
-            .build()? 
-            .into_arc();
-
-        let mut builder = SessionBuilder::new(&env)?
+    fn from_path(model_path: &Path, engine_cfg: &EngineConfig) -> Result<Self, EngineError> {        
+        let mut builder = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level3)?;
 
         if engine_cfg.intra_op_num_threads > 0 {
-            builder = builder.with_intra_threads(engine_cfg.intra_op_num_threads as i16)?;
+            builder = builder.with_intra_threads(engine_cfg.intra_op_num_threads as usize)?;
         }
 
         if engine_cfg.inter_op_num_threads > 0 {
-            builder = builder.with_inter_threads(engine_cfg.inter_op_num_threads as i16)?;
+            builder = builder.with_inter_threads(engine_cfg.inter_op_num_threads as usize)?;
         }
 
-        let session = builder.with_model_from_file(model_path)?;
+        let session = builder.commit_from_file(model_path)?;
 
-        Ok(Self { env, session })
+        Ok(Self { session })
     }
 
-    pub fn run(&self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
-        let allocator = self.session.allocator();
+    pub fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
+        // Create tensor from owned array - v2 requires owned data
+        let input_tensor = Tensor::from_array(input)?;
 
-        let cow: CowArray<'_, f32, IxDyn> = CowArray::from(input);
-        let input_value = Value::from_array(allocator, &cow)?;
+        // Run inference using ort::inputs! macro
+        let outputs = self.session.run(ort::inputs![input_tensor])?;
 
-        let outputs = self.session.run(vec![input_value])?;
-        let first = outputs
-            .into_iter()
+        // Get first output - outputs is a ValueMap, iterate to get first value
+        let output = outputs
+            .values()
             .next()
             .ok_or(EngineError::InvalidInputShape)?;
 
-        let tensor: OrtOwnedTensor<f32, IxDyn> = first.try_extract()?;
-        let view = tensor.view();
-        Ok(view.to_owned())
+        // Extract array view and convert to owned ArrayD
+        let array_view = output.try_extract_array::<f32>()?;
+        Ok(array_view.to_owned())
     }
 
     pub fn get_character_list(&self, key: &str) -> Option<Vec<String>> {

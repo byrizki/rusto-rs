@@ -8,53 +8,259 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  ONNXRUNTIME_VERSION: 1.17.0
 
 jobs:
-  # Build Rust CLI binaries for all platforms
-  build-cli:
-    name: Build CLI - ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
+  # Build ONNX Runtime from source for each platform/arch
+  build-onnxruntime:
+    name: Build ONNX Runtime - ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          # Linux x64
+          - os: linux
+            arch: x64
+            runner: ubuntu-22.04
+            cmake_args: ""
+          # Linux ARM64 (cross-compile)
+          - os: linux
+            arch: arm64
+            runner: ubuntu-22.04
+            cmake_args: "-DCMAKE_TOOLCHAIN_FILE=toolchains/arm64-linux.cmake"
+          # macOS x64
+          - os: macos
+            arch: x64
+            runner: macos-13
+            cmake_args: "-DCMAKE_OSX_ARCHITECTURES=x86_64"
+          # macOS ARM64
+          - os: macos
+            arch: arm64
+            runner: macos-14
+            cmake_args: "-DCMAKE_OSX_ARCHITECTURES=arm64"
+          # Windows x64
+          - os: windows
+            arch: x64
+            runner: windows-2022
+            cmake_args: "-A x64"
+    
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Linux dependencies
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake git libprotobuf-dev protobuf-compiler
+          
+      - name: Install Linux ARM64 cross-compile tools
+        if: matrix.os == 'linux' && matrix.arch == 'arm64'
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          
+      - name: Install macOS dependencies
+        if: matrix.os == 'macos'
+        run: |
+          brew install cmake protobuf
+      
+      - name: Clone ONNX Runtime
+        run: |
+          git clone --recursive --branch v${{ env.ONNXRUNTIME_VERSION }} https://github.com/microsoft/onnxruntime.git
+          cd onnxruntime
+      
+      - name: Build ONNX Runtime (Unix)
+        if: matrix.os != 'windows'
+        working-directory: onnxruntime
+        run: |
+          ./build.sh \
+            --config Release \
+            --build_shared_lib \
+            --parallel \
+            --skip_tests \
+            --compile_no_warning_as_error \
+            --cmake_extra_defines CMAKE_INSTALL_PREFIX=${{ github.workspace }}/onnxruntime-install ${{ matrix.cmake_args }}
+          
+          cd build/Linux/Release
+          make install
+      
+      - name: Build ONNX Runtime (Windows)
+        if: matrix.os == 'windows'
+        working-directory: onnxruntime
+        shell: cmd
+        run: |
+          call build.bat ^
+            --config Release ^
+            --build_shared_lib ^
+            --parallel ^
+            --skip_tests ^
+            --compile_no_warning_as_error ^
+            --cmake_generator "Visual Studio 17 2022" ^
+            ${{ matrix.cmake_args }}
+      
+      - name: Package ONNX Runtime
+        run: |
+          mkdir -p onnxruntime-package
+          cp -r onnxruntime-install/* onnxruntime-package/ || true
+          cp -r onnxruntime/build/*/Release/*.so onnxruntime-package/lib/ || true
+          cp -r onnxruntime/build/*/Release/*.dylib onnxruntime-package/lib/ || true
+          cp -r onnxruntime/build/*/Release/Release/*.dll onnxruntime-package/lib/ || true
+          cp -r onnxruntime/include/onnxruntime onnxruntime-package/include/ || true
+      
+      - name: Upload ONNX Runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: onnxruntime-${{ matrix.os }}-${{ matrix.arch }}
+          path: onnxruntime-package/
+
+  # Build RustO library for each platform
+  build-rusto:
+    name: Build RustO - ${{ matrix.target }}
+    needs: build-onnxruntime
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          # Linux x64
+          - os: linux
+            arch: x64
             target: x86_64-unknown-linux-gnu
-            artifact: rusto
-          - os: macos-latest
+            runner: ubuntu-22.04
+            lib_ext: so
+          # Linux ARM64
+          - os: linux
+            arch: arm64
+            target: aarch64-unknown-linux-gnu
+            runner: ubuntu-22.04
+            lib_ext: so
+          # macOS x64
+          - os: macos
+            arch: x64
             target: x86_64-apple-darwin
-            artifact: rusto
-          - os: macos-latest
+            runner: macos-13
+            lib_ext: dylib
+          # macOS ARM64
+          - os: macos
+            arch: arm64
             target: aarch64-apple-darwin
-            artifact: rusto
-          - os: windows-latest
+            runner: macos-14
+            lib_ext: dylib
+          # Windows x64
+          - os: windows
+            arch: x64
             target: x86_64-pc-windows-msvc
-            artifact: rusto.exe
+            runner: windows-2022
+            lib_ext: dll
     
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Download ONNX Runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: onnxruntime-${{ matrix.os }}-${{ matrix.arch }}
+          path: onnxruntime
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Setup environment (Unix)
+        if: matrix.os != 'windows'
+        run: |
+          echo "ORT_LIB_LOCATION=${{ github.workspace }}/onnxruntime/lib" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=${{ github.workspace }}/onnxruntime/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "DYLD_LIBRARY_PATH=${{ github.workspace }}/onnxruntime/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
       
-      - name: Strip binary (Unix)
-        if: runner.os != 'Windows'
-        run: strip target/${{ matrix.target }}/release/${{ matrix.artifact }}
+      - name: Setup environment (Windows)
+        if: matrix.os == 'windows'
+        shell: bash
+        run: |
+          echo "ORT_LIB_LOCATION=${{ github.workspace }}/onnxruntime/lib" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/onnxruntime/lib" >> $GITHUB_PATH
       
-      - name: Upload artifact
+      - name: Install Linux ARM64 cross-compile tools
+        if: matrix.os == 'linux' && matrix.arch == 'arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+      
+      - name: Build RustO CLI
+        run: |
+          cargo build --release --target ${{ matrix.target }} --bin rusto
+      
+      - name: Build RustO library (with FFI)
+        run: |
+          cargo build --release --target ${{ matrix.target }} --features ffi
+      
+      - name: Strip binaries (Unix)
+        if: matrix.os != 'windows'
+        run: |
+          strip target/${{ matrix.target }}/release/rusto || true
+          strip target/${{ matrix.target }}/release/librusto.${{ matrix.lib_ext }} || true
+      
+      - name: Package RustO
+        shell: bash
+        run: |
+          mkdir -p package/bin package/lib package/include
+          
+          # Copy CLI binary
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            cp target/${{ matrix.target }}/release/rusto.exe package/bin/
+          else
+            cp target/${{ matrix.target }}/release/rusto package/bin/
+          fi
+          
+          # Copy library
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            cp target/${{ matrix.target }}/release/rusto.dll package/lib/
+            cp target/${{ matrix.target }}/release/rusto.dll.lib package/lib/ || true
+          else
+            cp target/${{ matrix.target }}/release/librusto.${{ matrix.lib_ext }} package/lib/
+          fi
+          
+          # Copy ONNX Runtime dependencies
+          cp -r onnxruntime/lib/* package/lib/
+          
+          # Copy header for FFI
+          cp packages/dotnet/RapidOCR.cs package/include/ || true
+          
+          # Create README
+          cat > package/README.md << 'EOF'
+          # RustO! - Pure Rust OCR Library
+          
+          High-performance OCR library powered by PaddleOCR models with ONNX Runtime.
+          
+          ## Contents
+          
+          - `bin/rusto` - CLI executable
+          - `lib/` - Shared libraries (RustO + ONNX Runtime)
+          - `include/` - C# bindings (if applicable)
+          
+          ## Quick Start
+          
+          ```bash
+          ./bin/rusto --det-model det.onnx --rec-model rec.onnx --dict dict.txt image.jpg
+          ```
+          
+          For more information: https://github.com/yourusername/rusto-rs
+          EOF
+      
+      - name: Upload RustO artifact
         uses: actions/upload-artifact@v4
         with:
           name: rusto-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}
+          path: package/
 
   # Build iOS XCFramework
   build-ios:
-    name: Build iOS XCFramework
-    runs-on: macos-latest
+    name: Build RustO iOS XCFramework
+    needs: build-onnxruntime
+    runs-on: macos-14
     
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +274,7 @@ jobs:
           rustup target add aarch64-apple-ios-sim
           rustup target add x86_64-apple-ios
       
-      - name: Build for all iOS targets
+      - name: Build for iOS targets
         run: |
           cargo build --release --target aarch64-apple-ios --features ffi
           cargo build --release --target aarch64-apple-ios-sim --features ffi
@@ -76,19 +282,15 @@ jobs:
       
       - name: Create XCFramework
         run: |
-          mkdir -p build/ios-device
-          mkdir -p build/ios-simulator
+          mkdir -p build/ios-device build/ios-simulator
           
-          # Copy device library
           cp target/aarch64-apple-ios/release/librusto.a build/ios-device/
           
-          # Create simulator fat library
           lipo -create \
             target/aarch64-apple-ios-sim/release/librusto.a \
             target/x86_64-apple-ios/release/librusto.a \
             -output build/ios-simulator/librusto.a
           
-          # Create XCFramework
           xcodebuild -create-xcframework \
             -library build/ios-device/librusto.a \
             -library build/ios-simulator/librusto.a \
@@ -103,10 +305,11 @@ jobs:
           name: rusto-ios-xcframework
           path: build/RustO.xcframework.zip
 
-  # Build Android AAR (all architectures)
+  # Build Android AAR
   build-android:
-    name: Build Android AAR
-    runs-on: ubuntu-latest
+    name: Build RustO Android AAR
+    needs: build-onnxruntime
+    runs-on: ubuntu-22.04
     
     steps:
       - uses: actions/checkout@v4
@@ -130,20 +333,16 @@ jobs:
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r25c
+          ndk-version: r26c
           add-to-path: true
       
-      - name: Build for all Android targets
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+      - name: Build for Android targets
         run: |
-          # Build for each architecture
           cargo build --release --target aarch64-linux-android --features ffi
           cargo build --release --target armv7-linux-androideabi --features ffi
           cargo build --release --target i686-linux-android --features ffi
           cargo build --release --target x86_64-linux-android --features ffi
           
-          # Copy to jniLibs
           mkdir -p packages/android/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86,x86_64}
           cp target/aarch64-linux-android/release/librusto.so packages/android/src/main/jniLibs/arm64-v8a/
           cp target/armv7-linux-androideabi/release/librusto.so packages/android/src/main/jniLibs/armeabi-v7a/
@@ -162,38 +361,82 @@ jobs:
 
   # Build .NET NuGet package
   build-dotnet:
-    name: Build .NET NuGet
-    runs-on: ${{ matrix.os }}
+    name: Build .NET NuGet - ${{ matrix.target }}
+    needs: build-onnxruntime
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: linux
+            arch: x64
             target: linux-x64
+            runner: ubuntu-22.04
             lib: librusto.so
-          - os: macos-latest
+            rust_target: x86_64-unknown-linux-gnu
+          - os: macos
+            arch: x64
             target: osx-x64
+            runner: macos-13
             lib: librusto.dylib
-          - os: macos-latest
+            rust_target: x86_64-apple-darwin
+          - os: macos
+            arch: arm64
             target: osx-arm64
+            runner: macos-14
             lib: librusto.dylib
-          - os: windows-latest
+            rust_target: aarch64-apple-darwin
+          - os: windows
+            arch: x64
             target: win-x64
+            runner: windows-2022
             lib: rusto.dll
+            rust_target: x86_64-pc-windows-msvc
     
     steps:
       - uses: actions/checkout@v4
       
+      - name: Download ONNX Runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: onnxruntime-${{ matrix.os }}-${{ matrix.arch }}
+          path: onnxruntime
+      
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+      
+      - name: Setup environment (Unix)
+        if: matrix.os != 'windows'
+        run: |
+          echo "ORT_LIB_LOCATION=${{ github.workspace }}/onnxruntime/lib" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=${{ github.workspace }}/onnxruntime/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "DYLD_LIBRARY_PATH=${{ github.workspace }}/onnxruntime/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
+      
+      - name: Setup environment (Windows)
+        if: matrix.os == 'windows'
+        shell: bash
+        run: |
+          echo "ORT_LIB_LOCATION=${{ github.workspace }}/onnxruntime/lib" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/onnxruntime/lib" >> $GITHUB_PATH
       
       - name: Build native library
-        run: cargo build --release --features ffi
+        run: cargo build --release --target ${{ matrix.rust_target }} --features ffi
       
       - name: Create runtimes directory
+        shell: bash
         run: mkdir -p packages/dotnet/runtimes/${{ matrix.target }}/native
       
-      - name: Copy library
-        run: cp target/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
+      - name: Copy library (Unix)
+        if: matrix.os != 'windows'
+        run: cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
+      
+      - name: Copy library (Windows)
+        if: matrix.os == 'windows'
+        shell: bash
+        run: |
+          cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
+          cp target/${{ matrix.rust_target }}/release/rusto.dll.lib packages/dotnet/runtimes/${{ matrix.target }}/native/ || true
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -202,10 +445,10 @@ jobs:
           path: packages/dotnet/runtimes/${{ matrix.target }}/**/*
 
   # Create GitHub Release
-  create-release:
+  release:
     name: Create GitHub Release
-    needs: [build-cli, build-ios, build-android]
-    runs-on: ubuntu-latest
+    needs: [build-rusto, build-ios, build-android, build-dotnet]
+    runs-on: ubuntu-22.04
     if: startsWith(github.ref, 'refs/tags/')
     
     steps:
@@ -221,31 +464,68 @@ jobs:
           mkdir -p releases
           cd artifacts
           
-          # Package CLI binaries
-          for dir in rusto-*-*-*; do
-            if [ -d "$dir" ]; then
+          # Package each target (excluding dotnet, xcframework, aar)
+          for dir in rusto-*; do
+            if [ -d "$dir" ] && [[ ! "$dir" =~ (xcframework|aar|dotnet) ]]; then
               cd "$dir"
               tar czf "../../releases/${dir}.tar.gz" *
               cd ..
             fi
           done
           
-          # Copy XCFramework
+          # Copy iOS XCFramework
           if [ -d "rusto-ios-xcframework" ]; then
             cp rusto-ios-xcframework/RustO.xcframework.zip ../releases/
           fi
           
-          # Copy AAR
+          # Copy Android AAR
           if [ -d "rusto-android-aar" ]; then
             cp rusto-android-aar/*.aar ../releases/
           fi
+          
+          # Package .NET runtimes together
+          if ls rusto-dotnet-* 1> /dev/null 2>&1; then
+            mkdir -p dotnet-package/runtimes
+            for dir in rusto-dotnet-*; do
+              if [ -d "$dir" ]; then
+                cp -r "$dir/runtimes/"* dotnet-package/runtimes/
+              fi
+            done
+            cd dotnet-package
+            tar czf "../../releases/rusto-dotnet-runtimes.tar.gz" *
+            cd ..
+          fi
+      
+      - name: Generate checksums
+        working-directory: releases
+        run: |
+          sha256sum * > SHA256SUMS
       
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: releases/*
           draft: false
           prerelease: false
           generate_release_notes: true
+          body: |
+            ## RustO! Release
+            
+            ### Highlights
+            - Built with ONNX Runtime ${{ env.ONNXRUNTIME_VERSION }}
+            - Pure Rust OCR library
+            - Cross-platform support (Linux, macOS, Windows, iOS, Android, .NET)
+            
+            ### Platform Support
+            - **Linux**: x64, ARM64
+            - **macOS**: x64, ARM64 (Apple Silicon)
+            - **Windows**: x64
+            - **iOS**: Universal XCFramework
+            - **Android**: AAR with all architectures
+            - **.NET**: NuGet package with native libraries for Linux, macOS, Windows
+            
+            ### Installation
+            Download the appropriate package for your platform and extract it.
+            See SHA256SUMS for file verification.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

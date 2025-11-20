@@ -1,10 +1,10 @@
 use clap::{Parser, ValueEnum};
-use rusto::{RapidOCR, RapidOCRConfig};
+use rusto::{RustO, RustOConfig};
 use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "rusto")]
-#[command(about = "RustO! - Pure Rust OCR based on RapidOCR with PaddleOCR engine", long_about = None)]
+#[command(about = "RustO! - Pure Rust OCR powered by PaddleOCR engine", long_about = None)]
 struct Cli {
     /// Path to detection model (ONNX)
     #[arg(long)]
@@ -40,13 +40,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     // Initialize OCR
-    let config = RapidOCRConfig {
+    let config = RustOConfig {
         det_model_path: cli.det_model.to_str().unwrap().to_string(),
         rec_model_path: cli.rec_model.to_str().unwrap().to_string(),
         dict_path: cli.dict.to_str().unwrap().to_string(),
     };
 
-    let ocr = RapidOCR::new(config)?;
+    let mut ocr = RustO::new(config)?;
 
     // Load image
     let image_path = cli.image.to_str().unwrap();

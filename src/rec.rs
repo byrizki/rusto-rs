@@ -288,7 +288,7 @@ impl TextRecognizer {
         Ok(Self { cfg, session, decoder })
     }
 
-    pub fn run(&self, imgs: &[Mat], return_word_box: bool) -> Result<TextRecOutput, EngineError> {
+    pub fn run(&mut self, imgs: &[Mat], return_word_box: bool) -> Result<TextRecOutput, EngineError> {
         let start = Instant::now();
 
         if imgs.is_empty() {

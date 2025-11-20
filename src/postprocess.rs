@@ -103,7 +103,6 @@ impl DBPostProcess {
         ori_w: i32,
     ) -> Result<(Vec<[core::Point2f; 4]>, Vec<f32>), EngineError> {
         let (_, _, h, w) = pred.dim();
-        eprintln!("[OpenCV] Input pred shape: {}x{}, ori: {}x{}", h, w, ori_h, ori_w);
         if h == 0 || w == 0 {
             return Ok((Vec::new(), Vec::new()));
         }
@@ -175,22 +174,18 @@ impl DBPostProcess {
         for i in 0..num_contours {
             let contour = contours.get(i)?;
             if contour.len() < 3 {
-                eprintln!("[OpenCV] Contour {} rejected: len={} < 3", i, contour.len());
                 continue;
             }
 
             let (box_pts, sside) = self.get_mini_box(&contour)?;
             if sside < self.min_size {
-                eprintln!("[OpenCV] Contour {} rejected: sside={:.2} < {}", i, sside, self.min_size);
                 continue;
             }
 
             let score = self.box_score_fast(pred, &box_pts, height, width)?;
             if score < self.box_thresh {
-                eprintln!("[OpenCV] Contour {} rejected: score={:.3} < {}", i, score, self.box_thresh);
                 continue;
             }
-            eprintln!("[OpenCV] Contour {} PASSED initial filters, sside={:.2}, score={:.3}", i, sside, score);
 
             let unclipped = self.unclip(&box_pts)?;
             if unclipped.is_empty() {
@@ -555,9 +550,8 @@ impl DBPostProcess {
         let mut boxes = Vec::new();
         let mut scores = Vec::new();
 
-        for (i, contour) in contours.iter().enumerate().take(num_contours) {
+        for contour in contours.iter().take(num_contours) {
             if contour.len() < 4 {
-                eprintln!("[PureRust] Contour {} rejected: len={} < 4", i, contour.len());
                 continue;
             }
 
@@ -574,28 +568,23 @@ impl DBPostProcess {
             let side_len = size.width.min(size.height) as f32;
             
             if side_len < 3.0 {
-                eprintln!("[PureRust] Contour {} rejected: sside={:.2} < 3.0", i, side_len);
                 continue;
             }
 
             // Calculate score for this box
             let score = self.box_score_fast_pure(pred, &rect_points, h, w)?;
             if score < self.box_thresh {
-                eprintln!("[PureRust] Contour {} rejected: score={:.3} < {}", i, score, self.box_thresh);
                 continue;
             }
-            eprintln!("[PureRust] Contour {} PASSED initial filters, sside={:.2}, score={:.3}", i, side_len, score);
 
             // Unclip the box
             let unclipped = self.unclip_pure(&rect_points)?;
             if unclipped.len() < 4 {
-                eprintln!("[PureRust] Contour {} rejected after unclip: {} points < 4", i, unclipped.len());
                 continue;
             }
 
             // Get minimum area rectangle of unclipped points - matching get_mini_box_points
             let (center2, size2, angle2) = min_area_rect(&unclipped).map_err(|e| {
-                eprintln!("[PureRust] Contour {} failed min_area_rect on unclipped: {}", i, e);
                 EngineError::ImageError(e.to_string())
             })?;
             let box_pts_raw = box_points(center2, size2, angle2);
@@ -617,12 +606,9 @@ impl DBPostProcess {
             let box_pts = [tl2, tr2, br2, bl2];
             let sside = size2.width.min(size2.height).abs() as f32;
             if sside < 3.0 {
-                eprintln!("[PureRust] Contour {} rejected after unclip: sside2={:.2} < 3.0", i, sside);
                 continue;
             }
             
-            eprintln!("[PureRust] Contour {} passed unclip stage, sside2={:.2}", i, sside);
-
             // Scale to original image size
             let mut final_box = [Point2f::default(); 4];
             for (i, pt) in box_pts.iter().enumerate() {
@@ -644,17 +630,13 @@ impl DBPostProcess {
             .sqrt() as i32;
 
             if rect_width <= 3 || rect_height <= 3 {
-                eprintln!("[PureRust] Contour {} rejected at final stage: {}x{}", i, rect_width, rect_height);
                 continue;
             }
 
-            eprintln!("[PureRust] Contour {} FINAL ACCEPTED: {}x{}", i, rect_width, rect_height);
             boxes.push(final_box);
             scores.push(score);
         }
         
-        eprintln!("[PureRust] Total boxes after all filters: {}", boxes.len());
-
         Ok((boxes, scores))
     }
 
