@@ -11,6 +11,7 @@ categories = ["computer-vision", "text-processing"]
 [lib]
 name = "rusto"
 path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 ort = { version = "=2.0.0-rc.10" }
@@ -36,12 +37,8 @@ criterion = "0.5"
 default = []
 use-opencv = ["opencv"]
 ffi = []  # Enable C FFI bindings
-
-[profile.dev]
-rpath = true
  
 [profile.release]
-rpath = true
 opt-level = 3
 lto = "fat"
 codegen-units = 1
@@ -52,40 +49,3 @@ panic = "abort"
 inherits = "release"
 debug = true
 strip = false
-
-# rpath for linux
-[target.x86_64-unknown-linux-gnu]
-rustflags = [ "-Clink-args=-Wl,-rpath,\\$ORIGIN" ]
-
-[target.aarch64-unknown-linux-gnu]
-rustflags = ["-Clink-args=-Wl,-rpath,\\$ORIGIN"]
-
-[target.aarch64-linux-android]
-rustflags = ["-Clink-args=-Wl,-rpath,\\$ORIGIN"]
-
-[target.armv7-linux-androideabi]
-rustflags = ["-Clink-args=-Wl,-rpath,\\$ORIGIN"]
-
-# rpath for android
-[target.i686-linux-android]
-rustflags = ["-Clink-args=-Wl,-rpath,\\$ORIGIN"]
-
-[target.x86_64-linux-android]
-rustflags = ["-Clink-args=-Wl,-rpath,\\$ORIGIN"]
-
-# rpath for macos
-[target.x86_64-apple-darwin]
-rustflags = ["-Clink-args=-Wl,-rpath,@loader_path"]
-
-[target.aarch64-apple-darwin]
-rustflags = ["-Clink-args=-Wl,-rpath,@loader_path"]
-
-# rpath for ios
-[target.aarch64-apple-ios]
-rustflags = ["-Clink-args=-Wl,-rpath,@loader_path"]
-
-[target.aarch64-apple-ios-sim]
-rustflags = ["-Clink-args=-Wl,-rpath,@loader_path"]
-
-[target.x86_64-apple-ios]
-rustflags = ["-Clink-args=-Wl,-rpath,@loader_path"]

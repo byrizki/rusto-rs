@@ -42,7 +42,6 @@ mod rec;
 mod rusto_ocr;
 mod cal_rec_boxes;
 mod types;
-mod cls;
 
 #[cfg(not(feature = "use-opencv"))]
 mod contours;

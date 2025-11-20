@@ -8,241 +8,177 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  ONNXRUNTIME_VERSION: 1.17.0
+  ONNXRUNTIME_VERSION: 1.23.2
 
 jobs:
-  # Build ONNX Runtime from source for each platform/arch
-  build-onnxruntime:
-    name: Build ONNX Runtime - ${{ matrix.os }}-${{ matrix.arch }}
-    runs-on: ${{ matrix.runner }}
+  # Download prebuilt ONNX Runtime for desktop platforms
+  download-onnxruntime-desktop:
+    name: Download ONNX Runtime - ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
         include:
-          # Linux x64
           - os: linux
             arch: x64
-            runner: ubuntu-22.04
-            cmake_args: ""
-          # Linux ARM64 (cross-compile)
+            onnx_file: onnxruntime-linux-x64-1.23.2.tgz
           - os: linux
             arch: arm64
-            runner: ubuntu-22.04
-            cmake_args: "-DCMAKE_TOOLCHAIN_FILE=toolchains/arm64-linux.cmake"
-          # macOS x64
+            onnx_file: onnxruntime-linux-aarch64-1.23.2.tgz
           - os: macos
             arch: x64
-            runner: macos-13
-            cmake_args: "-DCMAKE_OSX_ARCHITECTURES=x86_64"
-          # macOS ARM64
+            onnx_file: onnxruntime-osx-x86_64-1.23.2.tgz
           - os: macos
             arch: arm64
-            runner: macos-14
-            cmake_args: "-DCMAKE_OSX_ARCHITECTURES=arm64"
-          # Windows x64
+            onnx_file: onnxruntime-osx-arm64-1.23.2.tgz
           - os: windows
             arch: x64
-            runner: windows-2022
-            cmake_args: ""
+            onnx_file: onnxruntime-win-x64-1.23.2.zip
     
     steps:
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install Linux dependencies
-        if: matrix.os == 'linux'
+      - name: Download ONNX Runtime prebuilt
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake git libprotobuf-dev protobuf-compiler
+          wget https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/${{ matrix.onnx_file }}
+          mkdir -p onnxruntime
+          if [[ "${{ matrix.onnx_file }}" == *.zip ]]; then
+            unzip ${{ matrix.onnx_file }} -d onnxruntime
+          else
+            tar -xzf ${{ matrix.onnx_file }} -C onnxruntime
+          fi
           
-      - name: Install Linux ARM64 cross-compile tools
-        if: matrix.os == 'linux' && matrix.arch == 'arm64'
-        run: |
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          
-      - name: Install macOS dependencies
-        if: matrix.os == 'macos'
-        run: |
-          brew install cmake protobuf
-      
-      - name: Clone ONNX Runtime
-        run: |
-          git clone --depth=1 --recursive --branch v${{ env.ONNXRUNTIME_VERSION }} https://github.com/microsoft/onnxruntime.git
           cd onnxruntime
-      
-      - name: Build ONNX Runtime (Unix)
-        if: matrix.os != 'windows'
-        working-directory: onnxruntime
-        run: |
-          ./build.sh \
-            --config Release \
-            --build_shared_lib \
-            --parallel \
-            --skip_tests \
-            --compile_no_warning_as_error \
-            --cmake_extra_defines CMAKE_INSTALL_PREFIX=${{ github.workspace }}/onnxruntime-install ${{ matrix.cmake_args }}
-          
-          cd build/Linux/Release
-          make install
-      
-      - name: Build ONNX Runtime (Windows)
-        if: matrix.os == 'windows'
-        working-directory: onnxruntime
-        shell: cmd
-        run: |
-          call build.bat ^
-            --config Release ^
-            --build_shared_lib ^
-            --parallel ^
-            --skip_tests ^
-            --compile_no_warning_as_error ^
-            --cmake_generator "Visual Studio 17 2022"
-      
-      - name: Package ONNX Runtime
-        run: |
-          mkdir -p onnxruntime-package
-          cp -r onnxruntime-install/* onnxruntime-package/ || true
-          cp -r onnxruntime/build/*/Release/*.so onnxruntime-package/lib/ || true
-          cp -r onnxruntime/build/*/Release/*.dylib onnxruntime-package/lib/ || true
-          cp -r onnxruntime/build/*/Release/Release/*.dll onnxruntime-package/lib/ || true
-          cp -r onnxruntime/include/onnxruntime onnxruntime-package/include/ || true
+          EXTRACTED_DIR=$(ls -d onnxruntime-* 2>/dev/null | head -n 1)
+          if [ -d "$EXTRACTED_DIR" ]; then
+            mv "$EXTRACTED_DIR"/* .
+            rmdir "$EXTRACTED_DIR"
+          fi
+          ls -la
       
       - name: Upload ONNX Runtime artifact
         uses: actions/upload-artifact@v4
         with:
           name: onnxruntime-${{ matrix.os }}-${{ matrix.arch }}
-          path: onnxruntime-package/
+          path: onnxruntime/
+          retention-days: 1
 
   # Build ONNX Runtime for iOS
   build-onnxruntime-ios:
-    name: Build ONNX Runtime iOS
+    name: Build ONNX Runtime - iOS
     runs-on: macos-14
+    
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
       - name: Install dependencies
         run: |
-          brew install cmake protobuf
-
-      - name: Clone ONNX Runtime
-        run: |
-          git clone --depth=1 --recursive --branch v${{ env.ONNXRUNTIME_VERSION }} https://github.com/microsoft/onnxruntime.git
-
+          brew install cmake ninja
+      
+      - name: Checkout ONNX Runtime
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/onnxruntime
+          ref: v${{ env.ONNXRUNTIME_VERSION }}
+          submodules: recursive
+      
       - name: Build ONNX Runtime for iOS
-        working-directory: onnxruntime
         run: |
-          ./build.sh \
+          python3 tools/ci_build/github/apple/build_ios_framework.py \
+            --build_dir build_ios \
             --config Release \
-            --build_shared_lib \
             --parallel \
             --skip_tests \
-            --ios \
-            --ios_sysroot iphoneos \
-            --osx_arch arm64
-
-      - name: Package ONNX Runtime iOS
-        run: |
+            --build_apple_framework
+          
           mkdir -p onnxruntime-ios
-          cp -R onnxruntime/build/* onnxruntime-ios/ || true
-          cp -R onnxruntime/include onnxruntime-ios/include || true
-
+          cp -r build_ios/Release/onnxruntime.xcframework onnxruntime-ios/
+      
       - name: Upload ONNX Runtime iOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: onnxruntime-ios
           path: onnxruntime-ios/
+          retention-days: 1
 
   # Build ONNX Runtime for Android
   build-onnxruntime-android:
-    name: Build ONNX Runtime Android
+    name: Build ONNX Runtime - Android
     runs-on: ubuntu-22.04
+    
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
-          python-version: '3.11'
-
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake git
-
+          distribution: 'temurin'
+          java-version: '17'
+      
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26c
           add-to-path: true
-
-      - name: Clone ONNX Runtime
+      
+      - name: Install dependencies
         run: |
-          git clone --depth=1 --recursive --branch v${{ env.ONNXRUNTIME_VERSION }} https://github.com/microsoft/onnxruntime.git
-
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build python3
+      
+      - name: Checkout ONNX Runtime
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/onnxruntime
+          ref: v${{ env.ONNXRUNTIME_VERSION }}
+          submodules: recursive
+      
       - name: Build ONNX Runtime for Android
-        working-directory: onnxruntime
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
         run: |
-          ./build.sh \
+          export ANDROID_NDK=$ANDROID_NDK_HOME
+          
+          python3 tools/ci_build/github/android/build_aar_package.py \
+            --build_dir build_android \
             --config Release \
-            --build_shared_lib \
+            --android_sdk_path $ANDROID_HOME \
+            --android_ndk_path $ANDROID_NDK \
             --parallel \
-            --skip_tests \
-            --android \
-            --android_abi=arm64-v8a,armeabi-v7a,x86,x86_64
-
-      - name: Package ONNX Runtime Android
-        run: |
+            --skip_tests
+          
           mkdir -p onnxruntime-android
-          cp -R onnxruntime/build/* onnxruntime-android/ || true
-          cp -R onnxruntime/include onnxruntime-android/include || true
-
+          cp -r build_android/aar_out/aar onnxruntime-android/ || cp -r build_android/*.aar onnxruntime-android/ || true
+          
+          mkdir -p onnxruntime-android/jni
+          find build_android -name "*.so" -exec cp {} onnxruntime-android/jni/ \; || true
+      
       - name: Upload ONNX Runtime Android artifact
         uses: actions/upload-artifact@v4
         with:
           name: onnxruntime-android
           path: onnxruntime-android/
+          retention-days: 1
 
-  # Build RustO library for each platform
+  # Build RustO library for desktop platforms
   build-rusto:
     name: Build RustO - ${{ matrix.target }}
-    needs: build-onnxruntime
+    needs: [download-onnxruntime-desktop]
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
-          # Linux x64
           - os: linux
             arch: x64
             target: x86_64-unknown-linux-gnu
             runner: ubuntu-22.04
             lib_ext: so
-          # Linux ARM64
           - os: linux
             arch: arm64
             target: aarch64-unknown-linux-gnu
             runner: ubuntu-22.04
             lib_ext: so
-          # macOS x64
           - os: macos
             arch: x64
             target: x86_64-apple-darwin
             runner: macos-13
             lib_ext: dylib
-          # macOS ARM64
           - os: macos
             arch: arm64
             target: aarch64-apple-darwin
             runner: macos-14
             lib_ext: dylib
-          # Windows x64
           - os: windows
             arch: x64
             target: x86_64-pc-windows-msvc
@@ -303,14 +239,12 @@ jobs:
         run: |
           mkdir -p package/bin package/lib package/include
           
-          # Copy CLI binary
           if [ "${{ matrix.os }}" = "windows" ]; then
             cp target/${{ matrix.target }}/release/rusto.exe package/bin/
           else
             cp target/${{ matrix.target }}/release/rusto package/bin/
           fi
           
-          # Copy library
           if [ "${{ matrix.os }}" = "windows" ]; then
             cp target/${{ matrix.target }}/release/rusto.dll package/lib/
             cp target/${{ matrix.target }}/release/rusto.dll.lib package/lib/ || true
@@ -318,13 +252,10 @@ jobs:
             cp target/${{ matrix.target }}/release/librusto.${{ matrix.lib_ext }} package/lib/
           fi
           
-          # Copy ONNX Runtime dependencies
-          cp -r onnxruntime/lib/* package/lib/
+          cp -r onnxruntime/lib/* package/lib/ || true
           
-          # Copy header for FFI
-          cp packages/dotnet/RapidOCR.cs package/include/ || true
+          cp packages/dotnet/RustO.cs package/include/ || true
           
-          # Create README
           cat > package/README.md << 'EOF'
           # RustO! - Pure Rust OCR Library
           
@@ -354,11 +285,17 @@ jobs:
   # Build iOS XCFramework
   build-ios:
     name: Build RustO iOS XCFramework
-    needs: build-onnxruntime
+    needs: [build-onnxruntime-ios]
     runs-on: macos-14
     
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Download ONNX Runtime iOS
+        uses: actions/download-artifact@v4
+        with:
+          name: onnxruntime-ios
+          path: onnxruntime-ios
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -368,6 +305,10 @@ jobs:
           rustup target add aarch64-apple-ios
           rustup target add aarch64-apple-ios-sim
           rustup target add x86_64-apple-ios
+      
+      - name: Setup environment
+        run: |
+          echo "ORT_LIB_LOCATION=${{ github.workspace }}/onnxruntime-ios" >> $GITHUB_ENV
       
       - name: Build for iOS targets
         run: |
@@ -403,11 +344,17 @@ jobs:
   # Build Android AAR
   build-android:
     name: Build RustO Android AAR
-    needs: build-onnxruntime
+    needs: [build-onnxruntime-android]
     runs-on: ubuntu-22.04
     
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Download ONNX Runtime Android
+        uses: actions/download-artifact@v4
+        with:
+          name: onnxruntime-android
+          path: onnxruntime-android
       
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -431,6 +378,10 @@ jobs:
           ndk-version: r26c
           add-to-path: true
       
+      - name: Setup environment
+        run: |
+          echo "ORT_LIB_LOCATION=${{ github.workspace }}/onnxruntime-android" >> $GITHUB_ENV
+      
       - name: Build for Android targets
         run: |
           cargo build --release --target aarch64-linux-android --features ffi
@@ -443,10 +394,26 @@ jobs:
           cp target/armv7-linux-androideabi/release/librusto.so packages/android/src/main/jniLibs/armeabi-v7a/
           cp target/i686-linux-android/release/librusto.so packages/android/src/main/jniLibs/x86/
           cp target/x86_64-linux-android/release/librusto.so packages/android/src/main/jniLibs/x86_64/
+          
+          if [ -d "onnxruntime-android/jni" ]; then
+            find onnxruntime-android/jni -name "*.so" -exec cp {} packages/android/src/main/jniLibs/arm64-v8a/ \; || true
+            find onnxruntime-android/jni -name "*.so" -exec cp {} packages/android/src/main/jniLibs/armeabi-v7a/ \; || true
+            find onnxruntime-android/jni -name "*.so" -exec cp {} packages/android/src/main/jniLibs/x86/ \; || true
+            find onnxruntime-android/jni -name "*.so" -exec cp {} packages/android/src/main/jniLibs/x86_64/ \; || true
+          fi
+      
+      - name: Make gradlew executable
+        working-directory: packages/android
+        run: chmod +x gradlew || true
       
       - name: Build AAR
         working-directory: packages/android
-        run: ./gradlew assembleRelease
+        run: |
+          if [ -f "gradlew" ]; then
+            ./gradlew assembleRelease
+          else
+            gradle assembleRelease
+          fi
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -457,7 +424,7 @@ jobs:
   # Build .NET NuGet package
   build-dotnet:
     name: Build .NET NuGet - ${{ matrix.target }}
-    needs: build-onnxruntime
+    needs: [download-onnxruntime-desktop]
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -524,7 +491,9 @@ jobs:
       
       - name: Copy library (Unix)
         if: matrix.os != 'windows'
-        run: cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
+        run: |
+          cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
+          cp -r onnxruntime/lib/* packages/dotnet/runtimes/${{ matrix.target }}/native/ || true
       
       - name: Copy library (Windows)
         if: matrix.os == 'windows'
@@ -532,6 +501,7 @@ jobs:
         run: |
           cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
           cp target/${{ matrix.rust_target }}/release/rusto.dll.lib packages/dotnet/runtimes/${{ matrix.target }}/native/ || true
+          cp -r onnxruntime/lib/* packages/dotnet/runtimes/${{ matrix.target }}/native/ || true
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -539,10 +509,51 @@ jobs:
           name: rusto-dotnet-${{ matrix.target }}
           path: packages/dotnet/runtimes/${{ matrix.target }}/**/*
 
+  # Package .NET NuGet
+  package-dotnet:
+    name: Package .NET NuGet
+    needs: [build-dotnet]
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      
+      - name: Download all .NET artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rusto-dotnet-*
+          path: artifacts
+      
+      - name: Merge runtime artifacts
+        run: |
+          mkdir -p packages/dotnet/runtimes
+          for dir in artifacts/rusto-dotnet-*; do
+            if [ -d "$dir/runtimes" ]; then
+              cp -r "$dir/runtimes/"* packages/dotnet/runtimes/
+            fi
+          done
+      
+      - name: Pack NuGet package
+        working-directory: packages/dotnet
+        run: dotnet pack -c Release -o ../../nupkg || echo "NuGet pack will be done manually"
+      
+      - name: Upload NuGet package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-dotnet-nupkg
+          path: |
+            nupkg/*.nupkg
+            packages/dotnet/runtimes/**/*
+
   # Create GitHub Release
   release:
     name: Create GitHub Release
-    needs: [build-rusto, build-ios, build-android, build-dotnet]
+    needs: [build-rusto, build-ios, build-android, package-dotnet]
     runs-on: ubuntu-22.04
     if: startsWith(github.ref, 'refs/tags/')
     
@@ -559,42 +570,37 @@ jobs:
           mkdir -p releases
           cd artifacts
           
-          # Package each target (excluding dotnet, xcframework, aar)
-          for dir in rusto-*; do
-            if [ -d "$dir" ] && [[ ! "$dir" =~ (xcframework|aar|dotnet) ]]; then
+          for dir in rusto-x86_64-* rusto-aarch64-*; do
+            if [ -d "$dir" ]; then
               cd "$dir"
               tar czf "../../releases/${dir}.tar.gz" *
               cd ..
             fi
           done
           
-          # Copy iOS XCFramework
           if [ -d "rusto-ios-xcframework" ]; then
             cp rusto-ios-xcframework/RustO.xcframework.zip ../releases/
           fi
           
-          # Copy Android AAR
           if [ -d "rusto-android-aar" ]; then
-            cp rusto-android-aar/*.aar ../releases/
+            cp rusto-android-aar/*.aar ../releases/ || true
           fi
           
-          # Package .NET runtimes together
-          if ls rusto-dotnet-* 1> /dev/null 2>&1; then
-            mkdir -p dotnet-package/runtimes
-            for dir in rusto-dotnet-*; do
-              if [ -d "$dir" ]; then
-                cp -r "$dir/runtimes/"* dotnet-package/runtimes/
-              fi
-            done
-            cd dotnet-package
-            tar czf "../../releases/rusto-dotnet-runtimes.tar.gz" *
+          if [ -d "rusto-dotnet-nupkg" ]; then
+            cd rusto-dotnet-nupkg
+            if ls *.nupkg 1> /dev/null 2>&1; then
+              cp *.nupkg ../../releases/ || true
+            fi
+            if [ -d "runtimes" ]; then
+              tar czf "../../releases/rusto-dotnet-runtimes.tar.gz" runtimes/
+            fi
             cd ..
           fi
       
       - name: Generate checksums
         working-directory: releases
         run: |
-          sha256sum * > SHA256SUMS
+          sha256sum * > SHA256SUMS || true
       
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -604,23 +610,27 @@ jobs:
           prerelease: false
           generate_release_notes: true
           body: |
-            ## RustO! Release
+            ## RustO! Release ${{ github.ref_name }}
             
             ### Highlights
             - Built with ONNX Runtime ${{ env.ONNXRUNTIME_VERSION }}
-            - Pure Rust OCR library
+            - Pure Rust OCR library powered by PaddleOCR models
             - Cross-platform support (Linux, macOS, Windows, iOS, Android, .NET)
             
             ### Platform Support
             - **Linux**: x64, ARM64
-            - **macOS**: x64, ARM64 (Apple Silicon)
+            - **macOS**: x64 (Intel), ARM64 (Apple Silicon)
             - **Windows**: x64
-            - **iOS**: Universal XCFramework
-            - **Android**: AAR with all architectures
-            - **.NET**: NuGet package with native libraries for Linux, macOS, Windows
+            - **iOS**: Universal XCFramework (device + simulator)
+            - **Android**: AAR with all architectures (arm64-v8a, armeabi-v7a, x86, x86_64)
+            - **.NET**: NuGet package with native libraries for all desktop platforms
             
             ### Installation
             Download the appropriate package for your platform and extract it.
             See SHA256SUMS for file verification.
+            
+            ### ONNX Runtime
+            - Desktop platforms use prebuilt ONNX Runtime v${{ env.ONNXRUNTIME_VERSION }}
+            - Mobile platforms (iOS/Android) include ONNX Runtime built from source
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

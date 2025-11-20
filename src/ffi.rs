@@ -83,7 +83,7 @@ pub unsafe extern "C" fn rocr_ocr_file(
         return -1;
     }
 
-    let ocr = &(*handle).inner;
+    let ocr = &mut (*handle).inner;
 
     let path = match CStr::from_ptr(image_path).to_str() {
         Ok(s) => s,
@@ -121,7 +121,7 @@ pub unsafe extern "C" fn rocr_ocr_data(
         return -1;
     }
 
-    let ocr = &(*handle).inner;
+    let ocr = &mut (*handle).inner;
     let data = slice::from_raw_parts(image_data, image_len);
 
     let results = match ocr.ocr_from_bytes(data) {
