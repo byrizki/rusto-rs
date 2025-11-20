@@ -42,7 +42,7 @@ jobs:
           - os: windows
             arch: x64
             runner: windows-2022
-            cmake_args: "-A x64"
+            cmake_args: ""
     
     steps:
       - name: Setup Python
@@ -68,7 +68,7 @@ jobs:
       
       - name: Clone ONNX Runtime
         run: |
-          git clone --recursive --branch v${{ env.ONNXRUNTIME_VERSION }} https://github.com/microsoft/onnxruntime.git
+          git clone --depth=1 --recursive --branch v${{ env.ONNXRUNTIME_VERSION }} https://github.com/microsoft/onnxruntime.git
           cd onnxruntime
       
       - name: Build ONNX Runtime (Unix)
@@ -97,8 +97,7 @@ jobs:
             --parallel ^
             --skip_tests ^
             --compile_no_warning_as_error ^
-            --cmake_generator "Visual Studio 17 2022" ^
-            ${{ matrix.cmake_args }}
+            --cmake_generator "Visual Studio 17 2022"
       
       - name: Package ONNX Runtime
         run: |
@@ -114,6 +113,102 @@ jobs:
         with:
           name: onnxruntime-${{ matrix.os }}-${{ matrix.arch }}
           path: onnxruntime-package/
+
+  # Build ONNX Runtime for iOS
+  build-onnxruntime-ios:
+    name: Build ONNX Runtime iOS
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          brew install cmake protobuf
+
+      - name: Clone ONNX Runtime
+        run: |
+          git clone --depth=1 --recursive --branch v${{ env.ONNXRUNTIME_VERSION }} https://github.com/microsoft/onnxruntime.git
+
+      - name: Build ONNX Runtime for iOS
+        working-directory: onnxruntime
+        run: |
+          ./build.sh \
+            --config Release \
+            --build_shared_lib \
+            --parallel \
+            --skip_tests \
+            --ios \
+            --ios_sysroot iphoneos \
+            --osx_arch arm64
+
+      - name: Package ONNX Runtime iOS
+        run: |
+          mkdir -p onnxruntime-ios
+          cp -R onnxruntime/build/* onnxruntime-ios/ || true
+          cp -R onnxruntime/include onnxruntime-ios/include || true
+
+      - name: Upload ONNX Runtime iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: onnxruntime-ios
+          path: onnxruntime-ios/
+
+  # Build ONNX Runtime for Android
+  build-onnxruntime-android:
+    name: Build ONNX Runtime Android
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake git
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26c
+          add-to-path: true
+
+      - name: Clone ONNX Runtime
+        run: |
+          git clone --depth=1 --recursive --branch v${{ env.ONNXRUNTIME_VERSION }} https://github.com/microsoft/onnxruntime.git
+
+      - name: Build ONNX Runtime for Android
+        working-directory: onnxruntime
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+        run: |
+          ./build.sh \
+            --config Release \
+            --build_shared_lib \
+            --parallel \
+            --skip_tests \
+            --android \
+            --android_abi=arm64-v8a,armeabi-v7a,x86,x86_64
+
+      - name: Package ONNX Runtime Android
+        run: |
+          mkdir -p onnxruntime-android
+          cp -R onnxruntime/build/* onnxruntime-android/ || true
+          cp -R onnxruntime/include onnxruntime-android/include || true
+
+      - name: Upload ONNX Runtime Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: onnxruntime-android
+          path: onnxruntime-android/
 
   # Build RustO library for each platform
   build-rusto:
