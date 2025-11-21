@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/yourusername/rusto-rs/workflows/CI/badge.svg)](https://github.com/yourusername/rusto-rs/actions)
 
-RustO! is a high-performance OCR (Optical Character Recognition) library written in pure Rust, based on [RapidOCR](https://github.com/RapidAI/RapidOCR) and powered by [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) models with ONNX Runtime inference.
+RustO! is a high-performance OCR (Optical Character Recognition) library written in pure Rust, based on [RapidOCR](https://github.com/RapidAI/RapidOCR) and powered by [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) models with MNN inference engine.
 
 ## 🎯 Why RustO!?
 
@@ -25,7 +25,7 @@ RustO! is built on top of proven OCR technology:
 
 - **Based on**: [RapidOCR](https://github.com/RapidAI/RapidOCR) architecture
 - **Models**: [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) PPOCRv4/v5 models
-- **Inference**: ONNX Runtime for cross-platform model execution
+- **Inference**: [MNN](https://github.com/alibaba/MNN) inference engine for high-performance cross-platform execution
 - **Image Processing**: Pure Rust implementation (image + imageproc crates)
 - **Contour Detection**: Custom Rust implementation matching OpenCV behavior
 
@@ -52,6 +52,23 @@ rusto-rs/
 
 ---
 
+## Model Conversion
+
+RustO! uses MNN inference engine. You need to convert PaddleOCR models to MNN format:
+
+```bash
+# Install required tools
+pip install paddle2onnx
+# Download and build MNN from https://github.com/alibaba/MNN
+
+# Convert models using the provided script
+python convert_paddle_to_mnn.py --ocr-dir ./models
+```
+
+See [MODEL_CONVERSION.md](MODEL_CONVERSION.md) for detailed conversion instructions.
+
+---
+
 ## Quick Start
 
 ### 1. Build the Library
@@ -72,23 +89,23 @@ cargo build --release --features use-opencv
 ```bash
 # JSON output (default)
 cargo run --release -- \
-  --det-model path/to/det.onnx \
-  --rec-model path/to/rec.onnx \
+  --det-model path/to/det.mnn \
+  --rec-model path/to/rec.mnn \
   --dict path/to/dict.txt \
   image.jpg
 
 # Plain text output
 cargo run --release -- \
-  --det-model path/to/det.onnx \
-  --rec-model path/to/rec.onnx \
+  --det-model path/to/det.mnn \
+  --rec-model path/to/rec.mnn \
   --dict path/to/dict.txt \
   --format text \
   image.jpg
 
 # TSV output
 cargo run --release -- \
-  --det-model path/to/det.onnx \
-  --rec-model path/to/rec.onnx \
+  --det-model path/to/det.mnn \
+  --rec-model path/to/rec.mnn \
   --dict path/to/dict.txt \
   --format tsv \
   image.jpg
@@ -111,8 +128,8 @@ use rusto::{RapidOCR, RapidOCRConfig};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Configure OCR
     let config = RapidOCRConfig {
-        det_model_path: "models/det.onnx".to_string(),
-        rec_model_path: "models/rec.onnx".to_string(),
+        det_model_path: "models/det.mnn".to_string(),
+        rec_model_path: "models/rec.mnn".to_string(),
         dict_path: "models/dict.txt".to_string(),
     };
     
@@ -146,8 +163,8 @@ Then in Swift:
 import RustO
 
 let ocr = try RapidOCR(
-    detModelPath: Bundle.main.path(forResource: "det", ofType: "onnx")!,
-    recModelPath: Bundle.main.path(forResource: "rec", ofType: "onnx")!,
+    detModelPath: Bundle.main.path(forResource: "det", ofType: "mnn")!,
+    recModelPath: Bundle.main.path(forResource: "rec", ofType: "mnn")!,
     dictPath: Bundle.main.path(forResource: "dict", ofType: "txt")!
 )
 
@@ -167,8 +184,8 @@ Configuration structure for initializing the OCR engine.
 
 ```rust
 pub struct RapidOCRConfig {
-    pub det_model_path: String,  // Path to detection ONNX model
-    pub rec_model_path: String,  // Path to recognition ONNX model
+    pub det_model_path: String,  // Path to detection MNN model
+    pub rec_model_path: String,  // Path to recognition MNN model
     pub dict_path: String,       // Path to character dictionary
 }
 ```

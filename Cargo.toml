@@ -5,7 +5,7 @@ edition = "2021"
 description = "RustO! - Pure Rust OCR library based on RapidOCR with PaddleOCR engine"
 license = "MIT"
 repository = "https://github.com/yourusername/rusto-rs"
-keywords = ["ocr", "paddle", "onnx", "computer-vision", "text-recognition"]
+keywords = ["ocr", "paddle", "mnn", "computer-vision", "text-recognition"]
 categories = ["computer-vision", "text-processing"]
 
 [lib]
@@ -14,14 +14,14 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-ort = { version = "=2.0.0-rc.10", features = [ "copy-dylibs", "download-binaries", "cuda", "tensorrt", "xnnpack", "coreml" ]}
-ndarray = "0.16"
+ndarray = { version = "0.16", features = ["rayon"] }
 thiserror = "1.0"
 geo-clipper = "0.9"
 geo-types = "0.7"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 clap = { version = "4.5", features = ["derive"] }
+rayon = "1.10"
 
 # Pure Rust image processing (default)
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
@@ -29,6 +29,21 @@ nalgebra = "0.33"
 
 # Optional OpenCV backend
 opencv = { version = "0.97.2", optional = true }
+
+[dependencies.mnn]
+git = "https://github.com/aftershootco/mnn-rs.git"
+
+[target.'cfg(target_os = "ios")'.dependencies.mnn]
+git = "https://github.com/aftershootco/mnn-rs.git"
+features = ["metal", "coreml"]
+
+[target.'cfg(target_os = "macos")'.dependencies.mnn]
+git = "https://github.com/aftershootco/mnn-rs.git"
+features = ["metal", "coreml"]
+
+[target.'cfg(not(any(target_os = "ios", target_os = "macos")))'.dependencies.mnn]
+git = "https://github.com/aftershootco/mnn-rs.git"
+features = ["opencl", "vulkan"]
 
 [dev-dependencies]
 criterion = "0.5"
@@ -38,11 +53,7 @@ default = []
 use-opencv = ["opencv"]
 ffi = []  # Enable C FFI bindings
  
-[profile.dev]
-rpath = true
- 
 [profile.release]
-rpath = true
 opt-level = 3
 lto = "fat"
 codegen-units = 1
@@ -53,9 +64,3 @@ panic = "abort"
 inherits = "release"
 debug = true
 strip = false
-
-[target.x86_64-unknown-linux-gnu]
-rustflags = [ "-Clink-args=-Wl,-rpath,\\$ORIGIN" ]
-
-[target.x86_64-apple-darwin]
-rustflags = [ "-Clink-args=-Wl,-rpath,@loader_path" ]

@@ -43,6 +43,8 @@ android {
         main {
             // Prebuilt native libraries location
             jniLibs.srcDirs = ['src/main/jniLibs']
+            // Model files and dict files as assets
+            assets.srcDirs = ['src/main/assets']
         }
     }
     

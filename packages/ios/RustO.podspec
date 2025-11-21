@@ -24,6 +24,12 @@ Pod::Spec.new do |s|
   # Use prebuilt XCFramework (multi-arch support: arm64 device + arm64/x86_64 simulator)
   s.vendored_frameworks = 'RustO.xcframework'
   
+  # Model files and dict files as resources
+  s.resources = 'packages/ios/Resources/**/*.{mnn,txt}'
+  s.resource_bundles = {
+    'RustOModels' => ['packages/ios/Resources/**/*.{mnn,txt}']
+  }
+  
   # Frameworks
   s.frameworks = 'Foundation'
   

@@ -13,7 +13,7 @@ use opencv::core::Mat;
 #[cfg(not(feature = "use-opencv"))]
 use crate::image_impl::{Mat, Size, INTER_LINEAR};
 
-use crate::engine::{EngineError, OrtSession};
+use crate::engine::{EngineError, MnnSession};
 use crate::types::RecConfig;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,7 +44,7 @@ struct CtcDecoder {
 }
 
 impl CtcDecoder {
-    fn from_cfg(cfg: &RecConfig, session: &OrtSession) -> Result<Self, EngineError> {
+    fn from_cfg(cfg: &RecConfig, session: &MnnSession) -> Result<Self, EngineError> {
         let mut chars: Option<Vec<String>> = None;
 
         if session.have_key("character") {
@@ -280,13 +280,13 @@ impl CtcDecoder {
 
 pub struct TextRecognizer {
     pub cfg: RecConfig,
-    pub session: OrtSession,
+    pub session: MnnSession,
     decoder: CtcDecoder,
 }
 
 impl TextRecognizer {
     pub fn new(cfg: RecConfig) -> Result<Self, EngineError> {
-        let session = OrtSession::from_rec_config(&cfg)?;
+        let session = MnnSession::from_rec_config(&cfg)?;
         let decoder = CtcDecoder::from_cfg(&cfg, &session)?;
         Ok(Self { cfg, session, decoder })
     }

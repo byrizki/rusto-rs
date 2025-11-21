@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use ndarray::{Array4, ArrayD};
 
-use crate::engine::{EngineError, OrtSession};
+use crate::engine::{EngineError, MnnSession};
 use crate::postprocess::{DBPostProcess, TextDetOutput};
 use crate::preprocess::DetPreProcess;
 use crate::types::DetConfig;
@@ -15,13 +15,13 @@ use crate::image_impl::Mat;
 
 pub struct TextDetector {
     pub cfg: DetConfig,
-    pub session: OrtSession,
+    pub session: MnnSession,
     pub postprocess: DBPostProcess,
 }
 
 impl TextDetector {
     pub fn new(cfg: DetConfig) -> Result<Self, EngineError> {
-        let session = OrtSession::from_det_config(&cfg)?;
+        let session = MnnSession::from_det_config(&cfg)?;
         let postprocess = DBPostProcess::new(
             cfg.thresh,
             cfg.box_thresh,

@@ -11,13 +11,15 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/yourusername/rusto-rs</RepositoryUrl>
     <PackageProjectUrl>https://github.com/yourusername/rusto-rs</PackageProjectUrl>
-    <PackageTags>OCR;TextRecognition;ComputerVision;Rust;PaddleOCR;ONNX</PackageTags>
+    <PackageTags>OCR;TextRecognition;ComputerVision;Rust;PaddleOCR;MNN</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="runtimes\**\*" Pack="true" PackagePath="runtimes\" />
+    <None Include="models\**\*.mnn" Pack="true" PackagePath="contentFiles\any\any\models\" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="models\**\*.txt" Pack="true" PackagePath="contentFiles\any\any\models\" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 

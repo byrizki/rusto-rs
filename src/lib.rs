@@ -1,7 +1,7 @@
 //! # RustO! - Pure Rust OCR Library
 //!
 //! RustO! is a high-performance OCR library written in pure Rust,
-//! powered by PaddleOCR models with ONNX Runtime inference.
+//! powered by PaddleOCR models with MNN inference engine.
 //!
 //! ## Features
 //!
@@ -17,8 +17,8 @@
 //! use rusto::{RustO, RustOConfig};
 //!
 //! let config = RustOConfig {
-//!     det_model_path: "models/det.onnx".to_string(),
-//!     rec_model_path: "models/rec.onnx".to_string(),
+//!     det_model_path: "models/det.mnn".to_string(),
+//!     rec_model_path: "models/rec.mnn".to_string(),
 //!     dict_path: "models/dict.txt".to_string(),
 //! };
 //!
