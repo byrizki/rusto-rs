@@ -169,14 +169,26 @@ mod rust_impl {
         // Invert the transformation matrix for reverse mapping
         let m_inv = invert_matrix_3x3(matrix)?;
 
+        // Pre-fetch matrix elements for better performance
+        let (m00, m01, m02) = (m_inv[0][0], m_inv[0][1], m_inv[0][2]);
+        let (m10, m11, m12) = (m_inv[1][0], m_inv[1][1], m_inv[1][2]);
+        let (m20, m21, m22) = (m_inv[2][0], m_inv[2][1], m_inv[2][2]);
+        let src_cols = src.cols();
+        let src_rows = src.rows();
+        
         for y in 0..dsize.height as u32 {
+            let y_f = y as f64;
+            // Pre-compute y-dependent terms
+            let m01y = m01 * y_f;
+            let m11y = m11 * y_f;
+            let m21y = m21 * y_f;
+            
             for x in 0..dsize.width as u32 {
                 // Apply inverse transform with homogeneous coordinates
                 let x_f = x as f64;
-                let y_f = y as f64;
-                let src_x_h = m_inv[0][0] * x_f + m_inv[0][1] * y_f + m_inv[0][2];
-                let src_y_h = m_inv[1][0] * x_f + m_inv[1][1] * y_f + m_inv[1][2];
-                let w = m_inv[2][0] * x_f + m_inv[2][1] * y_f + m_inv[2][2];
+                let src_x_h = m00 * x_f + m01y + m02;
+                let src_y_h = m10 * x_f + m11y + m12;
+                let w = m20 * x_f + m21y + m22;
 
                 let src_x_f = src_x_h / w;
                 let src_y_f = src_y_h / w;
@@ -188,7 +200,7 @@ mod rust_impl {
                 let y1 = y0 + 1;
 
                 // Check bounds for all 4 corners
-                if x0 >= 0 && x1 < src.cols() && y0 >= 0 && y1 < src.rows() {
+                if x0 >= 0 && x1 < src_cols && y0 >= 0 && y1 < src_rows {
                     let fx = src_x_f - x0 as f64;
                     let fy = src_y_f - y0 as f64;
 
@@ -212,7 +224,7 @@ mod rust_impl {
                         + fx * fy * p11[2] as f64) as u8;
 
                     out_img.put_pixel(x, y, image::Rgb([r, g, b]));
-                } else if x0 >= 0 && x0 < src.cols() && y0 >= 0 && y0 < src.rows() {
+                } else if x0 >= 0 && x0 < src_cols && y0 >= 0 && y0 < src_rows {
                     // Fallback to nearest neighbor at edges
                     let pixel = src_img.get_pixel(x0 as u32, y0 as u32);
                     out_img.put_pixel(x, y, *pixel);

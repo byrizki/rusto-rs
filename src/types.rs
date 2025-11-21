@@ -36,10 +36,15 @@ pub struct EngineConfig {
 
 impl Default for EngineConfig {
     fn default() -> Self {
+        // Auto-detect optimal thread count (use all available CPUs)
+        let num_threads = std::thread::available_parallelism()
+            .map(|n| n.get() as i32)
+            .unwrap_or(4);
+        
         Self {
-            intra_op_num_threads: -1,
-            inter_op_num_threads: -1,
-            enable_cpu_mem_arena: false,
+            intra_op_num_threads: num_threads,
+            inter_op_num_threads: 1, // Keep inter-op at 1 for better cache locality
+            enable_cpu_mem_arena: true, // Enable for better memory performance
         }
     }
 }

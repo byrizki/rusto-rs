@@ -20,3 +20,5 @@ onnxruntime.lib
 models/images
 !models/**/*.onnx
 !models/**/*.
+
+onnxruntime

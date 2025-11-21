@@ -29,7 +29,7 @@ impl Contour {
 pub fn find_contours(binary_img: &GrayImage) -> Vec<Contour> {
     let (width, height) = binary_img.dimensions();
     let mut label_map = vec![vec![0u32; width as usize]; height as usize];
-    let mut contours = Vec::new();
+    let mut contours = Vec::with_capacity(50); // Estimate typical contour count
     let mut label = 1u32;
     
     // First pass: label connected components using flood fill
@@ -92,7 +92,8 @@ fn flood_fill_label(
     width: i32,
     height: i32,
 ) {
-    let mut stack = vec![(start_x, start_y)];
+    let mut stack = Vec::with_capacity(256); // Pre-allocate stack
+    stack.push((start_x, start_y));
     
     while let Some((x, y)) = stack.pop() {
         if x < 0 || x >= width || y < 0 || y >= height {
@@ -113,11 +114,11 @@ fn flood_fill_label(
         
         labels[uy][ux] = label;
         
-        // 4-connected neighbors
-        stack.push((x + 1, y));
-        stack.push((x - 1, y));
-        stack.push((x, y + 1));
-        stack.push((x, y - 1));
+        // 4-connected neighbors - bounds checking integrated
+        if x + 1 < width { stack.push((x + 1, y)); }
+        if x > 0 { stack.push((x - 1, y)); }
+        if y + 1 < height { stack.push((x, y + 1)); }
+        if y > 0 { stack.push((x, y - 1)); }
     }
 }
 
@@ -155,7 +156,7 @@ fn extract_boundary(
     width: i32,
     height: i32,
 ) -> Vec<(i32, i32)> {
-    let mut boundary = Vec::new();
+    let mut boundary = Vec::with_capacity(100); // Typical boundary size estimate
     
     for y in 0..height {
         for x in 0..width {

@@ -125,6 +125,14 @@ impl DetPreProcess {
 
         let mut out = ndarray::Array4::<f32>::zeros((1, 3, h, w));
         let scale = 1.0 / 255.0;
+        
+        // Cache normalization parameters
+        let mean_b = self.mean[0];
+        let mean_g = self.mean[1];
+        let mean_r = self.mean[2];
+        let std_b = self.std[0];
+        let std_g = self.std[1];
+        let std_r = self.std[2];
 
         for y in 0..h {
             for x in 0..w {
@@ -136,9 +144,9 @@ impl DetPreProcess {
                 let b = pix[2] as f32 * scale;  // Blue channel
 
                 // Store in BGR order to match OpenCV
-                out[[0, 0, y, x]] = (b - self.mean[0]) / self.std[0];  // Blue
-                out[[0, 1, y, x]] = (g - self.mean[1]) / self.std[1];  // Green  
-                out[[0, 2, y, x]] = (r - self.mean[2]) / self.std[2];  // Red
+                out[[0, 0, y, x]] = (b - mean_b) / std_b;  // Blue
+                out[[0, 1, y, x]] = (g - mean_g) / std_g;  // Green  
+                out[[0, 2, y, x]] = (r - mean_r) / std_r;  // Red
             }
         }
 

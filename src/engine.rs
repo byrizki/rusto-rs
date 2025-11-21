@@ -2,8 +2,7 @@ use std::path::Path;
 
 use ndarray::ArrayD;
 use ort::{
-    session::{builder::GraphOptimizationLevel, Session},
-    value::Tensor,
+    execution_providers::{CUDAExecutionProvider, CoreMLExecutionProvider, DirectMLExecutionProvider, TensorRTExecutionProvider, XNNPACKExecutionProvider}, session::{Session, builder::GraphOptimizationLevel}, value::Tensor
 };
 
 use crate::types::{DetConfig, EngineConfig, RecConfig};
@@ -48,6 +47,17 @@ impl OrtSession {
 
     fn from_path(model_path: &Path, engine_cfg: &EngineConfig) -> Result<Self, EngineError> {        
         let mut builder = Session::builder()?
+            .with_execution_providers([
+                // Prefer TensorRT over CUDA.
+                TensorRTExecutionProvider::default().build(),
+                CUDAExecutionProvider::default().build(),
+                // Use DirectML on Windows if NVIDIA EPs are not available
+                DirectMLExecutionProvider::default().build(),
+                // use ANE on Apple platforms
+                CoreMLExecutionProvider::default().build(),
+                // Use XNNPACK on Android
+                XNNPACKExecutionProvider::default().build(),
+            ])?
             .with_optimization_level(GraphOptimizationLevel::Level3)?;
 
         if engine_cfg.intra_op_num_threads > 0 {

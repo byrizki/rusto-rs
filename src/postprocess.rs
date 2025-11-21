@@ -547,20 +547,19 @@ impl DBPostProcess {
         });
         
         let num_contours = contours.len().min(self.max_candidates);
-        let mut boxes = Vec::new();
-        let mut scores = Vec::new();
+        let mut boxes = Vec::with_capacity(num_contours.min(100));
+        let mut scores = Vec::with_capacity(num_contours.min(100));
 
         for contour in contours.iter().take(num_contours) {
             if contour.len() < 4 {
                 continue;
             }
 
-            // Convert contour points to f32
-            let points: Vec<Point2f> = contour
-                .points
-                .iter()
-                .map(|&(x, y)| Point2f::new(x as f32, y as f32))
-                .collect();
+            // Convert contour points to f32 - pre-allocate
+            let mut points = Vec::with_capacity(contour.points.len());
+            for &(x, y) in &contour.points {
+                points.push(Point2f::new(x as f32, y as f32));
+            }
 
             // Get minimum area rectangle
             let (center, size, angle) = min_area_rect(&points)?;
@@ -647,11 +646,21 @@ impl DBPostProcess {
         h: usize,
         w: usize,
     ) -> Result<f32, EngineError> {
-        // Get bounding box
-        let xmin = box_pts.iter().map(|p| p.x).fold(f32::INFINITY, f32::min).floor() as i32;
-        let xmax = box_pts.iter().map(|p| p.x).fold(f32::NEG_INFINITY, f32::max).ceil() as i32;
-        let ymin = box_pts.iter().map(|p| p.y).fold(f32::INFINITY, f32::min).floor() as i32;
-        let ymax = box_pts.iter().map(|p| p.y).fold(f32::NEG_INFINITY, f32::max).ceil() as i32;
+        // Get bounding box - optimized with single pass
+        let mut xmin = box_pts[0].x;
+        let mut xmax = box_pts[0].x;
+        let mut ymin = box_pts[0].y;
+        let mut ymax = box_pts[0].y;
+        for pt in &box_pts[1..] {
+            xmin = xmin.min(pt.x);
+            xmax = xmax.max(pt.x);
+            ymin = ymin.min(pt.y);
+            ymax = ymax.max(pt.y);
+        }
+        let xmin = xmin.floor() as i32;
+        let xmax = xmax.ceil() as i32;
+        let ymin = ymin.floor() as i32;
+        let ymax = ymax.ceil() as i32;
 
         let xmin = xmin.max(0).min(w as i32 - 1);
         let xmax = xmax.max(0).min(w as i32 - 1);

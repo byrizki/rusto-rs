@@ -5,13 +5,25 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      onnxruntime_version:
+        description: 'ONNX Runtime version to build (e.g., 1.23.2)'
+        required: false
+        default: '1.23.2'
+      minimal_build:
+        description: 'Build minimal ONNX Runtime (smaller binary, only PaddleOCR ops)'
+        required: false
+        default: 'true'
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
-  ONNXRUNTIME_VERSION: 1.23.2
+  ONNXRUNTIME_VERSION: ${{ github.event.inputs.onnxruntime_version || '1.23.2' }}
+  MINIMAL_BUILD: ${{ github.event.inputs.minimal_build || 'true' }}
 
 jobs:
   # Download prebuilt ONNX Runtime for desktop platforms
+  # For Windows, Linux, macOS - uses official prebuilt binaries from GitHub releases
   download-onnxruntime-desktop:
     name: Download ONNX Runtime - ${{ matrix.os }}-${{ matrix.arch }}
     runs-on: ubuntu-22.04
@@ -20,29 +32,49 @@ jobs:
         include:
           - os: linux
             arch: x64
-            onnx_file: onnxruntime-linux-x64-1.23.2.tgz
+            platform: linux
+            onnx_arch: x64
           - os: linux
             arch: arm64
-            onnx_file: onnxruntime-linux-aarch64-1.23.2.tgz
+            platform: linux
+            onnx_arch: aarch64
           - os: macos
             arch: x64
-            onnx_file: onnxruntime-osx-x86_64-1.23.2.tgz
+            platform: osx
+            onnx_arch: x86_64
           - os: macos
             arch: arm64
-            onnx_file: onnxruntime-osx-arm64-1.23.2.tgz
+            platform: osx
+            onnx_arch: arm64
           - os: windows
             arch: x64
-            onnx_file: onnxruntime-win-x64-1.23.2.zip
+            platform: win
+            onnx_arch: x64
     
     steps:
+      - name: Set ONNX filename
+        id: onnx_file
+        run: |
+          VERSION="${{ env.ONNXRUNTIME_VERSION }}"
+          PLATFORM="${{ matrix.platform }}"
+          ARCH="${{ matrix.onnx_arch }}"
+          
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            echo "filename=onnxruntime-${PLATFORM}-${ARCH}-${VERSION}.zip" >> $GITHUB_OUTPUT
+          else
+            echo "filename=onnxruntime-${PLATFORM}-${ARCH}-${VERSION}.tgz" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Download ONNX Runtime prebuilt
         run: |
-          wget https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/${{ matrix.onnx_file }}
+          ONNX_FILE="${{ steps.onnx_file.outputs.filename }}"
+          wget https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ONNXRUNTIME_VERSION }}/${ONNX_FILE}
+          
           mkdir -p onnxruntime
-          if [[ "${{ matrix.onnx_file }}" == *.zip ]]; then
-            unzip ${{ matrix.onnx_file }} -d onnxruntime
+          if [[ "${ONNX_FILE}" == *.zip ]]; then
+            unzip ${ONNX_FILE} -d onnxruntime
           else
-            tar -xzf ${{ matrix.onnx_file }} -C onnxruntime
+            tar -xzf ${ONNX_FILE} -C onnxruntime
           fi
           
           cd onnxruntime
@@ -66,9 +98,14 @@ jobs:
     runs-on: macos-14
     
     steps:
+      - name: Checkout RustO repository (for operator config)
+        uses: actions/checkout@v4
+        with:
+          path: rusto-repo
+      
       - name: Install dependencies
         run: |
-          brew install cmake ninja
+          brew install cmake ninja coreutils
       
       - name: Checkout ONNX Runtime
         uses: actions/checkout@v4
@@ -76,24 +113,127 @@ jobs:
           repository: microsoft/onnxruntime
           ref: v${{ env.ONNXRUNTIME_VERSION }}
           submodules: recursive
+          path: onnxruntime-repo
+      
+      - name: Move to ONNX Runtime directory
+        run: cd onnxruntime-repo
       
       - name: Build ONNX Runtime for iOS
+        working-directory: onnxruntime-repo
         run: |
-          python3 tools/ci_build/github/apple/build_ios_framework.py \
-            --build_dir build_ios \
-            --config Release \
-            --parallel \
-            --skip_tests \
-            --build_apple_framework
+          # Copy PaddleOCR operator config if minimal build
+          if [ "${{ env.MINIMAL_BUILD }}" = "true" ]; then
+            cp ../rusto-repo/.github/workflows/paddleocr_ops_config.json ./paddleocr_ops.config
+          fi
           
           mkdir -p onnxruntime-ios
-          cp -r build_ios/Release/onnxruntime.xcframework onnxruntime-ios/
+          
+          # Build using build.sh for both device and simulator
+          if [ "${{ env.MINIMAL_BUILD }}" = "true" ]; then
+            echo "Building minimal iOS framework for PaddleOCR"
+            
+            # Build for iOS device (arm64)
+            ./build.sh \
+              --config MinSizeRel \
+              --use_xcode \
+              --ios \
+              --apple_sysroot iphoneos \
+              --osx_arch arm64 \
+              --apple_deploy_target 12.0 \
+              --parallel \
+              --skip_tests \
+              --minimal_build extended \
+              --disable_ml_ops \
+              --disable_exceptions \
+              --build_dir build_ios_device
+            
+            # Build for iOS simulator (x86_64 + arm64)
+            ./build.sh \
+              --config MinSizeRel \
+              --use_xcode \
+              --ios \
+              --apple_sysroot iphonesimulator \
+              --osx_arch x86_64 \
+              --apple_deploy_target 12.0 \
+              --parallel \
+              --skip_tests \
+              --minimal_build extended \
+              --disable_ml_ops \
+              --disable_exceptions \
+              --build_dir build_ios_sim_x64
+            
+            ./build.sh \
+              --config MinSizeRel \
+              --use_xcode \
+              --ios \
+              --apple_sysroot iphonesimulator \
+              --osx_arch arm64 \
+              --apple_deploy_target 12.0 \
+              --parallel \
+              --skip_tests \
+              --minimal_build extended \
+              --disable_ml_ops \
+              --disable_exceptions \
+              --build_dir build_ios_sim_arm64
+          else
+            echo "Building full iOS framework"
+            
+            # Build for iOS device
+            ./build.sh \
+              --config Release \
+              --use_xcode \
+              --ios \
+              --apple_sysroot iphoneos \
+              --osx_arch arm64 \
+              --apple_deploy_target 12.0 \
+              --parallel \
+              --skip_tests \
+              --build_dir build_ios_device
+            
+            # Build for iOS simulator
+            ./build.sh \
+              --config Release \
+              --use_xcode \
+              --ios \
+              --apple_sysroot iphonesimulator \
+              --osx_arch x86_64 \
+              --apple_deploy_target 12.0 \
+              --parallel \
+              --skip_tests \
+              --build_dir build_ios_sim_x64
+            
+            ./build.sh \
+              --config Release \
+              --use_xcode \
+              --ios \
+              --apple_sysroot iphonesimulator \
+              --osx_arch arm64 \
+              --apple_deploy_target 12.0 \
+              --parallel \
+              --skip_tests \
+              --build_dir build_ios_sim_arm64
+          fi
+          
+          # Create universal simulator library
+          CONFIG_DIR=$( [ "${{ env.MINIMAL_BUILD }}" = "true" ] && echo "MinSizeRel" || echo "Release" )
+          
+          mkdir -p build_ios_simulator
+          lipo -create \
+            build_ios_sim_x64/${CONFIG_DIR}-iphonesimulator/libonnxruntime.a \
+            build_ios_sim_arm64/${CONFIG_DIR}-iphonesimulator/libonnxruntime.a \
+            -output build_ios_simulator/libonnxruntime.a
+          
+          # Create XCFramework
+          xcodebuild -create-xcframework \
+            -library build_ios_device/${CONFIG_DIR}-iphoneos/libonnxruntime.a \
+            -library build_ios_simulator/libonnxruntime.a \
+            -output onnxruntime-ios/onnxruntime.xcframework
       
       - name: Upload ONNX Runtime iOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: onnxruntime-ios
-          path: onnxruntime-ios/
+          path: onnxruntime-repo/onnxruntime-ios/
           retention-days: 1
 
   # Build ONNX Runtime for Android
@@ -102,6 +242,11 @@ jobs:
     runs-on: ubuntu-22.04
     
     steps:
+      - name: Checkout RustO repository (for operator config)
+        uses: actions/checkout@v4
+        with:
+          path: rusto-repo
+      
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -125,162 +270,75 @@ jobs:
           repository: microsoft/onnxruntime
           ref: v${{ env.ONNXRUNTIME_VERSION }}
           submodules: recursive
+          path: onnxruntime-repo
       
-      - name: Build ONNX Runtime for Android
+      - name: Build ONNX Runtime for Android using official script
+        working-directory: onnxruntime-repo
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME }}
         run: |
           export ANDROID_NDK=$ANDROID_NDK_HOME
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
           
-          python3 tools/ci_build/github/android/build_aar_package.py \
-            --build_dir build_android \
-            --config Release \
-            --android_sdk_path $ANDROID_HOME \
-            --android_ndk_path $ANDROID_NDK \
-            --parallel \
-            --skip_tests
+          # Copy PaddleOCR operator config if minimal build
+          if [ "${{ env.MINIMAL_BUILD }}" = "true" ]; then
+            cp ../rusto-repo/.github/workflows/paddleocr_ops_config.json ./paddleocr_ops.config
+          fi
           
-          mkdir -p onnxruntime-android
-          cp -r build_android/aar_out/aar onnxruntime-android/ || cp -r build_android/*.aar onnxruntime-android/ || true
+          mkdir -p onnxruntime-android/jni/{arm64-v8a,armeabi-v7a,x86_64,x86}
           
-          mkdir -p onnxruntime-android/jni
-          find build_android -name "*.so" -exec cp {} onnxruntime-android/jni/ \; || true
+          # Build each architecture following official documentation
+          for ABI in arm64-v8a armeabi-v7a x86_64 x86; do
+            echo "Building ONNX Runtime for Android ABI: $ABI"
+            
+            if [ "${{ env.MINIMAL_BUILD }}" = "true" ]; then
+              # Minimal build for smaller binary size
+              ./build.sh \
+                --android \
+                --android_sdk_path $ANDROID_HOME \
+                --android_ndk_path $ANDROID_NDK \
+                --android_abi $ABI \
+                --android_api 21 \
+                --config MinSizeRel \
+                --parallel \
+                --skip_tests \
+                --minimal_build extended \
+                --disable_ml_ops \
+                --disable_exceptions \
+                --use_nnapi \
+                --build_dir build_android_$ABI
+              
+              # Copy .so files to correct ABI directory
+              find build_android_$ABI/MinSizeRel -name "libonnxruntime.so" -exec cp {} onnxruntime-android/jni/$ABI/ \; 2>/dev/null || true
+            else
+              # Full build
+              ./build.sh \
+                --android \
+                --android_sdk_path $ANDROID_HOME \
+                --android_ndk_path $ANDROID_NDK \
+                --android_abi $ABI \
+                --android_api 21 \
+                --config Release \
+                --parallel \
+                --skip_tests \
+                --use_nnapi \
+                --build_dir build_android_$ABI
+              
+              # Copy .so files to correct ABI directory
+              find build_android_$ABI/Release -name "libonnxruntime.so" -exec cp {} onnxruntime-android/jni/$ABI/ \; 2>/dev/null || true
+            fi
+          done
+          
+          # List built libraries for verification
+          echo "Built libraries:"
+          find onnxruntime-android/jni -name "*.so" -ls
       
       - name: Upload ONNX Runtime Android artifact
         uses: actions/upload-artifact@v4
         with:
           name: onnxruntime-android
-          path: onnxruntime-android/
+          path: onnxruntime-repo/onnxruntime-android/
           retention-days: 1
-
-  # Build RustO library for desktop platforms
-  build-rusto:
-    name: Build RustO - ${{ matrix.target }}
-    needs: [download-onnxruntime-desktop]
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      matrix:
-        include:
-          - os: linux
-            arch: x64
-            target: x86_64-unknown-linux-gnu
-            runner: ubuntu-22.04
-            lib_ext: so
-          - os: linux
-            arch: arm64
-            target: aarch64-unknown-linux-gnu
-            runner: ubuntu-22.04
-            lib_ext: so
-          - os: macos
-            arch: x64
-            target: x86_64-apple-darwin
-            runner: macos-13
-            lib_ext: dylib
-          - os: macos
-            arch: arm64
-            target: aarch64-apple-darwin
-            runner: macos-14
-            lib_ext: dylib
-          - os: windows
-            arch: x64
-            target: x86_64-pc-windows-msvc
-            runner: windows-2022
-            lib_ext: dll
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Download ONNX Runtime
-        uses: actions/download-artifact@v4
-        with:
-          name: onnxruntime-${{ matrix.os }}-${{ matrix.arch }}
-          path: onnxruntime
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-      
-      - name: Setup environment (Unix)
-        if: matrix.os != 'windows'
-        run: |
-          echo "ORT_LIB_LOCATION=${{ github.workspace }}/onnxruntime/lib" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=${{ github.workspace }}/onnxruntime/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-          echo "DYLD_LIBRARY_PATH=${{ github.workspace }}/onnxruntime/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
-      
-      - name: Setup environment (Windows)
-        if: matrix.os == 'windows'
-        shell: bash
-        run: |
-          echo "ORT_LIB_LOCATION=${{ github.workspace }}/onnxruntime/lib" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/onnxruntime/lib" >> $GITHUB_PATH
-      
-      - name: Install Linux ARM64 cross-compile tools
-        if: matrix.os == 'linux' && matrix.arch == 'arm64'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-      
-      - name: Build RustO CLI
-        run: |
-          cargo build --release --target ${{ matrix.target }} --bin rusto
-      
-      - name: Build RustO library (with FFI)
-        run: |
-          cargo build --release --target ${{ matrix.target }} --features ffi
-      
-      - name: Strip binaries (Unix)
-        if: matrix.os != 'windows'
-        run: |
-          strip target/${{ matrix.target }}/release/rusto || true
-          strip target/${{ matrix.target }}/release/librusto.${{ matrix.lib_ext }} || true
-      
-      - name: Package RustO
-        shell: bash
-        run: |
-          mkdir -p package/bin package/lib package/include
-          
-          if [ "${{ matrix.os }}" = "windows" ]; then
-            cp target/${{ matrix.target }}/release/rusto.exe package/bin/
-          else
-            cp target/${{ matrix.target }}/release/rusto package/bin/
-          fi
-          
-          if [ "${{ matrix.os }}" = "windows" ]; then
-            cp target/${{ matrix.target }}/release/rusto.dll package/lib/
-            cp target/${{ matrix.target }}/release/rusto.dll.lib package/lib/ || true
-          else
-            cp target/${{ matrix.target }}/release/librusto.${{ matrix.lib_ext }} package/lib/
-          fi
-          
-          cp -r onnxruntime/lib/* package/lib/ || true
-          
-          cp packages/dotnet/RustO.cs package/include/ || true
-          
-          cat > package/README.md << 'EOF'
-          # RustO! - Pure Rust OCR Library
-          
-          High-performance OCR library powered by PaddleOCR models with ONNX Runtime.
-          
-          ## Contents
-          
-          - `bin/rusto` - CLI executable
-          - `lib/` - Shared libraries (RustO + ONNX Runtime)
-          - `include/` - C# bindings (if applicable)
-          
-          ## Quick Start
-          
-          ```bash
-          ./bin/rusto --det-model det.onnx --rec-model rec.onnx --dict dict.txt image.jpg
-          ```
-          
-          For more information: https://github.com/yourusername/rusto-rs
-          EOF
-      
-      - name: Upload RustO artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: rusto-${{ matrix.target }}
-          path: package/
 
   # Build iOS XCFramework
   build-ios:
@@ -553,7 +611,7 @@ jobs:
   # Create GitHub Release
   release:
     name: Create GitHub Release
-    needs: [build-rusto, build-ios, build-android, package-dotnet]
+    needs: [build-ios, build-android, package-dotnet]
     runs-on: ubuntu-22.04
     if: startsWith(github.ref, 'refs/tags/')
     

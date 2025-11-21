@@ -89,7 +89,7 @@ impl CtcDecoder {
     ) -> (Vec<(String, f32)>, Vec<WordInfo>) {
         let (n, t, c) = preds.dim();
         let mut line_results = Vec::with_capacity(n);
-        let mut word_infos = Vec::new();
+        let mut word_infos = Vec::with_capacity(if return_word_box { n } else { 0 });
 
         for b in 0..n {
             let mut token_indices = Vec::with_capacity(t);
@@ -132,7 +132,9 @@ impl CtcDecoder {
                 }
             }
 
-            let mut conf_list = Vec::new();
+            // Pre-allocate conf_list with estimated size
+            let est_size = selection.iter().filter(|&&s| s).count().max(1);
+            let mut conf_list = Vec::with_capacity(est_size);
             for (i, &sel) in selection.iter().enumerate() {
                 if sel {
                     let mut v = token_probs[i];
@@ -145,16 +147,17 @@ impl CtcDecoder {
                 conf_list.push(0.0);
             }
 
-            let mut chars = Vec::new();
+            // Pre-allocate chars vector
+            let mut chars = Vec::with_capacity(est_size);
             for (i, &sel) in selection.iter().enumerate() {
                 if sel {
                     if let Some(ch) = self.chars.get(token_indices[i]) {
-                        chars.push(ch.clone());
+                        chars.push(ch.as_str());
                     }
                 }
             }
 
-            let text = chars.join("");
+            let text = chars.concat();
             let mean_score: f32 = conf_list.iter().copied().sum::<f32>() / (conf_list.len() as f32);
 
             line_results.push((text.clone(), mean_score));
