@@ -276,7 +276,11 @@ jobs:
           mkdir -p packages/dotnet/models
           cp -r models/mnn/*.mnn packages/dotnet/models/ || true
           cp -r models/mnn/*.txt packages/dotnet/models/ || true
-      
+
+      - name: Build Project package
+        working-directory: packages/dotnet
+        run: dotnet build -c Release || echo "Build will be done manually"
+
       - name: Pack NuGet package
         working-directory: packages/dotnet
         run: dotnet pack -c Release -o ../../nupkg || echo "NuGet pack will be done manually"
