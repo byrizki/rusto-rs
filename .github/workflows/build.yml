@@ -55,8 +55,8 @@ jobs:
           
           # Copy model files and dict files
           mkdir -p packages/ios/Resources/models
-          cp -r models/mnn/*.mnn packages/ios/Resources/models/ || true
-          cp -r models/mnn/*.txt packages/ios/Resources/models/ || true
+          cp -r models/*.mnn packages/ios/Resources/models/ || true
+          cp -r models/*.txt packages/ios/Resources/models/ || true
           
           cd build
           zip -r RustO.xcframework.zip RustO.xcframework
@@ -143,8 +143,8 @@ jobs:
           
           # Copy model files and dict files to assets
           mkdir -p packages/android/src/main/assets/models
-          cp -r models/mnn/*.mnn packages/android/src/main/assets/models/ || true
-          cp -r models/mnn/*.txt packages/android/src/main/assets/models/ || true
+          cp -r models/*.mnn packages/android/src/main/assets/models/ || true
+          cp -r models/*.txt packages/android/src/main/assets/models/ || true
       
       - name: Make gradlew executable
         working-directory: packages/android
@@ -274,8 +274,8 @@ jobs:
           
           # Copy model files and dict files
           mkdir -p packages/dotnet/models
-          cp -r models/mnn/*.mnn packages/dotnet/models/ || true
-          cp -r models/mnn/*.txt packages/dotnet/models/ || true
+          cp -r models/*.mnn packages/dotnet/models/ || true
+          cp -r models/*.txt packages/dotnet/models/ || true
 
       - name: Build Project package
         working-directory: packages/dotnet
