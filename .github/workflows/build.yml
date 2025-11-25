@@ -53,10 +53,21 @@ jobs:
             -library build/ios-simulator/librusto.a \
             -output build/RustO.xcframework
           
-          # Copy model files and dict files
+          # Copy model files
+          echo "=== Copying model files to iOS package ==="
           mkdir -p packages/ios/Resources/models
-          cp -r models/*.mnn packages/ios/Resources/models/ || true
-          cp -r models/*.txt packages/ios/Resources/models/ || true
+          
+          echo "Looking for .mnn files:"
+          find models/ -name "*.mnn" -type f
+          
+          echo "Copying .mnn files..."
+          find models/ -name "*.mnn" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/ios/Resources/models/' _ {} \; || true
+          
+          echo "Copying .txt files..."
+          find models/ -name "*.txt" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/ios/Resources/models/' _ {} \; || true
+          
+          echo "\nFiles in iOS package models/:"
+          ls -lh packages/ios/Resources/models/ || echo "No files copied"
           
           cd build
           zip -r RustO.xcframework.zip RustO.xcframework
@@ -86,6 +97,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libpthread-stubs0-dev
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -140,11 +154,21 @@ jobs:
           cp target/i686-linux-android/release/librusto.so packages/android/src/main/jniLibs/x86/
           cp target/x86_64-linux-android/release/librusto.so packages/android/src/main/jniLibs/x86_64/
           
-          
-          # Copy model files and dict files to assets
+          # Copy model files
+          echo "=== Copying model files to Android package ==="
           mkdir -p packages/android/src/main/assets/models
-          cp -r models/*.mnn packages/android/src/main/assets/models/ || true
-          cp -r models/*.txt packages/android/src/main/assets/models/ || true
+          
+          echo "Looking for .mnn files:"
+          find models/ -name "*.mnn" -type f
+          
+          echo "Copying .mnn files..."
+          find models/ -name "*.mnn" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/android/src/main/assets/models/' _ {} \; || true
+          
+          echo "Copying .txt files..."
+          find models/ -name "*.txt" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/android/src/main/assets/models/' _ {} \; || true
+          
+          echo "\nFiles in Android package models/:"
+          ls -lh packages/android/src/main/assets/models/ || echo "No files copied"
       
       - name: Make gradlew executable
         working-directory: packages/android
@@ -272,18 +296,48 @@ jobs:
             fi
           done
           
-          # Copy model files and dict files
+      - name: Copy model files to package
+        run: |
+          echo "=== Copying model files to NuGet package ==="
           mkdir -p packages/dotnet/models
-          cp -r models/*.mnn packages/dotnet/models/ || true
-          cp -r models/*.txt packages/dotnet/models/ || true
+          
+          echo "Looking for .mnn files:"
+          find models/ -name "*.mnn" -type f
+          
+          echo "Looking for .txt files:"
+          find models/ -name "*.txt" -type f
+          
+          echo "Copying .mnn files..."
+          find models/ -name "*.mnn" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/dotnet/models/' _ {} \; || true
+          
+          echo "Copying .txt files..."
+          find models/ -name "*.txt" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/dotnet/models/' _ {} \; || true
+          
+          echo "\nFiles in packages/dotnet/models/:"
+          ls -lh packages/dotnet/models/ || echo "No files copied"
 
       - name: Build Project package
         working-directory: packages/dotnet
-        run: dotnet build -c Release || echo "Build will be done manually"
+        run: |
+          echo "=== Building .NET package ==="
+          echo "Current directory: $(pwd)"
+          echo "\nFiles in runtimes/:"
+          find runtimes/ -type f | head -20
+          echo "\nFiles in models/:"
+          ls -lh models/ || echo "No models directory"
+          echo "\nBuilding..."
+          dotnet build -c Release || echo "Build will be done manually"
 
       - name: Pack NuGet package
         working-directory: packages/dotnet
-        run: dotnet pack -c Release -o ../../nupkg || echo "NuGet pack will be done manually"
+        run: |
+          echo "=== Packing NuGet package ==="
+          echo "Project file contents:"
+          cat RustO.csproj | grep -A 5 "<ItemGroup>" || true
+          echo "\nPacking to ../../nupkg"
+          dotnet pack -c Release -o ../../nupkg -v detailed || echo "NuGet pack will be done manually"
+          echo "\nGenerated packages:"
+          ls -lh ../../nupkg/ || echo "No packages generated"
       
       - name: Upload NuGet package
         uses: actions/upload-artifact@v4

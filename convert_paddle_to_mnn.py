@@ -61,7 +61,8 @@ def convert_paddle_to_onnx(model_dir):
         '--model_dir', '.',
         '--model_filename', 'inference.json',
         '--params_filename', 'inference.pdiparams',
-        '--save_file', 'model.onnx'
+        '--save_file', 'model.onnx',
+        '--opset_version', '16'
     ]
     
     try:

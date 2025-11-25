@@ -32,15 +32,18 @@
 //! ```
 
 // Core modules
+mod cal_rec_boxes;
+pub mod config;
+mod det;
 mod engine;
 mod geometry;
-mod image_impl;
+pub mod image_impl;
+mod orient;
 mod postprocess;
 mod preprocess;
-mod det;
 mod rec;
-mod rusto_ocr;
-mod cal_rec_boxes;
+mod unwarp;
+pub mod rusto_ocr;
 mod types;
 
 #[cfg(not(feature = "use-opencv"))]
@@ -51,30 +54,21 @@ mod contours;
 pub mod ffi;
 
 // Public API exports
-pub use crate::rusto_ocr::RustO as RapidOcr;
-pub use crate::types::{DetConfig, GlobalConfig, RecConfig};
+pub use det::TextDetector;
+pub use orient::{Orientation, OrientClassifier, OrientOutput};
+pub use rec::{TextRecognizer, TextRecOutput, WordInfo, WordType};
+pub use unwarp::{DocUnwarper, UnwarpOutput};
+pub use config::RustOConfig;
+pub use rusto_ocr::{RustO, RustOOutput};
+pub use types::{
+    ClsConfig, DetConfig, GlobalConfig, OrientConfig, RecConfig, UnwarpConfig,
+};
+
+// Alias for compatibility
+pub use RustO as RapidOcr;
 
 // Re-export for easier access
-use crate::engine::EngineError;
-use std::path::Path;
-
-/// Configuration for RustO
-#[derive(Debug, Clone)]
-pub struct RustOConfig {
-    pub det_model_path: String,
-    pub rec_model_path: String,
-    pub dict_path: String,
-}
-
-impl Default for RustOConfig {
-    fn default() -> Self {
-        Self {
-            det_model_path: String::new(),
-            rec_model_path: String::new(),
-            dict_path: String::new(),
-        }
-    }
-}
+pub use crate::engine::EngineError;
 
 /// OCR text result with bounding box
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -83,63 +77,4 @@ pub struct TextResult {
     pub score: f32,
     /// Box points: [top-left, top-right, bottom-right, bottom-left]
     pub box_points: [(f32, f32); 4],
-}
-
-/// Main RustO interface
-pub struct RustO {
-    inner: RapidOcr,
-}
-
-impl RustO {
-    /// Create a new RustO instance
-    pub fn new(config: RustOConfig) -> Result<Self, EngineError> {
-        let inner = crate::rusto_ocr::RustO::new_ppv5(
-            &config.det_model_path,
-            &config.rec_model_path,
-            &config.dict_path,
-        )?;
-
-        Ok(Self { inner })
-    }
-
-    /// Run OCR on an image file
-    pub fn ocr<P: AsRef<Path>>(&mut self, image_path: P) -> Result<Vec<TextResult>, EngineError> {
-        let results = self.inner.run(image_path)?;
-        
-        // Convert RapidOcrOutput to Vec<TextResult>
-        Ok(results.boxes.into_iter()
-            .zip(results.txts.into_iter().zip(results.scores.into_iter()))
-            .map(|(boxes, (text, score))| TextResult {
-                text,
-                score,
-                box_points: [
-                    (boxes[0].x, boxes[0].y),
-                    (boxes[1].x, boxes[1].y),
-                    (boxes[2].x, boxes[2].y),
-                    (boxes[3].x, boxes[3].y),
-                ],
-            }).collect())
-    }
-
-    /// Run OCR on image data in memory
-    pub fn ocr_from_bytes(&mut self, image_data: &[u8]) -> Result<Vec<TextResult>, EngineError> {
-        // Load image from bytes using image crate
-        use image::ImageReader;
-        use std::io::Cursor;
-        
-        let img = ImageReader::new(Cursor::new(image_data))
-            .with_guessed_format()
-            .map_err(|e| EngineError::ImageError(e.to_string()))?
-            .decode()
-            .map_err(|e| EngineError::ImageError(e.to_string()))?;
-        
-        // Save to temp file and process
-        let temp_path = std::env::temp_dir().join(format!("rusto_{}.jpg", std::process::id()));
-        img.save(&temp_path)
-            .map_err(|e| EngineError::ImageError(e.to_string()))?;
-        
-        let result = self.ocr(&temp_path);
-        let _ = std::fs::remove_file(&temp_path);
-        result
-    }
 }

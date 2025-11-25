@@ -144,14 +144,28 @@ mod rust_impl {
         const ROTATE_180: i32 = 1;
         const ROTATE_90_COUNTERCLOCKWISE: i32 = 2;
 
-        let rotated = match rotation {
+        dst.image = match rotation {
             ROTATE_90_CLOCKWISE => src.image.rotate90(),
             ROTATE_180 => src.image.rotate180(),
             ROTATE_90_COUNTERCLOCKWISE => src.image.rotate270(),
-            _ => return Err("Invalid rotation code".into()),
+            _ => src.image.clone(),
         };
-        *dst = Mat::new(rotated);
         Ok(())
+    }
+    
+    /// Rotate image 90 degrees clockwise
+    pub fn rotate_90(src: &Mat) -> Result<Mat> {
+        Ok(Mat::new(src.image.rotate90()))
+    }
+    
+    /// Rotate image 180 degrees
+    pub fn rotate_180(src: &Mat) -> Result<Mat> {
+        Ok(Mat::new(src.image.rotate180()))
+    }
+    
+    /// Rotate image 270 degrees clockwise (90 counter-clockwise)
+    pub fn rotate_270(src: &Mat) -> Result<Mat> {
+        Ok(Mat::new(src.image.rotate270()))
     }
 
     pub fn warp_perspective(

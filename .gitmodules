@@ -1,0 +1,12 @@
+[submodule "vendor/mnn"]
+	path = vendor/mnn
+	url = https://github.com/alibaba/MNN.git
+[submodule "vendor/paddlex"]
+	path = vendor/paddlex
+	url = https://github.com/PaddlePaddle/PaddleX.git
+[submodule "vendor/RapidDoc"]
+	path = vendor/RapidDoc
+	url = https://github.com/RapidAI/RapidDoc.git
+[submodule "vendor/RapidUnwarp"]
+	path = vendor/RapidUnwarp
+	url = https://github.com/RapidAI/RapidUnDistort

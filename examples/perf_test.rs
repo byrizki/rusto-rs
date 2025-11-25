@@ -4,11 +4,11 @@ use std::time::Instant;
 fn main() {
     println!("=== RustO Performance Test ===\n");
     
-    let config = RustOConfig {
-        det_model_path: "models/PPOCR_v5/det.onnx".to_string(),
-        rec_model_path: "models/PPOCR_v5/rec.onnx".to_string(),
-        dict_path: "models/PPOCR_v5/dict.txt".to_string(),
-    };
+    let config = RustOConfig::new_ppv5(
+        "models/PPOCR_v5/det.mnn",
+        "models/PPOCR_v5/rec.mnn",
+        "models/PPOCR_v5/dict.txt"
+    );
     
     println!("Initializing OCR engine...");
     let init_start = Instant::now();
@@ -16,8 +16,7 @@ fn main() {
     println!("Initialization took: {:?}\n", init_start.elapsed());
     
     let test_images = vec![
-        ("KTP", "models/images/ktp-teng.jpg"),
-        ("Example1", "models/test_images/example1.png"),
+        ("example1", "models/test_images/example1.png"),
     ];
     
     for (name, path) in &test_images {
@@ -30,7 +29,7 @@ fn main() {
         
         // Warmup run
         println!("  Warmup run...");
-        let _ = ocr.ocr(path);
+        let _ = ocr.run(path);
         
         // Timed runs
         let num_runs = 5;
@@ -38,14 +37,14 @@ fn main() {
         
         for i in 1..=num_runs {
             let start = Instant::now();
-            let results = ocr.ocr(path).expect("OCR failed");
+            let results = ocr.run(path).expect("OCR failed");
             let elapsed = start.elapsed();
             times.push(elapsed);
             
-            println!("  Run {}: {:?} - {} text regions detected", i, elapsed, results.len());
-            if i == 1 && !results.is_empty() {
+            println!("  Run {}: {:?} - {} text regions detected", i, elapsed, results.boxes.len());
+            if i == 1 && !results.txts.is_empty() {
                 println!("    Sample result: {} (score: {:.3})", 
-                         results[0].text, results[0].score);
+                         results.txts[0], results.scores[0]);
             }
         }
         

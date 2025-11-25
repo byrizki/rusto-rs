@@ -1,0 +1,24 @@
+[package]
+name = "mnn-sys"
+version = "0.1.0"
+edition = "2021"
+description = "Low-level FFI bindings to MNN library"
+license = "MIT"
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.70"
+cc = "1.0"
+cmake = "0.1"
+
+[features]
+default = []
+metal = []
+coreml = []
+opencl = []
+vulkan = []
+cuda = []
+nnapi = []
+hiai = []
+qnn = []

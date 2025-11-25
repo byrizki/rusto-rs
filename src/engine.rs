@@ -64,7 +64,7 @@ impl MnnSession {
         Self::from_path(&cfg.model_path, &cfg.engine_cfg)
     }
 
-    fn from_path(model_path: &Path, _engine_cfg: &EngineConfig) -> Result<Self, EngineError> {        
+    pub fn from_path(model_path: &Path, _engine_cfg: &EngineConfig) -> Result<Self, EngineError> {        
         let interpreter = Interpreter::from_file(model_path)?;
         
         Ok(Self { 
@@ -145,12 +145,15 @@ impl MnnSession {
             
             // Copy input data
             if let Some(flat_data) = input.as_slice() {
-                let mut host_tensor = input_tensor.create_host_tensor_from_device(false);
+                // Use explicit NCHW host tensor to ensure correct layout
+                let shape = input_tensor.shape();
+                let mut host_tensor = mnn::Tensor::new_host(&shape);
                 let host_data_mut = host_tensor.host_mut();
                 host_data_mut.copy_from_slice(flat_data);
                 input_tensor.copy_from_host_tensor(&host_tensor)?;
             } else {
-                let mut host_tensor = input_tensor.create_host_tensor_from_device(false);
+                let shape = input_tensor.shape();
+                let mut host_tensor = mnn::Tensor::new_host(&shape);
                 let host_data_mut = host_tensor.host_mut();
                 for (i, val) in input.iter().enumerate() {
                     host_data_mut[i] = *val;
@@ -164,7 +167,10 @@ impl MnnSession {
             output.wait(mnn::ffi::MapType::MAP_TENSOR_READ, true);
             
             let shape = output.shape();
-            let output_host_tensor = output.create_host_tensor_from_device(true);
+            // Use explicit NCHW host tensor for output as well
+            let mut output_host_tensor = mnn::Tensor::new_host(&shape);
+            output.copy_to_host_tensor(&mut output_host_tensor)?;
+            
             (output_host_tensor.host().to_vec(), shape)
         };
         

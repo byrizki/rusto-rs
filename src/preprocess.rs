@@ -137,13 +137,12 @@ impl DetPreProcess {
         for y in 0..h {
             for x in 0..w {
                 let pix = img.get_pixel(x as u32, y as u32);
-                // CRITICAL: image crate loads as RGB, but OpenCV uses BGR
-                // Model was trained on BGR, so we must convert RGB -> BGR
+                // image crate loads as RGB, convert to BGR for detection model
                 let r = pix[0] as f32 * scale;  // Red channel
                 let g = pix[1] as f32 * scale;  // Green channel
                 let b = pix[2] as f32 * scale;  // Blue channel
 
-                // Store in BGR order to match OpenCV
+                // Store in BGR order (detection model expects BGR)
                 out[[0, 0, y, x]] = (b - mean_b) / std_b;  // Blue
                 out[[0, 1, y, x]] = (g - mean_g) / std_g;  // Green  
                 out[[0, 2, y, x]] = (r - mean_r) / std_r;  // Red

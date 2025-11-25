@@ -1,3 +1,6 @@
+[workspace]
+members = [".", "crates/mnn-sys", "crates/mnn"]
+
 [package]
 name = "rusto-rs"
 version = "0.1.0"
@@ -30,20 +33,8 @@ nalgebra = "0.33"
 # Optional OpenCV backend
 opencv = { version = "0.97.2", optional = true }
 
-[dependencies.mnn]
-git = "https://github.com/aftershootco/mnn-rs.git"
-
-[target.'cfg(target_os = "ios")'.dependencies.mnn]
-git = "https://github.com/aftershootco/mnn-rs.git"
-features = ["metal", "coreml"]
-
-[target.'cfg(target_os = "macos")'.dependencies.mnn]
-git = "https://github.com/aftershootco/mnn-rs.git"
-features = ["metal", "coreml"]
-
-[target.'cfg(not(any(target_os = "ios", target_os = "macos")))'.dependencies.mnn]
-git = "https://github.com/aftershootco/mnn-rs.git"
-features = ["opencl", "vulkan"]
+# Local MNN bindings
+mnn = { path = "crates/mnn" }
 
 [dev-dependencies]
 criterion = "0.5"
@@ -52,7 +43,25 @@ criterion = "0.5"
 default = []
 use-opencv = ["opencv"]
 ffi = []  # Enable C FFI bindings
+
+# MNN GPU/Accelerator backends
+metal = ["mnn/metal"]
+coreml = ["mnn/coreml"]
+opencl = ["mnn/opencl"]
+vulkan = ["mnn/vulkan"]
+cuda = ["mnn/cuda"]
+
+# MNN Mobile NPU backends
+nnapi = ["mnn/nnapi"]
+hiai = ["mnn/hiai"]
+qnn = ["mnn/qnn"]
  
+[profile.dev]
+# Faster dev builds
+opt-level = 1
+debug = true
+incremental = true
+
 [profile.release]
 opt-level = 3
 lto = "fat"
@@ -64,3 +73,9 @@ panic = "abort"
 inherits = "release"
 debug = true
 strip = false
+
+# Fast compilation profile for testing
+[profile.test]
+opt-level = 1
+debug = true
+incremental = true

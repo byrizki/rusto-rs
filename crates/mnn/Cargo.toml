@@ -1,0 +1,23 @@
+[package]
+name = "mnn"
+version = "0.1.0"
+edition = "2021"
+description = "Safe Rust bindings to MNN library"
+license = "MIT"
+
+[dependencies]
+mnn-sys = { path = "../mnn-sys" }
+thiserror = "1.0"
+
+[features]
+default = []
+# GPU/Accelerator backends
+metal = ["mnn-sys/metal"]
+coreml = ["mnn-sys/coreml"]
+opencl = ["mnn-sys/opencl"]
+vulkan = ["mnn-sys/vulkan"]
+cuda = ["mnn-sys/cuda"]
+# Mobile NPU backends
+nnapi = ["mnn-sys/nnapi"]
+hiai = ["mnn-sys/hiai"]
+qnn = ["mnn-sys/qnn"]

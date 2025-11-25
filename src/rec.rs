@@ -499,13 +499,15 @@ impl TextRecognizer {
         for y in 0..h2 {
             for x in 0..w2.min(img_width as usize) {
                 let pix = resized.get_pixel(x as u32, y as u32);
-                let b = pix[0] as f32 / 255.0;
-                let g = pix[1] as f32 / 255.0;
-                let r = pix[2] as f32 / 255.0;
+                // image crate uses RGB format, but model expects BGR
+                let r = pix[0] as f32 / 255.0;  // Red channel
+                let g = pix[1] as f32 / 255.0;  // Green channel
+                let b = pix[2] as f32 / 255.0;  // Blue channel
 
-                out[[0, y, x]] = (b - 0.5) / 0.5;
-                out[[1, y, x]] = (g - 0.5) / 0.5;
-                out[[2, y, x]] = (r - 0.5) / 0.5;
+                // Store in BGR order (model expects BGR as per inference.yml)
+                out[[0, y, x]] = (b - 0.5) / 0.5;  // Blue
+                out[[1, y, x]] = (g - 0.5) / 0.5;  // Green
+                out[[2, y, x]] = (r - 0.5) / 0.5;  // Red
             }
         }
 
