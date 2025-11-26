@@ -1,6 +1,6 @@
 use clap::{Parser, ValueEnum};
 use rusto::rusto_ocr::RustO as RustOCR;
-use rusto::{OrientClassifier, OrientConfig, DocUnwarper, UnwarpConfig};
+use rusto::{OrientClassifier, OrientConfig};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -41,7 +41,6 @@ struct Cli {
     /// Path to text unwarping model (uvdoc.mnn)
     #[arg(long)]
     unwarp_model: Option<PathBuf>,
-
     // Layout detection removed
 }
 
@@ -63,11 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     // Initialize base OCR using the advanced API
-    let mut ocr = RustOCR::new_ppv5(
-        &cli.det_model,
-        &cli.rec_model,
-        &cli.dict,
-    )?;
+    let mut ocr = RustOCR::new_ppv5(&cli.det_model, &cli.rec_model, &cli.dict)?;
 
     // Add optional features
     if cli.enable_orient {
@@ -80,19 +75,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("✓ Orientation classifier enabled");
         } else {
             eprintln!("Warning: --enable-orient specified but --orient-model not provided");
-        }
-    }
-
-    if cli.enable_unwarp {
-        if let Some(unwarp_path) = cli.unwarp_model {
-            eprintln!("Loading text unwarper...");
-            let unwarp_config = UnwarpConfig::default(unwarp_path);
-            let unwarper = DocUnwarper::new(unwarp_config)?;
-            ocr.global.use_unwarp = true;
-            ocr = ocr.with_unwarp(unwarper);
-            eprintln!("✓ Text unwarper enabled");
-        } else {
-            eprintln!("Warning: --enable-unwarp specified but --unwarp-model not provided");
         }
     }
 
@@ -121,7 +103,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "detection": result.elapse_det,
                     "recognition": result.elapse_rec,
                     "orientation": result.elapse_orient,
-                    "unwarping": result.elapse_unwarp,
                     // "layout" removed
                 },
             });
@@ -138,10 +119,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let score = result.scores[i];
                 let box_str = format!(
                     "{:.1},{:.1},{:.1},{:.1},{:.1},{:.1},{:.1},{:.1}",
-                    bbox[0].x, bbox[0].y,
-                    bbox[1].x, bbox[1].y,
-                    bbox[2].x, bbox[2].y,
-                    bbox[3].x, bbox[3].y,
+                    bbox[0].x,
+                    bbox[0].y,
+                    bbox[1].x,
+                    bbox[1].y,
+                    bbox[2].x,
+                    bbox[2].y,
+                    bbox[3].x,
+                    bbox[3].y,
                 );
                 println!("{}\t{:.3}\t{}", text, score, box_str);
             }

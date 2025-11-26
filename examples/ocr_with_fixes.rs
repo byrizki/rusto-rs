@@ -1,10 +1,10 @@
+use rusto::{RustO, RustOConfig};
 /// OCR with Image Fixes Example
 /// Demonstrates OCR with orientation classification and text unwarping
 /// Uses test images from models/test_images/ directory
 /// Outputs to data/output/ folder with debug images
 use std::error::Error;
 use std::fs;
-use rusto::{RustO, RustOConfig};
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -19,18 +19,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = RustOConfig::new_ppv5(
         "models/PPOCR_v5/det.mnn",
         "models/PPOCR_v5/rec.mnn",
-        "models/PPOCR_v5/dict.txt"
+        "models/PPOCR_v5/dict.txt",
     )
-    .with_cls("models/PPOCR_v5/lcnet-text.mnn")  // Text line orientation
-    .with_orientation("models/PPOCR_v5/lcnet.mnn")  // Page orientation (optional)
-    .with_unwarp("models/PPOCR_v5/uvdoc.mnn")  // Document unwarping (optional)
-    .with_debug_images(true);  // Enable debug images
-    
+    .with_cls("models/PPOCR_v5/lcnet-text.mnn") // Text line orientation
+    .with_orientation("models/PPOCR_v5/lcnet.mnn") // Page orientation (optional)
+    .with_unwarp("models/PPOCR_v5/uvdoc.mnn") // Document unwarping (optional)
+    .with_debug_images(true); // Enable debug images
+
     let mut ocr = RustO::new(config)?;
 
     // Test images directory
     let test_dir = "models/test_images";
-    
+
     // Get all test images
     let mut test_images: Vec<String> = fs::read_dir(test_dir)?
         .filter_map(|entry| entry.ok())
@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         })
         .collect();
-    
+
     test_images.sort();
 
     println!("Found {} test images\n", test_images.len());
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         match ocr.run(image_path) {
             Ok(result) => {
                 println!("Detected {} text regions", result.boxes.len());
-                
+
                 if let Some(orientation) = &result.orientation {
                     println!("Orientation: {} degrees", orientation.degrees());
                 }
@@ -89,36 +89,48 @@ fn main() -> Result<(), Box<dyn Error>> {
                 #[cfg(feature = "use-opencv")]
                 {
                     use opencv::imgcodecs::imwrite;
-                    
+
                     if let Some(oriented) = &result.debug_oriented_image {
                         let debug_file = output_dir.join(format!("{}_oriented.jpg", output_name));
-                        imwrite(&debug_file.to_string_lossy(), oriented, &opencv::core::Vector::new())?;
-                        println!("✓ Saved orientation-corrected image: {}", debug_file.display());
+                        imwrite(
+                            &debug_file.to_string_lossy(),
+                            oriented,
+                            &opencv::core::Vector::new(),
+                        )?;
+                        println!(
+                            "✓ Saved orientation-corrected image: {}",
+                            debug_file.display()
+                        );
                     }
-                    
+
                     if let Some(unwarped) = &result.debug_unwarped_image {
                         let debug_file = output_dir.join(format!("{}_unwarped.jpg", output_name));
-                        imwrite(&debug_file.to_string_lossy(), unwarped, &opencv::core::Vector::new())?;
+                        imwrite(
+                            &debug_file.to_string_lossy(),
+                            unwarped,
+                            &opencv::core::Vector::new(),
+                        )?;
                         println!("✓ Saved unwarped image: {}", debug_file.display());
                     }
                 }
-                
+
                 #[cfg(not(feature = "use-opencv"))]
                 {
                     if let Some(oriented) = &result.debug_oriented_image {
                         let debug_file = output_dir.join(format!("{}_oriented.png", output_name));
                         oriented.as_dynamic().save(&debug_file)?;
-                        println!("✓ Saved orientation-corrected image: {}", debug_file.display());
-                    }
-                    
-                    if let Some(unwarped) = &result.debug_rectified_image {
-                        let debug_file = output_dir.join(format!("{}_unwarped.png", output_name));
-                        unwarped.as_dynamic().save(&debug_file)?;
-                        println!("✓ Saved unwarped image: {}", debug_file.display());
+                        println!(
+                            "✓ Saved orientation-corrected image: {}",
+                            debug_file.display()
+                        );
                     }
                 }
 
-                println!("✓ Saved to {} and {}", raw_file.display(), csv_file.display());
+                println!(
+                    "✓ Saved to {} and {}",
+                    raw_file.display(),
+                    csv_file.display()
+                );
             }
             Err(e) => {
                 eprintln!("✗ Error: {}", e);

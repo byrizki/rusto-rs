@@ -42,7 +42,6 @@ mod orient;
 mod postprocess;
 mod preprocess;
 mod rec;
-mod unwarp;
 pub mod rusto_ocr;
 mod types;
 
@@ -54,15 +53,12 @@ mod contours;
 pub mod ffi;
 
 // Public API exports
-pub use det::TextDetector;
-pub use orient::{Orientation, OrientClassifier, OrientOutput};
-pub use rec::{TextRecognizer, TextRecOutput, WordInfo, WordType};
-pub use unwarp::{DocUnwarper, UnwarpOutput};
 pub use config::RustOConfig;
+pub use det::TextDetector;
+pub use orient::{OrientClassifier, OrientOutput, Orientation};
+pub use rec::{TextRecOutput, TextRecognizer, WordInfo, WordType};
 pub use rusto_ocr::{RustO, RustOOutput};
-pub use types::{
-    ClsConfig, DetConfig, GlobalConfig, OrientConfig, RecConfig, UnwarpConfig,
-};
+pub use types::{ClsConfig, DetConfig, GlobalConfig, OrientConfig, RecConfig};
 
 // Alias for compatibility
 pub use RustO as RapidOcr;
