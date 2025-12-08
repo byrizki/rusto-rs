@@ -402,7 +402,7 @@ jobs:
       - name: Pack NPM package
         working-directory: packages/react-native
         run: |
-          npm install
+          npm install --legacy-peer-deps
           npm pack
 
       - name: Upload NPM package
