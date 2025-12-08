@@ -56,37 +56,39 @@ jobs:
             -library build/ios-simulator/librusto.a \
             -output build/RustO.xcframework
 
-          # Copy model files
-          echo "=== Copying model files to iOS package ==="
-          mkdir -p packages/ios/Resources/models
+          # Copy model files to React Native iOS models directory (for RN bundling)
+          echo "=== Preparing models for React Native bundling ==="
+          mkdir -p packages/react-native/ios/models
 
           echo "Copying model files..."
-          cp models/PPOCR_v5/det.mnn packages/ios/Resources/models/
-          cp models/PPOCR_v5/rec.mnn packages/ios/Resources/models/
-          cp models/PPOCR_v5/dict.txt packages/ios/Resources/models/
+          cp models/PPOCR_v5/det.mnn packages/react-native/ios/models/
+          cp models/PPOCR_v5/rec.mnn packages/react-native/ios/models/
+          cp models/PPOCR_v5/dict.txt packages/react-native/ios/models/
 
-          echo "\nFiles in iOS package models/:"
-          ls -lh packages/ios/Resources/models/ || echo "No files copied"
+          echo "\nFiles in React Native iOS models/:"
+          ls -lh packages/react-native/ios/models/ || echo "No files copied"
 
+          # Create resource bundle for standalone iOS XCFramework
+          echo "=== Creating RustoModels.bundle for iOS XCFramework ==="
+          mkdir -p build/RustoModels.bundle
+
+          cp models/PPOCR_v5/det.mnn build/RustoModels.bundle/
+          cp models/PPOCR_v5/rec.mnn build/RustoModels.bundle/
+          cp models/PPOCR_v5/dict.txt build/RustoModels.bundle/
+
+          echo "\nFiles in RustoModels.bundle:"
+          ls -lh build/RustoModels.bundle/
+
+          # Package XCFramework and resource bundle together
           cd build
-          zip -r RustO.xcframework.zip RustO.xcframework
+          zip -r RustO.xcframework.zip RustO.xcframework RustoModels.bundle
           cd ..
-
-          # Create a package with models
-          mkdir -p build/package
-          cp -r build/RustO.xcframework build/package/
-          cp -r packages/ios/Resources build/package/
-          cd build/package
-          zip -r ../RustO-with-models.xcframework.zip .
-          cd ../..
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: rusto-ios-xcframework
-          path: |
-            build/RustO.xcframework.zip
-            build/RustO-with-models.xcframework.zip
+          path: build/RustO.xcframework.zip
 
   # Build Android AAR
   build-android:
@@ -383,7 +385,7 @@ jobs:
           mkdir -p packages/react-native/android/libs
 
           # Extract and copy iOS XCFramework
-          unzip artifacts/ios/RustO-with-models.xcframework.zip -d artifacts/ios/temp
+          unzip artifacts/ios/RustO.xcframework.zip -d artifacts/ios/temp
           cp -r artifacts/ios/temp/RustO.xcframework packages/react-native/ios/
 
           # Copy model files for iOS bundling
@@ -443,7 +445,6 @@ jobs:
 
           if [ -d "rusto-ios-xcframework" ]; then
             cp rusto-ios-xcframework/RustO.xcframework.zip ../releases/ || true
-            cp rusto-ios-xcframework/RustO-with-models.xcframework.zip ../releases/ || true
           fi
 
           if [ -d "rusto-android-aar" ]; then

@@ -33,26 +33,66 @@ public class RustO {
     private var handle: OpaquePointer?
 
     public static var version: String {
-        guard let versionPtr = rusto_version() else {
+        guard let versionPtr = rocr_version() else {
             return "unknown"
         }
         return String(cString: versionPtr)
     }
 
     public init(
-        detModelPath: String,
-        recModelPath: String,
-        dictPath: String
+        detModelPath: String? = nil,
+        recModelPath: String? = nil,
+        dictPath: String? = nil
     ) throws {
-        handle = rusto_new(
-            detModelPath,
-            recModelPath,
-            dictPath
+        // Use default bundled models if not specified
+        let detPath = detModelPath ?? resolveModelPath("det.mnn")
+        let recPath = recModelPath ?? resolveModelPath("rec.mnn")
+        let dictFile = dictPath ?? resolveModelPath("dict.txt")
+        
+        guard let detPath = detPath, let recPath = recPath, let dictFile = dictFile else {
+            throw RustOError.invalidPath
+        }
+        
+        handle = rocr_new(
+            detPath,
+            recPath,
+            dictFile
         )
 
         guard handle != nil else {
             throw RustOError.initializationFailed
         }
+    }
+    
+    private func resolveModelPath(_ filename: String) -> String? {
+        // If absolute path, use it directly
+        if filename.hasPrefix("/") && FileManager.default.fileExists(atPath: filename) {
+            return filename
+        }
+        
+        // Try RustoModels.bundle first (for bundled models)
+        if let bundlePath = Bundle.main.path(forResource: "RustoModels", ofType: "bundle"),
+           let bundle = Bundle(path: bundlePath) {
+            let name = filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
+            let ext = String(filename.split(separator: ".").last ?? "")
+            if let filePath = bundle.path(forResource: name, ofType: ext) {
+                return filePath
+            }
+        }
+        
+        // Try main bundle
+        if let bundlePath = Bundle.main.path(forResource: filename, ofType: nil) {
+            return bundlePath
+        }
+        
+        // Try documents directory
+        let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
+        let filePath = (documentsPath as NSString).appendingPathComponent(filename)
+        if FileManager.default.fileExists(atPath: filePath) {
+            return filePath
+        }
+        
+        return nil
     }
 
     public func recognizeFile(_ imagePath: String) throws -> [TextResult] {
@@ -63,12 +103,12 @@ public class RustO {
         var resultsPtr: UnsafeMutablePointer<CTextResult>?
         var count: Int = 0
 
-        let status = rusto_ocr_file(handle, imagePath, &resultsPtr, &count)
+        let status = rocr_ocr_file(handle, imagePath, &resultsPtr, &count)
         guard status == 0, let results = resultsPtr else {
             throw RustOError.recognitionFailed(status)
         }
 
-        defer { rusto_free_results(results, count) }
+        defer { rocr_free_results(results, count) }
 
         return (0..<count).map { i in
             let result = results[i]
@@ -94,7 +134,7 @@ public class RustO {
         var count: Int = 0
 
         let status = imageData.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
-            rusto_ocr_data(
+            rocr_ocr_data(
                 handle,
                 bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
                 bytes.count,
@@ -107,7 +147,7 @@ public class RustO {
             throw RustOError.recognitionFailed(status)
         }
 
-        defer { rusto_free_results(results, count) }
+        defer { rocr_free_results(results, count) }
 
         return (0..<count).map { i in
             let result = results[i]
@@ -126,7 +166,7 @@ public class RustO {
 
     deinit {
         if let h = handle {
-            rusto_free(h)
+            rocr_free(h)
         }
     }
 }
@@ -141,23 +181,23 @@ struct CTextResult {
     let box_x4, box_y4: Float
 }
 
-@_silgen_name("rusto_new")
-func rusto_new(
+@_silgen_name("rocr_new")
+func rocr_new(
     _ detModel: UnsafePointer<CChar>,
     _ recModel: UnsafePointer<CChar>,
     _ dict: UnsafePointer<CChar>
 ) -> OpaquePointer?
 
-@_silgen_name("rusto_ocr_file")
-func rusto_ocr_file(
+@_silgen_name("rocr_ocr_file")
+ func rocr_ocr_file(
     _ handle: OpaquePointer,
     _ imagePath: UnsafePointer<CChar>,
     _ resultsOut: UnsafeMutablePointer<UnsafeMutablePointer<CTextResult>?>,
     _ countOut: UnsafeMutablePointer<Int>
 ) -> Int32
 
-@_silgen_name("rusto_ocr_data")
-func rusto_ocr_data(
+@_silgen_name("rocr_ocr_data")
+func rocr_ocr_data(
     _ handle: OpaquePointer,
     _ imageData: UnsafePointer<UInt8>,
     _ imageLen: Int,
@@ -165,11 +205,11 @@ func rusto_ocr_data(
     _ countOut: UnsafeMutablePointer<Int>
 ) -> Int32
 
-@_silgen_name("rusto_free_results")
-func rusto_free_results(_ results: UnsafeMutablePointer<CTextResult>, _ count: Int)
+@_silgen_name("rocr_free_results")
+func rocr_free_results(_ results: UnsafeMutablePointer<CTextResult>, _ count: Int)
 
-@_silgen_name("rusto_free")
-func rusto_free(_ handle: OpaquePointer)
+@_silgen_name("rocr_free")
+func rocr_free(_ handle: OpaquePointer)
 
-@_silgen_name("rusto_version")
-func rusto_version() -> UnsafePointer<CChar>?
+@_silgen_name("rocr_version")
+func rocr_version() -> UnsafePointer<CChar>?

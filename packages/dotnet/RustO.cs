@@ -54,14 +54,14 @@ namespace RustO
         private const string LibName = "rusto";
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr rusto_new(
+        private static extern IntPtr rocr_new(
             [MarshalAs(UnmanagedType.LPUTF8Str)] string detModelPath,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string recModelPath,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string dictPath
         );
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int rusto_ocr_file(
+        private static extern int rocr_ocr_file(
             IntPtr handle,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string imagePath,
             out IntPtr results,
@@ -69,7 +69,7 @@ namespace RustO
         );
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int rusto_ocr_data(
+        private static extern int rocr_ocr_data(
             IntPtr handle,
             byte[] imageData,
             nuint imageLen,
@@ -78,13 +78,13 @@ namespace RustO
         );
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern void rusto_free_results(IntPtr results, nuint count);
+        private static extern void rocr_free_results(IntPtr results, nuint count);
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern void rusto_free(IntPtr handle);
+        private static extern void rocr_free(IntPtr handle);
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr rusto_version();
+        private static extern IntPtr rocr_version();
 
         private IntPtr _handle;
         private bool _disposed;
@@ -93,25 +93,68 @@ namespace RustO
         {
             get
             {
-                IntPtr versionPtr = rusto_version();
+                IntPtr versionPtr = rocr_version();
                 return Marshal.PtrToStringUTF8(versionPtr) ?? "unknown";
             }
         }
 
-        public RustO(string detModelPath, string recModelPath, string dictPath)
+        public RustO(string? detModelPath = null, string? recModelPath = null, string? dictPath = null)
         {
-            _handle = rusto_new(detModelPath, recModelPath, dictPath);
+            // Use default bundled models if not specified
+            detModelPath ??= "det.mnn";
+            recModelPath ??= "rec.mnn";
+            dictPath ??= "dict.txt";
+
+            // Resolve paths - look in models subdirectory of app directory first
+            detModelPath = ResolveModelPath(detModelPath);
+            recModelPath = ResolveModelPath(recModelPath);
+            dictPath = ResolveModelPath(dictPath);
+
+            _handle = rocr_new(detModelPath, recModelPath, dictPath);
             if (_handle == IntPtr.Zero)
             {
-                throw new RustOException("Failed to initialize RustO");
+                throw new RustOException($"Failed to initialize RustO with models: {detModelPath}, {recModelPath}, {dictPath}");
             }
+        }
+
+        private static string ResolveModelPath(string path)
+        {
+            // If absolute path exists, use it
+            if (Path.IsPathRooted(path) && File.Exists(path))
+            {
+                return path;
+            }
+
+            // Try models subdirectory in application directory
+            var appDir = AppContext.BaseDirectory;
+            var modelsPath = Path.Combine(appDir, "models", path);
+            if (File.Exists(modelsPath))
+            {
+                return modelsPath;
+            }
+
+            // Try directly in application directory
+            var directPath = Path.Combine(appDir, path);
+            if (File.Exists(directPath))
+            {
+                return directPath;
+            }
+
+            // Try current directory
+            if (File.Exists(path))
+            {
+                return Path.GetFullPath(path);
+            }
+
+            // Return original path and let native code handle the error
+            return path;
         }
 
         public List<TextResult> RecognizeFile(string imagePath)
         {
             ThrowIfDisposed();
 
-            int status = rusto_ocr_file(_handle, imagePath, out IntPtr resultsPtr, out nuint count);
+            int status = rocr_ocr_file(_handle, imagePath, out IntPtr resultsPtr, out nuint count);
             if (status != 0)
             {
                 throw new RustOException($"OCR failed with status code: {status}");
@@ -123,7 +166,7 @@ namespace RustO
             }
             finally
             {
-                rusto_free_results(resultsPtr, count);
+                rocr_free_results(resultsPtr, count);
             }
         }
 
@@ -131,7 +174,7 @@ namespace RustO
         {
             ThrowIfDisposed();
 
-            int status = rusto_ocr_data(_handle, imageData, (nuint)imageData.Length, 
+            int status = rocr_ocr_data(_handle, imageData, (nuint)imageData.Length, 
                 out IntPtr resultsPtr, out nuint count);
             if (status != 0)
             {
@@ -144,7 +187,7 @@ namespace RustO
             }
             finally
             {
-                rusto_free_results(resultsPtr, count);
+                rocr_free_results(resultsPtr, count);
             }
         }
 
@@ -177,7 +220,7 @@ namespace RustO
             {
                 if (_handle != IntPtr.Zero)
                 {
-                    rusto_free(_handle);
+                    rocr_free(_handle);
                     _handle = IntPtr.Zero;
                 }
                 _disposed = true;

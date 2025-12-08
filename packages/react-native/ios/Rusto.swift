@@ -35,11 +35,11 @@ class RustoModule: NSObject {
         
         // Free existing instance if any
         if let existing = rustoInstance {
-            rusto_free(existing)
+            rocr_free(existing)
         }
         
         // Initialize RustO with C FFI
-        rustoInstance = rusto_new(detPath, recPath, dictPath)
+        rustoInstance = rocr_new(detPath, recPath, dictPath)
         
         if rustoInstance == nil {
             reject("INIT_ERROR", "Failed to initialize RustO", nil)
@@ -69,7 +69,7 @@ class RustoModule: NSObject {
         var resultsPtr: UnsafeMutableRawPointer?
         var count: Int32 = 0
         
-        let status = rusto_ocr_file(instance, imagePath, &resultsPtr, &count)
+        let status = rocr_ocr_file(instance, imagePath, &resultsPtr, &count)
         
         if status != 0 {
             reject("OCR_ERROR", "OCR recognition failed with status: \(status)", nil)
@@ -85,7 +85,7 @@ class RustoModule: NSObject {
         let resultArray = convertResultsToArray(results, count: Int(count))
         
         // Free native results
-        rusto_free_results(results, count)
+        rocr_free_results(results, count)
         
         resolve(resultArray)
     }
@@ -111,7 +111,7 @@ class RustoModule: NSObject {
         var count: Int32 = 0
         
         data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
-            let status = rusto_ocr_data(instance, bytes.baseAddress, Int32(data.count), &resultsPtr, &count)
+            let status = rocr_ocr_data(instance, bytes.baseAddress, Int32(data.count), &resultsPtr, &count)
             
             if status != 0 {
                 reject("OCR_ERROR", "OCR recognition failed with status: \(status)", nil)
@@ -128,7 +128,7 @@ class RustoModule: NSObject {
         let resultArray = convertResultsToArray(results, count: Int(count))
         
         // Free native results
-        rusto_free_results(results, count)
+        rocr_free_results(results, count)
         
         resolve(resultArray)
     }
@@ -137,7 +137,7 @@ class RustoModule: NSObject {
     func getVersion(_ resolve: @escaping RCTPromiseResolveBlock,
                    rejecter reject: @escaping RCTPromiseRejectBlock) {
         
-        if let version = rusto_version() {
+        if let version = rocr_version() {
             let versionString = String(cString: version)
             resolve(versionString)
         } else {
@@ -148,54 +148,90 @@ class RustoModule: NSObject {
     // MARK: - Helper Methods
     
     private func getResourcePath(_ filename: String) -> String? {
+        // First, check if it's an absolute path that exists
+        if filename.hasPrefix("/") && FileManager.default.fileExists(atPath: filename) {
+            return filename
+        }
+        
+        // Try to find the file in bundle or documents, then copy to cache
+        var sourcePath: String?
+        
         // Try resource bundle first (for bundled models)
         if let bundlePath = Bundle(for: type(of: self)).path(forResource: "RustoModels", ofType: "bundle"),
-           let bundle = Bundle(path: bundlePath),
-           let filePath = bundle.path(forResource: filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: ""), ofType: String(filename.split(separator: ".").last ?? "")) {
-            return filePath
+           let bundle = Bundle(path: bundlePath) {
+            let name = filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
+            let ext = String(filename.split(separator: ".").last ?? "")
+            sourcePath = bundle.path(forResource: name, ofType: ext)
         }
         
         // Try main bundle resources
-        if let bundlePath = Bundle.main.path(forResource: filename, ofType: nil) {
-            return bundlePath
+        if sourcePath == nil {
+            sourcePath = Bundle.main.path(forResource: filename, ofType: nil)
         }
         
         // Try documents directory
-        let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
-        let filePath = (documentsPath as NSString).appendingPathComponent(filename)
+        if sourcePath == nil {
+            let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
+            let filePath = (documentsPath as NSString).appendingPathComponent(filename)
+            if FileManager.default.fileExists(atPath: filePath) {
+                sourcePath = filePath
+            }
+        }
         
-        if FileManager.default.fileExists(atPath: filePath) {
-            return filePath
+        // If we found the file, copy it to cache directory
+        if let source = sourcePath {
+            return copyToCache(source, filename: filename)
         }
         
         return nil
     }
     
+    private func copyToCache(_ sourcePath: String, filename: String) -> String? {
+        let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
+        let cachePath = (cacheDir as NSString).appendingPathComponent(filename)
+        
+        let fileManager = FileManager.default
+        
+        // If file already exists in cache, return cache path
+        if fileManager.fileExists(atPath: cachePath) {
+            return cachePath
+        }
+        
+        // Copy file to cache
+        do {
+            try fileManager.copyItem(atPath: sourcePath, toPath: cachePath)
+            return cachePath
+        } catch {
+            print("Error copying model to cache: \(error)")
+            // If copy fails, return original source path
+            return sourcePath
+        }
+    }
+    
     private func convertResultsToArray(_ resultsPtr: UnsafeMutableRawPointer, count: Int) -> [[String: Any]] {
         var resultArray: [[String: Any]] = []
+        let structSize = MemoryLayout<CTextResult>.stride
         
         for i in 0..<count {
-            var text: UnsafeMutablePointer<CChar>?
-            var score: Float = 0.0
-            var boxPoints = [Float](repeating: 0, count: 8)
+            let offset = i * structSize
+            let resultPtr = resultsPtr.advanced(by: offset)
+            let result = resultPtr.load(as: CTextResult.self)
             
-            rusto_get_result(resultsPtr, Int32(i), &text, &score, &boxPoints)
-            
-            if let textPtr = text {
+            if let textPtr = result.text {
                 let textString = String(cString: textPtr)
                 
-                let result: [String: Any] = [
+                let resultDict: [String: Any] = [
                     "text": textString,
-                    "score": Double(score),
+                    "score": Double(result.score),
                     "box_points": [
-                        [Double(boxPoints[0]), Double(boxPoints[1])],
-                        [Double(boxPoints[2]), Double(boxPoints[3])],
-                        [Double(boxPoints[4]), Double(boxPoints[5])],
-                        [Double(boxPoints[6]), Double(boxPoints[7])]
+                        [Double(result.box_x1), Double(result.box_y1)],
+                        [Double(result.box_x2), Double(result.box_y2)],
+                        [Double(result.box_x3), Double(result.box_y3)],
+                        [Double(result.box_x4), Double(result.box_y4)]
                     ]
                 ]
                 
-                resultArray.append(result)
+                resultArray.append(resultDict)
             }
         }
         
@@ -204,30 +240,41 @@ class RustoModule: NSObject {
     
     deinit {
         if let instance = rustoInstance {
-            rusto_free(instance)
+            rocr_free(instance)
         }
     }
 }
 
 // MARK: - C FFI Declarations
 
-@_silgen_name("rusto_new")
-func rusto_new(_ detModel: String, _ recModel: String, _ dict: String) -> OpaquePointer?
+// C struct matching Rust CTextResult
+struct CTextResult {
+    var text: UnsafeMutablePointer<CChar>?
+    var score: Float
+    var box_x1: Float
+    var box_y1: Float
+    var box_x2: Float
+    var box_y2: Float
+    var box_x3: Float
+    var box_y3: Float
+    var box_x4: Float
+    var box_y4: Float
+}
 
-@_silgen_name("rusto_ocr_file")
-func rusto_ocr_file(_ instance: OpaquePointer, _ imagePath: String, _ results: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ count: UnsafeMutablePointer<Int32>) -> Int32
+@_silgen_name("rocr_new")
+func rocr_new(_ detModel: String, _ recModel: String, _ dict: String) -> OpaquePointer?
 
-@_silgen_name("rusto_ocr_data")
-func rusto_ocr_data(_ instance: OpaquePointer, _ data: UnsafeRawPointer?, _ length: Int32, _ results: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ count: UnsafeMutablePointer<Int32>) -> Int32
+@_silgen_name("rocr_ocr_file")
+func rocr_ocr_file(_ instance: OpaquePointer, _ imagePath: String, _ results: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ count: UnsafeMutablePointer<Int32>) -> Int32
 
-@_silgen_name("rusto_get_result")
-func rusto_get_result(_ results: UnsafeMutableRawPointer, _ index: Int32, _ text: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>, _ score: UnsafeMutablePointer<Float>, _ boxPoints: UnsafeMutablePointer<Float>)
+@_silgen_name("rocr_ocr_data")
+func rocr_ocr_data(_ instance: OpaquePointer, _ data: UnsafeRawPointer?, _ length: Int32, _ results: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ count: UnsafeMutablePointer<Int32>) -> Int32
 
-@_silgen_name("rusto_free_results")
-func rusto_free_results(_ results: UnsafeMutableRawPointer, _ count: Int32)
+@_silgen_name("rocr_free_results")
+func rocr_free_results(_ results: UnsafeMutableRawPointer, _ count: Int32)
 
-@_silgen_name("rusto_free")
-func rusto_free(_ instance: OpaquePointer)
+@_silgen_name("rocr_free")
+func rocr_free(_ instance: OpaquePointer)
 
-@_silgen_name("rusto_version")
-func rusto_version() -> UnsafeMutablePointer<CChar>?
+@_silgen_name("rocr_version")
+func rocr_version() -> UnsafeMutablePointer<CChar>?
