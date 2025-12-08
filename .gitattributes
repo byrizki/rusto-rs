@@ -1,0 +1,7 @@
+# Treat model files as binary
+*.mnn binary
+*.onnx binary
+
+# Text files should use LF line endings
+*.txt text eol=lf
+*.md text eol=lf

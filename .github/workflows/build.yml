@@ -13,7 +13,7 @@ jobs:
   # Build iOS XCFramework
   build-ios:
     name: Build RustO iOS XCFramework
-    runs-on: macos-14
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -204,13 +204,13 @@ jobs:
           - os: macos
             arch: x64
             target: osx-x64
-            runner: macos-13
+            runner: macos-latest
             lib: librusto.dylib
             rust_target: x86_64-apple-darwin
           - os: macos
             arch: arm64
             target: osx-arm64
-            runner: macos-14
+            runner: macos-latest
             lib: librusto.dylib
             rust_target: aarch64-apple-darwin
           - os: windows

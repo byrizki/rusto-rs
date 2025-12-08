@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0;net6.0;netstandard2.1</TargetFrameworks>
     <RootNamespace>RustO</RootNamespace>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>RustO</PackageId>
@@ -18,8 +18,8 @@
 
   <ItemGroup>
     <None Include="runtimes\**\*" Pack="true" PackagePath="runtimes\" />
-    <None Include="models\**\*.mnn" Pack="true" PackagePath="contentFiles\any\any\models\" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="models\**\*.txt" Pack="true" PackagePath="contentFiles\any\any\models\" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="models\**\*.mnn" Pack="true" PackagePath="contentFiles\any\any\models\" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="models\**\*.txt" Pack="true" PackagePath="contentFiles\any\any\models\" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
