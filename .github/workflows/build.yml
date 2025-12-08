@@ -167,9 +167,11 @@ jobs:
            echo "\nFiles in Android package models/:"
            ls -lh packages/android/src/main/assets/models/ || echo "No files copied"
 
-      - name: Make gradlew executable
+      - name: Setup Gradle Wrapper
         working-directory: packages/android
-        run: chmod +x gradlew || true
+        run: |
+          gradle wrapper --gradle-version 8.7
+          chmod +x gradlew
 
       - name: Build AAR
         working-directory: packages/android
