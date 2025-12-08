@@ -89,8 +89,8 @@ impl<'a> Tensor<'a> {
 
     pub fn wait(&self, map_type: crate::ffi::MapType, finish: bool) {
         unsafe {
-            let mnn_map_type = map_type as u32;
-            mnn_sys::MNN_Tensor_wait(self.inner.as_ptr(), mnn_map_type, finish as i32);
+            let mnn_map_type: u32 = map_type as u32;
+            mnn_sys::MNN_Tensor_wait(self.inner.as_ptr(), mnn_map_type.try_into().unwrap(), finish as i32);
         }
     }
 }

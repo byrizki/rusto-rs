@@ -63,6 +63,14 @@ fn main() {
     if let Ok(num) = env::var("NUM_JOBS") {
         cmake_config.define("CMAKE_BUILD_PARALLEL_LEVEL", num);
     }
+
+    // Disable AVX/AVX2 optimizations for Android x86 builds to avoid linking errors
+    if env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() == "android" {
+        cmake_config
+            .define("MNN_AVX2", "OFF")
+            .define("MNN_AVX512", "OFF")
+            .define("MNN_FMA", "OFF"); 
+    }
     
     let dst = cmake_config.build();
 
@@ -76,11 +84,32 @@ fn main() {
         .compile("mnn_wrapper");
 
     // Tell cargo to look for the library
-    // MNN build output is in build directory since we skip install
-    println!("cargo:rustc-link-search=native={}/build", dst.display());
-    println!("cargo:rustc-link-search=native={}/lib", dst.display()); // Keep these as fallbacks
-    println!("cargo:rustc-link-search=native={}/lib64", dst.display());
+    // Recursively search for the MNN library file to handle different build layouts (e.g. MSVC Release/Debug)
+    let lib_name = if cfg!(windows) { "MNN.lib" } else { "libMNN.a" };
+    let mut found_lib = false;
     
+    if let Ok(entries) = walkdir::WalkDir::new(&dst).into_iter().collect::<Result<Vec<_>, _>>() {
+        for entry in entries {
+            if entry.file_name() == lib_name {
+                if let Some(parent) = entry.path().parent() {
+                    println!("cargo:rustc-link-search=native={}", parent.display());
+                    found_lib = true;
+                    // Don't break, allow adding multiple candidates if duplicates exist (rare but safe)
+                }
+            }
+        }
+    }
+    
+    if !found_lib {
+        // Fallback paths if walkdir fails or library not found (e.g. not built yet?)
+        println!("cargo:warning=MNN library ({}) not found in build output search. Using default fallback paths.", lib_name);
+        println!("cargo:rustc-link-search=native={}/build", dst.display());
+        println!("cargo:rustc-link-search=native={}/build/Release", dst.display());
+        println!("cargo:rustc-link-search=native={}/build/Debug", dst.display());
+        println!("cargo:rustc-link-search=native={}/lib", dst.display());
+        println!("cargo:rustc-link-search=native={}/lib64", dst.display());
+    }
+
     // Link MNN library
     println!("cargo:rustc-link-lib=static=MNN");
     

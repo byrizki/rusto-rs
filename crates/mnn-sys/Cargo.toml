@@ -11,6 +11,7 @@ license = "MIT"
 bindgen = "0.70"
 cc = "1.0"
 cmake = "0.1"
+walkdir = "2.5.0"
 
 [features]
 default = []

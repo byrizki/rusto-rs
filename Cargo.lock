@@ -594,6 +594,7 @@ dependencies = [
  "bindgen",
  "cc",
  "cmake",
+ "walkdir",
 ]
 
 [[package]]
