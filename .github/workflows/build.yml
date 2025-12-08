@@ -3,7 +3,7 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
   workflow_dispatch:
 
 env:
@@ -14,65 +14,63 @@ jobs:
   build-ios:
     name: Build RustO iOS XCFramework
     runs-on: macos-14
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          submodules: recursive
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      
+
       - name: Add iOS targets
         run: |
           rustup target add aarch64-apple-ios
           rustup target add aarch64-apple-ios-sim
           rustup target add x86_64-apple-ios
-      
+
       - name: Setup environment
         run: |
-          echo "ORT_LIB_LOCATION=${{ github.workspace }}/onnxruntime-ios" >> $GITHUB_ENV
-      
+          echo "Building MNN from source"
+
       - name: Build for iOS targets
         run: |
           cargo build --release --target aarch64-apple-ios --features ffi
           cargo build --release --target aarch64-apple-ios-sim --features ffi
           cargo build --release --target x86_64-apple-ios --features ffi
-      
+
       - name: Create XCFramework
         run: |
           mkdir -p build/ios-device build/ios-simulator
-          
+
           cp target/aarch64-apple-ios/release/librusto.a build/ios-device/
-          
+
           lipo -create \
             target/aarch64-apple-ios-sim/release/librusto.a \
             target/x86_64-apple-ios/release/librusto.a \
             -output build/ios-simulator/librusto.a
-          
+
           xcodebuild -create-xcframework \
             -library build/ios-device/librusto.a \
             -library build/ios-simulator/librusto.a \
             -output build/RustO.xcframework
-          
+
           # Copy model files
           echo "=== Copying model files to iOS package ==="
           mkdir -p packages/ios/Resources/models
-          
-          echo "Looking for .mnn files:"
-          find models/ -name "*.mnn" -type f
-          
-          echo "Copying .mnn files..."
-          find models/ -name "*.mnn" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/ios/Resources/models/' _ {} \; || true
-          
-          echo "Copying .txt files..."
-          find models/ -name "*.txt" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/ios/Resources/models/' _ {} \; || true
-          
+
+          echo "Copying model files..."
+          cp models/PPOCR_v5/det.mnn packages/ios/Resources/models/
+          cp models/PPOCR_v5/rec.mnn packages/ios/Resources/models/
+          cp models/PPOCR_v5/dict.txt packages/ios/Resources/models/
+
           echo "\nFiles in iOS package models/:"
           ls -lh packages/ios/Resources/models/ || echo "No files copied"
-          
+
           cd build
           zip -r RustO.xcframework.zip RustO.xcframework
           cd ..
-          
+
           # Create a package with models
           mkdir -p build/package
           cp -r build/RustO.xcframework build/package/
@@ -80,7 +78,7 @@ jobs:
           cd build/package
           zip -r ../RustO-with-models.xcframework.zip .
           cd ../..
-      
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -93,41 +91,43 @@ jobs:
   build-android:
     name: Build RustO Android AAR
     runs-on: ubuntu-22.04
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          submodules: recursive
+
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libpthread-stubs0-dev
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
-      
+          distribution: "temurin"
+          java-version: "17"
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      
+
       - name: Install Android targets
         run: |
           rustup target add aarch64-linux-android
           rustup target add armv7-linux-androideabi
           rustup target add i686-linux-android
           rustup target add x86_64-linux-android
-      
+
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26c
           add-to-path: true
-      
+
       - name: Setup NDK environment
         run: |
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
           echo "NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
           echo "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
-      
+
       - name: Build for Android targets
         env:
           CC_aarch64_linux_android: aarch64-linux-android21-clang
@@ -147,33 +147,29 @@ jobs:
           cargo build --release --target armv7-linux-androideabi --features ffi
           cargo build --release --target i686-linux-android --features ffi
           cargo build --release --target x86_64-linux-android --features ffi
-          
+
           mkdir -p packages/android/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86,x86_64}
           cp target/aarch64-linux-android/release/librusto.so packages/android/src/main/jniLibs/arm64-v8a/
           cp target/armv7-linux-androideabi/release/librusto.so packages/android/src/main/jniLibs/armeabi-v7a/
           cp target/i686-linux-android/release/librusto.so packages/android/src/main/jniLibs/x86/
           cp target/x86_64-linux-android/release/librusto.so packages/android/src/main/jniLibs/x86_64/
-          
-          # Copy model files
-          echo "=== Copying model files to Android package ==="
-          mkdir -p packages/android/src/main/assets/models
-          
-          echo "Looking for .mnn files:"
-          find models/ -name "*.mnn" -type f
-          
-          echo "Copying .mnn files..."
-          find models/ -name "*.mnn" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/android/src/main/assets/models/' _ {} \; || true
-          
-          echo "Copying .txt files..."
-          find models/ -name "*.txt" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/android/src/main/assets/models/' _ {} \; || true
-          
-          echo "\nFiles in Android package models/:"
-          ls -lh packages/android/src/main/assets/models/ || echo "No files copied"
-      
+
+           # Copy model files
+           echo "=== Copying model files to Android package ==="
+           mkdir -p packages/android/src/main/assets/models
+           
+           echo "Copying model files..."
+           cp models/PPOCR_v5/det.mnn packages/android/src/main/assets/models/
+           cp models/PPOCR_v5/rec.mnn packages/android/src/main/assets/models/
+           cp models/PPOCR_v5/dict.txt packages/android/src/main/assets/models/
+           
+           echo "\nFiles in Android package models/:"
+           ls -lh packages/android/src/main/assets/models/ || echo "No files copied"
+
       - name: Make gradlew executable
         working-directory: packages/android
         run: chmod +x gradlew || true
-      
+
       - name: Build AAR
         working-directory: packages/android
         run: |
@@ -182,7 +178,7 @@ jobs:
           else
             gradle assembleRelease
           fi
-      
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -220,47 +216,38 @@ jobs:
             runner: windows-2022
             lib: rusto.dll
             rust_target: x86_64-pc-windows-msvc
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          submodules: recursive
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust_target }}
-      
-      - name: Setup environment (Unix)
-        if: matrix.os != 'windows'
-        run: |
-          echo "ORT_LIB_LOCATION=${{ github.workspace }}/onnxruntime/lib" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=${{ github.workspace }}/onnxruntime/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-          echo "DYLD_LIBRARY_PATH=${{ github.workspace }}/onnxruntime/lib:$DYLD_LIBRARY_PATH" >> $GITHUB_ENV
-      
-      - name: Setup environment (Windows)
-        if: matrix.os == 'windows'
-        shell: bash
-        run: |
-          echo "ORT_LIB_LOCATION=${{ github.workspace }}/onnxruntime/lib" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/onnxruntime/lib" >> $GITHUB_PATH
-      
+
+      - name: Setup environment
+        run: echo "Building MNN from source"
+
       - name: Build native library
         run: cargo build --release --target ${{ matrix.rust_target }} --features ffi
-      
+
       - name: Create runtimes directory
         shell: bash
         run: mkdir -p packages/dotnet/runtimes/${{ matrix.target }}/native
-      
+
       - name: Copy library (Unix)
         if: matrix.os != 'windows'
         run: |
           cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
-      
+
       - name: Copy library (Windows)
         if: matrix.os == 'windows'
         shell: bash
         run: |
           cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
-      
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -272,21 +259,23 @@ jobs:
     name: Package .NET NuGet
     needs: [build-dotnet]
     runs-on: ubuntu-22.04
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          submodules: recursive
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
-      
+          dotnet-version: "8.0.x"
+
       - name: Download all .NET artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: rusto-dotnet-*
           path: artifacts
-      
+
       - name: Merge runtime artifacts
         run: |
           mkdir -p packages/dotnet/runtimes
@@ -295,24 +284,24 @@ jobs:
               cp -r "$dir/runtimes/"* packages/dotnet/runtimes/
             fi
           done
-          
+
       - name: Copy model files to package
         run: |
           echo "=== Copying model files to NuGet package ==="
           mkdir -p packages/dotnet/models
-          
+
           echo "Looking for .mnn files:"
           find models/ -name "*.mnn" -type f
-          
+
           echo "Looking for .txt files:"
           find models/ -name "*.txt" -type f
-          
+
           echo "Copying .mnn files..."
           find models/ -name "*.mnn" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/dotnet/models/' _ {} \; || true
-          
+
           echo "Copying .txt files..."
           find models/ -name "*.txt" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/dotnet/models/' _ {} \; || true
-          
+
           echo "\nFiles in packages/dotnet/models/:"
           ls -lh packages/dotnet/models/ || echo "No files copied"
 
@@ -338,7 +327,7 @@ jobs:
           dotnet pack -c Release -o ../../nupkg -v detailed || echo "NuGet pack will be done manually"
           echo "\nGenerated packages:"
           ls -lh ../../nupkg/ || echo "No packages generated"
-      
+
       - name: Upload NuGet package
         uses: actions/upload-artifact@v4
         with:
@@ -347,26 +336,84 @@ jobs:
             nupkg/*.nupkg
             packages/dotnet/runtimes/**/*
 
+  # package React Native
+  package-react-native:
+    name: Package React Native
+    needs: [build-ios, build-android]
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          registry-url: "https://registry.npmjs.org"
+
+      # Download iOS XCFramework
+      - name: Download iOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: rusto-ios-xcframework
+          path: artifacts/ios
+
+      # Download Android AAR
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: rusto-android-aar
+          path: artifacts/android
+
+      - name: Prepare React Native package
+        run: |
+          # Setup directories
+          mkdir -p packages/react-native/ios
+          mkdir -p packages/react-native/android/libs
+
+          # Extract and copy iOS XCFramework
+          unzip artifacts/ios/RustO-with-models.xcframework.zip -d artifacts/ios/temp
+          cp -r artifacts/ios/temp/RustO.xcframework packages/react-native/ios/
+
+          # Copy Android AAR
+          cp artifacts/android/*.aar packages/react-native/android/libs/RustO.aar
+
+      - name: Pack NPM package
+        working-directory: packages/react-native
+        run: |
+          npm install
+          npm pack
+
+      - name: Upload NPM package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-react-native-package
+          path: packages/react-native/*.tgz
+
   # Create GitHub Release
   release:
     name: Create GitHub Release
-    needs: [build-ios, build-android, package-dotnet]
+    needs: [build-ios, build-android, package-dotnet, package-react-native]
     runs-on: ubuntu-22.04
     if: startsWith(github.ref, 'refs/tags/')
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+        with:
+          submodules: recursive
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-      
+
       - name: Create release archives
         run: |
           mkdir -p releases
           cd artifacts
-          
+
           for dir in rusto-x86_64-* rusto-aarch64-*; do
             if [ -d "$dir" ]; then
               cd "$dir"
@@ -374,16 +421,16 @@ jobs:
               cd ..
             fi
           done
-          
+
           if [ -d "rusto-ios-xcframework" ]; then
             cp rusto-ios-xcframework/RustO.xcframework.zip ../releases/ || true
             cp rusto-ios-xcframework/RustO-with-models.xcframework.zip ../releases/ || true
           fi
-          
+
           if [ -d "rusto-android-aar" ]; then
             cp rusto-android-aar/*.aar ../releases/ || true
           fi
-          
+
           if [ -d "rusto-dotnet-nupkg" ]; then
             cd rusto-dotnet-nupkg
             if ls *.nupkg 1> /dev/null 2>&1; then
@@ -394,12 +441,16 @@ jobs:
             fi
             cd ..
           fi
-      
+
+          if [ -d "rusto-react-native-package" ]; then
+             cp rusto-react-native-package/*.tgz ../releases/ || true
+          fi
+
       - name: Generate checksums
         working-directory: releases
         run: |
           sha256sum * > SHA256SUMS || true
-      
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -409,13 +460,13 @@ jobs:
           generate_release_notes: true
           body: |
             ## RustO! Release ${{ github.ref_name }}
-            
+
             ### Highlights
             - Pure Rust OCR library powered by PaddleOCR models
             - Uses MNN inference engine for optimal performance
             - Cross-platform support (Linux, macOS, Windows, iOS, Android, .NET)
             - Includes bundled model files and dictionary files
-            
+
             ### Platform Support
             - **Linux**: x64, ARM64
             - **macOS**: x64 (Intel), ARM64 (Apple Silicon)
@@ -423,11 +474,12 @@ jobs:
             - **iOS**: Universal XCFramework (device + simulator)
             - **Android**: AAR with all architectures (arm64-v8a, armeabi-v7a, x86, x86_64)
             - **.NET**: NuGet package with native libraries for all desktop platforms
-            
+            - **React Native**: NPM package with bundled binaries
+
             ### Installation
             Download the appropriate package for your platform and extract it.
             See SHA256SUMS for file verification.
-            
+
             ### Inference Engine
             - Uses MNN (Mobile Neural Network) for efficient inference
             - Includes pre-converted PaddleOCR models in MNN format

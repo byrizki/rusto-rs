@@ -1,0 +1,48 @@
+buildscript {
+  // Buildscript is empty for module, but can be used for dependencies
+}
+
+apply plugin: 'com.android.library'
+
+def safeExtGet(prop, fallback) {
+  rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
+
+android {
+  compileSdkVersion safeExtGet('ReactNativeRusto_compileSdkVersion', 33)
+  
+  defaultConfig {
+    minSdkVersion safeExtGet('ReactNativeRusto_minSdkVersion', 21)
+    targetSdkVersion safeExtGet('ReactNativeRusto_targetSdkVersion', 33)
+    versionCode 1
+    versionName "1.0"
+  }
+
+  buildTypes {
+    release {
+      minifyEnabled false
+    }
+  }
+
+  lintOptions {
+    disable 'GradleCompatible'
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_1_8
+    targetCompatibility JavaVersion.VERSION_1_8
+  }
+}
+
+repositories {
+  mavenLocal()
+  google()
+  mavenCentral()
+}
+
+dependencies {
+  implementation "com.facebook.react:react-native:+"
+  
+  // Link the local AAR file
+  implementation files('libs/RustO.aar')
+}
