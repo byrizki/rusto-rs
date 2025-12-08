@@ -23,7 +23,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     // Test image from models/test_images
-    let test_image = "models/test_images/example1.png";
+    // let test_image = "models/test_images/example1.png";
+    let test_image = "models/images/ktp-teng.jpg";
     println!("Processing: {}\n", test_image);
 
     // Run OCR

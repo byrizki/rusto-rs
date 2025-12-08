@@ -68,7 +68,8 @@ int MNN_Interpreter_runSession(MNN_Interpreter* net, MNN_Session* session) {
 MNN_Tensor* MNN_Interpreter_getSessionInput(MNN_Interpreter* net, MNN_Session* session, const char* name) {
     auto* interpreter = reinterpret_cast<MNN::Interpreter*>(net);
     auto* s = reinterpret_cast<MNN::Session*>(session);
-    return reinterpret_cast<MNN_Tensor*>(interpreter->getSessionInput(s, name));
+    auto* t = interpreter->getSessionInput(s, name);
+    return reinterpret_cast<MNN_Tensor*>(t);
 }
 
 MNN_Tensor* MNN_Interpreter_getSessionOutput(MNN_Interpreter* net, MNN_Session* session, const char* name) {
@@ -94,6 +95,7 @@ MNN_TensorInfo* MNN_Interpreter_getSessionInputAll(MNN_Interpreter* net, MNN_Ses
     
     info_storage.clear();
     name_storage.clear();
+    name_storage.reserve(inputs.size());
     
     for (const auto& pair : inputs) {
         name_storage.push_back(pair.first);
@@ -123,6 +125,7 @@ MNN_TensorInfo* MNN_Interpreter_getSessionOutputAll(MNN_Interpreter* net, MNN_Se
     
     info_storage.clear();
     name_storage.clear();
+    name_storage.reserve(outputs.size());
     
     for (const auto& pair : outputs) {
         name_storage.push_back(pair.first);
@@ -143,12 +146,23 @@ void MNN_Interpreter_resizeTensor(MNN_Interpreter* net, MNN_Tensor* tensor, cons
     interpreter->resizeTensor(t, shape);
 }
 
-// Tensor functions
-MNN_Tensor* MNN_Tensor_create(int dims, const int* shape, int /*type*/) {
+// Tensor functions  
+MNN_Tensor* MNN_Tensor_create(int dims, const int* shape, int type) {
     std::vector<int> shape_vec(shape, shape + dims);
     halide_type_t halide_type;
-    halide_type.code = halide_type_float;
-    halide_type.bits = 32;
+    
+    // Halide type codes: int=0, uint=1, float=2
+    // Our type parameter: 0=int, 1=uint, 2=float (default)
+    if (type == 0) {
+        halide_type.code = halide_type_int;
+        halide_type.bits = 32;
+    } else if (type == 1) {
+        halide_type.code = halide_type_uint;
+        halide_type.bits = 32;
+    } else {
+        halide_type.code = halide_type_float;
+        halide_type.bits = 32;
+    }
     halide_type.lanes = 1;
     
     // Use CAFFE (NCHW) layout by default as it's the standard for data exchange

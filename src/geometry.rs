@@ -12,7 +12,9 @@ use opencv::core::{Mat, Point2f};
 type ImgResult<T> = opencv::Result<T>;
 
 #[cfg(not(feature = "use-opencv"))]
-use crate::image_impl::{self, Mat, Point2f, Result as ImgResult, Size, INTER_LINEAR, ROTATE_90_CLOCKWISE};
+use crate::image_impl::{
+    self, Mat, Point2f, Result as ImgResult, Size, INTER_LINEAR, ROTATE_90_CLOCKWISE,
+};
 
 pub type OpRecord = BTreeMap<String, BTreeMap<String, f32>>;
 
@@ -46,10 +48,18 @@ pub fn map_boxes_to_original(
 
     for box_pts in dt_boxes.iter_mut() {
         for p in box_pts.iter_mut() {
-            if p.x < 0.0 { p.x = 0.0; }
-            if p.y < 0.0 { p.y = 0.0; }
-            if p.x > ori_w as f32 { p.x = ori_w as f32; }
-            if p.y > ori_h as f32 { p.y = ori_h as f32; }
+            if p.x < 0.0 {
+                p.x = 0.0;
+            }
+            if p.y < 0.0 {
+                p.y = 0.0;
+            }
+            if p.x > ori_w as f32 {
+                p.x = ori_w as f32;
+            }
+            if p.y > ori_h as f32 {
+                p.y = ori_h as f32;
+            }
         }
     }
 }
@@ -262,16 +272,11 @@ pub fn reduce_max_side(img: &Mat, max_side_len: f32) -> Result<(Mat, f32, f32), 
         )?;
         d
     };
-    
+
     #[cfg(not(feature = "use-opencv"))]
     let dst = {
         let mut d = Mat::default();
-        image_impl::resize(
-            img,
-            &mut d,
-            Size::new(resize_w, resize_h),
-            INTER_LINEAR,
-        )?;
+        image_impl::resize(img, &mut d, Size::new(resize_w, resize_h), INTER_LINEAR)?;
         d
     };
 
@@ -320,16 +325,11 @@ pub fn increase_min_side(img: &Mat, min_side_len: f32) -> Result<(Mat, f32, f32)
         )?;
         d
     };
-    
+
     #[cfg(not(feature = "use-opencv"))]
     let dst = {
         let mut d = Mat::default();
-        image_impl::resize(
-            img,
-            &mut d,
-            Size::new(resize_w, resize_h),
-            INTER_LINEAR,
-        )?;
+        image_impl::resize(img, &mut d, Size::new(resize_w, resize_h), INTER_LINEAR)?;
         d
     };
 
@@ -339,10 +339,7 @@ pub fn increase_min_side(img: &Mat, min_side_len: f32) -> Result<(Mat, f32, f32)
 }
 
 #[cfg(feature = "use-opencv")]
-pub fn add_round_letterbox(
-    img: &Mat,
-    padding: (i32, i32, i32, i32),
-) -> Result<Mat, EngineError> {
+pub fn add_round_letterbox(img: &Mat, padding: (i32, i32, i32, i32)) -> Result<Mat, EngineError> {
     let mut dst = Mat::default();
     core::copy_make_border(
         img,
@@ -358,20 +355,17 @@ pub fn add_round_letterbox(
 }
 
 #[cfg(not(feature = "use-opencv"))]
-pub fn add_round_letterbox(
-    img: &Mat,
-    padding: (i32, i32, i32, i32),
-) -> Result<Mat, EngineError> {
-    use image::{RgbImage, Rgb};
-    
+pub fn add_round_letterbox(img: &Mat, padding: (i32, i32, i32, i32)) -> Result<Mat, EngineError> {
+    use image::{Rgb, RgbImage};
+
     let rgb_img = img.to_rgb8();
     let (width, height) = rgb_img.dimensions();
-    
+
     let new_width = width + padding.2 as u32 + padding.3 as u32;
     let new_height = height + padding.0 as u32 + padding.1 as u32;
-    
+
     let mut new_img = RgbImage::from_pixel(new_width, new_height, Rgb([0, 0, 0]));
-    
+
     // Copy original image to center
     for y in 0..height {
         for x in 0..width {
@@ -379,7 +373,67 @@ pub fn add_round_letterbox(
             new_img.put_pixel(x + padding.3 as u32, y + padding.0 as u32, *pixel);
         }
     }
-    
+
     Ok(Mat::new(image::DynamicImage::ImageRgb8(new_img)))
 }
 
+pub fn iou(box1: &[f32; 4], box2: &[f32; 4]) -> f32 {
+    let x1 = box1[0];
+    let y1 = box1[1];
+    let x2 = box1[2];
+    let y2 = box1[3];
+
+    let x1_p = box2[0];
+    let y1_p = box2[1];
+    let x2_p = box2[2];
+    let y2_p = box2[3];
+
+    let x1_i = x1.max(x1_p);
+    let y1_i = y1.max(y1_p);
+    let x2_i = x2.min(x2_p);
+    let y2_i = y2.min(y2_p);
+
+    let inter_area = (x2_i - x1_i + 1.0).max(0.0) * (y2_i - y1_i + 1.0).max(0.0);
+
+    let box1_area = (x2 - x1 + 1.0) * (y2 - y1 + 1.0);
+    let box2_area = (x2_p - x1_p + 1.0) * (y2_p - y1_p + 1.0);
+
+    inter_area / (box1_area + box2_area - inter_area)
+}
+
+pub fn nms(boxes: &[[f32; 6]], iou_same: f32, iou_diff: f32) -> Vec<usize> {
+    let mut indices: Vec<usize> = (0..boxes.len()).collect();
+    indices.sort_by(|&a, &b| boxes[b][1].partial_cmp(&boxes[a][1]).unwrap());
+
+    let mut selected_indices = Vec::new();
+
+    while let Some(&current) = indices.first() {
+        selected_indices.push(current);
+        let current_box = &boxes[current];
+        let current_class = current_box[0];
+        let current_coords = [
+            current_box[2],
+            current_box[3],
+            current_box[4],
+            current_box[5],
+        ];
+
+        indices.remove(0);
+
+        indices.retain(|&i| {
+            let box_ = &boxes[i];
+            let box_class = box_[0];
+            let box_coords = [box_[2], box_[3], box_[4], box_[5]];
+            let iou_value = iou(&current_coords, &box_coords);
+            let threshold = if current_class == box_class {
+                iou_same
+            } else {
+                iou_diff
+            };
+
+            iou_value < threshold
+        });
+    }
+
+    selected_indices
+}

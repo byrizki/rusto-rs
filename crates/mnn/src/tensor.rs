@@ -103,7 +103,7 @@ impl Tensor<'_> {
             let tensor_ptr = mnn_sys::MNN_Tensor_create(
                 dims,
                 shape.as_ptr(),
-                0, // type parameter unused in wrapper but passed for safety
+                2, // 2 = float32 (Halide type code)
             );
             
             let inner = NonNull::new(tensor_ptr)

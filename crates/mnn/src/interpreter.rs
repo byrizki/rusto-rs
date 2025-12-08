@@ -159,14 +159,14 @@ impl Interpreter {
         }
     }
 
-    pub fn resize_tensor(&self, tensor: &mut Tensor, shape: [i32; 4]) {
+    pub fn resize_tensor(&self, tensor: &mut Tensor, shape: &[i32]) {
         unsafe {
-            let dims = shape.as_ptr() as *const i32;
+            let dims = shape.as_ptr();
             mnn_sys::MNN_Interpreter_resizeTensor(
                 self.inner.as_ptr(),
                 tensor.as_ptr(),
                 dims,
-                4,
+                shape.len() as i32,
             );
         }
     }

@@ -25,9 +25,9 @@ pub enum TaskType {
     Det,
     Cls,
     Rec,
-    Orient,      // Document orientation classification
-    Unwarp,     // Text image rectification
-    Layout,      // Layout detection
+    Orient, // Document orientation classification
+    Unwarp, // Text image rectification
+    Layout, // Layout detection
 }
 
 #[derive(Clone, Debug)]
@@ -43,7 +43,7 @@ impl Default for EngineConfig {
         let num_threads = std::thread::available_parallelism()
             .map(|n| n.get() as i32)
             .unwrap_or(4);
-        
+
         Self {
             intra_op_num_threads: num_threads,
             inter_op_num_threads: 1, // Keep inter-op at 1 for better cache locality
@@ -170,7 +170,7 @@ pub struct OrientConfig {
     pub orient_image_shape: [i32; 3],
     pub mean: [f32; 3],
     pub std: [f32; 3],
-    pub confidence_threshold: f32,  // Minimum confidence to apply orientation correction
+    pub confidence_threshold: f32, // Minimum confidence to apply orientation correction
     pub orient_batch_num: i32,
     pub orient_thresh: f32,
     pub engine_cfg: EngineConfig,
@@ -186,7 +186,7 @@ impl OrientConfig {
             orient_image_shape: [3, 224, 224],
             mean: [0.5, 0.5, 0.5],
             std: [0.5, 0.5, 0.5],
-            confidence_threshold: 0.9,  // Default: 90% confidence required
+            confidence_threshold: 0.9, // Default: 90% confidence required
             orient_batch_num: 1,
             orient_thresh: 0.9,
             engine_cfg: EngineConfig::default(),
@@ -248,13 +248,44 @@ impl Default for GlobalConfig {
             use_unwarp: false,
             orient_config: None,
             unwarp_config: None,
-            debug_images: false,  // Disabled by default for performance
+            debug_images: false, // Disabled by default for performance
             min_height: 30.0,
             width_height_ratio: 8.0,
             max_side_len: 2000.0,
             min_side_len: 30.0,
             return_word_box: false,
             return_single_char_box: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LayoutConfig {
+    pub engine_type: EngineType,
+    pub model_type: ModelType,
+    pub task_type: TaskType,
+    pub model_path: PathBuf,
+    pub mean: [f32; 3],
+    pub std: [f32; 3],
+    pub conf_thresh: f32,
+    pub iou_thresh: f32,
+    pub target_size: i32,
+    pub engine_cfg: EngineConfig,
+}
+
+impl LayoutConfig {
+    pub fn default(model_path: PathBuf) -> Self {
+        Self {
+            engine_type: EngineType::OnnxRuntime,
+            model_type: ModelType::Mobile,
+            task_type: TaskType::Layout,
+            model_path,
+            mean: [0.485, 0.456, 0.406], // ImageNet mean
+            std: [0.229, 0.224, 0.225],  // ImageNet std
+            conf_thresh: 0.4,
+            iou_thresh: 0.5,
+            target_size: 640, // Default for PP-DocLayout_plus-L
+            engine_cfg: EngineConfig::default(),
         }
     }
 }

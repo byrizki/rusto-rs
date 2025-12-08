@@ -35,14 +35,17 @@
 mod cal_rec_boxes;
 pub mod config;
 mod det;
+pub mod doc_pipeline;
 mod engine;
 mod geometry;
 pub mod image_impl;
+pub mod layout;
 mod orient;
 mod postprocess;
 mod preprocess;
 mod rec;
 pub mod rusto_ocr;
+pub mod table;
 mod types;
 
 #[cfg(not(feature = "use-opencv"))]
@@ -55,10 +58,13 @@ pub mod ffi;
 // Public API exports
 pub use config::RustOConfig;
 pub use det::TextDetector;
+pub use doc_pipeline::{DocBlock, DocPipeline, DocPipelineConfig, DocResult};
+pub use layout::{LayoutDetector, LayoutOutput, LayoutRegion, LayoutType};
 pub use orient::{OrientClassifier, OrientOutput, Orientation};
 pub use rec::{TextRecOutput, TextRecognizer, WordInfo, WordType};
 pub use rusto_ocr::{RustO, RustOOutput};
-pub use types::{ClsConfig, DetConfig, GlobalConfig, OrientConfig, RecConfig};
+pub use table::{TableDetector, TableDetectorConfig, TableModelType, TableStructure, TableStructureConfig, TableStructureRecognizer};
+pub use types::{ClsConfig, DetConfig, GlobalConfig, LayoutConfig, OrientConfig, RecConfig};
 
 // Alias for compatibility
 pub use RustO as RapidOcr;

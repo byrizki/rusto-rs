@@ -39,14 +39,19 @@ rusto-rs/
 │   ├── ffi.rs          # C FFI bindings (optional)
 │   ├── det.rs          # Text detection
 │   ├── rec.rs          # Text recognition
+│   ├── layout.rs       # Layout detection
+│   ├── doc_pipeline.rs # Document pipeline (layout + OCR)
 │   ├── preprocess.rs   # Image preprocessing
 │   ├── postprocess.rs  # Result postprocessing
 │   ├── contours.rs     # Pure Rust contour detection
-│   ├── geometry.rs     # Geometric transformations
+│   ├── geometry.rs     # Geometric transformations + NMS
 │   ├── image_impl.rs   # Image abstraction layer
 │   └── ...
 ├── Cargo.toml          # Dependencies & optimization
 ├── docs/               # Documentation
+├── examples/           # Example applications
+│   ├── doc_pipeline_demo.rs  # Document pipeline example
+│   └── ...
 └── packages/           # Additional packages
 ```
 
@@ -149,7 +154,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### 4. iOS Integration
+### 4. Document Pipeline (Layout + OCR)
+
+RustO! now supports document layout analysis combined with OCR for structured document processing:
+
+```rust
+use rusto::{DocPipeline, DocPipelineConfig, LayoutConfig, RustOConfig};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Configure layout detection
+    let layout_config = LayoutConfig::default("models/DocOCR/layout.mnn".into());
+    
+    // Configure OCR
+    let ocr_config = RustOConfig::new_ppv5(
+        "models/det.mnn".into(),
+        "models/rec.mnn".into(),
+        "models/dict.txt".into(),
+    );
+    
+    // Create document pipeline
+    let config = DocPipelineConfig {
+        layout: layout_config,
+        ocr: ocr_config,
+    };
+    
+    let mut pipeline = DocPipeline::new(config)?;
+    let result = pipeline.run("document.jpg")?;
+    
+    // Generate markdown output
+    println!("{}", result.to_markdown());
+    
+    Ok(())
+}
+```
+
+**Supported Layout Elements:**
+- Text, Title, Header, Footer
+- Figure, Figure Caption
+- Table, Table Caption
+- Reference, Equation
+
+**Example:**
+```bash
+cargo run --example doc_pipeline_demo -- \
+  --image document.jpg \
+  --layout-model models/DocOCR/layout.mnn \
+  --det-model models/det.mnn \
+  --rec-model models/rec.mnn \
+  --keys-path models/dict.txt
+```
+
+### 5. iOS Integration
 
 Install via CocoaPods:
 

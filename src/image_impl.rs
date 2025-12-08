@@ -37,10 +37,29 @@ impl Size {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Rect {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Rect {
+    pub fn new(x: i32, y: i32, width: u32, height: u32) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+}
+
 // Pure Rust implementation
 #[cfg(not(feature = "use-opencv"))]
 mod rust_impl {
-    use super::{Point2f, Size};
+    use super::{Point2f, Rect, Size};
     use image::{DynamicImage, GenericImageView, ImageBuffer, Rgb};
     use std::path::Path;
 
@@ -119,19 +138,21 @@ mod rust_impl {
         Ok(())
     }
 
-    pub fn resize(
-        src: &Mat,
-        dst: &mut Mat,
-        dsize: Size,
-        interpolation: i32,
-    ) -> Result<()> {
+    pub fn crop(img: &Mat, rect: Rect) -> Result<Mat> {
+        let cropped = img
+            .image
+            .crop_imm(rect.x as u32, rect.y as u32, rect.width, rect.height);
+        Ok(Mat::new(cropped))
+    }
+
+    pub fn resize(src: &Mat, dst: &mut Mat, dsize: Size, interpolation: i32) -> Result<()> {
         // Match OpenCV's interpolation modes
         let filter = match interpolation {
-            1 => image::imageops::FilterType::Triangle,     // INTER_LINEAR (bilinear)
-            2 => image::imageops::FilterType::CatmullRom,   // INTER_CUBIC
-            _ => image::imageops::FilterType::Triangle,      // Default to bilinear
+            1 => image::imageops::FilterType::Triangle, // INTER_LINEAR (bilinear)
+            2 => image::imageops::FilterType::CatmullRom, // INTER_CUBIC
+            _ => image::imageops::FilterType::Triangle, // Default to bilinear
         };
-        
+
         let resized = src
             .image
             .resize_exact(dsize.width as u32, dsize.height as u32, filter);
@@ -152,17 +173,17 @@ mod rust_impl {
         };
         Ok(())
     }
-    
+
     /// Rotate image 90 degrees clockwise
     pub fn rotate_90(src: &Mat) -> Result<Mat> {
         Ok(Mat::new(src.image.rotate90()))
     }
-    
+
     /// Rotate image 180 degrees
     pub fn rotate_180(src: &Mat) -> Result<Mat> {
         Ok(Mat::new(src.image.rotate180()))
     }
-    
+
     /// Rotate image 270 degrees clockwise (90 counter-clockwise)
     pub fn rotate_270(src: &Mat) -> Result<Mat> {
         Ok(Mat::new(src.image.rotate270()))
@@ -189,14 +210,14 @@ mod rust_impl {
         let (m20, m21, m22) = (m_inv[2][0], m_inv[2][1], m_inv[2][2]);
         let src_cols = src.cols();
         let src_rows = src.rows();
-        
+
         for y in 0..dsize.height as u32 {
             let y_f = y as f64;
             // Pre-compute y-dependent terms
             let m01y = m01 * y_f;
             let m11y = m11 * y_f;
             let m21y = m21 * y_f;
-            
+
             for x in 0..dsize.width as u32 {
                 // Apply inverse transform with homogeneous coordinates
                 let x_f = x as f64;
@@ -263,7 +284,7 @@ mod rust_impl {
 
         for i in 0..4 {
             let x = src_pts[i][0] as f64;
-            let y = src_pts[i][1] as f64;
+            let y = src_pts[i][0] as f64;
             let u = dst_pts[i][0] as f64;
             let v = dst_pts[i][1] as f64;
 
@@ -323,28 +344,22 @@ mod rust_impl {
 
         // Compute A^T * A
         let ata = a9.transpose() * &a9;
-        
+
         // Perform SVD on A^T * A
         let svd = ata.svd(true, false);
-        
+
         // Get the right singular vector corresponding to the smallest singular value
         let v = svd.u.ok_or("SVD failed")?;
         let h = v.column(8); // Last column corresponds to smallest singular value
 
-        Ok([
-            [h[0], h[1], h[2]],
-            [h[3], h[4], h[5]],
-            [h[6], h[7], h[8]],
-        ])
+        Ok([[h[0], h[1], h[2]], [h[3], h[4], h[5]], [h[6], h[7], h[8]]])
     }
 
     fn invert_matrix_3x3(m: &[[f64; 3]; 3]) -> Result<[[f64; 3]; 3]> {
         use nalgebra::Matrix3;
 
         let mat = Matrix3::new(
-            m[0][0], m[0][1], m[0][2],
-            m[1][0], m[1][1], m[1][2],
-            m[2][0], m[2][1], m[2][2],
+            m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2], m[2][0], m[2][1], m[2][2],
         );
 
         let inv = mat.try_inverse().ok_or("Matrix is not invertible")?;
@@ -380,7 +395,7 @@ mod rust_impl {
 
         // Compute convex hull first
         let hull = compute_convex_hull(contour);
-        
+
         if hull.len() < 3 {
             // Fallback to axis-aligned bbox
             let mut min_x = f32::MAX;
@@ -409,12 +424,12 @@ mod rust_impl {
         for i in 0..n {
             let p1 = hull[i];
             let p2 = hull[(i + 1) % n];
-            
+
             // Edge vector
             let edge_x = p2.x - p1.x;
             let edge_y = p2.y - p1.y;
             let edge_len = (edge_x * edge_x + edge_y * edge_y).sqrt();
-            
+
             if edge_len < 1e-6 {
                 continue;
             }
@@ -422,7 +437,7 @@ mod rust_impl {
             // Normalized edge direction
             let ux = edge_x / edge_len;
             let uy = edge_y / edge_len;
-            
+
             // Perpendicular direction
             let vx = -uy;
             let vy = ux;
@@ -448,17 +463,17 @@ mod rust_impl {
 
             if area < min_area {
                 min_area = area;
-                
+
                 // Center in the rotated coordinate system
                 let center_u = (min_u + max_u) / 2.0;
                 let center_v = (min_v + max_v) / 2.0;
-                
+
                 // Transform back to original coordinates
                 let center_x = center_u * ux + center_v * vx;
                 let center_y = center_u * uy + center_v * vy;
-                
+
                 let angle = uy.atan2(ux).to_degrees();
-                
+
                 best_rect = Some((
                     Point2f::new(center_x, center_y),
                     Size::new(width as i32, height as i32),
@@ -479,7 +494,9 @@ mod rust_impl {
         // Find the point with lowest y-coordinate (and leftmost if tie)
         let mut start_idx = 0;
         for (i, pt) in points.iter().enumerate().skip(1) {
-            if pt.y < points[start_idx].y || (pt.y == points[start_idx].y && pt.x < points[start_idx].x) {
+            if pt.y < points[start_idx].y
+                || (pt.y == points[start_idx].y && pt.x < points[start_idx].x)
+            {
                 start_idx = i;
             }
         }
@@ -489,11 +506,13 @@ mod rust_impl {
         // Sort points by polar angle with respect to start point
         let mut sorted: Vec<Point2f> = points.to_vec();
         sorted.swap(0, start_idx);
-        
+
         sorted[1..].sort_by(|a, b| {
             let angle_a = (a.y - start.y).atan2(a.x - start.x);
             let angle_b = (b.y - start.y).atan2(b.x - start.x);
-            angle_a.partial_cmp(&angle_b).unwrap_or(std::cmp::Ordering::Equal)
+            angle_a
+                .partial_cmp(&angle_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         // Graham scan
@@ -506,10 +525,10 @@ mod rust_impl {
                 let len = hull.len();
                 let p1 = hull[len - 2];
                 let p2 = hull[len - 1];
-                
+
                 // Cross product to check if we make a left turn
                 let cross = (p2.x - p1.x) * (pt.y - p1.y) - (p2.y - p1.y) * (pt.x - p1.x);
-                
+
                 if cross <= 0.0 {
                     hull.pop();
                 } else {
@@ -530,12 +549,7 @@ mod rust_impl {
         let w = size.width as f32 / 2.0;
         let h = size.height as f32 / 2.0;
 
-        let corners = [
-            (-w, -h),
-            (w, -h),
-            (w, h),
-            (-w, h),
-        ];
+        let corners = [(-w, -h), (w, -h), (w, h), (-w, h)];
 
         corners.map(|(dx, dy)| {
             Point2f::new(
@@ -556,15 +570,15 @@ mod rust_impl {
 // OpenCV implementation
 #[cfg(feature = "use-opencv")]
 mod opencv_impl {
-    use super::{Point2f, Size};
+    use super::{Point2f, Rect, Size};
     pub use opencv::core::Mat;
+    pub use opencv::core::{rotate as cv_rotate, BorderTypes, RotateFlags};
     pub use opencv::imgcodecs::{imread as cv_imread, imwrite as cv_imwrite, IMREAD_COLOR};
     pub use opencv::imgproc::{
         get_perspective_transform, resize as cv_resize, warp_perspective as cv_warp_perspective,
         INTER_CUBIC, INTER_LINEAR,
     };
-    pub use opencv::core::{rotate as cv_rotate, BorderTypes, RotateFlags};
-    
+
     pub const BORDER_REPLICATE: i32 = BorderTypes::BORDER_REPLICATE as i32;
     pub const ROTATE_90_CLOCKWISE: i32 = RotateFlags::ROTATE_90_CLOCKWISE as i32;
     use std::path::Path;
@@ -582,6 +596,14 @@ mod opencv_impl {
             &opencv::core::Vector::new(),
         )?;
         Ok(())
+    }
+
+    pub fn crop(img: &Mat, rect: Rect) -> Result<Mat> {
+        let roi = opencv::core::Rect::new(rect.x, rect.y, rect.width as i32, rect.height as i32);
+        let cropped = Mat::roi(img, roi)?;
+        let mut dst = Mat::default();
+        cropped.copy_to(&mut dst)?;
+        Ok(dst)
     }
 
     pub fn resize(src: &Mat, dst: &mut Mat, dsize: Size, interpolation: i32) -> Result<()> {
