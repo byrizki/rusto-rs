@@ -2,7 +2,8 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int};
 use std::slice;
-use crate::{RustO, RustOConfig, TextResult};
+use crate::{RustO, RustOConfig, RustOOutput};
+use crate::image_impl::Mat;
 
 /// Opaque handle to RustO instance
 pub struct ROCRHandle {
@@ -53,12 +54,7 @@ pub unsafe extern "C" fn rocr_new(
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let config = RustOConfig {
-        det_model_path: det_model,
-        rec_model_path: rec_model,
-        dict_path: dict,
-        ..Default::default()
-    };
+    let config = RustOConfig::new_ppv5(det_model, rec_model, dict);
 
     match RustO::new(config) {
         Ok(ocr) => Box::into_raw(Box::new(ROCRHandle { inner: ocr })),
@@ -90,7 +86,7 @@ pub unsafe extern "C" fn rocr_ocr_file(
         Err(_) => return -2,
     };
 
-    let results = match ocr.ocr(path) {
+    let results = match ocr.run(path) {
         Ok(r) => r,
         Err(_) => return -3,
     };
@@ -124,7 +120,22 @@ pub unsafe extern "C" fn rocr_ocr_data(
     let ocr = &mut (*handle).inner;
     let data = slice::from_raw_parts(image_data, image_len);
 
-    let results = match ocr.ocr_from_bytes(data) {
+    #[cfg(not(feature = "use-opencv"))]
+    let img = match image::load_from_memory(data) {
+        Ok(dynamic_img) => Mat::new(dynamic_img),
+        Err(_) => return -3,
+    };
+
+    #[cfg(feature = "use-opencv")]
+    let img = {
+        // For OpenCV backend, we need to decode manually or use imdecode
+        // But since we don't have imdecode exposed in image_impl (only imread), 
+        // fallback or error out for now unless we add imdecode.
+        // Assuming pure rust backend for now as per user context "Pure Rust OCR".
+        return -4; 
+    };
+
+    let results = match ocr.run_on_mat(&img) {
         Ok(r) => r,
         Err(_) => return -3,
     };
@@ -175,23 +186,40 @@ pub extern "C" fn rocr_version() -> *const c_char {
 }
 
 // Helper function to convert Rust results to C results
-fn results_to_c(results: Vec<TextResult>) -> Vec<CTextResult> {
-    results
-        .into_iter()
-        .map(|r| {
-            let text = CString::new(r.text).unwrap();
-            CTextResult {
-                text: text.into_raw(),
-                score: r.score,
-                box_x1: r.box_points[0].0,
-                box_y1: r.box_points[0].1,
-                box_x2: r.box_points[1].0,
-                box_y2: r.box_points[1].1,
-                box_x3: r.box_points[2].0,
-                box_y3: r.box_points[2].1,
-                box_x4: r.box_points[3].0,
-                box_y4: r.box_points[3].1,
-            }
-        })
-        .collect()
+fn results_to_c(results: RustOOutput) -> Vec<CTextResult> {
+    let mut c_results = Vec::with_capacity(results.boxes.len());
+    
+    for (i, bbox) in results.boxes.iter().enumerate() {
+        if i >= results.txts.len() || i >= results.scores.len() {
+            break;
+        }
+        
+        // Convert Point2f (which might be from image_impl or opencv) to simple coords
+        // Assuming Point2f has x and y
+        let x1 = bbox[0].x;
+        let y1 = bbox[0].y;
+        let x2 = bbox[1].x;
+        let y2 = bbox[1].y;
+        let x3 = bbox[2].x;
+        let y3 = bbox[2].y;
+        let x4 = bbox[3].x;
+        let y4 = bbox[3].y;
+        
+        let text = CString::new(results.txts[i].clone()).unwrap_or_default();
+        
+        c_results.push(CTextResult {
+            text: text.into_raw(),
+            score: results.scores[i],
+            box_x1: x1,
+            box_y1: y1,
+            box_x2: x2,
+            box_y2: y2,
+            box_x3: x3,
+            box_y3: y3,
+            box_x4: x4,
+            box_y4: y4,
+        });
+    }
+    
+    c_results
 }

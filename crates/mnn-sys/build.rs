@@ -47,7 +47,7 @@ fn main() {
         .define("MNN_VULKAN", if has_vulkan { "ON" } else { "OFF" })
         .define("MNN_CUDA", if has_cuda { "ON" } else { "OFF" })
         .define("MNN_HIAI", if has_hiai { "ON" } else { "OFF" })
-        .define("MNN_USE_SYSTEM_LIB", "ON");  // Use system libraries when possible
+        .define("MNN_HIAI", if has_hiai { "ON" } else { "OFF" });
     
     // Platform-specific backends
     if has_nnapi {
