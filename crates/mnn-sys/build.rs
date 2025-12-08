@@ -159,9 +159,16 @@ fn main() {
     }
 
     // Generate bindings for our C wrapper
-    let bindings = bindgen::Builder::default()
+    let mut builder = bindgen::Builder::default()
         .header("mnn_wrapper.h")
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
+
+    // Fix for iOS Simulator build error where bindgen passes invalid target triple
+    if env::var("TARGET").unwrap_or_default() == "aarch64-apple-ios-sim" {
+        builder = builder.clang_arg("--target=arm64-apple-ios-simulator");
+    }
+
+    let bindings = builder
         .generate()
         .expect("Unable to generate bindings");
 
