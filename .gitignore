@@ -25,3 +25,4 @@ onnxruntime
 .gradle
 node_modules
 **/node_modules
+packages/react-native/lib

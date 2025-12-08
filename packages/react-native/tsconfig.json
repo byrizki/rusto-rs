@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "commonjs",
+    "lib": ["es2017"],
+    "allowJs": true,
+    "jsx": "react-native",
+    "noEmit": true,
+    "isolatedModules": true,
+    "strict": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "lib/typescript"
+  },
+  "include": ["src"],
+  "exclude": [
+    "node_modules",
+    "lib",
+    "**/__tests__",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
+  ]
+}
