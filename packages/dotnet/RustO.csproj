@@ -19,9 +19,23 @@
 
   <ItemGroup>
     <None Include="runtimes\**\*" Pack="true" PackagePath="runtimes\" />
-    <Content Include="models\**\*.mnn" Pack="true" PackagePath="contentFiles\any\any\models\" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="models\**\*.txt" Pack="true" PackagePath="contentFiles\any\any\models\" CopyToOutputDirectory="PreserveNewest" />
+    
+    <!-- Model files as None to avoid compilation, with metadata for NuGet content -->
+    <None Include="models\**\*.mnn" Pack="true" PackagePath="contentFiles\any\any\models\">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <PackageCopyToOutput>true</PackageCopyToOutput>
+      <BuildAction>None</BuildAction>
+    </None>
+    <None Include="models\**\*.txt" Pack="true" PackagePath="contentFiles\any\any\models\">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <PackageCopyToOutput>true</PackageCopyToOutput>
+      <BuildAction>None</BuildAction>
+    </None>
+    
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    
+    <!-- Include MSBuild targets file for automatic model file copying -->
+    <None Include="buildTransitive\RustO.targets" Pack="true" PackagePath="buildTransitive\" />
   </ItemGroup>
 
 </Project>
