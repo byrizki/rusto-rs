@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net6.0;netstandard2.1</TargetFrameworks>
     <RootNamespace>RustO</RootNamespace>
+    <LangVersion>latest</LangVersion>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>RustO</PackageId>
     <Version>0.1.0</Version>
