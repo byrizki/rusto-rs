@@ -23,6 +23,29 @@ export interface TextResult {
   box_points: [[number, number], [number, number], [number, number], [number, number]];
 }
 
+export interface RustoInterface {
+  initialize(detModel?: string, recModel?: string, dict?: string): Promise<boolean>;
+  detectText(imagePath: string): Promise<TextResult[]>;
+  detectTextFromBytes(imageData: string): Promise<TextResult[]>;
+  getVersion(): Promise<string>;
+}
+
+export function initialize(
+  detModel?: string,
+  recModel?: string,
+  dict?: string
+): Promise<boolean> {
+  return Rusto.initialize(detModel, recModel, dict);
+}
+
 export function detectText(imagePath: string): Promise<TextResult[]> {
   return Rusto.detectText(imagePath);
+}
+
+export function detectTextFromBytes(imageData: string): Promise<TextResult[]> {
+  return Rusto.detectTextFromBytes(imageData);
+}
+
+export function getVersion(): Promise<string> {
+  return Rusto.getVersion();
 }

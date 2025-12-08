@@ -155,23 +155,29 @@ jobs:
           cp target/i686-linux-android/release/librusto.so packages/android/src/main/jniLibs/x86/
           cp target/x86_64-linux-android/release/librusto.so packages/android/src/main/jniLibs/x86_64/
 
-           # Copy model files
-           echo "=== Copying model files to Android package ==="
-           mkdir -p packages/android/src/main/assets/models
-           
-           echo "Copying model files..."
-           cp models/PPOCR_v5/det.mnn packages/android/src/main/assets/models/
-           cp models/PPOCR_v5/rec.mnn packages/android/src/main/assets/models/
-           cp models/PPOCR_v5/dict.txt packages/android/src/main/assets/models/
-           
-           echo "\nFiles in Android package models/:"
-           ls -lh packages/android/src/main/assets/models/ || echo "No files copied"
+          # Copy model files to main Android package and React Native package
+          echo "=== Copying model files for bundling ==="
+          mkdir -p packages/android/src/main/assets
+          mkdir -p packages/react-native/android/src/main/assets
 
-      - name: Setup Gradle Wrapper
+          echo "Copying to packages/android/src/main/assets/..."
+          cp models/PPOCR_v5/det.mnn packages/android/src/main/assets/
+          cp models/PPOCR_v5/rec.mnn packages/android/src/main/assets/
+          cp models/PPOCR_v5/dict.txt packages/android/src/main/assets/
+
+          echo "Copying to packages/react-native/android/src/main/assets/..."
+          cp models/PPOCR_v5/det.mnn packages/react-native/android/src/main/assets/
+          cp models/PPOCR_v5/rec.mnn packages/react-native/android/src/main/assets/
+          cp models/PPOCR_v5/dict.txt packages/react-native/android/src/main/assets/
+
+          echo "\nFiles in Android package assets/:"
+          ls -lh packages/android/src/main/assets/ || echo "No files copied"
+          echo "\nFiles in React Native Android package assets/:"
+          ls -lh packages/react-native/android/src/main/assets/ || echo "No files copied"
+
+      - name: Make Gradle Wrapper executable
         working-directory: packages/android
-        run: |
-          gradle wrapper --gradle-version 8.7
-          chmod +x gradlew
+        run: chmod +x gradlew
 
       - name: Build AAR
         working-directory: packages/android
@@ -379,6 +385,16 @@ jobs:
           # Extract and copy iOS XCFramework
           unzip artifacts/ios/RustO-with-models.xcframework.zip -d artifacts/ios/temp
           cp -r artifacts/ios/temp/RustO.xcframework packages/react-native/ios/
+
+          # Copy model files for iOS bundling
+          echo "Copying models for iOS bundling..."
+          mkdir -p packages/react-native/ios/models
+          cp models/PPOCR_v5/det.mnn packages/react-native/ios/models/
+          cp models/PPOCR_v5/rec.mnn packages/react-native/ios/models/
+          cp models/PPOCR_v5/dict.txt packages/react-native/ios/models/
+
+          echo "Files in React Native iOS models/:"
+          ls -lh packages/react-native/ios/models/ || echo "No files copied"
 
           # Copy Android AAR
           cp artifacts/android/*.aar packages/react-native/android/libs/RustO.aar

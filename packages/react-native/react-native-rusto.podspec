@@ -15,9 +15,23 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/yourusername/rusto-rs.git", :tag => "#{s.version}" }
 
   s.source_files = "ios/**/*.{h,m,mm,swift}"
+  
+  s.swift_version = '5.0'
+  s.pod_target_xcconfig = { 
+    'DEFINES_MODULE' => 'YES',
+    'SWIFT_COMPILATION_MODE' => 'wholemodule'
+  }
 
   # Link the locally included XCFramework
   s.vendored_frameworks = 'ios/RustO.xcframework'
+  
+  # Bundle model files as resources
+  s.resource_bundles = {
+    'RustoModels' => [
+      'ios/models/*.mnn',
+      'ios/models/*.txt'
+    ]
+  }
 
   s.dependency "React-Core"
 

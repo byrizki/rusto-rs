@@ -1,21 +1,34 @@
 buildscript {
-  // Buildscript is empty for module, but can be used for dependencies
+  repositories {
+    google()
+    mavenCentral()
+  }
+  dependencies {
+    classpath 'com.android.tools.build:gradle:8.2.0'
+    classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.20'
+  }
 }
 
 apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
 
 def safeExtGet(prop, fallback) {
   rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
 }
 
 android {
-  compileSdkVersion safeExtGet('ReactNativeRusto_compileSdkVersion', 33)
+  namespace 'dev.rusto.reactnative'
+  compileSdkVersion safeExtGet('ReactNativeRusto_compileSdkVersion', 34)
   
   defaultConfig {
     minSdkVersion safeExtGet('ReactNativeRusto_minSdkVersion', 21)
-    targetSdkVersion safeExtGet('ReactNativeRusto_targetSdkVersion', 33)
+    targetSdkVersion safeExtGet('ReactNativeRusto_targetSdkVersion', 34)
     versionCode 1
-    versionName "1.0"
+    versionName "0.1.0"
+
+    ndk {
+      abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+    }
   }
 
   buildTypes {
@@ -29,8 +42,23 @@ android {
   }
 
   compileOptions {
-    sourceCompatibility JavaVersion.VERSION_1_8
-    targetCompatibility JavaVersion.VERSION_1_8
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+
+  kotlinOptions {
+    jvmTarget = '17'
+  }
+
+  sourceSets {
+    main {
+      // Include assets from both React Native package and main Android package
+      assets.srcDirs = [
+        'src/main/assets',
+        '../../../android/src/main/assets'
+      ]
+      jniLibs.srcDirs = ['../../../android/src/main/jniLibs']
+    }
   }
 }
 
@@ -41,8 +69,9 @@ repositories {
 }
 
 dependencies {
-  implementation "com.facebook.react:react-native:+"
+  implementation 'com.facebook.react:react-native:+'
+  implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.20'
   
-  // Link the local AAR file
-  implementation files('libs/RustO.aar')
+  // Link to the main RustO Android package
+  implementation project(':rusto-android')
 }
