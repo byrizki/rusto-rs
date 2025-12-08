@@ -116,6 +116,8 @@ fn main() {
     // Link C++ standard library
     if cfg!(target_os = "macos") {
         println!("cargo:rustc-link-lib=c++");
+    } else if cfg!(target_os = "windows") {
+        // MSVC links CRT automatically
     } else {
         println!("cargo:rustc-link-lib=stdc++");
     }
