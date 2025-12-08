@@ -20,16 +20,12 @@
   <ItemGroup>
     <None Include="runtimes\**\*" Pack="true" PackagePath="runtimes\" />
     
-    <!-- Model files as None to avoid compilation, with metadata for NuGet content -->
-    <None Include="models\**\*.mnn" Pack="true" PackagePath="contentFiles\any\any\models\">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <PackageCopyToOutput>true</PackageCopyToOutput>
-      <BuildAction>None</BuildAction>
+    <!-- Model files packaged in content folder (not contentFiles to avoid compile) -->
+    <None Include="models\**\*.mnn" Pack="true" PackagePath="content\models\">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
-    <None Include="models\**\*.txt" Pack="true" PackagePath="contentFiles\any\any\models\">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <PackageCopyToOutput>true</PackageCopyToOutput>
-      <BuildAction>None</BuildAction>
+    <None Include="models\**\*.txt" Pack="true" PackagePath="content\models\">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
     
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
