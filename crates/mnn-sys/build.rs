@@ -47,7 +47,8 @@ fn main() {
         .define("MNN_VULKAN", if has_vulkan { "ON" } else { "OFF" })
         .define("MNN_CUDA", if has_cuda { "ON" } else { "OFF" })
         .define("MNN_HIAI", if has_hiai { "ON" } else { "OFF" })
-        .define("MNN_HIAI", if has_hiai { "ON" } else { "OFF" });
+        .define("MNN_HIAI", if has_hiai { "ON" } else { "OFF" })
+        .build_target("MNN");
     
     // Platform-specific backends
     if has_nnapi {
@@ -75,7 +76,9 @@ fn main() {
         .compile("mnn_wrapper");
 
     // Tell cargo to look for the library
-    println!("cargo:rustc-link-search=native={}/lib", dst.display());
+    // MNN build output is in build directory since we skip install
+    println!("cargo:rustc-link-search=native={}/build", dst.display());
+    println!("cargo:rustc-link-search=native={}/lib", dst.display()); // Keep these as fallbacks
     println!("cargo:rustc-link-search=native={}/lib64", dst.display());
     
     // Link MNN library
