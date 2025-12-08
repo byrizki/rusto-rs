@@ -3,7 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
 
-namespace RustO
+namespace RustODotnet
 {
     [StructLayout(LayoutKind.Sequential)]
     internal struct CTextResult

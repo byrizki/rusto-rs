@@ -2,10 +2,11 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net6.0;netstandard2.1</TargetFrameworks>
-    <RootNamespace>RustO</RootNamespace>
+    <RootNamespace>RustODotnet</RootNamespace>
+    <AssemblyName>RustODotnet</AssemblyName>
     <LangVersion>latest</LangVersion>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageId>RustO</PackageId>
+    <PackageId>RustODotnet</PackageId>
     <Version>0.1.0</Version>
     <Authors>RustO Contributors</Authors>
     <Description>RustO! - Pure Rust OCR library based on RapidOCR with PaddleOCR engine</Description>
@@ -31,7 +32,7 @@
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     
     <!-- Include MSBuild targets file for automatic model file copying -->
-    <None Include="buildTransitive\RustO.targets" Pack="true" PackagePath="buildTransitive\" />
+    <None Include="buildTransitive\RustODotnet.targets" Pack="true" PackagePath="buildTransitive\" />
   </ItemGroup>
 
 </Project>
