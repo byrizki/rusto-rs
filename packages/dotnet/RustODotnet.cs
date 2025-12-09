@@ -70,6 +70,13 @@ namespace RustODotnet
         );
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int rocr_ocr_file_with_output(
+            IntPtr handle,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string imagePath,
+            out IntPtr output
+        );
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
         private static extern int rocr_ocr_data(
             IntPtr handle,
             byte[] imageData,
@@ -77,6 +84,43 @@ namespace RustODotnet
             out IntPtr results,
             out nuint count
         );
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int rocr_ocr_data_with_output(
+            IntPtr handle,
+            byte[] imageData,
+            nuint imageLen,
+            out IntPtr output
+        );
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr rocr_output_to_raw(IntPtr output);
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr rocr_output_to_csv(IntPtr output);
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr rocr_output_to_text_with_position(IntPtr output);
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr rocr_output_to_spatial_text(
+            IntPtr output,
+            float yThresholdMultiplier,
+            float xThresholdMultiplier
+        );
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern int rocr_output_get_results(
+            IntPtr output,
+            out IntPtr results,
+            out nuint count
+        );
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern void rocr_free_output(IntPtr output);
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern void rocr_free_string(IntPtr str);
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
         private static extern void rocr_free_results(IntPtr results, nuint count);
@@ -189,6 +233,114 @@ namespace RustODotnet
             finally
             {
                 rocr_free_results(resultsPtr, count);
+            }
+        }
+
+        public string RecognizeFileToRaw(string imagePath)
+        {
+            ThrowIfDisposed();
+            return RecognizeFileWithFormat(imagePath, rocr_output_to_raw);
+        }
+
+        public string RecognizeFileToCsv(string imagePath)
+        {
+            ThrowIfDisposed();
+            return RecognizeFileWithFormat(imagePath, rocr_output_to_csv);
+        }
+
+        public string RecognizeFileToTextWithPosition(string imagePath)
+        {
+            ThrowIfDisposed();
+            return RecognizeFileWithFormat(imagePath, rocr_output_to_text_with_position);
+        }
+
+        public string RecognizeFileToSpatialText(
+            string imagePath,
+            float yThresholdMultiplier = 0.6f,
+            float xThresholdMultiplier = 1.3f)
+        {
+            ThrowIfDisposed();
+            return RecognizeFileWithFormat(imagePath, output => 
+                rocr_output_to_spatial_text(output, yThresholdMultiplier, xThresholdMultiplier));
+        }
+
+        public string RecognizeToRaw(byte[] imageData)
+        {
+            ThrowIfDisposed();
+            return RecognizeWithFormat(imageData, rocr_output_to_raw);
+        }
+
+        public string RecognizeToCsv(byte[] imageData)
+        {
+            ThrowIfDisposed();
+            return RecognizeWithFormat(imageData, rocr_output_to_csv);
+        }
+
+        public string RecognizeToTextWithPosition(byte[] imageData)
+        {
+            ThrowIfDisposed();
+            return RecognizeWithFormat(imageData, rocr_output_to_text_with_position);
+        }
+
+        public string RecognizeToSpatialText(
+            byte[] imageData,
+            float yThresholdMultiplier = 0.6f,
+            float xThresholdMultiplier = 1.3f)
+        {
+            ThrowIfDisposed();
+            return RecognizeWithFormat(imageData, output => 
+                rocr_output_to_spatial_text(output, yThresholdMultiplier, xThresholdMultiplier));
+        }
+
+        private string RecognizeFileWithFormat(string imagePath, Func<IntPtr, IntPtr> formatFunc)
+        {
+            int status = rocr_ocr_file_with_output(_handle, imagePath, out IntPtr outputPtr);
+            if (status != 0)
+            {
+                throw new RustOException($"OCR failed with status code: {status}");
+            }
+
+            try
+            {
+                IntPtr strPtr = formatFunc(outputPtr);
+                try
+                {
+                    return Marshal.PtrToStringUTF8(strPtr) ?? string.Empty;
+                }
+                finally
+                {
+                    rocr_free_string(strPtr);
+                }
+            }
+            finally
+            {
+                rocr_free_output(outputPtr);
+            }
+        }
+
+        private string RecognizeWithFormat(byte[] imageData, Func<IntPtr, IntPtr> formatFunc)
+        {
+            int status = rocr_ocr_data_with_output(_handle, imageData, (nuint)imageData.Length, out IntPtr outputPtr);
+            if (status != 0)
+            {
+                throw new RustOException($"OCR failed with status code: {status}");
+            }
+
+            try
+            {
+                IntPtr strPtr = formatFunc(outputPtr);
+                try
+                {
+                    return Marshal.PtrToStringUTF8(strPtr) ?? string.Empty;
+                }
+                finally
+                {
+                    rocr_free_string(strPtr);
+                }
+            }
+            finally
+            {
+                rocr_free_output(outputPtr);
             }
         }
 

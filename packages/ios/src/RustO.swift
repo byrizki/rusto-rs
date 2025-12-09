@@ -164,6 +164,94 @@ public class RustO {
         }
     }
 
+    public func recognizeFileToRaw(_ imagePath: String) throws -> String {
+        guard let handle = handle else {
+            throw RustOError.invalidHandle
+        }
+        
+        var outputPtr: OpaquePointer?
+        let status = rocr_ocr_file_with_output(handle, imagePath, &outputPtr)
+        guard status == 0, let output = outputPtr else {
+            throw RustOError.recognitionFailed(status)
+        }
+        
+        defer { rocr_free_output(output) }
+        
+        guard let strPtr = rocr_output_to_raw(output) else {
+            return ""
+        }
+        defer { rocr_free_string(strPtr) }
+        
+        return String(cString: strPtr)
+    }
+    
+    public func recognizeFileToCsv(_ imagePath: String) throws -> String {
+        guard let handle = handle else {
+            throw RustOError.invalidHandle
+        }
+        
+        var outputPtr: OpaquePointer?
+        let status = rocr_ocr_file_with_output(handle, imagePath, &outputPtr)
+        guard status == 0, let output = outputPtr else {
+            throw RustOError.recognitionFailed(status)
+        }
+        
+        defer { rocr_free_output(output) }
+        
+        guard let strPtr = rocr_output_to_csv(output) else {
+            return ""
+        }
+        defer { rocr_free_string(strPtr) }
+        
+        return String(cString: strPtr)
+    }
+    
+    public func recognizeFileToTextWithPosition(_ imagePath: String) throws -> String {
+        guard let handle = handle else {
+            throw RustOError.invalidHandle
+        }
+        
+        var outputPtr: OpaquePointer?
+        let status = rocr_ocr_file_with_output(handle, imagePath, &outputPtr)
+        guard status == 0, let output = outputPtr else {
+            throw RustOError.recognitionFailed(status)
+        }
+        
+        defer { rocr_free_output(output) }
+        
+        guard let strPtr = rocr_output_to_text_with_position(output) else {
+            return ""
+        }
+        defer { rocr_free_string(strPtr) }
+        
+        return String(cString: strPtr)
+    }
+    
+    public func recognizeFileToSpatialText(
+        _ imagePath: String,
+        yThresholdMultiplier: Float = 0.6,
+        xThresholdMultiplier: Float = 1.3
+    ) throws -> String {
+        guard let handle = handle else {
+            throw RustOError.invalidHandle
+        }
+        
+        var outputPtr: OpaquePointer?
+        let status = rocr_ocr_file_with_output(handle, imagePath, &outputPtr)
+        guard status == 0, let output = outputPtr else {
+            throw RustOError.recognitionFailed(status)
+        }
+        
+        defer { rocr_free_output(output) }
+        
+        guard let strPtr = rocr_output_to_spatial_text(output, yThresholdMultiplier, xThresholdMultiplier) else {
+            return ""
+        }
+        defer { rocr_free_string(strPtr) }
+        
+        return String(cString: strPtr)
+    }
+
     deinit {
         if let h = handle {
             rocr_free(h)
@@ -210,6 +298,35 @@ func rocr_free_results(_ results: UnsafeMutablePointer<CTextResult>, _ count: In
 
 @_silgen_name("rocr_free")
 func rocr_free(_ handle: OpaquePointer)
+
+@_silgen_name("rocr_ocr_file_with_output")
+func rocr_ocr_file_with_output(
+    _ handle: OpaquePointer,
+    _ imagePath: UnsafePointer<CChar>,
+    _ outputOut: UnsafeMutablePointer<OpaquePointer?>
+) -> Int32
+
+@_silgen_name("rocr_output_to_raw")
+func rocr_output_to_raw(_ output: OpaquePointer) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rocr_output_to_csv")
+func rocr_output_to_csv(_ output: OpaquePointer) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rocr_output_to_text_with_position")
+func rocr_output_to_text_with_position(_ output: OpaquePointer) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rocr_output_to_spatial_text")
+func rocr_output_to_spatial_text(
+    _ output: OpaquePointer,
+    _ yThresholdMultiplier: Float,
+    _ xThresholdMultiplier: Float
+) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rocr_free_output")
+func rocr_free_output(_ output: OpaquePointer)
+
+@_silgen_name("rocr_free_string")
+func rocr_free_string(_ str: UnsafeMutablePointer<CChar>)
 
 @_silgen_name("rocr_version")
 func rocr_version() -> UnsafePointer<CChar>?

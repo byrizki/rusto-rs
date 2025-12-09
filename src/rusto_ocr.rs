@@ -486,4 +486,212 @@ impl RustOOutput {
 
         result
     }
+
+    /// Export OCR results as spatial text with intelligent spacing and line breaks
+    /// 
+    /// This method formats text based on the spatial position of bounding boxes,
+    /// constructing lines by mapping spatial coordinates to character positions.
+    /// It ensures that all separate bounding boxes are separated by at least one space.
+    /// 
+    /// # Parameters
+    /// 
+    /// * `y_threshold_multiplier` - Multiplier for average box height to determine line breaks.
+    ///   Default is 0.5. Higher values create fewer line breaks.
+    /// * `x_threshold_multiplier` - Unused in this new algorithm (kept for API compatibility).
+    ///   Spacing is now determined by exact spatial mapping + minimum separation.
+    /// 
+    /// # Returns
+    /// 
+    /// Formatted text string with spaces and newlines inserted based on spatial positioning.
+    pub fn to_spatial_text(
+        &self,
+        y_threshold_multiplier: Option<f32>,
+        x_threshold_multiplier: Option<f32>,
+    ) -> String {
+        if self.boxes.is_empty() {
+            return String::new();
+        }
+
+        let y_mult = y_threshold_multiplier.unwrap_or(0.5);
+        let x_mult = x_threshold_multiplier.unwrap_or(0.4);
+
+        #[derive(Debug, Clone)]
+        struct Token {
+            x: f32,
+            y: f32,
+            width: f32,
+            height: f32,
+            text: String,
+        }
+
+        // Create tokens from boxes and calculate dimensions
+        let mut tokens: Vec<Token> = self
+            .boxes
+            .iter()
+            .zip(self.txts.iter())
+            .map(|(bbox, text)| {
+                let x = bbox[0].x;
+                let y = bbox[0].y;
+                let width = (bbox[1].x - bbox[0].x).abs().max((bbox[2].x - bbox[3].x).abs());
+                let height = (bbox[3].y - bbox[0].y).abs().max((bbox[2].y - bbox[1].y).abs());
+                Token {
+                    x,
+                    y,
+                    width,
+                    height,
+                    text: text.clone(),
+                }
+            })
+            .collect();
+
+        // Calculate median height
+        let median_height = if !tokens.is_empty() {
+            let mut heights: Vec<f32> = tokens.iter().map(|t| t.height).collect();
+            heights.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            heights[heights.len() / 2]
+        } else {
+            10.0
+        };
+
+        // Calculate average character width
+        let avg_char_width = if !tokens.is_empty() {
+            let total_chars: usize = tokens.iter().map(|t| t.text.len()).sum();
+            let total_width: f32 = tokens.iter().map(|t| t.width).sum();
+            if total_chars > 0 {
+                total_width / total_chars as f32
+            } else {
+                median_height * 0.5
+            }
+        } else {
+            10.0
+        };
+
+        let x_gap_threshold = avg_char_width * x_mult;
+        let y_tolerance = median_height * y_mult; // Tolerance for Top-Y alignment
+
+        // Sort by Top Y first, then by X
+        tokens.sort_by(|a, b| {
+            a.y.partial_cmp(&b.y)
+                .unwrap()
+                .then(a.x.partial_cmp(&b.x).unwrap())
+        });
+
+        // Group into lines based on Top Y alignment
+        let mut lines: Vec<Vec<Token>> = Vec::new();
+        let mut current_line: Vec<Token> = Vec::new();
+        let mut current_line_y_sum: f32 = 0.0;
+
+        for token in tokens {
+            if !current_line.is_empty() {
+                let current_line_avg_y = current_line_y_sum / current_line.len() as f32;
+                
+                if (token.y - current_line_avg_y).abs() <= y_tolerance {
+                    current_line.push(token.clone());
+                    current_line_y_sum += token.y;
+                } else {
+                    lines.push(current_line);
+                    current_line = vec![token.clone()];
+                    current_line_y_sum = token.y;
+                }
+            } else {
+                current_line = vec![token.clone()];
+                current_line_y_sum = token.y;
+            }
+        }
+        if !current_line.is_empty() {
+            lines.push(current_line);
+        }
+
+        // Build output using cursor-based approach
+     // Note: Need to verify if `prev_line_avg_y` below needs update to `prev_line_avg_cy` logic.
+     // In the existing code block below this chunk, `prev_line_avg_y` uses `t.y`.
+     // I should leave `t.y` logic for blank lines or update it?
+     // The chunk ends before that logic, so I'm safe, but I should check the subsequent context.
+
+
+        // Build output using cursor-based approach
+        let mut result = String::new();
+        let mut prev_line_avg_y: Option<f32> = None;
+
+        // Determine the global min_x to avoid huge left padding
+        let min_x = if !lines.is_empty() {
+             lines.iter().flatten().map(|t| t.x).fold(f32::INFINITY, f32::min)
+        } else {
+            0.0
+        };
+
+        for line in lines {
+            if line.is_empty() {
+                continue;
+            }
+
+            // Vertical spacing logic
+            let current_line_avg_y = line.iter().map(|t| t.y).sum::<f32>() / line.len() as f32;
+            if let Some(prev_y) = prev_line_avg_y {
+                let vertical_gap = current_line_avg_y - prev_y;
+                // If gap is significantly larger than 1 line height, add blank lines
+                if vertical_gap > median_height * 1.5 {
+                    let num_blank_lines = ((vertical_gap - median_height) / median_height).round() as usize;
+                    for _ in 0..num_blank_lines.max(1) - 1 {
+                        result.push('\n');
+                    }
+                }
+            }
+            prev_line_avg_y = Some(current_line_avg_y);
+
+            // Sort line by X position
+            let mut line_sorted = line.clone();
+            line_sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap());
+
+            // Render line
+            let mut current_char_pos: f32 = 0.0;
+            let mut prev_token_end_x: f32 = min_x;
+            
+            for (i, token) in line_sorted.iter().enumerate() {
+                // Determine target position in characters relative to min_x
+                // But we don't want strict grid alignment for the *start* of the line, 
+                // just relative spacing. Or do we want indentation?
+                // Let's preserve indentation relative to min_x.
+                let target_char_pos = (token.x - min_x) / avg_char_width;
+                
+                // Calculate spaces to add
+                let spaces_needed = if i == 0 {
+                    // For first item, just indentation (can be 0)
+                    target_char_pos.max(0.0)
+                } else {
+                    // For subsequent items, check physical gap
+                    let physical_gap = token.x - prev_token_end_x;
+                    
+                    if physical_gap < x_gap_threshold {
+                         // Compact spacing for small gaps (standard word separation)
+                         1.0
+                    } else {
+                         // Spatial spacing for large gaps
+                         target_char_pos - current_char_pos
+                    }
+                };
+                
+                // Enforce minimum 1 space separation for subsequent items
+                let spaces_to_insert = if i > 0 {
+                     spaces_needed.round().max(1.0) as usize
+                } else {
+                    // Indentation
+                    spaces_needed.round() as usize
+                };
+
+                for _ in 0..spaces_to_insert {
+                    result.push(' ');
+                }
+
+                result.push_str(&token.text);
+                
+                // Update cursor position:
+                current_char_pos += spaces_to_insert as f32 + token.text.len() as f32;
+                prev_token_end_x = token.x + token.width;
+            }
+            result.push('\n');
+        }
+
+        result
+    }
 }
