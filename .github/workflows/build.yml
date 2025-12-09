@@ -468,11 +468,11 @@ jobs:
 
           if [ -d "rusto-dotnet-nupkg" ]; then
             cd rusto-dotnet-nupkg
-            if ls *.nupkg 1> /dev/null 2>&1; then
-              cp *.nupkg ../../releases/ || true
+            if [ -d "nupkg" ]; then
+              cp nupkg/*.nupkg ../../releases/ || true
             fi
-            if [ -d "runtimes" ]; then
-              tar czf "../../releases/rusto-dotnet-runtimes.tar.gz" runtimes/
+            if [ -d "packages/dotnet/runtimes" ]; then
+              tar czf "../../releases/rusto-dotnet-runtimes.tar.gz" packages/dotnet/runtimes/
             fi
             cd ..
           fi
