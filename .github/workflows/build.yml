@@ -291,10 +291,25 @@ jobs:
         run: |
           mkdir -p packages/dotnet/runtimes
           for dir in artifacts/rusto-dotnet-*; do
-            if [ -d "$dir/runtimes" ]; then
-              cp -r "$dir/runtimes/"* packages/dotnet/runtimes/
+            # Extract target name from artifact directory (e.g., rusto-dotnet-linux-x64 -> linux-x64)
+            target=$(basename "$dir" | sed 's/rusto-dotnet-//')
+            echo "Processing artifact: $dir (target: $target)"
+            
+            # The artifact contains native/* directly, we need to copy to runtimes/{target}/native/
+            if [ -d "$dir/native" ]; then
+              mkdir -p "packages/dotnet/runtimes/$target"
+              cp -rv "$dir/native" "packages/dotnet/runtimes/$target/"
+              echo "Copied native files for $target"
+            else
+              echo "Warning: No native directory found in $dir"
+              echo "Contents of $dir:"
+              ls -la "$dir" || true
             fi
           done
+
+          echo ""
+          echo "=== Final runtimes structure ==="
+          find packages/dotnet/runtimes -type f || echo "No runtime files found"
 
       - name: Copy model files to package
         run: |
