@@ -36,14 +36,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/rusto-rs.git"
+    "url": "git+https://github.com/byrizki/rusto-rs.git"
   },
-  "author": "Your Name <your.email@example.com> (https://github.com/yourusername)",
+  "author": "Your Name <your.email@example.com> (https://github.com/byrizki)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/yourusername/rusto-rs/issues"
+    "url": "https://github.com/byrizki/rusto-rs/issues"
   },
-  "homepage": "https://github.com/yourusername/rusto-rs#readme",
+  "homepage": "https://github.com/byrizki/rusto-rs#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },

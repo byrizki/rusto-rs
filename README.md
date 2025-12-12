@@ -5,7 +5,7 @@
 [![Crates.io](https://img.shields.io/crates/v/rusto-rs.svg)](https://crates.io/crates/rusto-rs)
 [![Documentation](https://docs.rs/rusto-rs/badge.svg)](https://docs.rs/rusto-rs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/yourusername/rusto-rs/workflows/CI/badge.svg)](https://github.com/yourusername/rusto-rs/actions)
+[![CI](https://github.com/byrizki/rusto-rs/workflows/CI/badge.svg)](https://github.com/byrizki/rusto-rs/actions)
 
 RustO! is a high-performance OCR (Optical Character Recognition) library written in pure Rust, based on [RapidOCR](https://github.com/RapidAI/RapidOCR) and powered by [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) models with MNN inference engine.
 
@@ -444,7 +444,7 @@ If you use RustO! in your research or project, please cite:
   title = {RustO! - Pure Rust OCR Library},
   author = {Your Name},
   year = {2024},
-  url = {https://github.com/yourusername/rusto-rs},
+  url = {https://github.com/byrizki/rusto-rs},
   note = {Based on RapidOCR and powered by PaddleOCR models}
 }
 ```
@@ -464,6 +464,6 @@ Also consider citing the underlying technologies:
 
 Made with ❤️ and 🦀 Rust
 
-[Report Bug](https://github.com/yourusername/rusto-rs/issues) · [Request Feature](https://github.com/yourusername/rusto-rs/issues) · [Contribute](https://github.com/yourusername/rusto-rs/pulls)
+[Report Bug](https://github.com/byrizki/rusto-rs/issues) · [Request Feature](https://github.com/byrizki/rusto-rs/issues) · [Contribute](https://github.com/byrizki/rusto-rs/pulls)
 
 </div>

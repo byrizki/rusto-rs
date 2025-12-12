@@ -26,6 +26,7 @@ jobs:
         run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
         continue-on-error: true
 
+
   # Publish to NuGet
   publish-nuget:
     name: Publish to NuGet
@@ -57,6 +58,36 @@ jobs:
       - name: Publish to NuGet
         working-directory: packages/dotnet
         run: dotnet nuget push "bin/Release/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+        continue-on-error: true
+
+  # Publish to NPM
+  publish-npm:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    needs: [publish-crates]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          registry-url: 'https://registry.npmjs.org'
+          
+      - name: Install dependencies
+        working-directory: packages/react-native
+        run: yarn install
+        
+      - name: Build package
+        working-directory: packages/react-native
+        run: npm run prepare
+        
+      - name: Publish to NPM
+        working-directory: packages/react-native
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         continue-on-error: true
 
   # Publish to CocoaPods

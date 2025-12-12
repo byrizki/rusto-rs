@@ -79,7 +79,7 @@ afterEvaluate {
                 pom {
                     name = 'RustO! Android'
                     description = 'RustO! - Pure Rust OCR library for Android'
-                    url = 'https://github.com/yourusername/rusto-rs'
+                    url = 'https://github.com/byrizki/rusto-rs'
                     
                     licenses {
                         license {
@@ -96,9 +96,9 @@ afterEvaluate {
                     }
                     
                     scm {
-                        connection = 'scm:git:git://github.com/yourusername/rusto-rs.git'
-                        developerConnection = 'scm:git:ssh://github.com/yourusername/rusto-rs.git'
-                        url = 'https://github.com/yourusername/rusto-rs'
+                        connection = 'scm:git:git://github.com/byrizki/rusto-rs.git'
+                        developerConnection = 'scm:git:ssh://github.com/byrizki/rusto-rs.git'
+                        url = 'https://github.com/byrizki/rusto-rs'
                     }
                 }
             }

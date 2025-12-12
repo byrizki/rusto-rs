@@ -6,8 +6,8 @@
     <authors>RustO Contributors</authors>
     <description>RustO! - Pure Rust OCR library based on RapidOCR with PaddleOCR engine</description>
     <license type="expression">MIT</license>
-    <projectUrl>https://github.com/yourusername/rusto-rs</projectUrl>
-    <repository type="git" url="https://github.com/yourusername/rusto-rs" />
+    <projectUrl>https://github.com/byrizki/rusto-rs</projectUrl>
+    <repository type="git" url="https://github.com/byrizki/rusto-rs" />
     <tags>OCR TextRecognition ComputerVision Rust PaddleOCR MNN</tags>
     <contentFiles>
       <files include="any/any/models/*.mnn" buildAction="None" copyToOutput="true" flatten="false" />
