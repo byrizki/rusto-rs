@@ -3,6 +3,10 @@
 **Pure Rust OCR Library** - Fast, Safe, and Cross-Platform
 
 [![Crates.io](https://img.shields.io/crates/v/rusto-rs.svg)](https://crates.io/crates/rusto-rs)
+[![NuGet](https://img.shields.io/nuget/v/RustODotnet.svg)](https://www.nuget.org/packages/RustODotnet)
+[![npm](https://img.shields.io/npm/v/react-native-rusto.svg)](https://www.npmjs.com/package/react-native-rusto)
+[![CocoaPods](https://img.shields.io/cocoapods/v/RustO.svg)](https://cocoapods.org/pods/RustO)
+[![Maven Central](https://img.shields.io/maven-central/v/dev.rusto/rusto-android.svg)](https://central.sonatype.com/artifact/dev.rusto/rusto-android)
 [![Documentation](https://docs.rs/rusto-rs/badge.svg)](https://docs.rs/rusto-rs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/byrizki/rusto-rs/workflows/CI/badge.svg)](https://github.com/byrizki/rusto-rs/actions)
@@ -442,7 +446,7 @@ If you use RustO! in your research or project, please cite:
 ```bibtex
 @software{rusto2024,
   title = {RustO! - Pure Rust OCR Library},
-  author = {Your Name},
+  author = {byrizki},
   year = {2024},
   url = {https://github.com/byrizki/rusto-rs},
   note = {Based on RapidOCR and powered by PaddleOCR models}

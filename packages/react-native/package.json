@@ -38,7 +38,7 @@
     "type": "git",
     "url": "git+https://github.com/byrizki/rusto-rs.git"
   },
-  "author": "Your Name <your.email@example.com> (https://github.com/byrizki)",
+  "author": "byrizki <contact@byrizki.com> (https://github.com/byrizki)",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/byrizki/rusto-rs/issues"

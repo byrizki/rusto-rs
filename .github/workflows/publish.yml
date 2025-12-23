@@ -127,7 +127,9 @@ jobs:
       
       - name: Publish to Maven Central
         working-directory: packages/android
-        run: ./gradlew publishReleasePublicationToMavenRepository
+        run: |
+          chmod +x gradlew
+          ./gradlew publishReleasePublicationToMavenRepository
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}

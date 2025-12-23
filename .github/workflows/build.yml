@@ -68,20 +68,29 @@ jobs:
           echo "\nFiles in React Native iOS models/:"
           ls -lh packages/react-native/ios/models/ || echo "No files copied"
 
+
           # Create resource bundle for standalone iOS XCFramework
-          echo "=== Creating RustoModels.bundle for iOS XCFramework ==="
-          mkdir -p build/RustoModels.bundle
+          echo "=== Preparing iOS Release Artifact ==="
+          mkdir -p build/Resources
+          
+          echo "Copying models to build/Resources..."
+          cp models/PPOCR_v5/det.mnn build/Resources/
+          cp models/PPOCR_v5/rec.mnn build/Resources/
+          cp models/PPOCR_v5/dict.txt build/Resources/
+          
+          echo "Copying Swift sources..."
+          mkdir -p build/src
+          cp -r packages/ios/src/* build/src/
+          
+          echo "Copying LICENSE..."
+          cp LICENSE build/
+          
+          echo "\nFiles in build/:"
+          ls -R build/
 
-          cp models/PPOCR_v5/det.mnn build/RustoModels.bundle/
-          cp models/PPOCR_v5/rec.mnn build/RustoModels.bundle/
-          cp models/PPOCR_v5/dict.txt build/RustoModels.bundle/
-
-          echo "\nFiles in RustoModels.bundle:"
-          ls -lh build/RustoModels.bundle/
-
-          # Package XCFramework and resource bundle together
+          # Package XCFramework, Resources, src, and LICENSE
           cd build
-          zip -r RustO.xcframework.zip RustO.xcframework RustoModels.bundle
+          zip -r RustO.xcframework.zip RustO.xcframework Resources src LICENSE
           cd ..
 
       - name: Upload artifact
