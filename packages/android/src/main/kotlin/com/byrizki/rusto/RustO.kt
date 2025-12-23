@@ -1,4 +1,4 @@
-package dev.rusto
+package com.byrizki.rusto
 
 import android.content.Context
 import android.graphics.Bitmap

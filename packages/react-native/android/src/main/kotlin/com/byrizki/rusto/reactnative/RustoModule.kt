@@ -1,4 +1,4 @@
-package dev.rusto.reactnative
+package com.byrizki.rusto.reactnative
 
 import android.graphics.BitmapFactory
 import com.facebook.react.bridge.Arguments
@@ -8,8 +8,8 @@ import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
-import dev.rusto.RustO
-import dev.rusto.TextResult
+import com.byrizki.rusto.RustO
+import com.byrizki.rusto.TextResult
 import java.io.File
 
 class RustoModule(private val reactContext: ReactApplicationContext) :

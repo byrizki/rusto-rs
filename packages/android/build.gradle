@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace 'dev.rusto'
+    namespace 'com.byrizki.rusto'
     compileSdk 34
 
     defaultConfig {
@@ -98,7 +98,7 @@ afterEvaluate {
             release(MavenPublication) {
                 from components.release
                 
-                groupId = 'dev.rusto'
+                groupId = 'com.byrizki.rusto'
                 artifactId = 'rusto-android'
                 version = '0.1.2'
                 

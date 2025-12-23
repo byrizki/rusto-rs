@@ -17,7 +17,7 @@ def safeExtGet(prop, fallback) {
 }
 
 android {
-  namespace 'dev.rusto.reactnative'
+  namespace 'com.byrizki.rusto.reactnative'
   compileSdkVersion safeExtGet('ReactNativeRusto_compileSdkVersion', 34)
   
   defaultConfig {

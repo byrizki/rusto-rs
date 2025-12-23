@@ -6,7 +6,7 @@
 [![NuGet](https://img.shields.io/nuget/v/RustODotnet.svg)](https://www.nuget.org/packages/RustODotnet)
 [![npm](https://img.shields.io/npm/v/react-native-rusto.svg)](https://www.npmjs.com/package/react-native-rusto)
 [![CocoaPods](https://img.shields.io/cocoapods/v/RustO.svg)](https://cocoapods.org/pods/RustO)
-[![Maven Central](https://img.shields.io/maven-central/v/dev.rusto/rusto-android.svg)](https://central.sonatype.com/artifact/dev.rusto/rusto-android)
+[![Maven Central](https://img.shields.io/maven-central/v/com.byrizki.rusto/rusto-android.svg)](https://central.sonatype.com/artifact/com.byrizki.rusto/rusto-android)
 [![Documentation](https://docs.rs/rusto-rs/badge.svg)](https://docs.rs/rusto-rs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/byrizki/rusto-rs/workflows/CI/badge.svg)](https://github.com/byrizki/rusto-rs/actions)
