@@ -922,7 +922,7 @@ checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "rusto-mnn"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "rusto-mnn-sys",
  "thiserror",
@@ -930,7 +930,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-mnn-sys"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bindgen",
  "cc",
@@ -940,7 +940,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-rs"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap",
  "criterion",
@@ -1218,7 +1218,7 @@ dependencies = [
 
 [[package]]
 name = "winapi-util"
-version = "0.1.11"
+version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
