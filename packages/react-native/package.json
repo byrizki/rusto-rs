@@ -1,6 +1,6 @@
 {
   "name": "react-native-rusto",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "React Native bindings for RustO! OCR library",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",

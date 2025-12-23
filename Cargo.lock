@@ -128,7 +128,7 @@ checksum = "1fbdf580320f38b612e485521afda1ee26d10cc9884efaaa750d383e13e3c5f4"
 
 [[package]]
 name = "byteorder-lite"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495"
 
@@ -581,7 +581,7 @@ dependencies = [
 
 [[package]]
 name = "mnn"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "mnn-sys",
  "thiserror",
@@ -589,7 +589,7 @@ dependencies = [
 
 [[package]]
 name = "mnn-sys"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bindgen",
  "cc",
@@ -940,7 +940,7 @@ checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "rusto-rs"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "criterion",
