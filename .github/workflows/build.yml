@@ -440,14 +440,24 @@ jobs:
   # Create GitHub Release
   release:
     name: Create GitHub Release
+    permissions:
+      contents: write
     needs: [build-ios, build-android, package-dotnet, package-react-native]
     runs-on: ubuntu-22.04
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Get version from Cargo.toml
+        id: get_version
+        run: |
+          VERSION=$(grep "^version =" Cargo.toml | head -1 | cut -d '"' -f 2)
+          echo "Detected version: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAG_NAME=v$VERSION" >> $GITHUB_ENV
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -490,6 +500,15 @@ jobs:
              cp rusto-react-native-package/*.tgz ../releases/ || true
           fi
 
+
+      - name: Create or Update Tag
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f ${{ env.TAG_NAME }} ${{ github.sha }}
+          git push origin ${{ env.TAG_NAME }} --force
+
       - name: Generate checksums
         working-directory: releases
         run: |
@@ -498,12 +517,14 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG_NAME }}
+          target_commitish: ${{ github.sha }}
           files: releases/*
           draft: false
           prerelease: false
           generate_release_notes: true
           body: |
-            ## RustO! Release ${{ github.ref_name }}
+            ## RustO! Release ${{ env.TAG_NAME }}
 
             ### Highlights
             - Pure Rust OCR library powered by PaddleOCR models
