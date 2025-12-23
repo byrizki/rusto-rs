@@ -143,7 +143,7 @@ namespace RustODotnet
             }
         }
 
-        public RustO(string? detModelPath = null, string? recModelPath = null, string? dictPath = null)
+        public RustO(string detModelPath = null, string recModelPath = null, string dictPath = null)
         {
             // Use default bundled models if not specified
             detModelPath ??= "det.mnn";
