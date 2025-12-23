@@ -9,12 +9,38 @@ on:
         description: 'Version to publish'
         required: true
         default: '0.1.2'
+      publish_crates:
+        description: 'Publish to Crates.io'
+        type: boolean
+        required: false
+        default: true
+      publish_nuget:
+        description: 'Publish to NuGet'
+        type: boolean
+        required: false
+        default: true
+      publish_npm:
+        description: 'Publish to NPM'
+        type: boolean
+        required: false
+        default: true
+      publish_cocoapods:
+        description: 'Publish to CocoaPods'
+        type: boolean
+        required: false
+        default: true
+      publish_maven:
+        description: 'Publish to Maven Central'
+        type: boolean
+        required: false
+        default: true
 
 jobs:
   # Publish to crates.io
   publish-crates:
     name: Publish to crates.io
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event.inputs.publish_crates == 'true' 
     steps:
       - uses: actions/checkout@v4
       
@@ -34,7 +60,8 @@ jobs:
   # Publish to NuGet
   publish-nuget:
     name: Publish to NuGet
-    runs-on: ubuntu-latest    
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event.inputs.publish_nuget == 'true'    
     steps:
       - uses: actions/checkout@v4
       
@@ -61,7 +88,8 @@ jobs:
   # Publish to NPM
   publish-npm:
     name: Publish to NPM
-    runs-on: ubuntu-latest    
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event.inputs.publish_npm == 'true'    
     steps:
       - uses: actions/checkout@v4
       
@@ -92,6 +120,7 @@ jobs:
   publish-cocoapods:
     name: Publish to CocoaPods
     runs-on: macos-latest
+    if: github.event_name == 'release' || github.event.inputs.publish_cocoapods == 'true'
     steps:
       - uses: actions/checkout@v4
       
@@ -113,6 +142,7 @@ jobs:
   publish-maven:
     name: Publish to Maven Central
     runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event.inputs.publish_maven == 'true'
     steps:
       - uses: actions/checkout@v4
       
