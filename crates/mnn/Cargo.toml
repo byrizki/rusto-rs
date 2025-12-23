@@ -1,12 +1,12 @@
 [package]
-name = "mnn"
+name = "rusto-mnn"
 version = "0.1.1"
 edition = "2021"
 description = "Safe Rust bindings to MNN library"
 license = "MIT"
 
 [dependencies]
-mnn-sys = { path = "../mnn-sys" }
+mnn-sys = { package = "rusto-mnn-sys", path = "../mnn-sys" }
 thiserror = "1.0"
 
 [features]

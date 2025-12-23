@@ -2,6 +2,7 @@ plugins {
     id 'com.android.library' version '8.2.0'
     id 'org.jetbrains.kotlin.android' version '1.9.20'
     id 'maven-publish'
+    id 'signing'
 }
 
 android {
@@ -64,6 +65,31 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+}
+
+publishing {
+    repositories {
+        maven {
+            name = 'Maven'
+            url = 'https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/'
+            credentials {
+                username = System.getenv('MAVEN_USERNAME')
+                password = System.getenv('MAVEN_PASSWORD')
+            }
+        }
+    }
+}
+
+signing {
+    def signingKey = System.getenv('SIGNING_KEY')
+    def signingPassword = System.getenv('SIGNING_PASSWORD')
+    def signingKeyId = System.getenv('SIGNING_KEY_ID')
+    
+    if (signingKey != null) {
+        useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
+    }
+    
+    sign publishing.publications
 }
 
 afterEvaluate {

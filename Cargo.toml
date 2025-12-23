@@ -34,7 +34,7 @@ nalgebra = "0.33"
 opencv = { version = "0.97.2", optional = true }
 
 # Local MNN bindings
-mnn = { path = "crates/mnn", version = "0.1.1" }
+mnn = { package = "rusto-mnn", path = "crates/mnn", version = "0.1.1" }
 
 [dev-dependencies]
 criterion = "0.5"
