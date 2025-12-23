@@ -41,23 +41,19 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       
-      - name: Download runtime artifacts from release
+      - name: Download NuGet package from release
         run: |
           VERSION="${{ github.event.inputs.version || github.ref_name }}"
           VERSION="${VERSION#v}"  # Remove 'v' prefix
           
-          # Download native libraries from GitHub release
-          gh release download "v${VERSION}" -p "rusto-dotnet-*" -D packages/dotnet/runtimes || true
+          # Download nupkg from GitHub release
+          gh release download "v${VERSION}" -p "*.nupkg" -Dpackages/dotnet || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Build NuGet package
-        working-directory: packages/dotnet
-        run: dotnet pack -c Release
-      
       - name: Publish to NuGet
         working-directory: packages/dotnet
-        run: dotnet nuget push "bin/Release/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+        run: dotnet nuget push "*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
         continue-on-error: true
 
   # Publish to NPM
@@ -75,17 +71,19 @@ jobs:
           node-version: '18.x'
           registry-url: 'https://registry.npmjs.org'
           
-      - name: Install dependencies
-        working-directory: packages/react-native
-        run: yarn install
-        
-      - name: Build package
-        working-directory: packages/react-native
-        run: npm run prepare
+      - name: Download NPM package from release
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          
+          # Download tgz from GitHub release
+          gh release download "v${VERSION}" -p "*.tgz" -D packages/react-native/ || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
       - name: Publish to NPM
         working-directory: packages/react-native
-        run: npm publish
+        run: npm publish *.tgz
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         continue-on-error: true
@@ -143,5 +141,3 @@ jobs:
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
