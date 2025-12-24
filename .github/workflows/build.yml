@@ -442,7 +442,6 @@ jobs:
     name: Create GitHub Release
     needs: [build-ios, build-android, package-dotnet, package-react-native]
     runs-on: ubuntu-22.04
-    if: startsWith(github.ref, 'refs/tags/')
 
     steps:
       - uses: actions/checkout@v4
