@@ -36,13 +36,16 @@ opencv = { version = "0.97.2", optional = true }
 # Local MNN bindings
 mnn = { package = "rusto-mnn", path = "crates/mnn", version = "0.1.2" }
 
+# JNI bindings for Android
+jni = { version = "0.21", optional = true }
+
 [dev-dependencies]
 criterion = "0.5"
 
 [features]
 default = []
 use-opencv = ["opencv"]
-ffi = []  # Enable C FFI bindings
+ffi = ["dep:jni"]  # Enable C FFI and JNI bindings
 
 # MNN GPU/Accelerator backends
 metal = ["mnn/metal"]

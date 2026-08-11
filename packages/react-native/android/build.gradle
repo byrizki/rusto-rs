@@ -52,12 +52,19 @@ android {
 
   sourceSets {
     main {
-      // Include assets from both React Native package and main Android package
-      assets.srcDirs = [
-        'src/main/assets',
-        '../../../android/src/main/assets'
-      ]
-      jniLibs.srcDirs = ['../../../android/src/main/jniLibs']
+      def assetDirs = ['src/main/assets']
+      def localAndroidAssets = file('../../../android/src/main/assets')
+      if (localAndroidAssets.exists()) {
+        assetDirs.add(localAndroidAssets.absolutePath)
+      }
+      assets.srcDirs = assetDirs
+
+      def jniDirs = ['src/main/jniLibs']
+      def localAndroidJni = file('../../../android/src/main/jniLibs')
+      if (localAndroidJni.exists()) {
+        jniDirs.add(localAndroidJni.absolutePath)
+      }
+      jniLibs.srcDirs = jniDirs
     }
   }
 }
@@ -66,12 +73,28 @@ repositories {
   mavenLocal()
   google()
   mavenCentral()
+  flatDir {
+    dirs 'libs'
+  }
 }
 
 dependencies {
   implementation 'com.facebook.react:react-native:+'
-  implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.20'
+  implementation "org.jetbrains.kotlin:kotlin-stdlib:${safeExtGet('kotlinVersion', '1.9.20')}"
+  implementation "androidx.core:core-ktx:${safeExtGet('coreKtxVersion', '1.12.0')}"
   
-  // Link to the main RustO Android package
-  implementation project(':rusto-android')
+  def libsDir = file('libs')
+  def hasLocalAar = libsDir.exists() && libsDir.listFiles()?.any { it.name.endsWith('.aar') || it.name.endsWith('.jar') }
+
+  if (rootProject.findProject(':rusto-android') != null) {
+    // Monorepo development mode where :rusto-android is included in root project settings.gradle
+    implementation project(':rusto-android')
+  } else if (hasLocalAar) {
+    // Standalone / bundled mode using prebuilt AAR in libs/
+    implementation fileTree(dir: 'libs', include: ['*.aar', '*.jar'])
+  } else {
+    // Fallback to Maven Central coordinate
+    def rustoAndroidVersion = safeExtGet('RustoAndroid_version', '0.1.2')
+    implementation "com.byrizki.rusto:rusto-android:$rustoAndroidVersion"
+  }
 }

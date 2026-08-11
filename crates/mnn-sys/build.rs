@@ -23,6 +23,9 @@ fn main() {
     let has_hiai = cfg!(feature = "hiai");
     let has_qnn = cfg!(feature = "qnn");
 
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+
     // Build MNN using CMake with optimizations for faster builds
     let mut cmake_config = cmake::Config::new(&mnn_dir);
     
@@ -39,14 +42,13 @@ fn main() {
         .define("MNN_EVALUATION", "OFF")
         .define("MNN_SEP_BUILD", "OFF")
         // Enable ARM optimizations if applicable
-        .define("MNN_ARM82", if cfg!(target_arch = "aarch64") { "ON" } else { "OFF" })
+        .define("MNN_ARM82", if target_arch == "aarch64" { "ON" } else { "OFF" })
         // Feature-based backends
         .define("MNN_METAL", if has_metal { "ON" } else { "OFF" })
         .define("MNN_COREML", if has_coreml { "ON" } else { "OFF" })
         .define("MNN_OPENCL", if has_opencl { "ON" } else { "OFF" })
         .define("MNN_VULKAN", if has_vulkan { "ON" } else { "OFF" })
         .define("MNN_CUDA", if has_cuda { "ON" } else { "OFF" })
-        .define("MNN_HIAI", if has_hiai { "ON" } else { "OFF" })
         .define("MNN_HIAI", if has_hiai { "ON" } else { "OFF" })
         .build_target("MNN");
     
@@ -64,12 +66,30 @@ fn main() {
         cmake_config.define("CMAKE_BUILD_PARALLEL_LEVEL", num);
     }
 
-    // Disable AVX/AVX2 optimizations for Android x86 builds to avoid linking errors
-    if env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() == "android" {
+    // Configure for Android cross-compilation
+    if target_os == "android" {
         cmake_config
+            .define("MNN_BUILD_FOR_ANDROID_COMMAND", "ON")
             .define("MNN_AVX2", "OFF")
             .define("MNN_AVX512", "OFF")
-            .define("MNN_FMA", "OFF"); 
+            .define("MNN_FMA", "OFF");
+
+        if let Ok(ndk_path) = env::var("ANDROID_NDK_HOME").or_else(|_| env::var("NDK_HOME")) {
+            let toolchain = PathBuf::from(&ndk_path).join("build/cmake/android.toolchain.cmake");
+            if toolchain.exists() {
+                cmake_config.define("CMAKE_TOOLCHAIN_FILE", toolchain);
+                let abi = match target_arch.as_str() {
+                    "aarch64" => "arm64-v8a",
+                    "arm" => "armeabi-v7a",
+                    "x86" => "x86",
+                    "x86_64" => "x86_64",
+                    _ => "arm64-v8a",
+                };
+                cmake_config.define("ANDROID_ABI", abi);
+                cmake_config.define("ANDROID_PLATFORM", "android-21");
+                cmake_config.define("ANDROID_STL", "c++_shared");
+            }
+        }
     }
     
     let dst = cmake_config.build();
@@ -85,7 +105,7 @@ fn main() {
 
     // Tell cargo to look for the library
     // Recursively search for the MNN library file to handle different build layouts (e.g. MSVC Release/Debug)
-    let lib_name = if cfg!(windows) { "MNN.lib" } else { "libMNN.a" };
+    let lib_name = if target_os == "windows" { "MNN.lib" } else { "libMNN.a" };
     let mut found_lib = false;
     
     if let Ok(entries) = walkdir::WalkDir::new(&dst).into_iter().collect::<Result<Vec<_>, _>>() {
@@ -114,10 +134,12 @@ fn main() {
     println!("cargo:rustc-link-lib=static=MNN");
     
     // Link C++ standard library
-    if cfg!(target_os = "macos") {
+    if target_os == "macos" || target_os == "ios" {
         println!("cargo:rustc-link-lib=c++");
-    } else if cfg!(target_os = "windows") {
+    } else if target_os == "windows" {
         // MSVC links CRT automatically
+    } else if target_os == "android" {
+        println!("cargo:rustc-link-lib=c++_shared");
     } else {
         println!("cargo:rustc-link-lib=stdc++");
     }
@@ -135,7 +157,7 @@ fn main() {
     }
     
     if has_opencl {
-        if cfg!(target_os = "macos") {
+        if target_os == "macos" || target_os == "ios" {
             println!("cargo:rustc-link-lib=framework=OpenCL");
         } else {
             println!("cargo:rustc-link-lib=OpenCL");
@@ -151,7 +173,7 @@ fn main() {
         println!("cargo:rustc-link-lib=cublas");
     }
     
-    if cfg!(target_os = "android") {
+    if target_os == "android" {
         println!("cargo:rustc-link-lib=log");
         if has_nnapi {
             println!("cargo:rustc-link-lib=android");

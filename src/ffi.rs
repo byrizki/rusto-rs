@@ -445,3 +445,223 @@ fn results_to_c(results: &RustOOutput) -> Vec<CTextResult> {
     
     c_results
 }
+
+// ============================================================================
+// Android JNI Bindings (com.byrizki.rusto.RustO)
+// ============================================================================
+
+#[cfg(feature = "ffi")]
+use jni::objects::{JByteArray, JClass, JFloatArray, JIntArray, JLongArray, JObjectArray, JString};
+#[cfg(feature = "ffi")]
+use jni::sys::{jfloat, jint, jlong, jstring};
+#[cfg(feature = "ffi")]
+use jni::JNIEnv;
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeVersion(
+    env: JNIEnv,
+    _class: JClass,
+) -> jstring {
+    match env.new_string(env!("CARGO_PKG_VERSION")) {
+        Ok(s) => s.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeNew(
+    mut env: JNIEnv,
+    _class: JClass,
+    det_model_path: JString,
+    rec_model_path: JString,
+    dict_path: JString,
+) -> jlong {
+    let det: String = match env.get_string(&det_model_path) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let rec: String = match env.get_string(&rec_model_path) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let dict: String = match env.get_string(&dict_path) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+
+    let config = RustOConfig::new_ppv5(det, rec, dict);
+    match RustO::new(config) {
+        Ok(ocr) => Box::into_raw(Box::new(ROCRHandle { inner: ocr })) as jlong,
+        Err(_) => 0,
+    }
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOcrFile(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    image_path: JString,
+    results_out: JLongArray,
+    count_out: JIntArray,
+) -> jint {
+    if handle == 0 {
+        return -1;
+    }
+
+    let path: String = match env.get_string(&image_path) {
+        Ok(s) => s.into(),
+        Err(_) => return -2,
+    };
+
+    let handle_ptr = handle as *mut ROCRHandle;
+    let ocr = &mut (*handle_ptr).inner;
+
+    let results = match ocr.run(&path) {
+        Ok(r) => r,
+        Err(_) => return -3,
+    };
+
+    let c_results = results_to_c(&results);
+    let count = c_results.len();
+    let results_ptr = c_results.as_ptr() as jlong;
+    std::mem::forget(c_results);
+
+    let count_val = [count as i32];
+    let results_val = [results_ptr];
+
+    if env.set_long_array_region(&results_out, 0, &results_val).is_err() {
+        return -4;
+    }
+    if env.set_int_array_region(&count_out, 0, &count_val).is_err() {
+        return -4;
+    }
+
+    0
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOcrData(
+    env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    image_data: JByteArray,
+    results_out: JLongArray,
+    count_out: JIntArray,
+) -> jint {
+    if handle == 0 {
+        return -1;
+    }
+
+    let bytes = match env.convert_byte_array(&image_data) {
+        Ok(b) => b,
+        Err(_) => return -2,
+    };
+
+    #[cfg(not(feature = "use-opencv"))]
+    let img = match image::load_from_memory(&bytes) {
+        Ok(dynamic_img) => Mat::new(dynamic_img),
+        Err(_) => return -3,
+    };
+
+    #[cfg(feature = "use-opencv")]
+    let img = {
+        return -4;
+    };
+
+    let handle_ptr = handle as *mut ROCRHandle;
+    let ocr = &mut (*handle_ptr).inner;
+
+    let results = match ocr.run_on_mat(&img) {
+        Ok(r) => r,
+        Err(_) => return -3,
+    };
+
+    let c_results = results_to_c(&results);
+    let count = c_results.len();
+    let results_ptr = c_results.as_ptr() as jlong;
+    std::mem::forget(c_results);
+
+    let count_val = [count as i32];
+    let results_val = [results_ptr];
+
+    if env.set_long_array_region(&results_out, 0, &results_val).is_err() {
+        return -4;
+    }
+    if env.set_int_array_region(&count_out, 0, &count_val).is_err() {
+        return -4;
+    }
+
+    0
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeGetResult(
+    env: JNIEnv,
+    _class: JClass,
+    results_ptr: jlong,
+    index: jint,
+    text_out: JObjectArray,
+    score_out: JFloatArray,
+    box_out: JFloatArray,
+) {
+    if results_ptr == 0 || index < 0 {
+        return;
+    }
+
+    let item_ptr = (results_ptr as *const CTextResult).add(index as usize);
+    let item = &*item_ptr;
+
+    if !item.text.is_null() {
+        let text_str = CStr::from_ptr(item.text).to_string_lossy();
+        if let Ok(j_str) = env.new_string(text_str) {
+            let _ = env.set_object_array_element(&text_out, 0, j_str);
+        }
+    }
+
+    let score_val = [item.score as jfloat];
+    let _ = env.set_float_array_region(&score_out, 0, &score_val);
+
+    let box_val = [
+        item.box_x1 as jfloat,
+        item.box_y1 as jfloat,
+        item.box_x2 as jfloat,
+        item.box_y2 as jfloat,
+        item.box_x3 as jfloat,
+        item.box_y3 as jfloat,
+        item.box_x4 as jfloat,
+        item.box_y4 as jfloat,
+    ];
+    let _ = env.set_float_array_region(&box_out, 0, &box_val);
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeFreeResults(
+    _env: JNIEnv,
+    _class: JClass,
+    results_ptr: jlong,
+    count: jint,
+) {
+    if results_ptr != 0 && count > 0 {
+        rocr_free_results(results_ptr as *mut CTextResult, count as usize);
+    }
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeFree(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) {
+    if handle != 0 {
+        rocr_free(handle as *mut ROCRHandle);
+    }
+}
+
