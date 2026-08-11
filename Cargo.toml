@@ -3,7 +3,7 @@ members = [".", "crates/mnn-sys", "crates/mnn"]
 
 [package]
 name = "rusto-rs"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "RustO! - Pure Rust OCR library based on RapidOCR with PaddleOCR engine"
 license = "MIT"
@@ -34,7 +34,7 @@ nalgebra = "0.33"
 opencv = { version = "0.97.2", optional = true }
 
 # Local MNN bindings
-mnn = { package = "rusto-mnn", path = "crates/mnn", version = "0.1.2" }
+mnn = { package = "rusto-mnn", path = "crates/mnn", version = "0.1.3" }
 
 # JNI bindings for Android
 jni = { version = "0.21", optional = true }
