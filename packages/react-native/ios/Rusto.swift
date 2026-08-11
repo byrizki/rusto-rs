@@ -48,6 +48,20 @@ class RustoModule: NSObject {
         }
     }
     
+    private func resolveFilePath(_ rawPath: String) -> String {
+        var path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        if path.hasPrefix("file://") {
+            if let url = URL(string: path) {
+                path = url.path
+            } else {
+                path = String(path.dropFirst(7))
+            }
+        } else if path.hasPrefix("file:") {
+            path = String(path.dropFirst(5))
+        }
+        return path.removingPercentEncoding ?? path
+    }
+    
     @objc
     func detectText(_ imagePath: String,
                    resolver resolve: @escaping RCTPromiseResolveBlock,
@@ -58,10 +72,12 @@ class RustoModule: NSObject {
             return
         }
         
+        let resolvedPath = resolveFilePath(imagePath)
+        
         // Check if file exists
         let fileManager = FileManager.default
-        guard fileManager.fileExists(atPath: imagePath) else {
-            reject("FILE_NOT_FOUND", "Image file not found: \(imagePath)", nil)
+        guard fileManager.fileExists(atPath: resolvedPath) else {
+            reject("FILE_NOT_FOUND", "Image file not found: \(imagePath) (resolved path: \(resolvedPath))", nil)
             return
         }
         
@@ -69,7 +85,7 @@ class RustoModule: NSObject {
         var resultsPtr: UnsafeMutableRawPointer?
         var count: Int32 = 0
         
-        let status = rocr_ocr_file(instance, imagePath, &resultsPtr, &count)
+        let status = rocr_ocr_file(instance, resolvedPath, &resultsPtr, &count)
         
         if status != 0 {
             reject("OCR_ERROR", "OCR recognition failed with status: \(status)", nil)

@@ -95,15 +95,30 @@ public class RustO {
         return nil
     }
 
+    private func resolveFilePath(_ rawPath: String) -> String {
+        var path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        if path.hasPrefix("file://") {
+            if let url = URL(string: path) {
+                path = url.path
+            } else {
+                path = String(path.dropFirst(7))
+            }
+        } else if path.hasPrefix("file:") {
+            path = String(path.dropFirst(5))
+        }
+        return path.removingPercentEncoding ?? path
+    }
+
     public func recognizeFile(_ imagePath: String) throws -> [TextResult] {
         guard let handle = handle else {
             throw RustOError.invalidHandle
         }
 
+        let resolvedPath = resolveFilePath(imagePath)
         var resultsPtr: UnsafeMutablePointer<CTextResult>?
         var count: Int = 0
 
-        let status = rocr_ocr_file(handle, imagePath, &resultsPtr, &count)
+        let status = rocr_ocr_file(handle, resolvedPath, &resultsPtr, &count)
         guard status == 0, let results = resultsPtr else {
             throw RustOError.recognitionFailed(status)
         }
@@ -169,8 +184,9 @@ public class RustO {
             throw RustOError.invalidHandle
         }
         
+        let resolvedPath = resolveFilePath(imagePath)
         var outputPtr: OpaquePointer?
-        let status = rocr_ocr_file_with_output(handle, imagePath, &outputPtr)
+        let status = rocr_ocr_file_with_output(handle, resolvedPath, &outputPtr)
         guard status == 0, let output = outputPtr else {
             throw RustOError.recognitionFailed(status)
         }
@@ -190,8 +206,9 @@ public class RustO {
             throw RustOError.invalidHandle
         }
         
+        let resolvedPath = resolveFilePath(imagePath)
         var outputPtr: OpaquePointer?
-        let status = rocr_ocr_file_with_output(handle, imagePath, &outputPtr)
+        let status = rocr_ocr_file_with_output(handle, resolvedPath, &outputPtr)
         guard status == 0, let output = outputPtr else {
             throw RustOError.recognitionFailed(status)
         }
@@ -211,8 +228,9 @@ public class RustO {
             throw RustOError.invalidHandle
         }
         
+        let resolvedPath = resolveFilePath(imagePath)
         var outputPtr: OpaquePointer?
-        let status = rocr_ocr_file_with_output(handle, imagePath, &outputPtr)
+        let status = rocr_ocr_file_with_output(handle, resolvedPath, &outputPtr)
         guard status == 0, let output = outputPtr else {
             throw RustOError.recognitionFailed(status)
         }
@@ -236,8 +254,9 @@ public class RustO {
             throw RustOError.invalidHandle
         }
         
+        let resolvedPath = resolveFilePath(imagePath)
         var outputPtr: OpaquePointer?
-        let status = rocr_ocr_file_with_output(handle, imagePath, &outputPtr)
+        let status = rocr_ocr_file_with_output(handle, resolvedPath, &outputPtr)
         guard status == 0, let output = outputPtr else {
             throw RustOError.recognitionFailed(status)
         }

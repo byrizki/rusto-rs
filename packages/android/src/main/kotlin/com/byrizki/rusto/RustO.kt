@@ -2,8 +2,10 @@ package com.byrizki.rusto
 
 import android.content.Context
 import android.graphics.Bitmap
-import java.io.File
+import android.net.Uri
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.net.URLDecoder
 
 data class Point2D(val x: Float, val y: Float)
 
@@ -100,10 +102,21 @@ class RustO private constructor(
         get() = nativeVersion()
 
     fun recognizeFile(imagePath: String): List<TextResult> {
+        var cleanPath = imagePath.trim()
+        if (cleanPath.startsWith("file://")) {
+            val uri = Uri.parse(cleanPath)
+            cleanPath = uri.path ?: cleanPath.removePrefix("file://")
+        } else if (cleanPath.startsWith("file:")) {
+            cleanPath = cleanPath.removePrefix("file:")
+        }
+        try {
+            cleanPath = URLDecoder.decode(cleanPath, "UTF-8")
+        } catch (_: Exception) {}
+
         val resultsOut = LongArray(1)
         val countOut = IntArray(1)
 
-        val status = nativeOcrFile(nativeHandle, imagePath, resultsOut, countOut)
+        val status = nativeOcrFile(nativeHandle, cleanPath, resultsOut, countOut)
         if (status != 0) {
             throw RustOException("OCR recognition failed with status: $status")
         }
@@ -113,6 +126,16 @@ class RustO private constructor(
         } finally {
             nativeFreeResults(resultsOut[0], countOut[0])
         }
+    }
+
+    fun recognize(context: Context, uri: Uri): List<TextResult> {
+        if (uri.scheme == "content") {
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: throw RustOException("Failed to open URI: $uri")
+            return recognize(bytes)
+        }
+        val path = uri.path ?: uri.toString()
+        return recognizeFile(path)
     }
 
     fun recognize(imageData: ByteArray): List<TextResult> {
@@ -138,25 +161,27 @@ class RustO private constructor(
     }
 
     private fun parseResults(resultsPtr: Long, count: Int): List<TextResult> {
-        val results = mutableListOf<TextResult>()
-        
-        for (i in 0 until count) {
-            val textOut = Array(1) { "" }
-            val scoreOut = FloatArray(1)
-            val boxOut = FloatArray(8)
+        val results = ArrayList<TextResult>(count)
 
+        val textOut = arrayOf("")
+        val scoreOut = FloatArray(1)
+        val boxOut = FloatArray(8)
+
+        for (i in 0 until count) {
             nativeGetResult(resultsPtr, i, textOut, scoreOut, boxOut)
+
+            val boxPoints = listOf(
+                Point2D(boxOut[0], boxOut[1]),
+                Point2D(boxOut[2], boxOut[3]),
+                Point2D(boxOut[4], boxOut[5]),
+                Point2D(boxOut[6], boxOut[7])
+            )
 
             results.add(
                 TextResult(
                     text = textOut[0],
                     score = scoreOut[0],
-                    boxPoints = listOf(
-                        Point2D(boxOut[0], boxOut[1]),
-                        Point2D(boxOut[2], boxOut[3]),
-                        Point2D(boxOut[4], boxOut[5]),
-                        Point2D(boxOut[6], boxOut[7])
-                    )
+                    boxPoints = boxPoints
                 )
             )
         }

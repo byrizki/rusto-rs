@@ -1,6 +1,6 @@
 package com.byrizki.rusto.reactnative
 
-import android.graphics.BitmapFactory
+import android.net.Uri
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -11,6 +11,8 @@ import com.facebook.react.bridge.WritableMap
 import com.byrizki.rusto.RustO
 import com.byrizki.rusto.TextResult
 import java.io.File
+import java.io.FileNotFoundException
+import java.net.URLDecoder
 
 class RustoModule(private val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
@@ -43,6 +45,47 @@ class RustoModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
+    private fun performOcrForPath(imagePath: String, instance: RustO): List<TextResult> {
+        val trimmed = imagePath.trim()
+        
+        // Handle content:// URI (e.g. from ImagePicker or media gallery)
+        if (trimmed.startsWith("content://")) {
+            val uri = Uri.parse(trimmed)
+            val bytes = reactContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: throw FileNotFoundException("Could not open content URI: $trimmed")
+            return instance.recognize(bytes)
+        }
+        
+        // Handle file:// or raw paths
+        var cleanPath = trimmed
+        if (cleanPath.startsWith("file://")) {
+            val uri = Uri.parse(cleanPath)
+            cleanPath = uri.path ?: cleanPath.removePrefix("file://")
+        } else if (cleanPath.startsWith("file:")) {
+            cleanPath = cleanPath.removePrefix("file:")
+        }
+        
+        try {
+            cleanPath = URLDecoder.decode(cleanPath, "UTF-8")
+        } catch (_: Exception) {}
+        
+        val imageFile = File(cleanPath)
+        if (imageFile.exists()) {
+            return instance.recognizeFile(cleanPath)
+        }
+        
+        // Fallback: attempt to open as URI via ContentResolver
+        try {
+            val uri = Uri.parse(trimmed)
+            val bytes = reactContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            if (bytes != null) {
+                return instance.recognize(bytes)
+            }
+        } catch (_: Exception) {}
+
+        throw FileNotFoundException("Image file not found: $imagePath (resolved path: $cleanPath)")
+    }
+
     @ReactMethod
     fun detectText(imagePath: String, promise: Promise) {
         try {
@@ -52,19 +95,13 @@ class RustoModule(private val reactContext: ReactApplicationContext) :
                 return
             }
 
-            // Check if file exists
-            val imageFile = File(imagePath)
-            if (!imageFile.exists()) {
-                promise.reject("FILE_NOT_FOUND", "Image file not found: $imagePath")
-                return
-            }
-
-            // Perform OCR
-            val results = instance.recognizeFile(imagePath)
+            val results = performOcrForPath(imagePath, instance)
             
             // Convert results to React Native format
             val resultArray = convertResultsToWritableArray(results)
             promise.resolve(resultArray)
+        } catch (e: FileNotFoundException) {
+            promise.reject("FILE_NOT_FOUND", e.message ?: "Image file not found: $imagePath", e)
         } catch (e: Exception) {
             promise.reject("OCR_ERROR", "Failed to detect text: ${e.message}", e)
         }

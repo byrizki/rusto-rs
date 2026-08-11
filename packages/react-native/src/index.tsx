@@ -79,7 +79,11 @@ export function detectTextToSpatialText(
   yThresholdMultiplier: number = 0.6,
   xThresholdMultiplier: number = 1.3
 ): Promise<string> {
-  return Rusto.detectTextToSpatialText(imagePath, yThresholdMultiplier, xThresholdMultiplier);
+  return Rusto.detectTextToSpatialText(
+    imagePath,
+    yThresholdMultiplier,
+    xThresholdMultiplier
+  );
 }
 
 export function detectTextFromBytesToRaw(imageData: string): Promise<string> {
