@@ -33,6 +33,7 @@ jobs:
         run: |
           echo "Building MNN from source"
           echo "IPHONEOS_DEPLOYMENT_TARGET=12.0" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
 
       - name: Build for iOS targets
         run: |
@@ -248,7 +249,12 @@ jobs:
           targets: ${{ matrix.rust_target }}
 
       - name: Setup environment
-        run: echo "Building MNN from source"
+        shell: bash
+        run: |
+          echo "Building MNN from source"
+          if [[ "${{ matrix.os }}" == "macos" ]]; then
+            echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
+          fi
 
       - name: Build native library
         run: cargo build --release --target ${{ matrix.rust_target }} --features ffi

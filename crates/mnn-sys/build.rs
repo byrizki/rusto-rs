@@ -91,6 +91,20 @@ fn main() {
             }
         }
     }
+
+    // Pin macOS/iOS deployment targets so that building on a recent macOS host
+    // (e.g. macOS 26) doesn't propagate an unsupported -mmacosx-version-min
+    // flag into MNN's CMake build.
+    if target_os == "macos" {
+        let deployment_target = env::var("MACOSX_DEPLOYMENT_TARGET")
+            .unwrap_or_else(|_| "11.0".to_string());
+        cmake_config.define("CMAKE_OSX_DEPLOYMENT_TARGET", &deployment_target);
+    }
+    if target_os == "ios" {
+        let deployment_target = env::var("IPHONEOS_DEPLOYMENT_TARGET")
+            .unwrap_or_else(|_| "12.0".to_string());
+        cmake_config.define("CMAKE_OSX_DEPLOYMENT_TARGET", &deployment_target);
+    }
     
     let dst = cmake_config.build();
 
