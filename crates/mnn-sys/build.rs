@@ -100,16 +100,16 @@ fn main() {
             .unwrap_or_else(|_| "11.0".to_string());
         cmake_config.define("CMAKE_OSX_DEPLOYMENT_TARGET", &deployment_target);
         // AppleClang 21+ (Xcode 26 / macOS 26) requires explicit <cstdint> for
-        // uint16_t/uint64_t in MNN's cpu_id.cc. Force-include via CMAKE_CXX_FLAGS
-        // so MNN's own flag appends preserve it (CMAKE_CXX_FLAGS_INIT is not
-        // reliable across all generator/toolchain combinations).
-        cmake_config.define("CMAKE_CXX_FLAGS", "-include cstdint");
+        // uint16_t/uint64_t in MNN's cpu_id.cc. Use cxxflag() to APPEND to the
+        // cmake crate's computed CMAKE_CXX_FLAGS (which includes the target triple)
+        // instead of replacing it entirely with define().
+        cmake_config.cxxflag("-include cstdint");
     }
     if target_os == "ios" {
         let deployment_target = env::var("IPHONEOS_DEPLOYMENT_TARGET")
             .unwrap_or_else(|_| "12.0".to_string());
         cmake_config.define("CMAKE_OSX_DEPLOYMENT_TARGET", &deployment_target);
-        cmake_config.define("CMAKE_CXX_FLAGS", "-include cstdint");
+        cmake_config.cxxflag("-include cstdint");
     }
     
     let dst = cmake_config.build();
