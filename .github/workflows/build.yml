@@ -5,6 +5,11 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (e.g. v0.1.3). Leave empty to use version from Cargo.toml'
+        required: false
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -500,15 +505,30 @@ jobs:
         run: |
           sha256sum * > SHA256SUMS || true
 
+      - name: Determine release tag
+        id: release_info
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+          elif [ -n "${{ inputs.tag_name }}" ]; then
+            TAG="${{ inputs.tag_name }}"
+          else
+            VERSION=$(grep -m1 '^version\s*=' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
+            TAG="v${VERSION}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          name: RustO! Release ${{ steps.release_info.outputs.tag }}
           files: releases/*
           draft: false
           prerelease: false
           generate_release_notes: true
           body: |
-            ## RustO! Release ${{ github.ref_name }}
+            ## RustO! Release ${{ steps.release_info.outputs.tag }}
 
             ### Highlights
             - Pure Rust OCR library powered by PaddleOCR models
