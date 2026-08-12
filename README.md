@@ -28,8 +28,8 @@ RustO! is a high-performance OCR (Optical Character Recognition) library written
 RustO! is built on top of proven OCR technology:
 
 - **Based on**: [RapidOCR](https://github.com/RapidAI/RapidOCR) architecture
-- **Models**: [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) PPOCRv4/v5 models
-- **Inference**: [MNN](https://github.com/alibaba/MNN) inference engine for high-performance cross-platform execution
+- **Models**: [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) PP-OCRv6 (Default), PP-OCRv5, PP-OCRv4, and PP-OCRv3 models
+- **Inference**: [MNN](https://github.com/alibaba/MNN) inference engine for high-performance cross-platform execution on mobile, desktop, and server
 - **Image Processing**: Pure Rust implementation (image + imageproc crates)
 - **Contour Detection**: Custom Rust implementation matching OpenCV behavior
 
@@ -38,43 +38,32 @@ RustO! is built on top of proven OCR technology:
 ```
 rusto-rs/
 ├── src/
-│   ├── lib.rs          # Public API
+│   ├── lib.rs          # Public API & exports
+│   ├── config.rs       # RustOConfig, presets (PPV6, PPV5, PPV4, PPV3), & builders
 │   ├── main.rs         # CLI application
-│   ├── ffi.rs          # C FFI bindings (optional)
-│   ├── det.rs          # Text detection
-│   ├── rec.rs          # Text recognition
+│   ├── ffi.rs          # C FFI bindings
+│   ├── det.rs          # Text detection (DBNet)
+│   ├── rec.rs          # Text recognition (CTC)
+│   ├── orient.rs       # Document orientation classification
 │   ├── layout.rs       # Layout detection
+│   ├── table.rs        # Table recognition & HTML structure
 │   ├── doc_pipeline.rs # Document pipeline (layout + OCR)
 │   ├── preprocess.rs   # Image preprocessing
 │   ├── postprocess.rs  # Result postprocessing
 │   ├── contours.rs     # Pure Rust contour detection
 │   ├── geometry.rs     # Geometric transformations + NMS
 │   ├── image_impl.rs   # Image abstraction layer
-│   └── ...
-├── Cargo.toml          # Dependencies & optimization
-├── docs/               # Documentation
-├── examples/           # Example applications
-│   ├── doc_pipeline_demo.rs  # Document pipeline example
-│   └── ...
-└── packages/           # Additional packages
+│   └── types.rs        # Type definitions, Frame, & Config structures
+├── models/
+│   ├── PPOCR_v6/       # PP-OCRv6 MNN models (Tiny prebundled, Small, Medium)
+│   └── PPOCR_v5/       # PP-OCRv5 MNN models
+├── packages/
+│   ├── react-native/   # React Native TypeScript + iOS/Android bindings
+│   ├── android/        # Android library (Kotlin/JNI)
+│   ├── ios/            # iOS Swift package / CocoaPod
+│   └── dotnet/         # .NET C# NuGet package
+└── ...
 ```
-
----
-
-## Model Conversion
-
-RustO! uses MNN inference engine. You need to convert PaddleOCR models to MNN format:
-
-```bash
-# Install required tools
-pip install paddle2onnx
-# Download and build MNN from https://github.com/alibaba/MNN
-
-# Convert models using the provided script
-python convert_paddle_to_mnn.py --ocr-dir ./models
-```
-
-See [MODEL_CONVERSION.md](MODEL_CONVERSION.md) for detailed conversion instructions.
 
 ---
 
@@ -98,29 +87,29 @@ cargo build --release --features use-opencv
 ```bash
 # JSON output (default)
 cargo run --release -- \
-  --det-model path/to/det.mnn \
-  --rec-model path/to/rec.mnn \
-  --dict path/to/dict.txt \
+  --det-model models/PPOCR_v6/det.mnn \
+  --rec-model models/PPOCR_v6/rec.mnn \
+  --dict models/PPOCR_v6/dict.txt \
   image.jpg
 
 # Plain text output
 cargo run --release -- \
-  --det-model path/to/det.mnn \
-  --rec-model path/to/rec.mnn \
-  --dict path/to/dict.txt \
+  --det-model models/PPOCR_v6/det.mnn \
+  --rec-model models/PPOCR_v6/rec.mnn \
+  --dict models/PPOCR_v6/dict.txt \
   --format text \
   image.jpg
 
 # TSV output
 cargo run --release -- \
-  --det-model path/to/det.mnn \
-  --rec-model path/to/rec.mnn \
-  --dict path/to/dict.txt \
+  --det-model models/PPOCR_v6/det.mnn \
+  --rec-model models/PPOCR_v6/rec.mnn \
+  --dict models/PPOCR_v6/dict.txt \
   --format tsv \
   image.jpg
 ```
 
-### 3. Use as a Library
+### 3. Use as a Rust Library
 
 Add to your `Cargo.toml`:
 
@@ -132,194 +121,212 @@ rusto = "0.1"
 Then in your code:
 
 ```rust
-use rusto::{RapidOCR, RapidOCRConfig};
+use rusto::{RustO, RustOConfig};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Configure OCR
-    let config = RapidOCRConfig {
-        det_model_path: "models/det.mnn".to_string(),
-        rec_model_path: "models/rec.mnn".to_string(),
-        dict_path: "models/dict.txt".to_string(),
-    };
+    // Configure OCR with default PP-OCRv6 preset
+    let config = RustOConfig::new(
+        "models/PPOCR_v6/det.mnn",
+        "models/PPOCR_v6/rec.mnn",
+        "models/PPOCR_v6/dict.txt",
+    )
+    .with_text_score(0.5)
+    .with_xy_threshold(0.5, 1.0); // Configure spatial text spacing
     
     // Create OCR instance
-    let ocr = RapidOCR::new(config)?;
+    let mut ocr = RustO::new(config)?;
     
     // Run OCR on an image
-    let results = ocr.ocr("image.jpg")?;
+    let output = ocr.run("image.jpg")?;
     
-    // Process results
-    for result in results {
-        println!("Text: {}, Score: {:.3}", result.text, result.score);
-        println!("Box: {:?}", result.box_points);
+    // 1. Get structured text results with axis-aligned bounding frames
+    let results = output.to_text_results();
+    for res in results {
+        println!("Text: '{}' (Score: {:.2})", res.text, res.score);
+        println!("  Frame: left={:.1}, top={:.1}, w={:.1}, h={:.1}", 
+            res.frame.left, res.frame.top, res.frame.width, res.frame.height);
+        println!("  Polygon: {:?}", res.box_points);
     }
     
+    // 2. Reconstruct spatial document layout text
+    let spatial_text = output.to_spatial_text(None, None);
+    println!("Spatial Layout:\n{}", spatial_text);
+    
     Ok(())
 }
 ```
 
-### 4. Document Pipeline (Layout + OCR)
+### 4. Template Presets & Architecture Support
 
-RustO! now supports document layout analysis combined with OCR for structured document processing:
+RustO! provides pre-configured template presets for different PaddleOCR model generations:
 
 ```rust
-use rusto::{DocPipeline, DocPipelineConfig, LayoutConfig, RustOConfig};
+use rusto::{RustOConfig, PPV6_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV3_MODEL_CONFIG};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Configure layout detection
-    let layout_config = LayoutConfig::default("models/DocOCR/layout.mnn".into());
-    
-    // Configure OCR
-    let ocr_config = RustOConfig::new_ppv5(
-        "models/det.mnn".into(),
-        "models/rec.mnn".into(),
-        "models/dict.txt".into(),
-    );
-    
-    // Create document pipeline
-    let config = DocPipelineConfig {
-        layout: layout_config,
-        ocr: ocr_config,
-    };
-    
-    let mut pipeline = DocPipeline::new(config)?;
-    let result = pipeline.run("document.jpg")?;
-    
-    // Generate markdown output
-    println!("{}", result.to_markdown());
-    
-    Ok(())
-}
+// PP-OCRv6 (Default): limit_side_len=736, min, det_thresh=0.3, det_box_thresh=0.6, unclip=2.0
+let v6_config = RustOConfig::ppv6("det.mnn", "rec.mnn", "dict.txt");
+
+// PP-OCRv5: limit_side_len=736, min, det_thresh=0.3, det_box_thresh=0.5, unclip=2.0
+let v5_config = RustOConfig::ppv5("det.mnn", "rec.mnn", "dict.txt");
+
+// PP-OCRv4: limit_side_len=960, max, det_thresh=0.3, det_box_thresh=0.6, unclip=1.5
+let v4_config = RustOConfig::ppv4("det.mnn", "rec.mnn", "dict.txt");
+
+// PP-OCRv3: limit_side_len=960, max, det_thresh=0.3, det_box_thresh=0.6, unclip=1.5
+let v3_config = RustOConfig::ppv3("det.mnn", "rec.mnn", "dict.txt");
 ```
 
-**Supported Layout Elements:**
-- Text, Title, Header, Footer
-- Figure, Figure Caption
-- Table, Table Caption
-- Reference, Equation
+### 5. Cross-Platform SDKs
 
-**Example:**
-```bash
-cargo run --example doc_pipeline_demo -- \
-  --image document.jpg \
-  --layout-model models/DocOCR/layout.mnn \
-  --det-model models/det.mnn \
-  --rec-model models/rec.mnn \
-  --keys-path models/dict.txt
+#### React Native
+```typescript
+import { initialize, detectText, detectTextToSpatialText } from 'react-native-rusto';
+
+// Initialize with bundled default PP-OCRv6 tiny models (no parameters needed!)
+await initialize();
+
+// Detect text with bounding frames
+const results = await detectText('/path/to/image.jpg');
+results.forEach((r) => {
+  console.log(`${r.text} (${r.score}) - Frame:`, r.frame); // { width, height, top, left }
+});
+
+// Or format directly to spatial layout text
+const spatialText = await detectTextToSpatialText('/path/to/image.jpg', 0.5, 1.0);
+console.log(spatialText);
 ```
 
-### 5. iOS Integration
-
-Install via CocoaPods:
-
-```ruby
-pod 'RustO', '~> 0.1'
-```
-
-Then in Swift:
-
+#### iOS (Swift)
 ```swift
 import RustO
 
-let ocr = try RapidOCR(
-    detModelPath: Bundle.main.path(forResource: "det", ofType: "mnn")!,
-    recModelPath: Bundle.main.path(forResource: "rec", ofType: "mnn")!,
-    dictPath: Bundle.main.path(forResource: "dict", ofType: "txt")!
+// Default PP-OCRv6 configuration
+let config = RustOConfig.ppv6(
+    det: "det.mnn",
+    rec: "rec.mnn",
+    dict: "dict.txt"
 )
+let ocr = try RustO(config: config)
 
 let results = try ocr.recognizeFile("image.jpg")
 for result in results {
-    print("\(result.text): \(result.score)")
+    print("\(result.text) (\(result.score)): frame=\(result.frame.left),\(result.frame.top),\(result.frame.width)x\(result.frame.height)")
 }
+```
+
+#### Android (Kotlin)
+```kotlin
+import com.byrizki.rusto.RustO
+import com.byrizki.rusto.RustOConfig
+
+val config = RustOConfig(
+    template = "ppv6",
+    detModelPath = "det.mnn",
+    recModelPath = "rec.mnn",
+    dictPath = "dict.txt"
+)
+val ocr = RustO(context, config)
+val results = ocr.recognizeFile("/path/to/image.jpg")
+```
+
+#### .NET (C#)
+```csharp
+using RustODotnet;
+
+var config = RustOConfig.Ppv6("det.mnn", "rec.mnn", "dict.txt");
+using var ocr = new RustO(config);
+var results = ocr.RecognizeFile("image.jpg");
 ```
 
 ---
 
 ## API Reference
 
-### RapidOCRConfig
+### RustOConfig & Builders
 
-Configuration structure for initializing the OCR engine.
+Comprehensive configuration structure supporting granular parameter overrides:
 
 ```rust
-pub struct RapidOCRConfig {
-    pub det_model_path: String,  // Path to detection MNN model
-    pub rec_model_path: String,  // Path to recognition MNN model
-    pub dict_path: String,       // Path to character dictionary
-}
+let config = RustOConfig::ppv6("det.mnn", "rec.mnn", "dict.txt")
+    // Detection tuning
+    .with_det_thresh(0.3)
+    .with_det_box_thresh(0.6)
+    .with_limit_side_len(736)
+    .with_limit_type("min")
+    .with_unclip_ratio(2.0)
+    .with_use_dilation(true)
+    .with_max_candidates(1000)
+    .with_score_mode("fast")
+    // Recognition tuning
+    .with_rec_img_shape([3, 48, 320])
+    .with_rec_batch_num(6)
+    // Global & Spatial tuning
+    .with_text_score(0.5)
+    .with_xy_threshold(0.5, 1.0)
+    .with_min_height(30.0)
+    .with_max_side_len(2000.0)
+    // Optional modules
+    .with_cls("models/cls.mnn", 0.9)
+    .with_orientation("models/orient.mnn", 0.9)
+    .with_unwarp("models/unwarp.mnn");
 ```
 
-### TextResult
-
-OCR result for a single detected text region.
+### Frame & TextResult
 
 ```rust
+pub struct Frame {
+    pub width: f32,
+    pub height: f32,
+    pub top: f32,
+    pub left: f32,
+}
+
 pub struct TextResult {
-    pub text: String,                    // Recognized text
-    pub score: f32,                      // Confidence score (0.0-1.0)
-    pub box_points: [(f32, f32); 4],    // Bounding box corners
+    pub text: String,                    // Recognized text string
+    pub score: f32,                      // Confidence score (0.0 - 1.0)
+    pub box_points: [(f32, f32); 4],    // 4 rotated polygon corner points
+    pub frame: Frame,                    // Axis-aligned bounding frame
 }
 ```
-
-### RapidOCR
-
-Main OCR engine.
-
-```rust
-impl RapidOCR {
-    // Create a new OCR instance
-    pub fn new(config: RapidOCRConfig) -> Result<Self, EngineError>;
-    
-    // Run OCR on an image file
-    pub fn ocr<P: AsRef<Path>>(&self, image_path: P) -> Result<Vec<TextResult>, EngineError>;
-    
-    // Run OCR on image data in memory
-    pub fn ocr_from_bytes(&self, image_data: &[u8]) -> Result<Vec<TextResult>, EngineError>;
-}
-```
-
----
-
-## FFI Bindings
-
-The library includes C FFI bindings for integration with other languages. Enable with the `ffi` feature:
-
-```bash
-cargo build --release --features ffi
-```
-
-This produces:
-- **Linux**: `librusto.so`
-- **macOS**: `librusto.dylib`
-- **Windows**: `rusto.dll`
-
-See `src/ffi.rs` for the complete FFI API documentation.
 
 ---
 
 ## 📦 Models
 
-RustO! uses PaddleOCR models converted to ONNX format:
+RustO! uses lightweight, high-performance PaddleOCR models in MNN format:
 
-### Supported Models
+### Model Series Supported
+- **PP-OCRv6** (Default & Recommended) — MetaFormer-based PPLCNetV4 architecture with 50-language unified dictionary. Available in **Tiny** (prebundled, 6.0 MB total), **Small**, and **Medium** tiers.
+- **PP-OCRv5** — High-accuracy detection with SVTR-LCNet recognition.
+- **PP-OCRv4** — Lightweight mobile OCR models.
+- **PP-OCRv3** — Legacy mobile OCR models.
 
-- **PPOCRv4** - PaddleOCR version 4 models
-- **PPOCRv5** - PaddleOCR version 5 models (recommended)
-
-### Model Components
-
-1. **Detection Model** (`det.onnx`) - Detects text regions in images
-2. **Recognition Model** (`rec.onnx`) - Recognizes text within detected regions
-3. **Dictionary** (`dict.txt`) - Character dictionary for text recognition
-
-### Download Models
+### Downloading Pre-Converted MNN Models
+Official models are hosted on [ModelScope RapidAI/RapidOCR](https://www.modelscope.cn/models/RapidAI/RapidOCR/tree/master/mnn/PP-OCRv6):
 
 ```bash
-# Example: Download PPOCRv5 models
-wget https://github.com/RapidAI/RapidOCR/releases/download/v1.3.0/det.onnx
-wget https://github.com/RapidAI/RapidOCR/releases/download/v1.3.0/rec.onnx
-wget https://github.com/RapidAI/RapidOCR/releases/download/v1.3.0/dict.txt
+# PP-OCRv6 Tiny (Prebundled default)
+curl -L -o models/PPOCR_v6/det.mnn "https://www.modelscope.cn/api/v1/models/RapidAI/RapidOCR/repo?Revision=master&FilePath=mnn%2FPP-OCRv6%2Fdet%2FPP-OCRv6_det_tiny.mnn"
+curl -L -o models/PPOCR_v6/rec.mnn "https://www.modelscope.cn/api/v1/models/RapidAI/RapidOCR/repo?Revision=master&FilePath=mnn%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_tiny.mnn"
+curl -L -o models/PPOCR_v6/dict.txt "https://www.modelscope.cn/api/v1/models/RapidAI/RapidOCR/repo?Revision=master&FilePath=paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_tiny%2Fppocrv6_tiny_dict.txt"
 ```
+
+---
+
+## 🔌 C FFI & Shared Libraries
+
+RustO! provides a high-performance C FFI interface for building desktop, mobile, and native bindings. Enable with the `ffi` feature:
+
+```bash
+cargo build --release --features ffi
+```
+
+This compiles shared libraries:
+- **Linux**: `target/release/librusto.so`
+- **macOS / iOS**: `target/release/librusto.dylib`
+- **Windows**: `target/release/rusto.dll`
+
+FFI APIs include `rocr_new_with_config(config_json)`, `rocr_run(inst, image_path)`, `rocr_run_to_spatial_text(inst, image_path, y_multiplier, x_multiplier)`, and direct memory pointer interfaces.
 
 ---
 

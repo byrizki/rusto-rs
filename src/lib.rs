@@ -50,7 +50,7 @@ mod contours;
 pub mod ffi;
 
 // Public API exports
-pub use config::RustOConfig;
+pub use config::{ModelPreset, RustOConfig, PPV3_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG};
 pub use det::TextDetector;
 pub use doc_pipeline::{DocBlock, DocPipeline, DocPipelineConfig, DocResult};
 pub use layout::{LayoutDetector, LayoutOutput, LayoutRegion, LayoutType};
@@ -58,7 +58,7 @@ pub use orient::{OrientClassifier, OrientOutput, Orientation};
 pub use rec::{TextRecOutput, TextRecognizer, WordInfo, WordType};
 pub use rusto_ocr::{RustO, RustOOutput};
 pub use table::{TableDetector, TableDetectorConfig, TableModelType, TableStructure, TableStructureConfig, TableStructureRecognizer};
-pub use types::{ClsConfig, DetConfig, GlobalConfig, LayoutConfig, OrientConfig, RecConfig};
+pub use types::{ClsConfig, DetConfig, Frame, GlobalConfig, LayoutConfig, OrientConfig, RecConfig};
 
 // Alias for compatibility
 pub use RustO as RapidOcr;
@@ -66,11 +66,13 @@ pub use RustO as RapidOcr;
 // Re-export for easier access
 pub use crate::engine::EngineError;
 
-/// OCR text result with bounding box
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+/// OCR text result with bounding box and frame
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TextResult {
     pub text: String,
     pub score: f32,
     /// Box points: [top-left, top-right, bottom-right, bottom-left]
     pub box_points: [(f32, f32); 4],
+    /// Axis-aligned bounding box frame
+    pub frame: Frame,
 }

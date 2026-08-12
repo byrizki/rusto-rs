@@ -32,6 +32,8 @@ pub struct RustOOutput {
     pub elapse_orient: f64,
     /// Debug: Orientation-corrected image (if orientation was detected)
     pub debug_oriented_image: Option<Mat>,
+    pub y_threshold_multiplier: Option<f32>,
+    pub x_threshold_multiplier: Option<f32>,
 }
 
 pub struct RustO {
@@ -181,7 +183,9 @@ impl RustO {
                     elapse_rec: 0.0,
                     elapse_orient,
                     debug_oriented_image,
-                })
+                    y_threshold_multiplier: self.global.y_threshold_multiplier,
+                    x_threshold_multiplier: self.global.x_threshold_multiplier,
+                });
             }
         };
 
@@ -266,6 +270,8 @@ impl RustO {
             elapse_rec: rec_res.elapse,
             elapse_orient,
             debug_oriented_image,
+            y_threshold_multiplier: self.global.y_threshold_multiplier,
+            x_threshold_multiplier: self.global.x_threshold_multiplier,
         })
     }
 
@@ -277,6 +283,30 @@ impl RustO {
 }
 
 impl RustOOutput {
+    /// Convert output into a list of TextResult with bounding box and frame
+    pub fn to_text_results(&self) -> Vec<crate::TextResult> {
+        let mut results = Vec::with_capacity(self.boxes.len());
+        for (i, bbox) in self.boxes.iter().enumerate() {
+            if i >= self.txts.len() || i >= self.scores.len() {
+                break;
+            }
+            let box_points = [
+                (bbox[0].x, bbox[0].y),
+                (bbox[1].x, bbox[1].y),
+                (bbox[2].x, bbox[2].y),
+                (bbox[3].x, bbox[3].y),
+            ];
+            let frame = crate::Frame::from_points(&box_points);
+            results.push(crate::TextResult {
+                text: self.txts[i].clone(),
+                score: self.scores[i],
+                box_points,
+                frame,
+            });
+        }
+        results
+    }
+
     /// Export raw OCR results as ASCII format
     /// Format: [x,y] confidence% text
     /// X,Y are from top-left point of bounding box
@@ -512,8 +542,12 @@ impl RustOOutput {
             return String::new();
         }
 
-        let y_mult = y_threshold_multiplier.unwrap_or(0.5);
-        let x_mult = x_threshold_multiplier.unwrap_or(0.4);
+        let y_mult = y_threshold_multiplier
+            .or(self.y_threshold_multiplier)
+            .unwrap_or(0.5);
+        let x_mult = x_threshold_multiplier
+            .or(self.x_threshold_multiplier)
+            .unwrap_or(0.4);
 
         #[derive(Debug, Clone)]
         struct Token {

@@ -12,18 +12,57 @@ class RustoModule: NSObject {
     }
     
     @objc
-    func initialize(_ detModel: String?,
+    func initialize(_ configOrDet: Any?,
                    recModel: String?,
                    dict: String?,
                    resolver resolve: @escaping RCTPromiseResolveBlock,
                    rejecter reject: @escaping RCTPromiseRejectBlock) {
         
-        // Use default bundled models if not specified
-        let detModelName = detModel ?? "det.mnn"
+        if let configDict = configOrDet as? [String: Any] {
+            if let existing = rustoInstance {
+                rocr_free(existing)
+                rustoInstance = nil
+            }
+            
+            var resolvedConfig = configDict
+            let detModelName = (configDict["detModelPath"] as? String) ?? "det.mnn"
+            let recModelName = (configDict["recModelPath"] as? String) ?? "rec.mnn"
+            let dictName = (configDict["dictPath"] as? String) ?? "dict.txt"
+            
+            resolvedConfig["detModelPath"] = getResourcePath(detModelName) ?? detModelName
+            resolvedConfig["recModelPath"] = getResourcePath(recModelName) ?? recModelName
+            resolvedConfig["dictPath"] = getResourcePath(dictName) ?? dictName
+            
+            if let cls = configDict["clsModelPath"] as? String {
+                resolvedConfig["clsModelPath"] = getResourcePath(cls) ?? cls
+            }
+            if let orient = configDict["orientModelPath"] as? String {
+                resolvedConfig["orientModelPath"] = getResourcePath(orient) ?? orient
+            }
+            if let unwarp = configDict["unwarpModelPath"] as? String {
+                resolvedConfig["unwarpModelPath"] = getResourcePath(unwarp) ?? unwarp
+            }
+            
+            guard let jsonData = try? JSONSerialization.data(withJSONObject: resolvedConfig),
+                  let jsonStr = String(data: jsonData, encoding: .utf8) else {
+                reject("INIT_ERROR", "Failed to serialize configuration", nil)
+                return
+            }
+            
+            rustoInstance = rocr_new_with_config(jsonStr)
+            if rustoInstance == nil {
+                reject("INIT_ERROR", "Failed to initialize RustO with config", nil)
+            } else {
+                resolve(true)
+            }
+            return
+        }
+        
+        let detModelStr = configOrDet as? String
+        let detModelName = detModelStr ?? "det.mnn"
         let recModelName = recModel ?? "rec.mnn"
         let dictName = dict ?? "dict.txt"
         
-        // Get paths from bundle or documents directory
         let detPath = getResourcePath(detModelName)
         let recPath = getResourcePath(recModelName)
         let dictPath = getResourcePath(dictName)
@@ -33,12 +72,11 @@ class RustoModule: NSObject {
             return
         }
         
-        // Free existing instance if any
         if let existing = rustoInstance {
             rocr_free(existing)
+            rustoInstance = nil
         }
         
-        // Initialize RustO with C FFI
         rustoInstance = rocr_new(detPath, recPath, dictPath)
         
         if rustoInstance == nil {
@@ -73,20 +111,16 @@ class RustoModule: NSObject {
         }
         
         let resolvedPath = resolveFilePath(imagePath)
-        
-        // Check if file exists
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: resolvedPath) else {
             reject("FILE_NOT_FOUND", "Image file not found: \(imagePath) (resolved path: \(resolvedPath))", nil)
             return
         }
         
-        // Call native OCR function
         var resultsPtr: UnsafeMutableRawPointer?
         var count: Int32 = 0
         
         let status = rocr_ocr_file(instance, resolvedPath, &resultsPtr, &count)
-        
         if status != 0 {
             reject("OCR_ERROR", "OCR recognition failed with status: \(status)", nil)
             return
@@ -97,12 +131,8 @@ class RustoModule: NSObject {
             return
         }
         
-        // Convert results to array
         let resultArray = convertResultsToArray(results, count: Int(count))
-        
-        // Free native results
         rocr_free_results(results, count)
-        
         resolve(resultArray)
     }
     
@@ -116,19 +146,16 @@ class RustoModule: NSObject {
             return
         }
         
-        // Decode base64 image data
         guard let data = Data(base64Encoded: imageData) else {
             reject("DECODE_ERROR", "Failed to decode base64 image data", nil)
             return
         }
         
-        // Call native OCR function
         var resultsPtr: UnsafeMutableRawPointer?
         var count: Int32 = 0
         
         data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
             let status = rocr_ocr_data(instance, bytes.baseAddress, Int32(data.count), &resultsPtr, &count)
-            
             if status != 0 {
                 reject("OCR_ERROR", "OCR recognition failed with status: \(status)", nil)
                 return
@@ -140,19 +167,159 @@ class RustoModule: NSObject {
             return
         }
         
-        // Convert results to array
         let resultArray = convertResultsToArray(results, count: Int(count))
-        
-        // Free native results
         rocr_free_results(results, count)
-        
         resolve(resultArray)
+    }
+    
+    @objc
+    func detectTextToRaw(_ imagePath: String,
+                         resolver resolve: @escaping RCTPromiseResolveBlock,
+                         rejecter reject: @escaping RCTPromiseRejectBlock) {
+        runOutputFormatForPath(imagePath, reject: reject) { output in
+            guard let strPtr = rocr_output_to_raw(output) else { return "" }
+            defer { rocr_free_string(strPtr) }
+            return String(cString: strPtr)
+        } resolve: { resolve($0) }
+    }
+    
+    @objc
+    func detectTextToCsv(_ imagePath: String,
+                         resolver resolve: @escaping RCTPromiseResolveBlock,
+                         rejecter reject: @escaping RCTPromiseRejectBlock) {
+        runOutputFormatForPath(imagePath, reject: reject) { output in
+            guard let strPtr = rocr_output_to_csv(output) else { return "" }
+            defer { rocr_free_string(strPtr) }
+            return String(cString: strPtr)
+        } resolve: { resolve($0) }
+    }
+    
+    @objc
+    func detectTextToTextWithPosition(_ imagePath: String,
+                                      resolver resolve: @escaping RCTPromiseResolveBlock,
+                                      rejecter reject: @escaping RCTPromiseRejectBlock) {
+        runOutputFormatForPath(imagePath, reject: reject) { output in
+            guard let strPtr = rocr_output_to_text_with_position(output) else { return "" }
+            defer { rocr_free_string(strPtr) }
+            return String(cString: strPtr)
+        } resolve: { resolve($0) }
+    }
+    
+    @objc
+    func detectTextToSpatialText(_ imagePath: String,
+                                yThresholdMultiplier: NSNumber?,
+                                xThresholdMultiplier: NSNumber?,
+                                resolver resolve: @escaping RCTPromiseResolveBlock,
+                                rejecter reject: @escaping RCTPromiseRejectBlock) {
+        let yMult = yThresholdMultiplier?.floatValue ?? 0.0
+        let xMult = xThresholdMultiplier?.floatValue ?? 0.0
+        runOutputFormatForPath(imagePath, reject: reject) { output in
+            guard let strPtr = rocr_output_to_spatial_text(output, yMult, xMult) else { return "" }
+            defer { rocr_free_string(strPtr) }
+            return String(cString: strPtr)
+        } resolve: { resolve($0) }
+    }
+    
+    @objc
+    func detectTextFromBytesToRaw(_ imageData: String,
+                                  resolver resolve: @escaping RCTPromiseResolveBlock,
+                                  rejecter reject: @escaping RCTPromiseRejectBlock) {
+        runOutputFormatForBytes(imageData, reject: reject) { output in
+            guard let strPtr = rocr_output_to_raw(output) else { return "" }
+            defer { rocr_free_string(strPtr) }
+            return String(cString: strPtr)
+        } resolve: { resolve($0) }
+    }
+    
+    @objc
+    func detectTextFromBytesToCsv(_ imageData: String,
+                                  resolver resolve: @escaping RCTPromiseResolveBlock,
+                                  rejecter reject: @escaping RCTPromiseRejectBlock) {
+        runOutputFormatForBytes(imageData, reject: reject) { output in
+            guard let strPtr = rocr_output_to_csv(output) else { return "" }
+            defer { rocr_free_string(strPtr) }
+            return String(cString: strPtr)
+        } resolve: { resolve($0) }
+    }
+    
+    @objc
+    func detectTextFromBytesToTextWithPosition(_ imageData: String,
+                                               resolver resolve: @escaping RCTPromiseResolveBlock,
+                                               rejecter reject: @escaping RCTPromiseRejectBlock) {
+        runOutputFormatForBytes(imageData, reject: reject) { output in
+            guard let strPtr = rocr_output_to_text_with_position(output) else { return "" }
+            defer { rocr_free_string(strPtr) }
+            return String(cString: strPtr)
+        } resolve: { resolve($0) }
+    }
+    
+    @objc
+    func detectTextFromBytesToSpatialText(_ imageData: String,
+                                         yThresholdMultiplier: NSNumber?,
+                                         xThresholdMultiplier: NSNumber?,
+                                         resolver resolve: @escaping RCTPromiseResolveBlock,
+                                         rejecter reject: @escaping RCTPromiseRejectBlock) {
+        let yMult = yThresholdMultiplier?.floatValue ?? 0.0
+        let xMult = xThresholdMultiplier?.floatValue ?? 0.0
+        runOutputFormatForBytes(imageData, reject: reject) { output in
+            guard let strPtr = rocr_output_to_spatial_text(output, yMult, xMult) else { return "" }
+            defer { rocr_free_string(strPtr) }
+            return String(cString: strPtr)
+        } resolve: { resolve($0) }
+    }
+    
+    private func runOutputFormatForPath(_ imagePath: String,
+                                        reject: @escaping RCTPromiseRejectBlock,
+                                        format: (OpaquePointer) -> String,
+                                        resolve: @escaping (String) -> Void) {
+        guard let instance = rustoInstance else {
+            reject("NOT_INITIALIZED", "RustO not initialized. Call initialize() first.", nil)
+            return
+        }
+        let resolvedPath = resolveFilePath(imagePath)
+        guard FileManager.default.fileExists(atPath: resolvedPath) else {
+            reject("FILE_NOT_FOUND", "Image file not found: \(imagePath)", nil)
+            return
+        }
+        
+        var outputPtr: OpaquePointer?
+        let status = rocr_ocr_file_with_output(instance, resolvedPath, &outputPtr)
+        guard status == 0, let output = outputPtr else {
+            reject("OCR_ERROR", "OCR failed with status: \(status)", nil)
+            return
+        }
+        defer { rocr_free_output(output) }
+        resolve(format(output))
+    }
+    
+    private func runOutputFormatForBytes(_ imageData: String,
+                                         reject: @escaping RCTPromiseRejectBlock,
+                                         format: (OpaquePointer) -> String,
+                                         resolve: @escaping (String) -> Void) {
+        guard let instance = rustoInstance else {
+            reject("NOT_INITIALIZED", "RustO not initialized. Call initialize() first.", nil)
+            return
+        }
+        guard let data = Data(base64Encoded: imageData) else {
+            reject("DECODE_ERROR", "Failed to decode base64 image data", nil)
+            return
+        }
+        
+        var outputPtr: OpaquePointer?
+        let status = data.withUnsafeBytes { bytes in
+            rocr_ocr_data_with_output(instance, bytes.baseAddress, Int32(data.count), &outputPtr)
+        }
+        guard status == 0, let output = outputPtr else {
+            reject("OCR_ERROR", "OCR failed with status: \(status)", nil)
+            return
+        }
+        defer { rocr_free_output(output) }
+        resolve(format(output))
     }
     
     @objc
     func getVersion(_ resolve: @escaping RCTPromiseResolveBlock,
                    rejecter reject: @escaping RCTPromiseRejectBlock) {
-        
         if let version = rocr_version() {
             let versionString = String(cString: version)
             resolve(versionString)
@@ -164,15 +331,11 @@ class RustoModule: NSObject {
     // MARK: - Helper Methods
     
     private func getResourcePath(_ filename: String) -> String? {
-        // First, check if it's an absolute path that exists
         if filename.hasPrefix("/") && FileManager.default.fileExists(atPath: filename) {
             return filename
         }
         
-        // Try to find the file in bundle or documents, then copy to cache
         var sourcePath: String?
-        
-        // Try resource bundle first (for bundled models)
         if let bundlePath = Bundle(for: type(of: self)).path(forResource: "RustoModels", ofType: "bundle"),
            let bundle = Bundle(path: bundlePath) {
             let name = filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
@@ -180,12 +343,10 @@ class RustoModule: NSObject {
             sourcePath = bundle.path(forResource: name, ofType: ext)
         }
         
-        // Try main bundle resources
         if sourcePath == nil {
             sourcePath = Bundle.main.path(forResource: filename, ofType: nil)
         }
         
-        // Try documents directory
         if sourcePath == nil {
             let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
             let filePath = (documentsPath as NSString).appendingPathComponent(filename)
@@ -194,7 +355,6 @@ class RustoModule: NSObject {
             }
         }
         
-        // If we found the file, copy it to cache directory
         if let source = sourcePath {
             return copyToCache(source, filename: filename)
         }
@@ -205,21 +365,16 @@ class RustoModule: NSObject {
     private func copyToCache(_ sourcePath: String, filename: String) -> String? {
         let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
         let cachePath = (cacheDir as NSString).appendingPathComponent(filename)
-        
         let fileManager = FileManager.default
         
-        // If file already exists in cache, return cache path
         if fileManager.fileExists(atPath: cachePath) {
             return cachePath
         }
         
-        // Copy file to cache
         do {
             try fileManager.copyItem(atPath: sourcePath, toPath: cachePath)
             return cachePath
         } catch {
-            print("Error copying model to cache: \(error)")
-            // If copy fails, return original source path
             return sourcePath
         }
     }
@@ -236,6 +391,11 @@ class RustoModule: NSObject {
             if let textPtr = result.text {
                 let textString = String(cString: textPtr)
                 
+                let minX = min(result.box_x1, result.box_x2, result.box_x3, result.box_x4)
+                let maxX = max(result.box_x1, result.box_x2, result.box_x3, result.box_x4)
+                let minY = min(result.box_y1, result.box_y2, result.box_y3, result.box_y4)
+                let maxY = max(result.box_y1, result.box_y2, result.box_y3, result.box_y4)
+                
                 let resultDict: [String: Any] = [
                     "text": textString,
                     "score": Double(result.score),
@@ -244,6 +404,12 @@ class RustoModule: NSObject {
                         [Double(result.box_x2), Double(result.box_y2)],
                         [Double(result.box_x3), Double(result.box_y3)],
                         [Double(result.box_x4), Double(result.box_y4)]
+                    ],
+                    "frame": [
+                        "width": Double(maxX - minX),
+                        "height": Double(maxY - minY),
+                        "top": Double(minY),
+                        "left": Double(minX)
                     ]
                 ]
                 
@@ -263,7 +429,6 @@ class RustoModule: NSObject {
 
 // MARK: - C FFI Declarations
 
-// C struct matching Rust CTextResult
 struct CTextResult {
     var text: UnsafeMutablePointer<CChar>?
     var score: Float
@@ -275,16 +440,47 @@ struct CTextResult {
     var box_y3: Float
     var box_x4: Float
     var box_y4: Float
+    var frame_width: Float
+    var frame_height: Float
+    var frame_top: Float
+    var frame_left: Float
 }
 
 @_silgen_name("rocr_new")
 func rocr_new(_ detModel: String, _ recModel: String, _ dict: String) -> OpaquePointer?
+
+@_silgen_name("rocr_new_with_config")
+func rocr_new_with_config(_ configJson: String) -> OpaquePointer?
 
 @_silgen_name("rocr_ocr_file")
 func rocr_ocr_file(_ instance: OpaquePointer, _ imagePath: String, _ results: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ count: UnsafeMutablePointer<Int32>) -> Int32
 
 @_silgen_name("rocr_ocr_data")
 func rocr_ocr_data(_ instance: OpaquePointer, _ data: UnsafeRawPointer?, _ length: Int32, _ results: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ count: UnsafeMutablePointer<Int32>) -> Int32
+
+@_silgen_name("rocr_ocr_file_with_output")
+func rocr_ocr_file_with_output(_ instance: OpaquePointer, _ imagePath: String, _ output: UnsafeMutablePointer<OpaquePointer?>) -> Int32
+
+@_silgen_name("rocr_ocr_data_with_output")
+func rocr_ocr_data_with_output(_ instance: OpaquePointer, _ data: UnsafeRawPointer?, _ length: Int32, _ output: UnsafeMutablePointer<OpaquePointer?>) -> Int32
+
+@_silgen_name("rocr_output_to_raw")
+func rocr_output_to_raw(_ output: OpaquePointer) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rocr_output_to_csv")
+func rocr_output_to_csv(_ output: OpaquePointer) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rocr_output_to_text_with_position")
+func rocr_output_to_text_with_position(_ output: OpaquePointer) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rocr_output_to_spatial_text")
+func rocr_output_to_spatial_text(_ output: OpaquePointer, _ yThresholdMultiplier: Float, _ xThresholdMultiplier: Float) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rocr_free_output")
+func rocr_free_output(_ output: OpaquePointer)
+
+@_silgen_name("rocr_free_string")
+func rocr_free_string(_ str: UnsafeMutablePointer<CChar>)
 
 @_silgen_name("rocr_free_results")
 func rocr_free_results(_ results: UnsafeMutableRawPointer, _ count: Int32)

@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace RustODotnet
 {
@@ -12,6 +14,7 @@ namespace RustODotnet
         public float Score;
         public float BoxX1, BoxY1, BoxX2, BoxY2;
         public float BoxX3, BoxY3, BoxX4, BoxY4;
+        public float FrameWidth, FrameHeight, FrameTop, FrameLeft;
     }
 
     public struct Point2D
@@ -22,11 +25,28 @@ namespace RustODotnet
         public Point2D(float x, float y) { X = x; Y = y; }
     }
 
+    public struct Frame
+    {
+        public float Width { get; set; }
+        public float Height { get; set; }
+        public float Top { get; set; }
+        public float Left { get; set; }
+
+        public Frame(float width, float height, float top, float left)
+        {
+            Width = width;
+            Height = height;
+            Top = top;
+            Left = left;
+        }
+    }
+
     public class TextResult
     {
         public string Text { get; set; }
         public float Score { get; set; }
         public Point2D[] BoxPoints { get; set; }
+        public Frame Frame { get; set; }
 
         internal static TextResult FromNative(CTextResult native)
         {
@@ -40,9 +60,122 @@ namespace RustODotnet
                     new Point2D(native.BoxX2, native.BoxY2),
                     new Point2D(native.BoxX3, native.BoxY3),
                     new Point2D(native.BoxX4, native.BoxY4),
-                }
+                },
+                Frame = new Frame(native.FrameWidth, native.FrameHeight, native.FrameTop, native.FrameLeft)
             };
         }
+    }
+
+    public class RustOConfig
+    {
+        [JsonPropertyName("template")]
+        public string Template { get; set; } = "ppv6";
+
+        [JsonPropertyName("detModelPath")]
+        public string DetModelPath { get; set; } = "det.mnn";
+
+        [JsonPropertyName("recModelPath")]
+        public string RecModelPath { get; set; } = "rec.mnn";
+
+        [JsonPropertyName("dictPath")]
+        public string DictPath { get; set; } = "dict.txt";
+
+        [JsonPropertyName("clsModelPath")]
+        public string ClsModelPath { get; set; }
+
+        [JsonPropertyName("orientModelPath")]
+        public string OrientModelPath { get; set; }
+
+        [JsonPropertyName("unwarpModelPath")]
+        public string UnwarpModelPath { get; set; }
+
+        [JsonPropertyName("orientThreshold")]
+        public float? OrientThreshold { get; set; }
+
+        [JsonPropertyName("clsThreshold")]
+        public float? ClsThreshold { get; set; }
+
+        [JsonPropertyName("textScore")]
+        public float TextScore { get; set; } = 0.5f;
+
+        [JsonPropertyName("detThresh")]
+        public float DetThresh { get; set; } = 0.3f;
+
+        [JsonPropertyName("detBoxThresh")]
+        public float DetBoxThresh { get; set; } = 0.6f;
+
+        [JsonPropertyName("limitSideLen")]
+        public int LimitSideLen { get; set; } = 736;
+
+        [JsonPropertyName("limitType")]
+        public string LimitType { get; set; } = "min";
+
+        [JsonPropertyName("unclipRatio")]
+        public float UnclipRatio { get; set; } = 2.0f;
+
+        [JsonPropertyName("useDilation")]
+        public bool UseDilation { get; set; } = true;
+
+        [JsonPropertyName("useDet")]
+        public bool UseDet { get; set; } = true;
+
+        [JsonPropertyName("useRec")]
+        public bool UseRec { get; set; } = true;
+
+        [JsonPropertyName("useCls")]
+        public bool UseCls { get; set; } = false;
+
+        [JsonPropertyName("useOrient")]
+        public bool UseOrient { get; set; } = false;
+
+        [JsonPropertyName("useUnwarp")]
+        public bool UseUnwarp { get; set; } = false;
+
+        [JsonPropertyName("debugImages")]
+        public bool DebugImages { get; set; } = false;
+
+        [JsonPropertyName("minHeight")]
+        public float MinHeight { get; set; } = 30.0f;
+
+        [JsonPropertyName("maxSideLen")]
+        public float MaxSideLen { get; set; } = 2000.0f;
+
+        [JsonPropertyName("minSideLen")]
+        public float MinSideLen { get; set; } = 30.0f;
+
+        [JsonPropertyName("returnWordBox")]
+        public bool ReturnWordBox { get; set; } = false;
+
+        [JsonPropertyName("returnSingleCharBox")]
+        public bool ReturnSingleCharBox { get; set; } = false;
+
+        [JsonPropertyName("yThresholdMultiplier")]
+        public float? YThresholdMultiplier { get; set; }
+
+        [JsonPropertyName("xThresholdMultiplier")]
+        public float? XThresholdMultiplier { get; set; }
+
+        public RustOConfig() { }
+
+        public RustOConfig(string detModelPath, string recModelPath, string dictPath, string template = "ppv6")
+        {
+            Template = template;
+            DetModelPath = detModelPath;
+            RecModelPath = recModelPath;
+            DictPath = dictPath;
+        }
+
+        public static RustOConfig Ppv6(string det = "det.mnn", string rec = "rec.mnn", string dict = "dict.txt") =>
+            new RustOConfig(det, rec, dict, "ppv6") { DetBoxThresh = 0.6f };
+
+        public static RustOConfig Ppv5(string det = "det.mnn", string rec = "rec.mnn", string dict = "dict.txt") =>
+            new RustOConfig(det, rec, dict, "ppv5");
+
+        public static RustOConfig Ppv4(string det = "det.mnn", string rec = "rec.mnn", string dict = "dict.txt") =>
+            new RustOConfig(det, rec, dict, "ppv4") { LimitSideLen = 960, LimitType = "max", UnclipRatio = 1.5f, UseDilation = false, DetBoxThresh = 0.6f };
+
+        public static RustOConfig Ppv3(string det = "det.mnn", string rec = "rec.mnn", string dict = "dict.txt") =>
+            new RustOConfig(det, rec, dict, "ppv3") { LimitSideLen = 960, LimitType = "max", UnclipRatio = 1.5f, UseDilation = false, DetBoxThresh = 0.6f };
     }
 
     public class RustOException : Exception
@@ -59,6 +192,11 @@ namespace RustODotnet
             [MarshalAs(UnmanagedType.LPUTF8Str)] string detModelPath,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string recModelPath,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string dictPath
+        );
+
+        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr rocr_new_with_config(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string configJson
         );
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
@@ -143,14 +281,32 @@ namespace RustODotnet
             }
         }
 
+        public RustO(RustOConfig config)
+        {
+            if (config == null) throw new ArgumentNullException(nameof(config));
+
+            config.DetModelPath = ResolveModelPath(config.DetModelPath ?? "det.mnn");
+            config.RecModelPath = ResolveModelPath(config.RecModelPath ?? "rec.mnn");
+            config.DictPath = ResolveModelPath(config.DictPath ?? "dict.txt");
+
+            if (config.ClsModelPath != null) config.ClsModelPath = ResolveModelPath(config.ClsModelPath);
+            if (config.OrientModelPath != null) config.OrientModelPath = ResolveModelPath(config.OrientModelPath);
+            if (config.UnwarpModelPath != null) config.UnwarpModelPath = ResolveModelPath(config.UnwarpModelPath);
+
+            string json = JsonSerializer.Serialize(config);
+            _handle = rocr_new_with_config(json);
+            if (_handle == IntPtr.Zero)
+            {
+                throw new RustOException("Failed to initialize RustO with config");
+            }
+        }
+
         public RustO(string detModelPath = null, string recModelPath = null, string dictPath = null)
         {
-            // Use default bundled models if not specified
             detModelPath ??= "det.mnn";
             recModelPath ??= "rec.mnn";
             dictPath ??= "dict.txt";
 
-            // Resolve paths - look in models subdirectory of app directory first
             detModelPath = ResolveModelPath(detModelPath);
             recModelPath = ResolveModelPath(recModelPath);
             dictPath = ResolveModelPath(dictPath);
@@ -164,13 +320,11 @@ namespace RustODotnet
 
         private static string ResolveModelPath(string path)
         {
-            // If absolute path exists, use it
             if (Path.IsPathRooted(path) && File.Exists(path))
             {
                 return path;
             }
 
-            // Try models subdirectory in application directory
             var appDir = AppContext.BaseDirectory;
             var modelsPath = Path.Combine(appDir, "models", path);
             if (File.Exists(modelsPath))
@@ -178,20 +332,17 @@ namespace RustODotnet
                 return modelsPath;
             }
 
-            // Try directly in application directory
             var directPath = Path.Combine(appDir, path);
             if (File.Exists(directPath))
             {
                 return directPath;
             }
 
-            // Try current directory
             if (File.Exists(path))
             {
                 return Path.GetFullPath(path);
             }
 
-            // Return original path and let native code handle the error
             return path;
         }
 
@@ -256,8 +407,8 @@ namespace RustODotnet
 
         public string RecognizeFileToSpatialText(
             string imagePath,
-            float yThresholdMultiplier = 0.6f,
-            float xThresholdMultiplier = 1.3f)
+            float yThresholdMultiplier = 0.0f,
+            float xThresholdMultiplier = 0.0f)
         {
             ThrowIfDisposed();
             return RecognizeFileWithFormat(imagePath, output => 
@@ -284,8 +435,8 @@ namespace RustODotnet
 
         public string RecognizeToSpatialText(
             byte[] imageData,
-            float yThresholdMultiplier = 0.6f,
-            float xThresholdMultiplier = 1.3f)
+            float yThresholdMultiplier = 0.0f,
+            float xThresholdMultiplier = 0.0f)
         {
             ThrowIfDisposed();
             return RecognizeWithFormat(imageData, output => 

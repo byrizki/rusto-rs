@@ -3,14 +3,22 @@
 
 $ErrorActionPreference = "Stop"
 
+param (
+    [string]$ModelVersion = "PPOCR_v6"
+)
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Resolve-Path "$ScriptDir\..\..\..\"
-$ModelsSource = Join-Path $RepoRoot "models\PPOCR_v5"
+$ModelsSource = Join-Path $RepoRoot "models\$ModelVersion"
+if (-not (Test-Path $ModelsSource)) {
+    $ModelsSource = Join-Path $RepoRoot "models\PPOCR_v5"
+}
 $RNPackage = Join-Path $RepoRoot "packages\react-native"
 $AndroidPackage = Join-Path $RepoRoot "packages\android"
 
 Write-Host "Copying model files for React Native bundling..." -ForegroundColor Cyan
 Write-Host "Repository root: $RepoRoot"
+Write-Host "Model source: $ModelsSource"
 Write-Host ""
 
 # Check if source models exist

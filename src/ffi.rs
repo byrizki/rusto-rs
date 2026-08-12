@@ -28,6 +28,38 @@ pub struct CTextResult {
     pub box_y3: c_float,
     pub box_x4: c_float,
     pub box_y4: c_float,
+    pub frame_width: c_float,
+    pub frame_height: c_float,
+    pub frame_top: c_float,
+    pub frame_left: c_float,
+}
+
+/// Create a new RustO instance with JSON configuration
+///
+/// # Safety
+/// config_json must be a valid null-terminated UTF-8 JSON string
+#[no_mangle]
+pub unsafe extern "C" fn rocr_new_with_config(
+    config_json: *const c_char,
+) -> *mut ROCRHandle {
+    if config_json.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let json_str = match CStr::from_ptr(config_json).to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let config = match RustOConfig::from_json(json_str) {
+        Ok(c) => c,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match RustO::new(config) {
+        Ok(ocr) => Box::into_raw(Box::new(ROCRHandle { inner: ocr })),
+        Err(_) => std::ptr::null_mut(),
+    }
 }
 
 /// Create a new RustO instance
@@ -416,8 +448,6 @@ fn results_to_c(results: &RustOOutput) -> Vec<CTextResult> {
             break;
         }
         
-        // Convert Point2f (which might be from image_impl or opencv) to simple coords
-        // Assuming Point2f has x and y
         let x1 = bbox[0].x;
         let y1 = bbox[0].y;
         let x2 = bbox[1].x;
@@ -426,6 +456,11 @@ fn results_to_c(results: &RustOOutput) -> Vec<CTextResult> {
         let y3 = bbox[2].y;
         let x4 = bbox[3].x;
         let y4 = bbox[3].y;
+        
+        let min_x = x1.min(x2).min(x3).min(x4);
+        let max_x = x1.max(x2).max(x3).max(x4);
+        let min_y = y1.min(y2).min(y3).min(y4);
+        let max_y = y1.max(y2).max(y3).max(y4);
         
         let text = CString::new(results.txts[i].clone()).unwrap_or_default();
         
@@ -440,6 +475,10 @@ fn results_to_c(results: &RustOOutput) -> Vec<CTextResult> {
             box_y3: y3,
             box_x4: x4,
             box_y4: y4,
+            frame_width: max_x - min_x,
+            frame_height: max_y - min_y,
+            frame_top: min_y,
+            frame_left: min_x,
         });
     }
     
@@ -650,6 +689,175 @@ pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeFreeResults(
 ) {
     if results_ptr != 0 && count > 0 {
         rocr_free_results(results_ptr as *mut CTextResult, count as usize);
+    }
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeNewWithConfig(
+    mut env: JNIEnv,
+    _class: JClass,
+    config_json: JString,
+) -> jlong {
+    let json_str: String = match env.get_string(&config_json) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+
+    let config = match RustOConfig::from_json(&json_str) {
+        Ok(c) => c,
+        Err(_) => return 0,
+    };
+
+    match RustO::new(config) {
+        Ok(ocr) => Box::into_raw(Box::new(ROCRHandle { inner: ocr })) as jlong,
+        Err(_) => 0,
+    }
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOcrFileWithOutput(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    image_path: JString,
+) -> jlong {
+    if handle == 0 {
+        return 0;
+    }
+    let path: String = match env.get_string(&image_path) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let handle_ptr = handle as *mut ROCRHandle;
+    let ocr = &mut (*handle_ptr).inner;
+    match ocr.run(&path) {
+        Ok(r) => Box::into_raw(Box::new(ROCROutputHandle { inner: r })) as jlong,
+        Err(_) => 0,
+    }
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOcrDataWithOutput(
+    env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    image_data: JByteArray,
+) -> jlong {
+    if handle == 0 {
+        return 0;
+    }
+    let bytes = match env.convert_byte_array(&image_data) {
+        Ok(b) => b,
+        Err(_) => return 0,
+    };
+    #[cfg(not(feature = "use-opencv"))]
+    let img = match image::load_from_memory(&bytes) {
+        Ok(dynamic_img) => Mat::new(dynamic_img),
+        Err(_) => return 0,
+    };
+    #[cfg(feature = "use-opencv")]
+    let img = return 0;
+
+    let handle_ptr = handle as *mut ROCRHandle;
+    let ocr = &mut (*handle_ptr).inner;
+    match ocr.run_on_mat(&img) {
+        Ok(r) => Box::into_raw(Box::new(ROCROutputHandle { inner: r })) as jlong,
+        Err(_) => 0,
+    }
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOutputToRaw(
+    env: JNIEnv,
+    _class: JClass,
+    output: jlong,
+) -> jstring {
+    if output == 0 {
+        return std::ptr::null_mut();
+    }
+    let output_ref = &(*(output as *const ROCROutputHandle)).inner;
+    match env.new_string(output_ref.to_raw()) {
+        Ok(s) => s.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOutputToCsv(
+    env: JNIEnv,
+    _class: JClass,
+    output: jlong,
+) -> jstring {
+    if output == 0 {
+        return std::ptr::null_mut();
+    }
+    let output_ref = &(*(output as *const ROCROutputHandle)).inner;
+    match env.new_string(output_ref.to_csv()) {
+        Ok(s) => s.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOutputToTextWithPosition(
+    env: JNIEnv,
+    _class: JClass,
+    output: jlong,
+) -> jstring {
+    if output == 0 {
+        return std::ptr::null_mut();
+    }
+    let output_ref = &(*(output as *const ROCROutputHandle)).inner;
+    match env.new_string(output_ref.to_text_with_position()) {
+        Ok(s) => s.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOutputToSpatialText(
+    env: JNIEnv,
+    _class: JClass,
+    output: jlong,
+    y_threshold_multiplier: jfloat,
+    x_threshold_multiplier: jfloat,
+) -> jstring {
+    if output == 0 {
+        return std::ptr::null_mut();
+    }
+    let output_ref = &(*(output as *const ROCROutputHandle)).inner;
+    let y_mult = if y_threshold_multiplier <= 0.0 {
+        None
+    } else {
+        Some(y_threshold_multiplier as f32)
+    };
+    let x_mult = if x_threshold_multiplier <= 0.0 {
+        None
+    } else {
+        Some(x_threshold_multiplier as f32)
+    };
+    match env.new_string(output_ref.to_spatial_text(y_mult, x_mult)) {
+        Ok(s) => s.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeFreeOutput(
+    _env: JNIEnv,
+    _class: JClass,
+    output: jlong,
+) {
+    if output != 0 {
+        rocr_free_output(output as *mut ROCROutputHandle);
     }
 }
 

@@ -10,15 +10,109 @@ public struct Point2D {
     }
 }
 
+public struct Frame {
+    public let width: Float
+    public let height: Float
+    public let top: Float
+    public let left: Float
+    
+    public init(width: Float, height: Float, top: Float, left: Float) {
+        self.width = width
+        self.height = height
+        self.top = top
+        self.left = left
+    }
+}
+
 public struct TextResult {
     public let text: String
     public let score: Float
     public let boxPoints: [Point2D]
+    public let frame: Frame
     
-    public init(text: String, score: Float, boxPoints: [Point2D]) {
+    public init(text: String, score: Float, boxPoints: [Point2D], frame: Frame? = nil) {
         self.text = text
         self.score = score
         self.boxPoints = boxPoints
+        if let frame = frame {
+            self.frame = frame
+        } else {
+            let minX = boxPoints.map { $0.x }.min() ?? 0f
+            let maxX = boxPoints.map { $0.x }.max() ?? 0f
+            let minY = boxPoints.map { $0.y }.min() ?? 0f
+            let maxY = boxPoints.map { $0.y }.max() ?? 0f
+            self.frame = Frame(width: maxX - minX, height: maxY - minY, top: minY, left: minX)
+        }
+    }
+}
+
+public struct RustOConfig: Codable {
+    public var template: String = "ppv6"
+    public var detModelPath: String = "det.mnn"
+    public var recModelPath: String = "rec.mnn"
+    public var dictPath: String = "dict.txt"
+    public var clsModelPath: String? = nil
+    public var orientModelPath: String? = nil
+    public var unwarpModelPath: String? = nil
+    public var orientThreshold: Float? = nil
+    public var clsThreshold: Float? = nil
+    public var textScore: Float = 0.5
+    public var detThresh: Float = 0.3
+    public var detBoxThresh: Float = 0.6
+    public var limitSideLen: Int = 736
+    public var limitType: String = "min"
+    public var unclipRatio: Float = 2.0
+    public var useDilation: Bool = true
+    public var useDet: Bool = true
+    public var useRec: Bool = true
+    public var useCls: Bool = false
+    public var useOrient: Bool = false
+    public var useUnwarp: Bool = false
+    public var debugImages: Bool = false
+    public var minHeight: Float = 30.0
+    public var maxSideLen: Float = 2000.0
+    public var minSideLen: Float = 30.0
+    public var returnWordBox: Bool = false
+    public var returnSingleCharBox: Bool = false
+    public var yThresholdMultiplier: Float? = nil
+    public var xThresholdMultiplier: Float? = nil
+
+    public init(
+        detModelPath: String = "det.mnn",
+        recModelPath: String = "rec.mnn",
+        dictPath: String = "dict.txt",
+        template: String = "ppv6"
+    ) {
+        self.template = template
+        self.detModelPath = detModelPath
+        self.recModelPath = recModelPath
+        self.dictPath = dictPath
+    }
+
+    public static func ppv6(det: String = "det.mnn", rec: String = "rec.mnn", dict: String = "dict.txt") -> RustOConfig {
+        RustOConfig(detModelPath: det, recModelPath: rec, dictPath: dict, template: "ppv6")
+    }
+
+    public static func ppv5(det: String = "det.mnn", rec: String = "rec.mnn", dict: String = "dict.txt") -> RustOConfig {
+        RustOConfig(detModelPath: det, recModelPath: rec, dictPath: dict, template: "ppv5")
+    }
+
+    public static func ppv4(det: String = "det.mnn", rec: String = "rec.mnn", dict: String = "dict.txt") -> RustOConfig {
+        var cfg = RustOConfig(detModelPath: det, recModelPath: rec, dictPath: dict, template: "ppv4")
+        cfg.limitSideLen = 960
+        cfg.limitType = "max"
+        cfg.unclipRatio = 1.5
+        cfg.useDilation = false
+        return cfg
+    }
+
+    public static func ppv3(det: String = "det.mnn", rec: String = "rec.mnn", dict: String = "dict.txt") -> RustOConfig {
+        var cfg = RustOConfig(detModelPath: det, recModelPath: rec, dictPath: dict, template: "ppv3")
+        cfg.limitSideLen = 960
+        cfg.limitType = "max"
+        cfg.unclipRatio = 1.5
+        cfg.useDilation = false
+        return cfg
     }
 }
 
@@ -27,6 +121,7 @@ public enum RustOError: Error {
     case recognitionFailed(Int32)
     case invalidHandle
     case invalidPath
+    case serializationFailed
 }
 
 public class RustO {
@@ -39,12 +134,39 @@ public class RustO {
         return String(cString: versionPtr)
     }
 
+    public init(config: RustOConfig) throws {
+        var resolvedConfig = config
+        resolvedConfig.detModelPath = resolveModelPath(config.detModelPath) ?? config.detModelPath
+        resolvedConfig.recModelPath = resolveModelPath(config.recModelPath) ?? config.recModelPath
+        resolvedConfig.dictPath = resolveModelPath(config.dictPath) ?? config.dictPath
+
+        if let cls = config.clsModelPath {
+            resolvedConfig.clsModelPath = resolveModelPath(cls) ?? cls
+        }
+        if let orient = config.orientModelPath {
+            resolvedConfig.orientModelPath = resolveModelPath(orient) ?? orient
+        }
+        if let unwarp = config.unwarpModelPath {
+            resolvedConfig.unwarpModelPath = resolveModelPath(unwarp) ?? unwarp
+        }
+
+        let encoder = JSONEncoder()
+        guard let data = try? encoder.encode(resolvedConfig),
+              let jsonStr = String(data: data, encoding: .utf8) else {
+            throw RustOError.serializationFailed
+        }
+
+        handle = rocr_new_with_config(jsonStr)
+        guard handle != nil else {
+            throw RustOError.initializationFailed
+        }
+    }
+
     public init(
         detModelPath: String? = nil,
         recModelPath: String? = nil,
         dictPath: String? = nil
     ) throws {
-        // Use default bundled models if not specified
         let detPath = detModelPath ?? resolveModelPath("det.mnn")
         let recPath = recModelPath ?? resolveModelPath("rec.mnn")
         let dictFile = dictPath ?? resolveModelPath("dict.txt")
@@ -65,12 +187,10 @@ public class RustO {
     }
     
     private func resolveModelPath(_ filename: String) -> String? {
-        // If absolute path, use it directly
         if filename.hasPrefix("/") && FileManager.default.fileExists(atPath: filename) {
             return filename
         }
         
-        // Try RustoModels.bundle first (for bundled models)
         if let bundlePath = Bundle.main.path(forResource: "RustoModels", ofType: "bundle"),
            let bundle = Bundle(path: bundlePath) {
             let name = filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
@@ -80,12 +200,10 @@ public class RustO {
             }
         }
         
-        // Try main bundle
         if let bundlePath = Bundle.main.path(forResource: filename, ofType: nil) {
             return bundlePath
         }
         
-        // Try documents directory
         let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
         let filePath = (documentsPath as NSString).appendingPathComponent(filename)
         if FileManager.default.fileExists(atPath: filePath) {
@@ -127,15 +245,23 @@ public class RustO {
 
         return (0..<count).map { i in
             let result = results[i]
+            let boxPoints = [
+                Point2D(x: result.box_x1, y: result.box_y1),
+                Point2D(x: result.box_x2, y: result.box_y2),
+                Point2D(x: result.box_x3, y: result.box_y3),
+                Point2D(x: result.box_x4, y: result.box_y4),
+            ]
+            let frame = Frame(
+                width: result.frame_width,
+                height: result.frame_height,
+                top: result.frame_top,
+                left: result.frame_left
+            )
             return TextResult(
                 text: String(cString: result.text),
                 score: result.score,
-                boxPoints: [
-                    Point2D(x: result.box_x1, y: result.box_y1),
-                    Point2D(x: result.box_x2, y: result.box_y2),
-                    Point2D(x: result.box_x3, y: result.box_y3),
-                    Point2D(x: result.box_x4, y: result.box_y4),
-                ]
+                boxPoints: boxPoints,
+                frame: frame
             )
         }
     }
@@ -166,15 +292,23 @@ public class RustO {
 
         return (0..<count).map { i in
             let result = results[i]
+            let boxPoints = [
+                Point2D(x: result.box_x1, y: result.box_y1),
+                Point2D(x: result.box_x2, y: result.box_y2),
+                Point2D(x: result.box_x3, y: result.box_y3),
+                Point2D(x: result.box_x4, y: result.box_y4),
+            ]
+            let frame = Frame(
+                width: result.frame_width,
+                height: result.frame_height,
+                top: result.frame_top,
+                left: result.frame_left
+            )
             return TextResult(
                 text: String(cString: result.text),
                 score: result.score,
-                boxPoints: [
-                    Point2D(x: result.box_x1, y: result.box_y1),
-                    Point2D(x: result.box_x2, y: result.box_y2),
-                    Point2D(x: result.box_x3, y: result.box_y3),
-                    Point2D(x: result.box_x4, y: result.box_y4),
-                ]
+                boxPoints: boxPoints,
+                frame: frame
             )
         }
     }
@@ -247,8 +381,8 @@ public class RustO {
     
     public func recognizeFileToSpatialText(
         _ imagePath: String,
-        yThresholdMultiplier: Float = 0.6,
-        xThresholdMultiplier: Float = 1.3
+        yThresholdMultiplier: Float = 0.0,
+        xThresholdMultiplier: Float = 0.0
     ) throws -> String {
         guard let handle = handle else {
             throw RustOError.invalidHandle
@@ -271,6 +405,78 @@ public class RustO {
         return String(cString: strPtr)
     }
 
+    public func recognizeDataToRaw(_ imageData: Data) throws -> String {
+        guard let handle = handle else {
+            throw RustOError.invalidHandle
+        }
+        var outputPtr: OpaquePointer?
+        let status = imageData.withUnsafeBytes { bytes in
+            rocr_ocr_data_with_output(handle, bytes.baseAddress!.assumingMemoryBound(to: UInt8.self), bytes.count, &outputPtr)
+        }
+        guard status == 0, let output = outputPtr else {
+            throw RustOError.recognitionFailed(status)
+        }
+        defer { rocr_free_output(output) }
+        guard let strPtr = rocr_output_to_raw(output) else { return "" }
+        defer { rocr_free_string(strPtr) }
+        return String(cString: strPtr)
+    }
+
+    public func recognizeDataToCsv(_ imageData: Data) throws -> String {
+        guard let handle = handle else {
+            throw RustOError.invalidHandle
+        }
+        var outputPtr: OpaquePointer?
+        let status = imageData.withUnsafeBytes { bytes in
+            rocr_ocr_data_with_output(handle, bytes.baseAddress!.assumingMemoryBound(to: UInt8.self), bytes.count, &outputPtr)
+        }
+        guard status == 0, let output = outputPtr else {
+            throw RustOError.recognitionFailed(status)
+        }
+        defer { rocr_free_output(output) }
+        guard let strPtr = rocr_output_to_csv(output) else { return "" }
+        defer { rocr_free_string(strPtr) }
+        return String(cString: strPtr)
+    }
+
+    public func recognizeDataToTextWithPosition(_ imageData: Data) throws -> String {
+        guard let handle = handle else {
+            throw RustOError.invalidHandle
+        }
+        var outputPtr: OpaquePointer?
+        let status = imageData.withUnsafeBytes { bytes in
+            rocr_ocr_data_with_output(handle, bytes.baseAddress!.assumingMemoryBound(to: UInt8.self), bytes.count, &outputPtr)
+        }
+        guard status == 0, let output = outputPtr else {
+            throw RustOError.recognitionFailed(status)
+        }
+        defer { rocr_free_output(output) }
+        guard let strPtr = rocr_output_to_text_with_position(output) else { return "" }
+        defer { rocr_free_string(strPtr) }
+        return String(cString: strPtr)
+    }
+
+    public func recognizeDataToSpatialText(
+        _ imageData: Data,
+        yThresholdMultiplier: Float = 0.0,
+        xThresholdMultiplier: Float = 0.0
+    ) throws -> String {
+        guard let handle = handle else {
+            throw RustOError.invalidHandle
+        }
+        var outputPtr: OpaquePointer?
+        let status = imageData.withUnsafeBytes { bytes in
+            rocr_ocr_data_with_output(handle, bytes.baseAddress!.assumingMemoryBound(to: UInt8.self), bytes.count, &outputPtr)
+        }
+        guard status == 0, let output = outputPtr else {
+            throw RustOError.recognitionFailed(status)
+        }
+        defer { rocr_free_output(output) }
+        guard let strPtr = rocr_output_to_spatial_text(output, yThresholdMultiplier, xThresholdMultiplier) else { return "" }
+        defer { rocr_free_string(strPtr) }
+        return String(cString: strPtr)
+    }
+
     deinit {
         if let h = handle {
             rocr_free(h)
@@ -286,6 +492,8 @@ struct CTextResult {
     let box_x2, box_y2: Float
     let box_x3, box_y3: Float
     let box_x4, box_y4: Float
+    let frame_width, frame_height: Float
+    let frame_top, frame_left: Float
 }
 
 @_silgen_name("rocr_new")
@@ -295,8 +503,13 @@ func rocr_new(
     _ dict: UnsafePointer<CChar>
 ) -> OpaquePointer?
 
+@_silgen_name("rocr_new_with_config")
+func rocr_new_with_config(
+    _ configJson: UnsafePointer<CChar>
+) -> OpaquePointer?
+
 @_silgen_name("rocr_ocr_file")
- func rocr_ocr_file(
+func rocr_ocr_file(
     _ handle: OpaquePointer,
     _ imagePath: UnsafePointer<CChar>,
     _ resultsOut: UnsafeMutablePointer<UnsafeMutablePointer<CTextResult>?>,
@@ -322,6 +535,14 @@ func rocr_free(_ handle: OpaquePointer)
 func rocr_ocr_file_with_output(
     _ handle: OpaquePointer,
     _ imagePath: UnsafePointer<CChar>,
+    _ outputOut: UnsafeMutablePointer<OpaquePointer?>
+) -> Int32
+
+@_silgen_name("rocr_ocr_data_with_output")
+func rocr_ocr_data_with_output(
+    _ handle: OpaquePointer,
+    _ imageData: UnsafePointer<UInt8>,
+    _ imageLen: Int,
     _ outputOut: UnsafeMutablePointer<OpaquePointer?>
 ) -> Int32
 

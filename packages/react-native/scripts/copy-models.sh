@@ -7,12 +7,20 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-MODELS_SOURCE="$REPO_ROOT/models/PPOCR_v5"
+MODEL_VERSION="${1:-PPOCR_v6}"
+if [ -d "$REPO_ROOT/models/$MODEL_VERSION" ]; then
+    MODELS_SOURCE="$REPO_ROOT/models/$MODEL_VERSION"
+elif [ -d "$REPO_ROOT/models/PPOCR_v6" ]; then
+    MODELS_SOURCE="$REPO_ROOT/models/PPOCR_v6"
+else
+    MODELS_SOURCE="$REPO_ROOT/models/PPOCR_v5"
+fi
 RN_PACKAGE="$REPO_ROOT/packages/react-native"
 ANDROID_PACKAGE="$REPO_ROOT/packages/android"
 
 echo "Copying model files for React Native bundling..."
 echo "Repository root: $REPO_ROOT"
+echo "Model source: $MODELS_SOURCE"
 echo ""
 
 # Check if source models exist
@@ -22,16 +30,22 @@ if [ ! -d "$MODELS_SOURCE" ]; then
     exit 1
 fi
 
-# Android: Copy to main android package assets
+# Android: Copy to main android package assets and react-native android assets
 echo "📦 Android Setup..."
 ANDROID_ASSETS="$ANDROID_PACKAGE/src/main/assets"
+RN_ANDROID_ASSETS="$RN_PACKAGE/android/src/main/assets"
 mkdir -p "$ANDROID_ASSETS"
+mkdir -p "$RN_ANDROID_ASSETS"
 
 cp "$MODELS_SOURCE/det.mnn" "$ANDROID_ASSETS/"
 cp "$MODELS_SOURCE/rec.mnn" "$ANDROID_ASSETS/"
 cp "$MODELS_SOURCE/dict.txt" "$ANDROID_ASSETS/"
 
-echo "✓ Copied models to $ANDROID_ASSETS"
+cp "$MODELS_SOURCE/det.mnn" "$RN_ANDROID_ASSETS/"
+cp "$MODELS_SOURCE/rec.mnn" "$RN_ANDROID_ASSETS/"
+cp "$MODELS_SOURCE/dict.txt" "$RN_ANDROID_ASSETS/"
+
+echo "✓ Copied models to $ANDROID_ASSETS and $RN_ANDROID_ASSETS"
 echo "  - det.mnn ($(du -h "$ANDROID_ASSETS/det.mnn" | cut -f1))"
 echo "  - rec.mnn ($(du -h "$ANDROID_ASSETS/rec.mnn" | cut -f1))"
 echo "  - dict.txt ($(du -h "$ANDROID_ASSETS/dict.txt" | cut -f1))"

@@ -41,7 +41,8 @@ const results = await detectText('/path/to/image.jpg');
 results.forEach((result) => {
   console.log(`Text: ${result.text}`);
   console.log(`Score: ${result.score}`);
-  console.log(`Box: ${result.box_points}`);
+  console.log(`Frame: ${result.frame.left}, ${result.frame.top}, ${result.frame.width}x${result.frame.height}`);
+  console.log(`Box: ${JSON.stringify(result.box_points)}`);
 });
 
 // Get library version
@@ -49,20 +50,26 @@ const version = await getVersion();
 console.log(`RustO version: ${version}`);
 ```
 
-### Advanced Usage (with custom models)
+### Advanced Usage (with RustOConfig)
 
 ```typescript
-import { initialize, detectText } from 'react-native-rusto';
+import { initialize, detectText, detectTextToSpatialText } from 'react-native-rusto';
 
-// Initialize with custom model files
-await initialize(
-  '/custom/path/det_model.mnn',    // Detection model
-  '/custom/path/rec_model.mnn',    // Recognition model
-  '/custom/path/dict.txt'          // Dictionary file
-);
+// Initialize with unified RustOConfig
+await initialize({
+  detModelPath: 'det.mnn',
+  recModelPath: 'rec.mnn',
+  dictPath: 'dict.txt',
+  textScore: 0.6,
+  detThresh: 0.3,
+  detBoxThresh: 0.5,
+  yThresholdMultiplier: 0.5,
+  xThresholdMultiplier: 0.4,
+});
 
-// Or partially override (use bundled models for unspecified parameters)
-await initialize(undefined, undefined, '/custom/dict.txt');
+// Or extract spatial text with custom XY thresholds
+const spatialText = await detectTextToSpatialText('/path/to/image.jpg', 0.5, 0.4);
+console.log(spatialText);
 ```
 
 ### Model Bundling
@@ -74,39 +81,20 @@ Model files can be bundled with your app. See [BUNDLING.md](./BUNDLING.md) for d
 
 ## API
 
-### `initialize(detModel?: string, recModel?: string, dict?: string): Promise<boolean>`
+### `initialize(configOrDetModel?: RustOConfig | string, recModel?: string, dict?: string): Promise<boolean>`
 
-Initialize the RustO engine with model files.
+Initialize the RustO engine with a `RustOConfig` object or individual model files.
 
-**Parameters (all optional):**
-- `detModel`: Path to detection model file (default: `'det.mnn'` from bundled assets)
-- `recModel`: Path to recognition model file (default: `'rec.mnn'` from bundled assets)
-- `dict`: Path to dictionary file (default: `'dict.txt'` from bundled assets)
-
-Model files are searched in this order:
-1. **iOS**: Resource bundle → Main bundle → Documents directory
-2. **Android**: Custom path → Assets (auto-extracted to cache)
+**Parameters:**
+- `configOrDetModel`: A `RustOConfig` configuration object, or path to detection model file (default: `'det.mnn'`)
+- `recModel`: Path to recognition model file (default: `'rec.mnn'`)
+- `dict`: Path to dictionary file (default: `'dict.txt'`)
 
 **Returns:** `true` on successful initialization
-
-**Examples:**
-```typescript
-// Use bundled models (recommended)
-await initialize();
-
-// Use custom models
-await initialize('/path/to/det.mnn', '/path/to/rec.mnn', '/path/to/dict.txt');
-
-// Mix bundled and custom
-await initialize(undefined, undefined, '/custom/dict.txt');
-```
 
 ### `detectText(imagePath: string): Promise<TextResult[]>`
 
 Perform OCR on an image file.
-
-**Parameters:**
-- `imagePath`: Absolute path to the image file
 
 **Returns:** Array of `TextResult` objects
 
@@ -114,24 +102,62 @@ Perform OCR on an image file.
 
 Perform OCR on base64-encoded image data.
 
-**Parameters:**
-- `imageData`: Base64-encoded image data
-
 **Returns:** Array of `TextResult` objects
+
+### `detectTextToSpatialText(imagePath: string, yThresholdMultiplier?: number, xThresholdMultiplier?: number): Promise<string>`
+
+Export OCR text formatted according to spatial position, with configurable line grouping (`yThresholdMultiplier`) and word/column spacing (`xThresholdMultiplier`).
 
 ### `getVersion(): Promise<string>`
 
 Get the RustO library version.
 
-**Returns:** Version string
-
-### TextResult
+### Types
 
 ```typescript
+interface Frame {
+  width: number;
+  height: number;
+  top: number;
+  left: number;
+}
+
 interface TextResult {
   text: string;
   score: number;
   box_points: [[number, number], [number, number], [number, number], [number, number]];
+  frame: Frame;
+}
+
+interface RustOConfig {
+  detModelPath?: string;
+  recModelPath?: string;
+  dictPath?: string;
+  clsModelPath?: string;
+  orientModelPath?: string;
+  unwarpModelPath?: string;
+  orientThreshold?: number;
+  clsThreshold?: number;
+  textScore?: number;
+  detThresh?: number;
+  detBoxThresh?: number;
+  limitSideLen?: number;
+  limitType?: string;
+  unclipRatio?: number;
+  useDilation?: boolean;
+  useDet?: boolean;
+  useRec?: boolean;
+  useCls?: boolean;
+  useOrient?: boolean;
+  useUnwarp?: boolean;
+  debugImages?: boolean;
+  minHeight?: number;
+  maxSideLen?: number;
+  minSideLen?: number;
+  returnWordBox?: boolean;
+  returnSingleCharBox?: boolean;
+  yThresholdMultiplier?: number;
+  xThresholdMultiplier?: number;
 }
 ```
 
