@@ -37,10 +37,10 @@ public struct TextResult {
         if let frame = frame {
             self.frame = frame
         } else {
-            let minX = boxPoints.map { $0.x }.min() ?? 0f
-            let maxX = boxPoints.map { $0.x }.max() ?? 0f
-            let minY = boxPoints.map { $0.y }.min() ?? 0f
-            let maxY = boxPoints.map { $0.y }.max() ?? 0f
+            let minX = boxPoints.map { $0.x }.min() ?? 0.0
+            let maxX = boxPoints.map { $0.x }.max() ?? 0.0
+            let minY = boxPoints.map { $0.y }.min() ?? 0.0
+            let maxY = boxPoints.map { $0.y }.max() ?? 0.0
             self.frame = Frame(width: maxX - minX, height: maxY - minY, top: minY, left: minX)
         }
     }
