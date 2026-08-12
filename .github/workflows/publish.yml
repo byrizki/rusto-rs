@@ -49,12 +49,42 @@ jobs:
       
       - name: Publish to crates.io
         run: |
-          cargo publish -p rusto-mnn-sys --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          sleep 30
-          cargo publish -p rusto-mnn --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          sleep 30
-          cargo publish -p rusto-rs --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        continue-on-error: true
+          publish_crate() {
+            local pkg="$1"
+            local max_attempts=4
+            local delay=15
+            
+            for attempt in $(seq 1 $max_attempts); do
+              echo "==> Publishing $pkg (Attempt $attempt/$max_attempts)..."
+              output=$(cargo publish -p "$pkg" --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" 2>&1) && {
+                echo "$output"
+                echo "Successfully published $pkg"
+                return 0
+              }
+              
+              echo "$output"
+              
+              if echo "$output" | grep -qi "already uploaded\|already exists"; then
+                echo "Package $pkg is already published on crates.io, skipping."
+                return 0
+              fi
+              
+              if [ $attempt -lt $max_attempts ]; then
+                echo "Failed to publish $pkg. Retrying in ${delay}s..."
+                sleep $delay
+                delay=$((delay * 2))
+              else
+                echo "Failed to publish $pkg after $max_attempts attempts."
+                return 1
+              fi
+            done
+          }
+          
+          publish_crate rusto-mnn-sys
+          sleep 20
+          publish_crate rusto-mnn
+          sleep 20
+          publish_crate rusto-rs
 
 
   # Publish to NuGet
