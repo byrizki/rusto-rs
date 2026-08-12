@@ -250,7 +250,7 @@ class RustoModule(private val reactContext: ReactApplicationContext) :
     private inline fun runOutputFormatForPath(
         imagePath: String,
         promise: Promise,
-        action: (RustO, String?, ByteArray?) -> String
+        crossinline action: (RustO, String?, ByteArray?) -> String
     ) {
         try {
             val instance = rustoInstance ?: run {
