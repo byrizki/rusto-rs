@@ -5,6 +5,21 @@ All notable changes to RustO! will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-08-12
+
+### Changed
+- Update script
+- Use prebuilt MNN intelligently
+
+### Fixed
+- Fix release tag on build
+- Fix ios/osx build
+- Revert mnn submodule to upstream; inject cstdint via cmake flags instead
+- Update mnn submodule - add cstdint for AppleClang 21 (macOS 26)
+- Fix mac os build
+- Android/ios file content uri resolver
+- RN binding, build and ts types
+
 ## [0.1.0] - 2024-11-20
 
 ### Added
@@ -59,7 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Project Status
 
-**Version**: 0.1.0  
+**Version**: 0.1.4  
 **Status**: Production Ready  
 **Accuracy**: 99.3% OpenCV parity  
-**Last Updated**: November 20, 2024
+**Last Updated**: August 12, 2026

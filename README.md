@@ -463,7 +463,7 @@ Also consider citing the underlying technologies:
 <div align="center">
 
 **Status**: Production Ready 🚀  
-**Version**: 0.1.3      
+**Version**: 0.1.4        
 **License**: MIT
 
 Made with ❤️ and 🦀 Rust
