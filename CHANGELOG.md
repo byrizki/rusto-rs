@@ -9,17 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Separate model files from repo, download on-the-fly from rusto-rs-models releases
-- Add PP OCR v6
-
-### Changed
-- Update cargo.toml
-- Use maven central
 
 ### Fixed
 - Fix swift lint
 - Fix C# build
-- Fix crates publish with retry
-- Fix sign key id
+
 
 ## [0.1.5] - 2026-08-12
 

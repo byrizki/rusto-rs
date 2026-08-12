@@ -99,7 +99,89 @@ def update_json_file(file_path: Path, new_ver: str, dry_run: bool = False, stage
     print(f"  [OK] Updated version to {new_ver} in {file_path.relative_to(REPO_ROOT)}")
     return True
 
-def get_commits_since_last_tag() -> List[str]:
+def normalize_changelog_text(text: str) -> str:
+    """
+    Normalizes a changelog entry or commit message for deduplication comparison.
+    Strips leading markdown list tokens, link syntax, bold/italic, scope prefixes,
+    conventional commit prefixes, trailing issue/PR refs, whitespace, and punctuation.
+    """
+    text = re.sub(r"^[\s\-\*\+]+", "", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"[\*_]{1,3}", "", text)
+    text = re.sub(r"\s*\([#\d\w\s,-]+\)$", "", text)
+    text = re.sub(r"^(feat|feature|fix|bug|patch|hotfix|chore|docs|refactor|style|test|perf|build|ci)(\([^)]+\))?:\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text).strip().lower()
+    return text.rstrip(".,;!?:")
+
+def extract_existing_changelog_entries(changelog_path: Path, exclude_version: str = "") -> tuple:
+    """
+    Extracts all bullet points from existing sections in CHANGELOG.md,
+    returning sets of normalized strings for deduplication:
+    - existing: full normalized strings
+    - core_existing: core text with any scope prefix stripped
+    """
+    existing: Set[str] = set()
+    core_existing: Set[str] = set()
+    if not changelog_path or not changelog_path.exists():
+        return existing, core_existing
+
+    try:
+        with open(changelog_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        return existing, core_existing
+
+    sections = re.split(r"\n(?=##\s*\[)", content)
+    for sec in sections:
+        ver_match = re.match(r"##\s*\[([^\]]+)\]", sec.strip())
+        if ver_match:
+            sec_ver = ver_match.group(1).strip()
+            if exclude_version and sec_ver == exclude_version:
+                continue
+        for line in sec.splitlines():
+            line = line.strip()
+            if line.startswith(("-", "*", "+")):
+                norm = normalize_changelog_text(line)
+                if norm:
+                    existing.add(norm)
+                    core_norm = re.sub(r"^[a-z0-9_ -]+:\s*", "", norm)
+                    if core_norm:
+                        core_existing.add(core_norm)
+    return existing, core_existing
+
+def find_base_commit_for_changelog(current_ver: str) -> str:
+    """
+    Finds the base commit/tag from which to collect new changelog items.
+    """
+    # 1. Check if git tag exists for current_ver
+    if current_ver:
+        for tag in [f"v{current_ver}", current_ver]:
+            res = subprocess.run(
+                ["git", "rev-parse", "--verify", f"refs/tags/{tag}"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True
+            )
+            if res.returncode == 0:
+                return tag
+
+    # 2. Check recent commit history for release commit of current_ver
+    if current_ver:
+        log_res = subprocess.run(
+            ["git", "log", "--format=%H %s", "-n", "50"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True
+        )
+        pattern = rf"^(?:chore(?:\([^)]+\))?:\s*)?(?:release\s+)?v?{re.escape(current_ver)}$"
+        for line in log_res.stdout.splitlines():
+            parts = line.split(" ", 1)
+            if len(parts) == 2:
+                commit_hash, subject = parts[0], parts[1].strip()
+                if re.match(pattern, subject, re.IGNORECASE):
+                    return commit_hash
+
+    # 3. Fallback to latest tag in git
     try:
         tag_proc = subprocess.run(
             ["git", "describe", "--tags", "--abbrev=0"],
@@ -109,10 +191,16 @@ def get_commits_since_last_tag() -> List[str]:
             check=False
         )
         latest_tag = tag_proc.stdout.strip()
+        if latest_tag:
+            return latest_tag
     except Exception:
-        latest_tag = ""
+        pass
 
-    git_range = f"{latest_tag}..HEAD" if latest_tag else "HEAD"
+    return ""
+
+def get_commits_since_last_version(current_ver: str = "") -> List[str]:
+    base_ref = find_base_commit_for_changelog(current_ver)
+    git_range = f"{base_ref}..HEAD" if base_ref else "HEAD"
 
     try:
         log_proc = subprocess.run(
@@ -126,16 +214,36 @@ def get_commits_since_last_tag() -> List[str]:
     except Exception:
         return []
 
-def generate_changelog_section(new_ver: str) -> str:
+def generate_changelog_section(new_ver: str, current_ver: str = "", changelog_path: Path = None) -> str:
     import datetime
-    commits = get_commits_since_last_tag()
+    commits = get_commits_since_last_version(current_ver)
     today = datetime.date.today().strftime("%Y-%m-%d")
+
+    existing_entries: Set[str] = set()
+    existing_core_entries: Set[str] = set()
+    if changelog_path is not None:
+        existing_entries, existing_core_entries = extract_existing_changelog_entries(changelog_path, exclude_version=new_ver)
 
     added: List[str] = []
     fixed: List[str] = []
     changed: List[str] = []
+    seen_in_current: Set[str] = set()
 
-    def add_item(target_list: List[str], item: str):
+    def add_item(target_list: List[str], item: str, raw_msg: str):
+        norm = normalize_changelog_text(item)
+        core_norm = re.sub(r"^[a-z0-9_ -]+:\s*", "", norm)
+        raw_norm = normalize_changelog_text(raw_msg)
+        raw_core_norm = re.sub(r"^[a-z0-9_ -]+:\s*", "", raw_norm)
+
+        # Check deduplication against previous changelog entries and current section
+        if norm in existing_entries or core_norm in existing_core_entries or norm in seen_in_current:
+            return
+        if raw_norm in existing_entries or raw_core_norm in existing_core_entries:
+            return
+
+        seen_in_current.add(norm)
+        if core_norm:
+            seen_in_current.add(core_norm)
         if item not in target_list:
             target_list.append(item)
 
@@ -155,22 +263,22 @@ def generate_changelog_section(new_ver: str) -> str:
             item = f"- **{scope}**: {text}" if scope else f"- {text}"
 
             if c_type in ("feat", "feature", "add"):
-                add_item(added, item)
+                add_item(added, item, msg)
             elif c_type in ("fix", "bug", "patch", "hotfix"):
-                add_item(fixed, item)
+                add_item(fixed, item, msg)
             else:
-                add_item(changed, item)
+                add_item(changed, item, msg)
         else:
             clean_msg = msg.strip()
             if clean_msg:
                 clean_msg = clean_msg[0].upper() + clean_msg[1:]
             lower = clean_msg.lower()
             if lower.startswith("add") or lower.startswith("feat"):
-                add_item(added, f"- {clean_msg}")
+                add_item(added, f"- {clean_msg}", msg)
             elif lower.startswith("fix"):
-                add_item(fixed, f"- {clean_msg}")
+                add_item(fixed, f"- {clean_msg}", msg)
             else:
-                add_item(changed, f"- {clean_msg}")
+                add_item(changed, f"- {clean_msg}", msg)
 
     section_lines = [f"## [{new_ver}] - {today}\n"]
 
@@ -196,7 +304,7 @@ def generate_changelog_section(new_ver: str) -> str:
 
     return "\n".join(section_lines).strip() + "\n\n"
 
-def update_changelog_file(file_path: Path, new_ver: str, dry_run: bool = False, staged_files: Set[Path] = None) -> bool:
+def update_changelog_file(file_path: Path, new_ver: str, current_ver: str = "", dry_run: bool = False, staged_files: Set[Path] = None) -> bool:
     import datetime
     if not file_path.exists():
         print(f"  [WARN] File not found: {file_path.relative_to(REPO_ROOT)}")
@@ -205,24 +313,23 @@ def update_changelog_file(file_path: Path, new_ver: str, dry_run: bool = False, 
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    if f"## [{new_ver}]" in content:
-        print(f"  [INFO] CHANGELOG.md already has an entry for [{new_ver}], skipping insertion.")
-        if staged_files is not None:
-            staged_files.add(file_path)
-        return True
+    new_section = generate_changelog_section(new_ver, current_ver=current_ver, changelog_path=file_path)
 
-    new_section = generate_changelog_section(new_ver)
-
-    first_section_match = re.search(r"\n(##\s*\[\d+\.\d+\.\d+\])", content)
-    if first_section_match:
-        pos = first_section_match.start(1)
-        updated_content = content[:pos] + new_section + content[pos:]
+    # Check if section for new_ver already exists in CHANGELOG.md
+    existing_pattern = rf"(##\s*\[{re.escape(new_ver)}\][^\n]*\n(?:(?!\n##\s*\[|\n---\n|\n##\s*Project\s*Status)[\s\S])*)"
+    if re.search(existing_pattern, content):
+        updated_content = re.sub(existing_pattern, new_section.strip(), content, count=1)
     else:
-        header_end = content.find("\n\n")
-        if header_end != -1:
-            updated_content = content[:header_end+2] + new_section + content[header_end+2:]
+        first_section_match = re.search(r"\n(##\s*\[\d+\.\d+\.\d+\])", content)
+        if first_section_match:
+            pos = first_section_match.start(1)
+            updated_content = content[:pos] + new_section + content[pos:]
         else:
-            updated_content = content + "\n\n" + new_section
+            header_end = content.find("\n\n")
+            if header_end != -1:
+                updated_content = content[:header_end+2] + new_section + content[header_end+2:]
+            else:
+                updated_content = content + "\n\n" + new_section
 
     today_formatted = datetime.date.today().strftime("%B %d, %Y")
     updated_content = re.sub(
@@ -246,7 +353,7 @@ def update_changelog_file(file_path: Path, new_ver: str, dry_run: bool = False, 
     print(f"  [OK] Updated {file_path.relative_to(REPO_ROOT)} with new section for [{new_ver}]")
     return True
 
-def update_all_files(new_ver: str, dry_run: bool = False) -> Set[Path]:
+def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False) -> Set[Path]:
     print(f"\nUpdating version to '{new_ver}' across repository files...")
     staged_files: Set[Path] = set()
     
@@ -409,8 +516,9 @@ def update_all_files(new_ver: str, dry_run: bool = False) -> Set[Path]:
         update_changelog_file(
             REPO_ROOT / "CHANGELOG.md",
             new_ver,
-            dry_run,
-            staged_files
+            current_ver=current_ver,
+            dry_run=dry_run,
+            staged_files=staged_files
         )
 
     return staged_files
@@ -479,7 +587,7 @@ Examples:
     if args.dry_run:
         print("Mode            : [DRY-RUN - No files will be modified]")
 
-    modified_files = update_all_files(new_ver, args.dry_run)
+    modified_files = update_all_files(new_ver, current_ver=current_ver, dry_run=args.dry_run)
 
     # Sync Cargo.lock if cargo is installed
     if not args.dry_run:
