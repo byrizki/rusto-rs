@@ -27,3 +27,6 @@ onnxruntime
 node_modules
 **/node_modules
 packages/react-native/lib
+
+__pycache__/
+*.pyc
