@@ -164,10 +164,15 @@ jobs:
         working-directory: packages/android
         run: |
           chmod +x gradlew
+          KEY_ID="${{ secrets.SIGNING_KEY_ID }}"
+          if [ -n "$KEY_ID" ] && [ ${#KEY_ID} -gt 8 ]; then
+            export ORG_GRADLE_PROJECT_signingInMemoryKeyId="${KEY_ID: -8}"
+          elif [ -n "$KEY_ID" ]; then
+            export ORG_GRADLE_PROJECT_signingInMemoryKeyId="$KEY_ID"
+          fi
           ./gradlew publishAllPublicationsToMavenCentralRepository --no-configuration-cache
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
