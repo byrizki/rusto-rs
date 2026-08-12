@@ -5,6 +5,22 @@ All notable changes to RustO! will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] - 2026-08-12
+
+### Added
+- Separate model files from repo, download on-the-fly from rusto-rs-models releases
+- Add PP OCR v6
+
+### Changed
+- Update cargo.toml
+- Use maven central
+
+### Fixed
+- Fix swift lint
+- Fix C# build
+- Fix crates publish with retry
+- Fix sign key id
+
 ## [0.1.5] - 2026-08-12
 
 ### Added
@@ -87,7 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Project Status
 
-**Version**: 0.1.5  
+**Version**: 0.1.6  
 **Status**: Production Ready  
 **Accuracy**: 99.3% OpenCV parity  
 **Last Updated**: August 12, 2026
