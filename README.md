@@ -470,7 +470,7 @@ Also consider citing the underlying technologies:
 <div align="center">
 
 **Status**: Production Ready 🚀  
-**Version**: 0.1.6            
+**Version**: 0.1.7              
 **License**: MIT
 
 Made with ❤️ and 🦀 Rust

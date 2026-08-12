@@ -160,7 +160,7 @@ fn find_or_build_mnn(target_os: &str, target_arch: &str, out_dir: &Path) -> Path
 
 fn try_get_prebuilt(out_dir: &Path, lib_name: &str) -> Option<PathBuf> {
     let target = env::var("TARGET").unwrap_or_default();
-    let version = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.6".to_string());
+    let version = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.7".to_string());
     let prebuilt_dir = out_dir.join("prebuilt");
     let lib_dest = prebuilt_dir.join(lib_name);
 

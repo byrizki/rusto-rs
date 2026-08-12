@@ -24,7 +24,7 @@ android {
     minSdkVersion safeExtGet('ReactNativeRusto_minSdkVersion', 21)
     targetSdkVersion safeExtGet('ReactNativeRusto_targetSdkVersion', 34)
     versionCode 1
-    versionName "0.1.6"
+    versionName "0.1.7"
 
     ndk {
       abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
@@ -94,7 +94,7 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.aar', '*.jar'])
   } else {
     // Fallback to Maven Central coordinate
-    def rustoAndroidVersion = safeExtGet('RustoAndroid_version', '0.1.6')
+    def rustoAndroidVersion = safeExtGet('RustoAndroid_version', '0.1.7')
     implementation "com.byrizki.rusto:rusto-android:$rustoAndroidVersion"
   }
 }

@@ -12,7 +12,7 @@ android {
         minSdk 21
         targetSdk 34
         versionCode 1
-        versionName "0.1.6"
+        versionName "0.1.7"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
@@ -63,7 +63,7 @@ mavenPublishing {
     publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
     signAllPublications()
 
-    coordinates('com.byrizki.rusto', 'rusto-android', '0.1.6')
+    coordinates('com.byrizki.rusto', 'rusto-android', '0.1.7')
 
     pom {
         name = 'RustO! Android'

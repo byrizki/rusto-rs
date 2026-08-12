@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
   <metadata>
     <id>RustODotnet</id>
-    <version>0.1.6</version>
+    <version>0.1.7</version>
     <authors>RustO Contributors</authors>
     <description>RustO! - Pure Rust OCR library based on RapidOCR with PaddleOCR engine</description>
     <license type="expression">MIT</license>

@@ -7,7 +7,7 @@
     <LangVersion>latest</LangVersion>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>RustODotnet</PackageId>
-    <Version>0.1.6</Version>
+    <Version>0.1.7</Version>
     <Authors>RustO Contributors</Authors>
     <Description>RustO! - Pure Rust OCR library based on RapidOCR with PaddleOCR engine</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

@@ -8,7 +8,7 @@ on:
       version:
         description: 'Version to publish'
         required: true
-        default: '0.1.6'
+        default: '0.1.7'
       publish_crates:
         description: 'Publish to Crates.io'
         type: boolean
