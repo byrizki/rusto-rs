@@ -19,6 +19,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Needed by netstandard2.1; net6.0+ provides this from shared framework. -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+
     <None Include="runtimes\**\*" Pack="true" PackagePath="runtimes\" />
     
     <!-- Model files packaged in content folder (not contentFiles to avoid compile) -->
