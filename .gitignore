@@ -18,9 +18,30 @@ libonnxruntime.dylib*
 onnxruntime.dll
 onnxruntime.lib
 
-models/images
-!models/**/*.onnx
-!models/**/*.
+# Model binaries (downloaded on the fly via scripts/download_models.sh)
+models/**/*.mnn
+models/**/*.onnx
+
+# Bundled model assets (generated at build time via packages/react-native/scripts/copy-models.sh)
+packages/android/src/main/assets/*.mnn
+packages/android/src/main/assets/*.onnx
+packages/android/src/main/assets/*.txt
+packages/react-native/android/src/main/assets/*.mnn
+packages/react-native/android/src/main/assets/*.onnx
+packages/react-native/android/src/main/assets/*.txt
+packages/react-native/ios/models/*.mnn
+packages/react-native/ios/models/*.onnx
+packages/react-native/ios/models/*.txt
+packages/dotnet/models/*.mnn
+packages/dotnet/models/*.onnx
+packages/dotnet/models/*.txt
+packages/ios/Resources/det.mnn
+packages/ios/Resources/rec.mnn
+packages/ios/Resources/lcnet.mnn
+packages/ios/Resources/dict.txt
+
+# Dictionary files in bundled paths are also downloaded at build time
+# (only models/PPOCR_v*/dict.txt are kept for CI reference)
 
 onnxruntime
 .gradle

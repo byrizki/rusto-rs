@@ -21,11 +21,10 @@ Write-Host "Repository root: $RepoRoot"
 Write-Host "Model source: $ModelsSource"
 Write-Host ""
 
-# Check if source models exist
-if (-not (Test-Path $ModelsSource)) {
-    Write-Host "Error: Source models directory not found: $ModelsSource" -ForegroundColor Red
-    Write-Host "Please ensure models are downloaded first."
-    exit 1
+# Check if source models exist; if not, download on the fly
+if (-not (Test-Path "$ModelsSource\det.mnn") -or -not (Test-Path "$ModelsSource\rec.mnn") -or -not (Test-Path "$ModelsSource\dict.txt")) {
+    Write-Host "Models not found in $ModelsSource. Downloading default PP-OCRv6 tiny models..." -ForegroundColor Yellow
+    & "$RepoRoot\scripts\download_models.ps1" -OutputDir "$ModelsSource"
 }
 
 # Android: Copy to main android package assets

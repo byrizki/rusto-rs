@@ -25,6 +25,11 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Download default PP-OCRv6 models
+        run: |
+          chmod +x scripts/download_models.sh
+          bash scripts/download_models.sh
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -67,9 +72,9 @@ jobs:
           mkdir -p packages/react-native/ios/models
 
           echo "Copying model files..."
-          cp models/PPOCR_v5/det.mnn packages/react-native/ios/models/
-          cp models/PPOCR_v5/rec.mnn packages/react-native/ios/models/
-          cp models/PPOCR_v5/dict.txt packages/react-native/ios/models/
+          cp models/PPOCR_v6/det.mnn packages/react-native/ios/models/
+          cp models/PPOCR_v6/rec.mnn packages/react-native/ios/models/
+          cp models/PPOCR_v6/dict.txt packages/react-native/ios/models/
 
           echo "\nFiles in React Native iOS models/:"
           ls -lh packages/react-native/ios/models/ || echo "No files copied"
@@ -80,9 +85,9 @@ jobs:
           mkdir -p build/Resources
           
           echo "Copying models to build/Resources..."
-          cp models/PPOCR_v5/det.mnn build/Resources/
-          cp models/PPOCR_v5/rec.mnn build/Resources/
-          cp models/PPOCR_v5/dict.txt build/Resources/
+          cp models/PPOCR_v6/det.mnn build/Resources/
+          cp models/PPOCR_v6/rec.mnn build/Resources/
+          cp models/PPOCR_v6/dict.txt build/Resources/
           
           echo "Copying Swift sources..."
           mkdir -p build/src
@@ -114,6 +119,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Download default PP-OCRv6 models
+        run: |
+          chmod +x scripts/download_models.sh
+          bash scripts/download_models.sh
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libpthread-stubs0-dev
@@ -178,14 +188,14 @@ jobs:
           mkdir -p packages/react-native/android/src/main/assets
 
           echo "Copying to packages/android/src/main/assets/..."
-          cp models/PPOCR_v5/det.mnn packages/android/src/main/assets/
-          cp models/PPOCR_v5/rec.mnn packages/android/src/main/assets/
-          cp models/PPOCR_v5/dict.txt packages/android/src/main/assets/
+          cp models/PPOCR_v6/det.mnn packages/android/src/main/assets/
+          cp models/PPOCR_v6/rec.mnn packages/android/src/main/assets/
+          cp models/PPOCR_v6/dict.txt packages/android/src/main/assets/
 
           echo "Copying to packages/react-native/android/src/main/assets/..."
-          cp models/PPOCR_v5/det.mnn packages/react-native/android/src/main/assets/
-          cp models/PPOCR_v5/rec.mnn packages/react-native/android/src/main/assets/
-          cp models/PPOCR_v5/dict.txt packages/react-native/android/src/main/assets/
+          cp models/PPOCR_v6/det.mnn packages/react-native/android/src/main/assets/
+          cp models/PPOCR_v6/rec.mnn packages/react-native/android/src/main/assets/
+          cp models/PPOCR_v6/dict.txt packages/react-native/android/src/main/assets/
 
           echo "\nFiles in Android package assets/:"
           ls -lh packages/android/src/main/assets/ || echo "No files copied"
@@ -350,23 +360,18 @@ jobs:
           echo "=== Final runtimes structure ==="
           find packages/dotnet/runtimes -type f || echo "No runtime files found"
 
+      - name: Download default PP-OCRv6 models
+        run: |
+          chmod +x scripts/download_models.sh
+          bash scripts/download_models.sh
+
       - name: Copy model files to package
         run: |
           echo "=== Copying model files to NuGet package ==="
           mkdir -p packages/dotnet/models
-
-          echo "Looking for .mnn files:"
-          find models/ -name "*.mnn" -type f
-
-          echo "Looking for .txt files:"
-          find models/ -name "*.txt" -type f
-
-          echo "Copying .mnn files..."
-          find models/ -name "*.mnn" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/dotnet/models/' _ {} \; || true
-
-          echo "Copying .txt files..."
-          find models/ -name "*.txt" -exec sh -c 'echo "  Copying: $1"; cp "$1" packages/dotnet/models/' _ {} \; || true
-
+          cp models/PPOCR_v6/det.mnn packages/dotnet/models/
+          cp models/PPOCR_v6/rec.mnn packages/dotnet/models/
+          cp models/PPOCR_v6/dict.txt packages/dotnet/models/
           echo "\nFiles in packages/dotnet/models/:"
           ls -lh packages/dotnet/models/ || echo "No files copied"
 
@@ -412,6 +417,11 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Download default PP-OCRv6 models
+        run: |
+          chmod +x scripts/download_models.sh
+          bash scripts/download_models.sh
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -445,9 +455,9 @@ jobs:
           # Copy model files for iOS bundling
           echo "Copying models for iOS bundling..."
           mkdir -p packages/react-native/ios/models
-          cp models/PPOCR_v5/det.mnn packages/react-native/ios/models/
-          cp models/PPOCR_v5/rec.mnn packages/react-native/ios/models/
-          cp models/PPOCR_v5/dict.txt packages/react-native/ios/models/
+          cp models/PPOCR_v6/det.mnn packages/react-native/ios/models/
+          cp models/PPOCR_v6/rec.mnn packages/react-native/ios/models/
+          cp models/PPOCR_v6/dict.txt packages/react-native/ios/models/
 
           echo "Files in React Native iOS models/:"
           ls -lh packages/react-native/ios/models/ || echo "No files copied"

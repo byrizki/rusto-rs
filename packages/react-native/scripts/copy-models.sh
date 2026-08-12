@@ -23,11 +23,10 @@ echo "Repository root: $REPO_ROOT"
 echo "Model source: $MODELS_SOURCE"
 echo ""
 
-# Check if source models exist
-if [ ! -d "$MODELS_SOURCE" ]; then
-    echo "Error: Source models directory not found: $MODELS_SOURCE"
-    echo "Please ensure models are downloaded first."
-    exit 1
+# Check if source models exist; if not, download on the fly
+if [ ! -f "$MODELS_SOURCE/det.mnn" ] || [ ! -f "$MODELS_SOURCE/rec.mnn" ] || [ ! -f "$MODELS_SOURCE/dict.txt" ]; then
+    echo "Models not found in $MODELS_SOURCE. Downloading default PP-OCRv6 tiny models..."
+    bash "$REPO_ROOT/scripts/download_models.sh" --output-dir "$MODELS_SOURCE"
 fi
 
 # Android: Copy to main android package assets and react-native android assets
