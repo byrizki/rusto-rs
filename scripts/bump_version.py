@@ -319,8 +319,8 @@ def update_all_files(new_ver: str, dry_run: bool = False) -> Set[Path]:
     )
     replace_in_file(
         REPO_ROOT / "packages" / "android" / "build.gradle",
-        r'(version\s*=\s*\')[^\']+(\')',
-        rf'\g<1>{new_ver}\g<2>',
+        r"(coordinates\('[^']+',\s*'[^']+',\s*')[^']+(\'\))",
+        rf"\g<1>{new_ver}\g<2>",
         dry_run,
         staged_files
     )

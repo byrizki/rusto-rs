@@ -1,8 +1,7 @@
 plugins {
     id 'com.android.library' version '8.2.0'
     id 'org.jetbrains.kotlin.android' version '1.9.20'
-    id 'maven-publish'
-    id 'signing'
+    id 'com.vanniktech.maven.publish' version '0.28.0'
 }
 
 android {
@@ -48,13 +47,6 @@ android {
             assets.srcDirs = ['src/main/assets']
         }
     }
-    
-    publishing {
-        singleVariant('release') {
-            withSourcesJar()
-            withJavadocJar()
-        }
-    }
 }
 
 dependencies {
@@ -67,94 +59,36 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
 
-publishing {
-    repositories {
-        maven {
-            name = 'Maven'
-            url = 'https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/'
-            credentials {
-                username = System.getenv('MAVEN_USERNAME')
-                password = System.getenv('MAVEN_PASSWORD')
-            }
-        }
-    }
-}
+mavenPublishing {
+    publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL)
+    signAllPublications()
 
-signing {
-    def signingKey = System.getenv('SIGNING_KEY')
-    def signingPassword = System.getenv('SIGNING_PASSWORD')
-    def signingKeyId = System.getenv('SIGNING_KEY_ID')
-    
-    def hasKey = signingKey != null && !signingKey.trim().isEmpty()
-    
-    if (hasKey) {
-        def normalizedKey = signingKey.trim()
-        if (normalizedKey.contains('\\n')) {
-            normalizedKey = normalizedKey.replace('\\n', '\n')
-        }
-        if (!normalizedKey.contains('BEGIN PGP PRIVATE KEY BLOCK')) {
-            try {
-                def decoded = new String(normalizedKey.decodeBase64(), 'UTF-8')
-                if (decoded.contains('BEGIN PGP PRIVATE KEY BLOCK')) {
-                    normalizedKey = decoded
-                }
-            } catch (Exception ignored) {}
+    coordinates('com.byrizki.rusto', 'rusto-android', '0.1.4')
+
+    pom {
+        name = 'RustO! Android'
+        description = 'RustO! - Pure Rust OCR library for Android'
+        url = 'https://github.com/byrizki/rusto-rs'
+        
+        licenses {
+            license {
+                name = 'MIT License'
+                url = 'https://opensource.org/licenses/MIT'
+            }
         }
         
-        if (signingKeyId != null && !signingKeyId.trim().isEmpty()) {
-            def keyId = signingKeyId.trim()
-            if (keyId.startsWith("0x") || keyId.startsWith("0X")) {
-                keyId = keyId.substring(2)
+        developers {
+            developer {
+                id = 'rusto'
+                name = 'RustO Contributors'
             }
-            if (keyId.length() > 8) {
-                keyId = keyId.substring(keyId.length() - 8)
-            }
-            useInMemoryPgpKeys(keyId, normalizedKey, signingPassword ?: '')
-        } else {
-            useInMemoryPgpKeys(normalizedKey, signingPassword ?: '')
+        }
+        
+        scm {
+            connection = 'scm:git:git://github.com/byrizki/rusto-rs.git'
+            developerConnection = 'scm:git:ssh://github.com/byrizki/rusto-rs.git'
+            url = 'https://github.com/byrizki/rusto-rs'
         }
     }
-    
-    required { hasKey }
-    sign publishing.publications
 }
 
-afterEvaluate {
-    publishing {
-        publications {
-            release(MavenPublication) {
-                from components.release
-                
-                groupId = 'com.byrizki.rusto'
-                artifactId = 'rusto-android'
-                version = '0.1.4'
-                
-                pom {
-                    name = 'RustO! Android'
-                    description = 'RustO! - Pure Rust OCR library for Android'
-                    url = 'https://github.com/byrizki/rusto-rs'
-                    
-                    licenses {
-                        license {
-                            name = 'MIT License'
-                            url = 'https://opensource.org/licenses/MIT'
-                        }
-                    }
-                    
-                    developers {
-                        developer {
-                            id = 'rusto'
-                            name = 'RustO Contributors'
-                        }
-                    }
-                    
-                    scm {
-                        connection = 'scm:git:git://github.com/byrizki/rusto-rs.git'
-                        developerConnection = 'scm:git:ssh://github.com/byrizki/rusto-rs.git'
-                        url = 'https://github.com/byrizki/rusto-rs'
-                    }
-                }
-            }
-        }
-    }
-}
