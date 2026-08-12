@@ -8,6 +8,12 @@ repository = "https://github.com/byrizki/rusto-rs"
 homepage = "https://github.com/byrizki/rusto-rs"
 documentation = "https://docs.rs/rusto-mnn"
 readme = "README.md"
+include = [
+    "/src/**",
+    "/Cargo.toml",
+    "/README.md",
+    "/LICENSE*"
+]
 
 [dependencies]
 mnn-sys = { package = "rusto-mnn-sys", path = "../mnn-sys", version = "0.1.4" }

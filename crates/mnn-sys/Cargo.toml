@@ -9,14 +9,14 @@ homepage = "https://github.com/byrizki/rusto-rs"
 documentation = "https://docs.rs/rusto-mnn-sys"
 readme = "README.md"
 include = [
-    "src/**/*",
-    "include/**/*",
-    "mnn_wrapper.cpp",
-    "mnn_wrapper.h",
-    "wrapper.h",
-    "build.rs",
-    "Cargo.toml",
-    "README.md"
+    "/src/**",
+    "/include/**",
+    "/mnn_wrapper.cpp",
+    "/mnn_wrapper.h",
+    "/wrapper.h",
+    "/build.rs",
+    "/Cargo.toml",
+    "/README.md"
 ]
 
 [dependencies]
