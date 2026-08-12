@@ -1,6 +1,7 @@
 target/
 build
 output
+output.txt
 *.nupkg
 *.xcframework
 *.aar

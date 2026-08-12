@@ -4,13 +4,19 @@ version = "0.1.3"
 edition = "2021"
 description = "Safe Rust bindings to MNN library"
 license = "MIT"
+repository = "https://github.com/byrizki/rusto-rs"
+homepage = "https://github.com/byrizki/rusto-rs"
+documentation = "https://docs.rs/rusto-mnn"
+readme = "README.md"
 
 [dependencies]
-mnn-sys = { package = "rusto-mnn-sys", path = "../mnn-sys" }
+mnn-sys = { package = "rusto-mnn-sys", path = "../mnn-sys", version = "0.1.3" }
 thiserror = "1.0"
 
 [features]
-default = []
+default = ["prebuilt"]
+prebuilt = ["mnn-sys/prebuilt"]
+build-from-source = ["mnn-sys/build-from-source"]
 # GPU/Accelerator backends
 metal = ["mnn-sys/metal"]
 coreml = ["mnn-sys/coreml"]
@@ -21,3 +27,4 @@ cuda = ["mnn-sys/cuda"]
 nnapi = ["mnn-sys/nnapi"]
 hiai = ["mnn-sys/hiai"]
 qnn = ["mnn-sys/qnn"]
+

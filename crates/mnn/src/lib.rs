@@ -6,7 +6,7 @@ mod error;
 
 pub use interpreter::Interpreter;
 pub use session::Session;
-pub use tensor::{Tensor, HostTensor};
+pub use tensor::{Tensor, HostTensor, TensorInfo};
 pub use config::{ScheduleConfig, BackendConfig, ForwardType, PrecisionMode, PowerMode};
 pub use error::{MNNError, Result};
 

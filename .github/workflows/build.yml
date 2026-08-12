@@ -279,6 +279,25 @@ jobs:
         run: |
           cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
 
+      - name: Package MNN static prebuilt
+        shell: bash
+        run: |
+          mkdir -p mnn-prebuilt-pkg
+          LIB_MNN=$(find target/${{ matrix.rust_target }}/release/build -type f \( -name "libMNN.a" -o -name "MNN.lib" \) | head -n 1)
+          if [ -n "$LIB_MNN" ]; then
+            cp "$LIB_MNN" mnn-prebuilt-pkg/
+            tar -czf "mnn-static-${{ matrix.rust_target }}.tar.gz" -C mnn-prebuilt-pkg $(basename "$LIB_MNN")
+          else
+            echo "::warning::libMNN static library not found for ${{ matrix.rust_target }}"
+          fi
+
+      - name: Upload MNN prebuilt artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-static-${{ matrix.rust_target }}
+          path: mnn-static-${{ matrix.rust_target }}.tar.gz
+          if-no-files-found: ignore
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -499,6 +518,12 @@ jobs:
           if [ -d "rusto-react-native-package" ]; then
              cp rusto-react-native-package/*.tgz ../releases/ || true
           fi
+
+          for f in mnn-static-*/*.tar.gz; do
+            if [ -f "$f" ]; then
+              cp "$f" ../releases/ || true
+            fi
+          done
 
       - name: Generate checksums
         working-directory: releases

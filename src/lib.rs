@@ -14,19 +14,13 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use rusto::{RustO, RustOConfig};
+//! use rusto::RustO;
 //!
-//! let config = RustOConfig {
-//!     det_model_path: "models/det.mnn".to_string(),
-//!     rec_model_path: "models/rec.mnn".to_string(),
-//!     dict_path: "models/dict.txt".to_string(),
-//! };
+//! let mut ocr = RustO::new_ppv5("models/det.mnn", "models/rec.mnn", "models/dict.txt")?;
+//! let result = ocr.run("image.jpg")?;
 //!
-//! let ocr = RustO::new(config)?;
-//! let results = ocr.ocr("image.jpg")?;
-//!
-//! for result in results {
-//!     println!("{}: {:.3}", result.text, result.score);
+//! for (text, score) in result.txts.iter().zip(result.scores.iter()) {
+//!     println!("{}: {:.3}", text, score);
 //! }
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```

@@ -47,6 +47,9 @@ default = []
 use-opencv = ["opencv"]
 ffi = ["dep:jni"]  # Enable C FFI and JNI bindings
 
+# Features
+build-from-source = ["mnn/build-from-source"]
+
 # MNN GPU/Accelerator backends
 metal = ["mnn/metal"]
 coreml = ["mnn/coreml"]

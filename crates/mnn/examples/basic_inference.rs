@@ -1,6 +1,6 @@
 /// Basic MNN inference example
 /// Demonstrates loading a model and running inference
-use mnn::{Interpreter, ScheduleConfig, ForwardType, BackendConfig, PrecisionMode, PowerMode};
+use rusto_mnn::{Interpreter, ScheduleConfig, ForwardType, BackendConfig, PrecisionMode, PowerMode};
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
