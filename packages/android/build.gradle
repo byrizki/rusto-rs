@@ -85,10 +85,37 @@ signing {
     def signingPassword = System.getenv('SIGNING_PASSWORD')
     def signingKeyId = System.getenv('SIGNING_KEY_ID')
     
-    if (signingKey != null) {
-        useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
+    def hasKey = signingKey != null && !signingKey.trim().isEmpty()
+    
+    if (hasKey) {
+        def normalizedKey = signingKey.trim()
+        if (normalizedKey.contains('\\n')) {
+            normalizedKey = normalizedKey.replace('\\n', '\n')
+        }
+        if (!normalizedKey.contains('BEGIN PGP PRIVATE KEY BLOCK')) {
+            try {
+                def decoded = new String(normalizedKey.decodeBase64(), 'UTF-8')
+                if (decoded.contains('BEGIN PGP PRIVATE KEY BLOCK')) {
+                    normalizedKey = decoded
+                }
+            } catch (Exception ignored) {}
+        }
+        
+        if (signingKeyId != null && !signingKeyId.trim().isEmpty()) {
+            def keyId = signingKeyId.trim()
+            if (keyId.startsWith("0x") || keyId.startsWith("0X")) {
+                keyId = keyId.substring(2)
+            }
+            if (keyId.length() > 8) {
+                keyId = keyId.substring(keyId.length() - 8)
+            }
+            useInMemoryPgpKeys(keyId, normalizedKey, signingPassword ?: '')
+        } else {
+            useInMemoryPgpKeys(normalizedKey, signingPassword ?: '')
+        }
     }
     
+    required { hasKey }
     sign publishing.publications
 }
 
