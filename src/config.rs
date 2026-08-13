@@ -70,7 +70,7 @@ pub const PPV3_MODEL_CONFIG: ModelPreset = ModelPreset {
 
 /// Main configuration for RustO OCR engine
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RustOConfig {
+pub struct InitializeConfig {
     /// Detection model configuration
     pub det: DetConfig,
     
@@ -90,7 +90,7 @@ pub struct RustOConfig {
     pub cls: Option<ClsConfig>,
 }
 
-impl Default for RustOConfig {
+impl Default for InitializeConfig {
     fn default() -> Self {
         Self::from_preset(PPV6_MODEL_CONFIG, "det.mnn", "rec.mnn", "dict.txt")
     }
@@ -194,7 +194,7 @@ struct FlatConfig {
     layout: Option<LayoutConfigJson>,
 }
 
-impl RustOConfig {
+impl InitializeConfig {
     /// Create a configuration with model paths using the default PPV6 template
     pub fn new<P: Into<PathBuf>>(
         det_model_path: P,
@@ -250,15 +250,6 @@ impl RustOConfig {
         Self::from_preset(PPV6_MODEL_CONFIG, det_model_path, rec_model_path, dict_path)
     }
 
-    /// Alias for ppv6
-    pub fn new_ppv6<P: Into<PathBuf>>(
-        det_model_path: P,
-        rec_model_path: P,
-        dict_path: P,
-    ) -> Self {
-        Self::ppv6(det_model_path, rec_model_path, dict_path)
-    }
-
     /// Create a configuration for PP-OCRv5 models
     pub fn ppv5<P: Into<PathBuf>>(
         det_model_path: P,
@@ -266,15 +257,6 @@ impl RustOConfig {
         dict_path: P,
     ) -> Self {
         Self::from_preset(PPV5_MODEL_CONFIG, det_model_path, rec_model_path, dict_path)
-    }
-
-    /// Alias for ppv5
-    pub fn new_ppv5<P: Into<PathBuf>>(
-        det_model_path: P,
-        rec_model_path: P,
-        dict_path: P,
-    ) -> Self {
-        Self::ppv5(det_model_path, rec_model_path, dict_path)
     }
 
     /// Create a configuration for PP-OCRv4 models
@@ -298,7 +280,7 @@ impl RustOConfig {
     /// Parse configuration from a JSON string (supports direct structured and grouped JSON formats)
     pub fn from_json(json_str: &str) -> Result<Self, serde_json::Error> {
         // Try direct structured format first
-        if let Ok(config) = serde_json::from_str::<RustOConfig>(json_str) {
+        if let Ok(config) = serde_json::from_str::<InitializeConfig>(json_str) {
             return Ok(config);
         }
 

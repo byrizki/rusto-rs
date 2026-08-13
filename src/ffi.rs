@@ -1,18 +1,38 @@
 // FFI bindings for C/C++/C#
+use crate::{DetectTextResult, ImageSource, OcrRunOptions, OutputGranularity, RustO, InitializeConfig};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int};
 use std::slice;
-use crate::{RustO, RustOConfig, RustOOutput};
-use crate::image_impl::Mat;
+
+const ROCR_INVALID_OPTIONS: c_int = -4;
+
+unsafe fn parse_run_options(options_json: *const c_char) -> Result<OcrRunOptions, c_int> {
+    if options_json.is_null() {
+        return Err(-1);
+    }
+    let options = CStr::from_ptr(options_json)
+        .to_str()
+        .ok()
+        .and_then(|json| serde_json::from_str::<OcrRunOptions>(json).ok())
+        .ok_or(ROCR_INVALID_OPTIONS)?;
+    if options
+        .line_y_threshold
+        .is_some_and(|value| !value.is_finite() || value < 0.0)
+        || options
+            .word_x_threshold
+            .is_some_and(|value| !value.is_finite() || value < 0.0)
+        || options
+            .text_score
+            .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
+    {
+        return Err(ROCR_INVALID_OPTIONS);
+    }
+    Ok(options)
+}
 
 /// Opaque handle to RustO instance
 pub struct ROCRHandle {
     inner: RustO,
-}
-
-/// Opaque handle to RustOOutput result
-pub struct ROCROutputHandle {
-    inner: RustOOutput,
 }
 
 /// C-compatible text result structure
@@ -39,9 +59,7 @@ pub struct CTextResult {
 /// # Safety
 /// config_json must be a valid null-terminated UTF-8 JSON string
 #[no_mangle]
-pub unsafe extern "C" fn rocr_new_with_config(
-    config_json: *const c_char,
-) -> *mut ROCRHandle {
+pub unsafe extern "C" fn rocr_initialize(config_json: *const c_char) -> *mut ROCRHandle {
     if config_json.is_null() {
         return std::ptr::null_mut();
     }
@@ -51,350 +69,173 @@ pub unsafe extern "C" fn rocr_new_with_config(
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let config = match RustOConfig::from_json(json_str) {
+    let config = match InitializeConfig::from_json(json_str) {
         Ok(c) => c,
         Err(_) => return std::ptr::null_mut(),
     };
 
-    match RustO::new(config) {
+    match RustO::initialize(config) {
         Ok(ocr) => Box::into_raw(Box::new(ROCRHandle { inner: ocr })),
         Err(_) => std::ptr::null_mut(),
     }
 }
 
-/// Create a new RustO instance
-///
-/// # Safety
-/// All string pointers must be valid null-terminated UTF-8 strings
+/// Run OCR on an image file with runtime output options.
 #[no_mangle]
-pub unsafe extern "C" fn rocr_new(
-    det_model_path: *const c_char,
-    rec_model_path: *const c_char,
-    dict_path: *const c_char
-) -> *mut ROCRHandle {
-    if det_model_path.is_null() || rec_model_path.is_null() || dict_path.is_null() {
-        return std::ptr::null_mut();
-    }
-
-    let det_model = match CStr::from_ptr(det_model_path).to_str() {
-        Ok(s) => s.to_string(),
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    let rec_model = match CStr::from_ptr(rec_model_path).to_str() {
-        Ok(s) => s.to_string(),
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    let dict = match CStr::from_ptr(dict_path).to_str() {
-        Ok(s) => s.to_string(),
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    let config = RustOConfig::new(det_model, rec_model, dict);
-
-    match RustO::new(config) {
-        Ok(ocr) => Box::into_raw(Box::new(ROCRHandle { inner: ocr })),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
-/// Run OCR on an image file
-///
-/// # Safety
-/// - handle must be a valid pointer returned from rocr_new
-/// - image_path must be a valid null-terminated UTF-8 string
-/// - results_out will be allocated and must be freed with rocr_free_results
-#[no_mangle]
-pub unsafe extern "C" fn rocr_ocr_file(
+pub unsafe extern "C" fn rocr_detect_text_file(
     handle: *mut ROCRHandle,
     image_path: *const c_char,
+    options_json: *const c_char,
     results_out: *mut *mut CTextResult,
     count_out: *mut usize,
 ) -> c_int {
-    if handle.is_null() || image_path.is_null() || results_out.is_null() || count_out.is_null() {
+    if handle.is_null()
+        || image_path.is_null()
+        || options_json.is_null()
+        || results_out.is_null()
+        || count_out.is_null()
+    {
         return -1;
     }
-
-    let ocr = &mut (*handle).inner;
-
     let path = match CStr::from_ptr(image_path).to_str() {
-        Ok(s) => s,
+        Ok(value) => value,
         Err(_) => return -2,
     };
-
-    let results = match ocr.run(path) {
-        Ok(r) => r,
+    let options = match parse_run_options(options_json) {
+        Ok(value) => value,
+        Err(code) => return code,
+    };
+    if options.output == OutputGranularity::Spatial {
+        return -5;
+    }
+    let detected = match (*handle)
+        .inner
+        .detect_text(&ImageSource::Path(path.into()), &options)
+    {
+        Ok(value) => value,
         Err(_) => return -3,
     };
-
-    let c_results = results_to_c(&results);
+    let DetectTextResult::Structured(projected) = detected else {
+        return -5;
+    };
+    let c_results = text_results_to_c(&projected);
     *count_out = c_results.len();
     *results_out = c_results.as_ptr() as *mut CTextResult;
     std::mem::forget(c_results);
-
     0
 }
 
-/// Run OCR on an image file and return output handle for formatting
-///
-/// # Safety
-/// - handle must be a valid pointer returned from rocr_new
-/// - image_path must be a valid null-terminated UTF-8 string
-/// - output_out will contain a handle that must be freed with rocr_free_output
+/// Run OCR on an image file and return spatial text with runtime options.
 #[no_mangle]
-pub unsafe extern "C" fn rocr_ocr_file_with_output(
+pub unsafe extern "C" fn rocr_detect_text_file_spatial(
     handle: *mut ROCRHandle,
     image_path: *const c_char,
-    output_out: *mut *mut ROCROutputHandle,
-) -> c_int {
-    if handle.is_null() || image_path.is_null() || output_out.is_null() {
-        return -1;
+    options_json: *const c_char,
+) -> *mut c_char {
+    if handle.is_null() || image_path.is_null() || options_json.is_null() {
+        return std::ptr::null_mut();
     }
-
-    let ocr = &mut (*handle).inner;
-
     let path = match CStr::from_ptr(image_path).to_str() {
-        Ok(s) => s,
-        Err(_) => return -2,
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
     };
-
-    let results = match ocr.run(path) {
-        Ok(r) => r,
-        Err(_) => return -3,
+    let options = match parse_run_options(options_json) {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
     };
-
-    *output_out = Box::into_raw(Box::new(ROCROutputHandle { inner: results }));
-    0
+    if options.output != OutputGranularity::Spatial {
+        return std::ptr::null_mut();
+    }
+    let detected = match (*handle)
+        .inner
+        .detect_text(&ImageSource::Path(path.into()), &options)
+    {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let DetectTextResult::Spatial(text) = detected else {
+        return std::ptr::null_mut();
+    };
+    CString::new(text).map_or(std::ptr::null_mut(), CString::into_raw)
 }
 
-/// Run OCR on image data in memory
-///
-/// # Safety
-/// - handle must be a valid pointer returned from rocr_new
-/// - image_data must point to valid image bytes of length image_len
-/// - results_out will be allocated and must be freed with rocr_free_results
+/// Run OCR on image data with runtime output options.
 #[no_mangle]
-pub unsafe extern "C" fn rocr_ocr_data(
+pub unsafe extern "C" fn rocr_detect_text_data(
     handle: *mut ROCRHandle,
     image_data: *const u8,
     image_len: usize,
+    options_json: *const c_char,
     results_out: *mut *mut CTextResult,
     count_out: *mut usize,
 ) -> c_int {
-    if handle.is_null() || image_data.is_null() || results_out.is_null() || count_out.is_null() {
+    if handle.is_null()
+        || image_data.is_null()
+        || options_json.is_null()
+        || results_out.is_null()
+        || count_out.is_null()
+    {
         return -1;
     }
-
-    let ocr = &mut (*handle).inner;
-    let data = slice::from_raw_parts(image_data, image_len);
-
-    #[cfg(not(feature = "use-opencv"))]
-    let img = match image::load_from_memory(data) {
-        Ok(dynamic_img) => Mat::new(dynamic_img),
+    let options = match parse_run_options(options_json) {
+        Ok(value) => value,
+        Err(code) => return code,
+    };
+    if options.output == OutputGranularity::Spatial {
+        return -5;
+    }
+    let detected = match (*handle).inner.detect_text(
+        &ImageSource::Bytes(slice::from_raw_parts(image_data, image_len).to_vec()),
+        &options,
+    ) {
+        Ok(value) => value,
         Err(_) => return -3,
     };
-
-    #[cfg(feature = "use-opencv")]
-    let img = {
-        // For OpenCV backend, we need to decode manually or use imdecode
-        // But since we don't have imdecode exposed in image_impl (only imread), 
-        // fallback or error out for now unless we add imdecode.
-        // Assuming pure rust backend for now as per user context "Pure Rust OCR".
-        return -4; 
+    let DetectTextResult::Structured(results) = detected else {
+        return -5;
     };
-
-    let results = match ocr.run_on_mat(&img) {
-        Ok(r) => r,
-        Err(_) => return -3,
-    };
-
-    let c_results = results_to_c(&results);
+    let c_results = text_results_to_c(&results);
     *count_out = c_results.len();
     *results_out = c_results.as_ptr() as *mut CTextResult;
     std::mem::forget(c_results);
-
     0
 }
 
-/// Run OCR on image data and return output handle for formatting
-///
-/// # Safety
-/// - handle must be a valid pointer returned from rocr_new
-/// - image_data must point to valid image bytes of length image_len
-/// - output_out will contain a handle that must be freed with rocr_free_output
+/// Run OCR on image data and return spatial text with runtime options.
 #[no_mangle]
-pub unsafe extern "C" fn rocr_ocr_data_with_output(
+pub unsafe extern "C" fn rocr_detect_text_data_spatial(
     handle: *mut ROCRHandle,
     image_data: *const u8,
     image_len: usize,
-    output_out: *mut *mut ROCROutputHandle,
-) -> c_int {
-    if handle.is_null() || image_data.is_null() || output_out.is_null() {
-        return -1;
-    }
-
-    let ocr = &mut (*handle).inner;
-    let data = slice::from_raw_parts(image_data, image_len);
-
-    #[cfg(not(feature = "use-opencv"))]
-    let img = match image::load_from_memory(data) {
-        Ok(dynamic_img) => Mat::new(dynamic_img),
-        Err(_) => return -3,
-    };
-
-    #[cfg(feature = "use-opencv")]
-    let img = {
-        return -4;
-    };
-
-    let results = match ocr.run_on_mat(&img) {
-        Ok(r) => r,
-        Err(_) => return -3,
-    };
-
-    *output_out = Box::into_raw(Box::new(ROCROutputHandle { inner: results }));
-    0
-}
-
-/// Export output to raw format
-///
-/// # Safety
-/// - output must be a valid pointer returned from rocr_ocr_*_with_output
-/// - returned string must be freed with rocr_free_string
-#[no_mangle]
-pub unsafe extern "C" fn rocr_output_to_raw(output: *const ROCROutputHandle) -> *mut c_char {
-    if output.is_null() {
-        return std::ptr::null_mut();
-    }
-
-    let output_ref = &(*output).inner;
-    let text = output_ref.to_raw();
-    
-    match CString::new(text) {
-        Ok(c_str) => c_str.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
-/// Export output to CSV format
-///
-/// # Safety
-/// - output must be a valid pointer returned from rocr_ocr_*_with_output
-/// - returned string must be freed with rocr_free_string
-#[no_mangle]
-pub unsafe extern "C" fn rocr_output_to_csv(output: *const ROCROutputHandle) -> *mut c_char {
-    if output.is_null() {
-        return std::ptr::null_mut();
-    }
-
-    let output_ref = &(*output).inner;
-    let text = output_ref.to_csv();
-    
-    match CString::new(text) {
-        Ok(c_str) => c_str.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
-/// Export output to text with position format
-///
-/// # Safety
-/// - output must be a valid pointer returned from rocr_ocr_*_with_output
-/// - returned string must be freed with rocr_free_string
-#[no_mangle]
-pub unsafe extern "C" fn rocr_output_to_text_with_position(
-    output: *const ROCROutputHandle
+    options_json: *const c_char,
 ) -> *mut c_char {
-    if output.is_null() {
+    if handle.is_null() || image_data.is_null() || options_json.is_null() {
         return std::ptr::null_mut();
     }
-
-    let output_ref = &(*output).inner;
-    let text = output_ref.to_text_with_position();
-    
-    match CString::new(text) {
-        Ok(c_str) => c_str.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
-/// Export output to spatial text format
-///
-/// # Safety
-/// - output must be a valid pointer returned from rocr_ocr_*_with_output
-/// - returned string must be freed with rocr_free_string
-#[no_mangle]
-pub unsafe extern "C" fn rocr_output_to_spatial_text(
-    output: *const ROCROutputHandle,
-    y_threshold_multiplier: c_float,
-    x_threshold_multiplier: c_float,
-) -> *mut c_char {
-    if output.is_null() {
+    let options = match parse_run_options(options_json) {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    if options.output != OutputGranularity::Spatial {
         return std::ptr::null_mut();
     }
-
-    let output_ref = &(*output).inner;
-    
-    let y_mult = if y_threshold_multiplier <= 0.0 {
-        None
-    } else {
-        Some(y_threshold_multiplier)
+    let detected = match (*handle).inner.detect_text(
+        &ImageSource::Bytes(slice::from_raw_parts(image_data, image_len).to_vec()),
+        &options,
+    ) {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
     };
-    
-    let x_mult = if x_threshold_multiplier <= 0.0 {
-        None
-    } else {
-        Some(x_threshold_multiplier)
+    let DetectTextResult::Spatial(text) = detected else {
+        return std::ptr::null_mut();
     };
-    
-    let text = output_ref.to_spatial_text(y_mult, x_mult);
-    
-    match CString::new(text) {
-        Ok(c_str) => c_str.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
-/// Get results from output handle as C array
-///
-/// # Safety
-/// - output must be a valid pointer returned from rocr_ocr_*_with_output
-/// - results_out will be allocated and must be freed with rocr_free_results
-#[no_mangle]
-pub unsafe extern "C" fn rocr_output_get_results(
-    output: *const ROCROutputHandle,
-    results_out: *mut *mut CTextResult,
-    count_out: *mut usize,
-) -> c_int {
-    if output.is_null() || results_out.is_null() || count_out.is_null() {
-        return -1;
-    }
-
-    let output_ref = &(*output).inner;
-    let c_results = results_to_c(output_ref);
-    *count_out = c_results.len();
-    *results_out = c_results.as_ptr() as *mut CTextResult;
-    std::mem::forget(c_results);
-
-    0
-}
-
-/// Free output handle
-///
-/// # Safety
-/// - output must be a valid pointer returned from rocr_ocr_*_with_output
-#[no_mangle]
-pub unsafe extern "C" fn rocr_free_output(output: *mut ROCROutputHandle) {
-    if !output.is_null() {
-        drop(Box::from_raw(output));
-    }
+    CString::new(text).map_or(std::ptr::null_mut(), CString::into_raw)
 }
 
 /// Free string returned from export functions
 ///
 /// # Safety
-/// - s must be a pointer returned from rocr_output_to_* functions
+/// - s must be a pointer returned from rocr_detect_text_*_spatial
 #[no_mangle]
 pub unsafe extern "C" fn rocr_free_string(s: *mut c_char) {
     if !s.is_null() {
@@ -402,11 +243,11 @@ pub unsafe extern "C" fn rocr_free_string(s: *mut c_char) {
     }
 }
 
-/// Free results returned from rocr_ocr
+/// Free results returned from structured text detection.
 ///
 /// # Safety
-/// - results must be a pointer returned from rocr_ocr_file or rocr_ocr_data
-/// - count must match the count returned from rocr_ocr
+/// - results must be a pointer returned from rocr_detect_text_file or rocr_detect_text_data
+/// - count must match the count returned by text detection
 #[no_mangle]
 pub unsafe extern "C" fn rocr_free_results(results: *mut CTextResult, count: usize) {
     if results.is_null() {
@@ -424,7 +265,7 @@ pub unsafe extern "C" fn rocr_free_results(results: *mut CTextResult, count: usi
 /// Free a RustO instance
 ///
 /// # Safety
-/// handle must be a valid pointer returned from rocr_new
+/// handle must be a valid pointer returned from rocr_initialize
 #[no_mangle]
 pub unsafe extern "C" fn rocr_free(handle: *mut ROCRHandle) {
     if !handle.is_null() {
@@ -439,54 +280,32 @@ pub extern "C" fn rocr_version() -> *const c_char {
     VERSION.as_ptr() as *const c_char
 }
 
-// Helper function to convert Rust results to C results
-fn results_to_c(results: &RustOOutput) -> Vec<CTextResult> {
-    let mut c_results = Vec::with_capacity(results.boxes.len());
-    
-    for (i, bbox) in results.boxes.iter().enumerate() {
-        if i >= results.txts.len() || i >= results.scores.len() {
-            break;
-        }
-        
-        let x1 = bbox[0].x;
-        let y1 = bbox[0].y;
-        let x2 = bbox[1].x;
-        let y2 = bbox[1].y;
-        let x3 = bbox[2].x;
-        let y3 = bbox[2].y;
-        let x4 = bbox[3].x;
-        let y4 = bbox[3].y;
-        
-        let min_x = x1.min(x2).min(x3).min(x4);
-        let max_x = x1.max(x2).max(x3).max(x4);
-        let min_y = y1.min(y2).min(y3).min(y4);
-        let max_y = y1.max(y2).max(y3).max(y4);
-        
-        let text = CString::new(results.txts[i].clone()).unwrap_or_default();
-        
-        c_results.push(CTextResult {
-            text: text.into_raw(),
-            score: results.scores[i],
-            box_x1: x1,
-            box_y1: y1,
-            box_x2: x2,
-            box_y2: y2,
-            box_x3: x3,
-            box_y3: y3,
-            box_x4: x4,
-            box_y4: y4,
-            frame_width: max_x - min_x,
-            frame_height: max_y - min_y,
-            frame_top: min_y,
-            frame_left: min_x,
-        });
-    }
-    
-    c_results
+fn text_results_to_c(results: &[crate::TextResult]) -> Vec<CTextResult> {
+    results
+        .iter()
+        .map(|result| CTextResult {
+            text: CString::new(result.text.clone())
+                .unwrap_or_default()
+                .into_raw(),
+            score: result.score,
+            box_x1: result.box_points[0].0,
+            box_y1: result.box_points[0].1,
+            box_x2: result.box_points[1].0,
+            box_y2: result.box_points[1].1,
+            box_x3: result.box_points[2].0,
+            box_y3: result.box_points[2].1,
+            box_x4: result.box_points[3].0,
+            box_y4: result.box_points[3].1,
+            frame_width: result.frame.width,
+            frame_height: result.frame.height,
+            frame_top: result.frame.top,
+            frame_left: result.frame.left,
+        })
+        .collect()
 }
 
 // ============================================================================
-// Android JNI Bindings (com.byrizki.rusto.RustO)
+// Android JNI bindings (com.byrizki.rusto.RustO)
 // ============================================================================
 
 #[cfg(feature = "ffi")]
@@ -497,41 +316,47 @@ use jni::sys::{jfloat, jint, jlong, jstring};
 use jni::JNIEnv;
 
 #[cfg(feature = "ffi")]
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeVersion(
-    env: JNIEnv,
-    _class: JClass,
-) -> jstring {
-    match env.new_string(env!("CARGO_PKG_VERSION")) {
-        Ok(s) => s.into_raw(),
-        Err(_) => std::ptr::null_mut(),
+unsafe fn write_jni_results(
+    env: &mut JNIEnv,
+    results_out: &JLongArray,
+    count_out: &JIntArray,
+    results: Vec<CTextResult>,
+) -> jint {
+    let count = results.len();
+    let ptr = results.as_ptr() as jlong;
+    if env.set_long_array_region(results_out, 0, &[ptr]).is_err()
+        || env.set_int_array_region(count_out, 0, &[count as jint]).is_err()
+    {
+        // `results` still owns allocations here; normal Vec drop releases the
+        // buffer but not individual CString allocations.
+        for result in results {
+            if !result.text.is_null() {
+                drop(CString::from_raw(result.text));
+            }
+        }
+        return -4;
     }
+    std::mem::forget(results);
+    0
+}
+
+#[cfg(feature = "ffi")]
+unsafe fn parse_jni_options(env: &mut JNIEnv, options_json: JString) -> Result<OcrRunOptions, jint> {
+    let json: String = env.get_string(&options_json).map_err(|_| -4)?.into();
+    let c_json = CString::new(json).map_err(|_| ROCR_INVALID_OPTIONS)?;
+    parse_run_options(c_json.as_ptr()).map_err(|code| code as jint)
 }
 
 #[cfg(feature = "ffi")]
 #[no_mangle]
-pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeNew(
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeInitialize(
     mut env: JNIEnv,
     _class: JClass,
-    det_model_path: JString,
-    rec_model_path: JString,
-    dict_path: JString,
+    config_json: JString,
 ) -> jlong {
-    let det: String = match env.get_string(&det_model_path) {
-        Ok(s) => s.into(),
-        Err(_) => return 0,
-    };
-    let rec: String = match env.get_string(&rec_model_path) {
-        Ok(s) => s.into(),
-        Err(_) => return 0,
-    };
-    let dict: String = match env.get_string(&dict_path) {
-        Ok(s) => s.into(),
-        Err(_) => return 0,
-    };
-
-    let config = RustOConfig::new(det, rec, dict);
-    match RustO::new(config) {
+    let json: String = match env.get_string(&config_json) { Ok(value) => value.into(), Err(_) => return 0 };
+    let config = match InitializeConfig::from_json(&json) { Ok(value) => value, Err(_) => return 0 };
+    match RustO::initialize(config) {
         Ok(ocr) => Box::into_raw(Box::new(ROCRHandle { inner: ocr })) as jlong,
         Err(_) => 0,
     }
@@ -539,103 +364,90 @@ pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeNew(
 
 #[cfg(feature = "ffi")]
 #[no_mangle]
-pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOcrFile(
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeDetectTextFile(
     mut env: JNIEnv,
     _class: JClass,
     handle: jlong,
     image_path: JString,
+    options_json: JString,
     results_out: JLongArray,
     count_out: JIntArray,
 ) -> jint {
-    if handle == 0 {
-        return -1;
-    }
-
-    let path: String = match env.get_string(&image_path) {
-        Ok(s) => s.into(),
-        Err(_) => return -2,
-    };
-
-    let handle_ptr = handle as *mut ROCRHandle;
-    let ocr = &mut (*handle_ptr).inner;
-
-    let results = match ocr.run(&path) {
-        Ok(r) => r,
-        Err(_) => return -3,
-    };
-
-    let c_results = results_to_c(&results);
-    let count = c_results.len();
-    let results_ptr = c_results.as_ptr() as jlong;
-    std::mem::forget(c_results);
-
-    let count_val = [count as i32];
-    let results_val = [results_ptr];
-
-    if env.set_long_array_region(&results_out, 0, &results_val).is_err() {
-        return -4;
-    }
-    if env.set_int_array_region(&count_out, 0, &count_val).is_err() {
-        return -4;
-    }
-
-    0
+    if handle == 0 { return -1; }
+    let path: String = match env.get_string(&image_path) { Ok(value) => value.into(), Err(_) => return -2 };
+    let options = match parse_jni_options(&mut env, options_json) { Ok(value) => value, Err(code) => return code };
+    if options.output == OutputGranularity::Spatial { return -5; }
+    let detected = match (&mut (*(handle as *mut ROCRHandle)).inner)
+        .detect_text(&ImageSource::Path(path.into()), &options)
+    { Ok(value) => value, Err(_) => return -3 };
+    let DetectTextResult::Structured(results) = detected else { return -5; };
+    write_jni_results(&mut env, &results_out, &count_out, text_results_to_c(&results))
 }
 
 #[cfg(feature = "ffi")]
 #[no_mangle]
-pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOcrData(
-    env: JNIEnv,
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeDetectTextData(
+    mut env: JNIEnv,
     _class: JClass,
     handle: jlong,
     image_data: JByteArray,
+    options_json: JString,
     results_out: JLongArray,
     count_out: JIntArray,
 ) -> jint {
-    if handle == 0 {
-        return -1;
-    }
+    if handle == 0 { return -1; }
+    let bytes = match env.convert_byte_array(&image_data) { Ok(value) => value, Err(_) => return -2 };
+    let options = match parse_jni_options(&mut env, options_json) { Ok(value) => value, Err(code) => return code };
+    if options.output == OutputGranularity::Spatial { return -5; }
+    let detected = match (&mut (*(handle as *mut ROCRHandle)).inner)
+        .detect_text(&ImageSource::Bytes(bytes), &options)
+    { Ok(value) => value, Err(_) => return -3 };
+    let DetectTextResult::Structured(results) = detected else { return -5; };
+    write_jni_results(&mut env, &results_out, &count_out, text_results_to_c(&results))
+}
 
-    let bytes = match env.convert_byte_array(&image_data) {
-        Ok(b) => b,
-        Err(_) => return -2,
-    };
+#[cfg(feature = "ffi")]
+unsafe fn spatial_to_jstring(env: &mut JNIEnv, detected: DetectTextResult) -> jstring {
+    let DetectTextResult::Spatial(text) = detected else { return std::ptr::null_mut(); };
+    env.new_string(text).map_or(std::ptr::null_mut(), |value| value.into_raw())
+}
 
-    #[cfg(not(feature = "use-opencv"))]
-    let img = match image::load_from_memory(&bytes) {
-        Ok(dynamic_img) => Mat::new(dynamic_img),
-        Err(_) => return -3,
-    };
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeDetectTextFileSpatial(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    image_path: JString,
+    options_json: JString,
+) -> jstring {
+    if handle == 0 { return std::ptr::null_mut(); }
+    let path: String = match env.get_string(&image_path) { Ok(value) => value.into(), Err(_) => return std::ptr::null_mut() };
+    let options = match parse_jni_options(&mut env, options_json) { Ok(value) => value, Err(_) => return std::ptr::null_mut() };
+    if options.output != OutputGranularity::Spatial { return std::ptr::null_mut(); }
+    let detected = match (&mut (*(handle as *mut ROCRHandle)).inner)
+        .detect_text(&ImageSource::Path(path.into()), &options)
+    { Ok(value) => value, Err(_) => return std::ptr::null_mut() };
+    spatial_to_jstring(&mut env, detected)
+}
 
-    #[cfg(feature = "use-opencv")]
-    let img = {
-        return -4;
-    };
-
-    let handle_ptr = handle as *mut ROCRHandle;
-    let ocr = &mut (*handle_ptr).inner;
-
-    let results = match ocr.run_on_mat(&img) {
-        Ok(r) => r,
-        Err(_) => return -3,
-    };
-
-    let c_results = results_to_c(&results);
-    let count = c_results.len();
-    let results_ptr = c_results.as_ptr() as jlong;
-    std::mem::forget(c_results);
-
-    let count_val = [count as i32];
-    let results_val = [results_ptr];
-
-    if env.set_long_array_region(&results_out, 0, &results_val).is_err() {
-        return -4;
-    }
-    if env.set_int_array_region(&count_out, 0, &count_val).is_err() {
-        return -4;
-    }
-
-    0
+#[cfg(feature = "ffi")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeDetectTextDataSpatial(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    image_data: JByteArray,
+    options_json: JString,
+) -> jstring {
+    if handle == 0 { return std::ptr::null_mut(); }
+    let bytes = match env.convert_byte_array(&image_data) { Ok(value) => value, Err(_) => return std::ptr::null_mut() };
+    let options = match parse_jni_options(&mut env, options_json) { Ok(value) => value, Err(_) => return std::ptr::null_mut() };
+    if options.output != OutputGranularity::Spatial { return std::ptr::null_mut(); }
+    let detected = match (&mut (*(handle as *mut ROCRHandle)).inner)
+        .detect_text(&ImageSource::Bytes(bytes), &options)
+    { Ok(value) => value, Err(_) => return std::ptr::null_mut() };
+    spatial_to_jstring(&mut env, detected)
 }
 
 #[cfg(feature = "ffi")]
@@ -649,227 +461,32 @@ pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeGetResult(
     score_out: JFloatArray,
     box_out: JFloatArray,
 ) {
-    if results_ptr == 0 || index < 0 {
-        return;
-    }
-
-    let item_ptr = (results_ptr as *const CTextResult).add(index as usize);
-    let item = &*item_ptr;
-
+    if results_ptr == 0 || index < 0 { return; }
+    let item = &*((results_ptr as *const CTextResult).add(index as usize));
     if !item.text.is_null() {
-        let text_str = CStr::from_ptr(item.text).to_string_lossy();
-        if let Ok(j_str) = env.new_string(text_str) {
-            let _ = env.set_object_array_element(&text_out, 0, j_str);
+        if let Ok(text) = env.new_string(CStr::from_ptr(item.text).to_string_lossy()) {
+            let _ = env.set_object_array_element(&text_out, 0, text);
         }
     }
-
-    let score_val = [item.score as jfloat];
-    let _ = env.set_float_array_region(&score_out, 0, &score_val);
-
-    let box_val = [
-        item.box_x1 as jfloat,
-        item.box_y1 as jfloat,
-        item.box_x2 as jfloat,
-        item.box_y2 as jfloat,
-        item.box_x3 as jfloat,
-        item.box_y3 as jfloat,
-        item.box_x4 as jfloat,
-        item.box_y4 as jfloat,
-    ];
-    let _ = env.set_float_array_region(&box_out, 0, &box_val);
+    let _ = env.set_float_array_region(&score_out, 0, &[item.score as jfloat]);
+    let _ = env.set_float_array_region(&box_out, 0, &[
+        item.box_x1 as jfloat, item.box_y1 as jfloat, item.box_x2 as jfloat, item.box_y2 as jfloat,
+        item.box_x3 as jfloat, item.box_y3 as jfloat, item.box_x4 as jfloat, item.box_y4 as jfloat,
+    ]);
 }
 
 #[cfg(feature = "ffi")]
 #[no_mangle]
 pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeFreeResults(
-    _env: JNIEnv,
-    _class: JClass,
-    results_ptr: jlong,
-    count: jint,
+    _env: JNIEnv, _class: JClass, results_ptr: jlong, count: jint,
 ) {
-    if results_ptr != 0 && count > 0 {
-        rocr_free_results(results_ptr as *mut CTextResult, count as usize);
-    }
-}
-
-#[cfg(feature = "ffi")]
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeNewWithConfig(
-    mut env: JNIEnv,
-    _class: JClass,
-    config_json: JString,
-) -> jlong {
-    let json_str: String = match env.get_string(&config_json) {
-        Ok(s) => s.into(),
-        Err(_) => return 0,
-    };
-
-    let config = match RustOConfig::from_json(&json_str) {
-        Ok(c) => c,
-        Err(_) => return 0,
-    };
-
-    match RustO::new(config) {
-        Ok(ocr) => Box::into_raw(Box::new(ROCRHandle { inner: ocr })) as jlong,
-        Err(_) => 0,
-    }
-}
-
-#[cfg(feature = "ffi")]
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOcrFileWithOutput(
-    mut env: JNIEnv,
-    _class: JClass,
-    handle: jlong,
-    image_path: JString,
-) -> jlong {
-    if handle == 0 {
-        return 0;
-    }
-    let path: String = match env.get_string(&image_path) {
-        Ok(s) => s.into(),
-        Err(_) => return 0,
-    };
-    let handle_ptr = handle as *mut ROCRHandle;
-    let ocr = &mut (*handle_ptr).inner;
-    match ocr.run(&path) {
-        Ok(r) => Box::into_raw(Box::new(ROCROutputHandle { inner: r })) as jlong,
-        Err(_) => 0,
-    }
-}
-
-#[cfg(feature = "ffi")]
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOcrDataWithOutput(
-    env: JNIEnv,
-    _class: JClass,
-    handle: jlong,
-    image_data: JByteArray,
-) -> jlong {
-    if handle == 0 {
-        return 0;
-    }
-    let bytes = match env.convert_byte_array(&image_data) {
-        Ok(b) => b,
-        Err(_) => return 0,
-    };
-    #[cfg(not(feature = "use-opencv"))]
-    let img = match image::load_from_memory(&bytes) {
-        Ok(dynamic_img) => Mat::new(dynamic_img),
-        Err(_) => return 0,
-    };
-    #[cfg(feature = "use-opencv")]
-    let img = return 0;
-
-    let handle_ptr = handle as *mut ROCRHandle;
-    let ocr = &mut (*handle_ptr).inner;
-    match ocr.run_on_mat(&img) {
-        Ok(r) => Box::into_raw(Box::new(ROCROutputHandle { inner: r })) as jlong,
-        Err(_) => 0,
-    }
-}
-
-#[cfg(feature = "ffi")]
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOutputToRaw(
-    env: JNIEnv,
-    _class: JClass,
-    output: jlong,
-) -> jstring {
-    if output == 0 {
-        return std::ptr::null_mut();
-    }
-    let output_ref = &(*(output as *const ROCROutputHandle)).inner;
-    match env.new_string(output_ref.to_raw()) {
-        Ok(s) => s.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
-#[cfg(feature = "ffi")]
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOutputToCsv(
-    env: JNIEnv,
-    _class: JClass,
-    output: jlong,
-) -> jstring {
-    if output == 0 {
-        return std::ptr::null_mut();
-    }
-    let output_ref = &(*(output as *const ROCROutputHandle)).inner;
-    match env.new_string(output_ref.to_csv()) {
-        Ok(s) => s.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
-#[cfg(feature = "ffi")]
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOutputToTextWithPosition(
-    env: JNIEnv,
-    _class: JClass,
-    output: jlong,
-) -> jstring {
-    if output == 0 {
-        return std::ptr::null_mut();
-    }
-    let output_ref = &(*(output as *const ROCROutputHandle)).inner;
-    match env.new_string(output_ref.to_text_with_position()) {
-        Ok(s) => s.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
-#[cfg(feature = "ffi")]
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeOutputToSpatialText(
-    env: JNIEnv,
-    _class: JClass,
-    output: jlong,
-    y_threshold_multiplier: jfloat,
-    x_threshold_multiplier: jfloat,
-) -> jstring {
-    if output == 0 {
-        return std::ptr::null_mut();
-    }
-    let output_ref = &(*(output as *const ROCROutputHandle)).inner;
-    let y_mult = if y_threshold_multiplier <= 0.0 {
-        None
-    } else {
-        Some(y_threshold_multiplier as f32)
-    };
-    let x_mult = if x_threshold_multiplier <= 0.0 {
-        None
-    } else {
-        Some(x_threshold_multiplier as f32)
-    };
-    match env.new_string(output_ref.to_spatial_text(y_mult, x_mult)) {
-        Ok(s) => s.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
-}
-
-#[cfg(feature = "ffi")]
-#[no_mangle]
-pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeFreeOutput(
-    _env: JNIEnv,
-    _class: JClass,
-    output: jlong,
-) {
-    if output != 0 {
-        rocr_free_output(output as *mut ROCROutputHandle);
-    }
+    if results_ptr != 0 && count >= 0 { rocr_free_results(results_ptr as *mut CTextResult, count as usize); }
 }
 
 #[cfg(feature = "ffi")]
 #[no_mangle]
 pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeFree(
-    _env: JNIEnv,
-    _class: JClass,
-    handle: jlong,
+    _env: JNIEnv, _class: JClass, handle: jlong,
 ) {
-    if handle != 0 {
-        rocr_free(handle as *mut ROCRHandle);
-    }
+    if handle != 0 { rocr_free(handle as *mut ROCRHandle); }
 }
-

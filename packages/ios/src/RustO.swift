@@ -145,7 +145,7 @@ public struct LayoutConfig: Codable {
     }
 }
 
-public struct RustOConfig: Codable {
+public struct InitializeConfig: Codable {
     public var template: String? = nil
     public var detection: DetectionConfig? = nil
     public var recognition: RecognitionConfig? = nil
@@ -175,20 +175,20 @@ public struct RustOConfig: Codable {
         self.layout = layout
     }
 
-    public static func ppv6(detection: DetectionConfig? = nil, recognition: RecognitionConfig? = nil) -> RustOConfig {
-        RustOConfig(template: "ppv6", detection: detection, recognition: recognition)
+    public static func ppv6(detection: DetectionConfig? = nil, recognition: RecognitionConfig? = nil) -> InitializeConfig {
+        InitializeConfig(template: "ppv6", detection: detection, recognition: recognition)
     }
 
-    public static func ppv5(detection: DetectionConfig? = nil, recognition: RecognitionConfig? = nil) -> RustOConfig {
-        RustOConfig(template: "ppv5", detection: detection, recognition: recognition)
+    public static func ppv5(detection: DetectionConfig? = nil, recognition: RecognitionConfig? = nil) -> InitializeConfig {
+        InitializeConfig(template: "ppv5", detection: detection, recognition: recognition)
     }
 
-    public static func ppv4(detection: DetectionConfig? = nil, recognition: RecognitionConfig? = nil) -> RustOConfig {
-        RustOConfig(template: "ppv4", detection: detection, recognition: recognition)
+    public static func ppv4(detection: DetectionConfig? = nil, recognition: RecognitionConfig? = nil) -> InitializeConfig {
+        InitializeConfig(template: "ppv4", detection: detection, recognition: recognition)
     }
 
-    public static func ppv3(detection: DetectionConfig? = nil, recognition: RecognitionConfig? = nil) -> RustOConfig {
-        RustOConfig(template: "ppv3", detection: detection, recognition: recognition)
+    public static func ppv3(detection: DetectionConfig? = nil, recognition: RecognitionConfig? = nil) -> InitializeConfig {
+        InitializeConfig(template: "ppv3", detection: detection, recognition: recognition)
     }
 }
 
@@ -200,19 +200,59 @@ public enum RustOError: Error {
     case serializationFailed
 }
 
+public enum OutputGranularity: String, Codable {
+    case lines, words, spatial
+}
+
+public struct OcrRunOptions: Codable {
+    public var output: OutputGranularity
+    public var lineYThreshold: Float?
+    public var wordXThreshold: Float?
+    public var textScore: Float?
+    public var classification: Bool?
+    public var orientation: Bool?
+
+    public init(
+        output: OutputGranularity = .lines,
+        lineYThreshold: Float? = nil,
+        wordXThreshold: Float? = nil,
+        textScore: Float? = nil,
+        classification: Bool? = nil,
+        orientation: Bool? = nil
+    ) {
+        self.output = output
+        self.lineYThreshold = lineYThreshold
+        self.wordXThreshold = wordXThreshold
+        self.textScore = textScore
+        self.classification = classification
+        self.orientation = orientation
+    }
+}
+
+public enum ImageSource {
+    case uri(String)
+    case bytes(Data)
+}
+
+public enum DetectTextResult {
+    case structured([TextResult])
+    case spatial(String)
+}
+
 public class RustO {
     private var handle: OpaquePointer?
 
+    private init(handle: OpaquePointer) {
+        self.handle = handle
+    }
+
     public static var version: String {
-        guard let versionPtr = rocr_version() else {
-            return "unknown"
-        }
+        guard let versionPtr = rocr_version() else { return "unknown" }
         return String(cString: versionPtr)
     }
 
-    public init(config: RustOConfig = RustOConfig()) throws {
+    public static func initialize(config: InitializeConfig = InitializeConfig()) throws -> RustO {
         var resolvedConfig = config
-
         var det = config.detection ?? DetectionConfig()
         let detName = det.modelPath ?? "det.mnn"
         det.modelPath = resolveModelPath(detName) ?? detName
@@ -225,336 +265,127 @@ public class RustO {
         rec.dictPath = resolveModelPath(dictName) ?? dictName
         resolvedConfig.recognition = rec
 
-        if var clsCfg = config.classification, let clsPath = clsCfg.modelPath {
-            clsCfg.modelPath = resolveModelPath(clsPath) ?? clsPath
-            resolvedConfig.classification = clsCfg
+        if var cls = config.classification, let path = cls.modelPath {
+            cls.modelPath = resolveModelPath(path) ?? path
+            resolvedConfig.classification = cls
         }
-        if var orientCfg = config.orientation, let orientPath = orientCfg.modelPath {
-            orientCfg.modelPath = resolveModelPath(orientPath) ?? orientPath
-            resolvedConfig.orientation = orientCfg
+        if var orient = config.orientation, let path = orient.modelPath {
+            orient.modelPath = resolveModelPath(path) ?? path
+            resolvedConfig.orientation = orient
         }
-        if var unwarpCfg = config.unwarp, let unwarpPath = unwarpCfg.modelPath {
-            unwarpCfg.modelPath = resolveModelPath(unwarpPath) ?? unwarpPath
-            resolvedConfig.unwarp = unwarpCfg
-        }
-
-        let encoder = JSONEncoder()
-        guard let data = try? encoder.encode(resolvedConfig),
-              let jsonStr = String(data: data, encoding: .utf8) else {
-            throw RustOError.serializationFailed
+        if var unwarp = config.unwarp, let path = unwarp.modelPath {
+            unwarp.modelPath = resolveModelPath(path) ?? path
+            resolvedConfig.unwarp = unwarp
         }
 
-        handle = rocr_new_with_config(jsonStr)
-        guard handle != nil else {
+        guard let data = try? JSONEncoder().encode(resolvedConfig),
+              let json = String(data: data, encoding: .utf8),
+              let handle = rocr_initialize(json) else {
             throw RustOError.initializationFailed
         }
-    }
-    
-    private func resolveModelPath(_ filename: String) -> String? {
-        if filename.hasPrefix("/") && FileManager.default.fileExists(atPath: filename) {
-            return filename
-        }
-        
-        let name = filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
-        let ext = String(filename.split(separator: ".").last ?? "")
-        
-        let bundleNames = [
-            "RustOModels", "RustoModels",
-            "RustOModels_PPOCRv6_Tiny", "RustOModels_PPOCRv6_Small", "RustOModels_PPOCRv6_Medium",
-            "RustOModels_PPOCRv5_Mobile", "RustOModels_PPOCRv5_Server",
-            "RustOModels_PPOCRv4_Mobile", "RustOModels_PPOCRv4_Server"
-        ]
-        
-        for bName in bundleNames {
-            if let bundlePath = Bundle.main.path(forResource: bName, ofType: "bundle"),
-               let bundle = Bundle(path: bundlePath),
-               let filePath = bundle.path(forResource: name, ofType: ext) {
-                return filePath
-            }
-        }
-        
-        if let bundlePath = Bundle.main.path(forResource: filename, ofType: nil) {
-            return bundlePath
-        }
-        
-        let documentsPath = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
-        let filePath = (documentsPath as NSString).appendingPathComponent(filename)
-        if FileManager.default.fileExists(atPath: filePath) {
-            return filePath
-        }
-        
-        return nil
+        return RustO(handle: handle)
     }
 
-    private func resolveFilePath(_ rawPath: String) -> String {
-        var path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        if path.hasPrefix("file://") {
-            if let url = URL(string: path) {
-                path = url.path
-            } else {
-                path = String(path.dropFirst(7))
-            }
-        } else if path.hasPrefix("file:") {
-            path = String(path.dropFirst(5))
+    public func detectText(_ source: ImageSource, options: OcrRunOptions = OcrRunOptions()) throws -> DetectTextResult {
+        guard let handle else { throw RustOError.invalidHandle }
+        try validate(options)
+        guard let data = try? JSONEncoder().encode(options),
+              let json = String(data: data, encoding: .utf8) else {
+            throw RustOError.serializationFailed
         }
+        switch (source, options.output) {
+        case let (.uri(value), .lines), let (.uri(value), .words):
+            return .structured(try structuredFile(handle, path: resolveFilePath(value), options: json))
+        case let (.bytes(data), .lines), let (.bytes(data), .words):
+            return .structured(try structuredData(handle, data: data, options: json))
+        case let (.uri(value), .spatial):
+            guard let text = rocr_detect_text_file_spatial(handle, resolveFilePath(value), json) else {
+                throw RustOError.recognitionFailed(-1)
+            }
+            defer { rocr_free_string(text) }
+            return .spatial(String(cString: text))
+        case let (.bytes(data), .spatial):
+            guard !data.isEmpty else { throw RustOError.invalidPath }
+            let text = data.withUnsafeBytes { bytes in
+                rocr_detect_text_data_spatial(handle, bytes.baseAddress, data.count, json)
+            }
+            guard let text else { throw RustOError.recognitionFailed(-1) }
+            defer { rocr_free_string(text) }
+            return .spatial(String(cString: text))
+        }
+    }
+
+    private func structuredFile(_ handle: OpaquePointer, path: String, options: String) throws -> [TextResult] {
+        var results: UnsafeMutablePointer<CTextResult>?
+        var count = 0
+        let status = rocr_detect_text_file(handle, path, options, &results, &count)
+        guard status == 0 else { throw RustOError.recognitionFailed(status) }
+        return try convertResults(results, count: count)
+    }
+
+    private func structuredData(_ handle: OpaquePointer, data: Data, options: String) throws -> [TextResult] {
+        guard !data.isEmpty else { throw RustOError.invalidPath }
+        var results: UnsafeMutablePointer<CTextResult>?
+        var count = 0
+        let status = data.withUnsafeBytes { bytes in
+            rocr_detect_text_data(handle, bytes.baseAddress, data.count, options, &results, &count)
+        }
+        guard status == 0 else { throw RustOError.recognitionFailed(status) }
+        return try convertResults(results, count: count)
+    }
+
+    private func convertResults(_ results: UnsafeMutablePointer<CTextResult>?, count: Int) throws -> [TextResult] {
+        guard let results else {
+            if count == 0 { return [] }
+            throw RustOError.recognitionFailed(-1)
+        }
+        defer { rocr_free_results(results, count) }
+        return (0..<count).map { index in
+            let result = results[index]
+            let points = [
+                Point2D(x: result.box_x1, y: result.box_y1),
+                Point2D(x: result.box_x2, y: result.box_y2),
+                Point2D(x: result.box_x3, y: result.box_y3),
+                Point2D(x: result.box_x4, y: result.box_y4),
+            ]
+            return TextResult(
+                text: String(cString: result.text), score: result.score, boxPoints: points,
+                frame: Frame(width: result.frame_width, height: result.frame_height, top: result.frame_top, left: result.frame_left)
+            )
+        }
+    }
+
+    private func validate(_ options: OcrRunOptions) throws {
+        let validThreshold = { (value: Float?) in value == nil || (value!.isFinite && value! >= 0) }
+        guard validThreshold(options.lineYThreshold), validThreshold(options.wordXThreshold),
+              options.textScore == nil || (options.textScore!.isFinite && (0...1).contains(options.textScore!)) else {
+            throw RustOError.serializationFailed
+        }
+    }
+
+    private static func resolveModelPath(_ filename: String) -> String? {
+        if filename.hasPrefix("/") && FileManager.default.fileExists(atPath: filename) { return filename }
+        let name = filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
+        let ext = String(filename.split(separator: ".").last ?? "")
+        let bundleNames = ["RustOModels", "RustoModels", "RustOModels_PPOCRv6_Tiny", "RustOModels_PPOCRv6_Small", "RustOModels_PPOCRv6_Medium", "RustOModels_PPOCRv5_Mobile", "RustOModels_PPOCRv5_Server", "RustOModels_PPOCRv4_Mobile", "RustOModels_PPOCRv4_Server"]
+        for bundleName in bundleNames {
+            if let path = Bundle.main.path(forResource: bundleName, ofType: "bundle"),
+               let bundle = Bundle(path: path), let file = bundle.path(forResource: name, ofType: ext) { return file }
+        }
+        if let file = Bundle.main.path(forResource: filename, ofType: nil) { return file }
+        let documents = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]
+        let file = (documents as NSString).appendingPathComponent(filename)
+        return FileManager.default.fileExists(atPath: file) ? file : nil
+    }
+
+    private func resolveFilePath(_ value: String) -> String {
+        var path = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if path.hasPrefix("file://"), let url = URL(string: path) { path = url.path }
+        else if path.hasPrefix("file:") { path = String(path.dropFirst(5)) }
         return path.removingPercentEncoding ?? path
     }
 
-    public func recognizeFile(_ imagePath: String) throws -> [TextResult] {
-        guard let handle = handle else {
-            throw RustOError.invalidHandle
-        }
-
-        let resolvedPath = resolveFilePath(imagePath)
-        var resultsPtr: UnsafeMutablePointer<CTextResult>?
-        var count: Int = 0
-
-        let status = rocr_ocr_file(handle, resolvedPath, &resultsPtr, &count)
-        guard status == 0, let results = resultsPtr else {
-            throw RustOError.recognitionFailed(status)
-        }
-
-        defer { rocr_free_results(results, count) }
-
-        return (0..<count).map { i in
-            let result = results[i]
-            let boxPoints = [
-                Point2D(x: result.box_x1, y: result.box_y1),
-                Point2D(x: result.box_x2, y: result.box_y2),
-                Point2D(x: result.box_x3, y: result.box_y3),
-                Point2D(x: result.box_x4, y: result.box_y4),
-            ]
-            let frame = Frame(
-                width: result.frame_width,
-                height: result.frame_height,
-                top: result.frame_top,
-                left: result.frame_left
-            )
-            return TextResult(
-                text: String(cString: result.text),
-                score: result.score,
-                boxPoints: boxPoints,
-                frame: frame
-            )
-        }
-    }
-
-    public func recognize(_ imageData: Data) throws -> [TextResult] {
-        guard let handle = handle else {
-            throw RustOError.invalidHandle
-        }
-
-        var resultsPtr: UnsafeMutablePointer<CTextResult>?
-        var count: Int = 0
-
-        let status = imageData.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
-            rocr_ocr_data(
-                handle,
-                bytes.baseAddress!.assumingMemoryBound(to: UInt8.self),
-                bytes.count,
-                &resultsPtr,
-                &count
-            )
-        }
-
-        guard status == 0, let results = resultsPtr else {
-            throw RustOError.recognitionFailed(status)
-        }
-
-        defer { rocr_free_results(results, count) }
-
-        return (0..<count).map { i in
-            let result = results[i]
-            let boxPoints = [
-                Point2D(x: result.box_x1, y: result.box_y1),
-                Point2D(x: result.box_x2, y: result.box_y2),
-                Point2D(x: result.box_x3, y: result.box_y3),
-                Point2D(x: result.box_x4, y: result.box_y4),
-            ]
-            let frame = Frame(
-                width: result.frame_width,
-                height: result.frame_height,
-                top: result.frame_top,
-                left: result.frame_left
-            )
-            return TextResult(
-                text: String(cString: result.text),
-                score: result.score,
-                boxPoints: boxPoints,
-                frame: frame
-            )
-        }
-    }
-
-    public func recognizeFileToRaw(_ imagePath: String) throws -> String {
-        guard let handle = handle else {
-            throw RustOError.invalidHandle
-        }
-        
-        let resolvedPath = resolveFilePath(imagePath)
-        var outputPtr: OpaquePointer?
-        let status = rocr_ocr_file_with_output(handle, resolvedPath, &outputPtr)
-        guard status == 0, let output = outputPtr else {
-            throw RustOError.recognitionFailed(status)
-        }
-        
-        defer { rocr_free_output(output) }
-        
-        guard let strPtr = rocr_output_to_raw(output) else {
-            return ""
-        }
-        defer { rocr_free_string(strPtr) }
-        
-        return String(cString: strPtr)
-    }
-    
-    public func recognizeFileToCsv(_ imagePath: String) throws -> String {
-        guard let handle = handle else {
-            throw RustOError.invalidHandle
-        }
-        
-        let resolvedPath = resolveFilePath(imagePath)
-        var outputPtr: OpaquePointer?
-        let status = rocr_ocr_file_with_output(handle, resolvedPath, &outputPtr)
-        guard status == 0, let output = outputPtr else {
-            throw RustOError.recognitionFailed(status)
-        }
-        
-        defer { rocr_free_output(output) }
-        
-        guard let strPtr = rocr_output_to_csv(output) else {
-            return ""
-        }
-        defer { rocr_free_string(strPtr) }
-        
-        return String(cString: strPtr)
-    }
-    
-    public func recognizeFileToTextWithPosition(_ imagePath: String) throws -> String {
-        guard let handle = handle else {
-            throw RustOError.invalidHandle
-        }
-        
-        let resolvedPath = resolveFilePath(imagePath)
-        var outputPtr: OpaquePointer?
-        let status = rocr_ocr_file_with_output(handle, resolvedPath, &outputPtr)
-        guard status == 0, let output = outputPtr else {
-            throw RustOError.recognitionFailed(status)
-        }
-        
-        defer { rocr_free_output(output) }
-        
-        guard let strPtr = rocr_output_to_text_with_position(output) else {
-            return ""
-        }
-        defer { rocr_free_string(strPtr) }
-        
-        return String(cString: strPtr)
-    }
-    
-    public func recognizeFileToSpatialText(
-        _ imagePath: String,
-        yThresholdMultiplier: Float = 0.0,
-        xThresholdMultiplier: Float = 0.0
-    ) throws -> String {
-        guard let handle = handle else {
-            throw RustOError.invalidHandle
-        }
-        
-        let resolvedPath = resolveFilePath(imagePath)
-        var outputPtr: OpaquePointer?
-        let status = rocr_ocr_file_with_output(handle, resolvedPath, &outputPtr)
-        guard status == 0, let output = outputPtr else {
-            throw RustOError.recognitionFailed(status)
-        }
-        
-        defer { rocr_free_output(output) }
-        
-        guard let strPtr = rocr_output_to_spatial_text(output, yThresholdMultiplier, xThresholdMultiplier) else {
-            return ""
-        }
-        defer { rocr_free_string(strPtr) }
-        
-        return String(cString: strPtr)
-    }
-
-    public func recognizeDataToRaw(_ imageData: Data) throws -> String {
-        guard let handle = handle else {
-            throw RustOError.invalidHandle
-        }
-        var outputPtr: OpaquePointer?
-        let status = imageData.withUnsafeBytes { bytes in
-            rocr_ocr_data_with_output(handle, bytes.baseAddress!.assumingMemoryBound(to: UInt8.self), bytes.count, &outputPtr)
-        }
-        guard status == 0, let output = outputPtr else {
-            throw RustOError.recognitionFailed(status)
-        }
-        defer { rocr_free_output(output) }
-        guard let strPtr = rocr_output_to_raw(output) else { return "" }
-        defer { rocr_free_string(strPtr) }
-        return String(cString: strPtr)
-    }
-
-    public func recognizeDataToCsv(_ imageData: Data) throws -> String {
-        guard let handle = handle else {
-            throw RustOError.invalidHandle
-        }
-        var outputPtr: OpaquePointer?
-        let status = imageData.withUnsafeBytes { bytes in
-            rocr_ocr_data_with_output(handle, bytes.baseAddress!.assumingMemoryBound(to: UInt8.self), bytes.count, &outputPtr)
-        }
-        guard status == 0, let output = outputPtr else {
-            throw RustOError.recognitionFailed(status)
-        }
-        defer { rocr_free_output(output) }
-        guard let strPtr = rocr_output_to_csv(output) else { return "" }
-        defer { rocr_free_string(strPtr) }
-        return String(cString: strPtr)
-    }
-
-    public func recognizeDataToTextWithPosition(_ imageData: Data) throws -> String {
-        guard let handle = handle else {
-            throw RustOError.invalidHandle
-        }
-        var outputPtr: OpaquePointer?
-        let status = imageData.withUnsafeBytes { bytes in
-            rocr_ocr_data_with_output(handle, bytes.baseAddress!.assumingMemoryBound(to: UInt8.self), bytes.count, &outputPtr)
-        }
-        guard status == 0, let output = outputPtr else {
-            throw RustOError.recognitionFailed(status)
-        }
-        defer { rocr_free_output(output) }
-        guard let strPtr = rocr_output_to_text_with_position(output) else { return "" }
-        defer { rocr_free_string(strPtr) }
-        return String(cString: strPtr)
-    }
-
-    public func recognizeDataToSpatialText(
-        _ imageData: Data,
-        yThresholdMultiplier: Float = 0.0,
-        xThresholdMultiplier: Float = 0.0
-    ) throws -> String {
-        guard let handle = handle else {
-            throw RustOError.invalidHandle
-        }
-        var outputPtr: OpaquePointer?
-        let status = imageData.withUnsafeBytes { bytes in
-            rocr_ocr_data_with_output(handle, bytes.baseAddress!.assumingMemoryBound(to: UInt8.self), bytes.count, &outputPtr)
-        }
-        guard status == 0, let output = outputPtr else {
-            throw RustOError.recognitionFailed(status)
-        }
-        defer { rocr_free_output(output) }
-        guard let strPtr = rocr_output_to_spatial_text(output, yThresholdMultiplier, xThresholdMultiplier) else { return "" }
-        defer { rocr_free_string(strPtr) }
-        return String(cString: strPtr)
-    }
-
-    deinit {
-        if let h = handle {
-            rocr_free(h)
-        }
-    }
+    deinit { if let handle { rocr_free(handle) } }
 }
 
 // C API bridge
@@ -569,77 +400,29 @@ struct CTextResult {
     let frame_top, frame_left: Float
 }
 
-@_silgen_name("rocr_new")
-func rocr_new(
-    _ detModel: UnsafePointer<CChar>,
-    _ recModel: UnsafePointer<CChar>,
-    _ dict: UnsafePointer<CChar>
-) -> OpaquePointer?
+@_silgen_name("rocr_initialize")
+func rocr_initialize(_ configJson: String) -> OpaquePointer?
 
-@_silgen_name("rocr_new_with_config")
-func rocr_new_with_config(
-    _ configJson: UnsafePointer<CChar>
-) -> OpaquePointer?
+@_silgen_name("rocr_detect_text_file")
+func rocr_detect_text_file(_ handle: OpaquePointer, _ imagePath: String, _ options: String, _ results: UnsafeMutablePointer<UnsafeMutablePointer<CTextResult>?>, _ count: UnsafeMutablePointer<Int>) -> Int32
 
-@_silgen_name("rocr_ocr_file")
-func rocr_ocr_file(
-    _ handle: OpaquePointer,
-    _ imagePath: UnsafePointer<CChar>,
-    _ resultsOut: UnsafeMutablePointer<UnsafeMutablePointer<CTextResult>?>,
-    _ countOut: UnsafeMutablePointer<Int>
-) -> Int32
+@_silgen_name("rocr_detect_text_data")
+func rocr_detect_text_data(_ handle: OpaquePointer, _ data: UnsafeRawPointer?, _ length: Int, _ options: String, _ results: UnsafeMutablePointer<UnsafeMutablePointer<CTextResult>?>, _ count: UnsafeMutablePointer<Int>) -> Int32
 
-@_silgen_name("rocr_ocr_data")
-func rocr_ocr_data(
-    _ handle: OpaquePointer,
-    _ imageData: UnsafePointer<UInt8>,
-    _ imageLen: Int,
-    _ resultsOut: UnsafeMutablePointer<UnsafeMutablePointer<CTextResult>?>,
-    _ countOut: UnsafeMutablePointer<Int>
-) -> Int32
+@_silgen_name("rocr_detect_text_file_spatial")
+func rocr_detect_text_file_spatial(_ handle: OpaquePointer, _ imagePath: String, _ options: String) -> UnsafeMutablePointer<CChar>?
+
+@_silgen_name("rocr_detect_text_data_spatial")
+func rocr_detect_text_data_spatial(_ handle: OpaquePointer, _ data: UnsafeRawPointer?, _ length: Int, _ options: String) -> UnsafeMutablePointer<CChar>?
 
 @_silgen_name("rocr_free_results")
 func rocr_free_results(_ results: UnsafeMutablePointer<CTextResult>, _ count: Int)
 
-@_silgen_name("rocr_free")
-func rocr_free(_ handle: OpaquePointer)
-
-@_silgen_name("rocr_ocr_file_with_output")
-func rocr_ocr_file_with_output(
-    _ handle: OpaquePointer,
-    _ imagePath: UnsafePointer<CChar>,
-    _ outputOut: UnsafeMutablePointer<OpaquePointer?>
-) -> Int32
-
-@_silgen_name("rocr_ocr_data_with_output")
-func rocr_ocr_data_with_output(
-    _ handle: OpaquePointer,
-    _ imageData: UnsafePointer<UInt8>,
-    _ imageLen: Int,
-    _ outputOut: UnsafeMutablePointer<OpaquePointer?>
-) -> Int32
-
-@_silgen_name("rocr_output_to_raw")
-func rocr_output_to_raw(_ output: OpaquePointer) -> UnsafeMutablePointer<CChar>?
-
-@_silgen_name("rocr_output_to_csv")
-func rocr_output_to_csv(_ output: OpaquePointer) -> UnsafeMutablePointer<CChar>?
-
-@_silgen_name("rocr_output_to_text_with_position")
-func rocr_output_to_text_with_position(_ output: OpaquePointer) -> UnsafeMutablePointer<CChar>?
-
-@_silgen_name("rocr_output_to_spatial_text")
-func rocr_output_to_spatial_text(
-    _ output: OpaquePointer,
-    _ yThresholdMultiplier: Float,
-    _ xThresholdMultiplier: Float
-) -> UnsafeMutablePointer<CChar>?
-
-@_silgen_name("rocr_free_output")
-func rocr_free_output(_ output: OpaquePointer)
-
 @_silgen_name("rocr_free_string")
 func rocr_free_string(_ str: UnsafeMutablePointer<CChar>)
+
+@_silgen_name("rocr_free")
+func rocr_free(_ handle: OpaquePointer)
 
 @_silgen_name("rocr_version")
 func rocr_version() -> UnsafePointer<CChar>?

@@ -47,78 +47,28 @@
 
 ### 1. Rust
 
-Add RustO! to your `Cargo.toml`:
-
-```toml
-[dependencies]
-rusto-rs = "0.1"
-```
-
 ```rust
-use rusto::{RustO, RustOConfig};
+use rusto::{DetectTextResult, ImageSource, OcrRunOptions, RustO, InitializeConfig};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize with PP-OCRv6 preset
-    let config = RustOConfig::ppv6("models/det.mnn", "models/rec.mnn", "models/dict.txt")
-        .with_text_score(0.5)
-        .with_xy_threshold(0.5, 1.0); // Configure spatial text spacing
-    
-    let mut ocr = RustO::new(config)?;
-    let output = ocr.run("document.jpg")?;
-    
-    // 1. Structured text results with bounding boxes & frames
-    for res in output.to_text_results() {
-        println!("Text: '{}' (Confidence: {:.2})", res.text, res.score);
-        println!("  Frame: [left={:.1}, top={:.1}, w={:.1}, h={:.1}]", 
-            res.frame.left, res.frame.top, res.frame.width, res.frame.height);
-    }
-    
-    // 2. Spatial layout text (visual document representation)
-    let spatial_text = output.to_spatial_text(None, None);
-    println!("Spatial Document:\n{}", spatial_text);
-    
-    Ok(())
+let mut ocr = RustO::initialize(InitializeConfig::ppv6("det.mnn", "rec.mnn", "dict.txt"))?;
+match ocr.detect_text(&ImageSource::Path("document.jpg".into()), &OcrRunOptions::default())? {
+    DetectTextResult::Structured(results) => println!("{:?}", results),
+    DetectTextResult::Spatial(text) => println!("{text}"),
 }
 ```
 
 ---
+
 
 ### 2. .NET / C#
 
-Install the core runtime and your preferred model package:
-
-```bash
-# Core managed runtime + cross-platform desktop native runtimes
-dotnet add package RustODotnet
-
-# Choose an OCR model tier (models copy automatically to output models/ dir):
-dotnet add package RustODotnet.Models.PPOCRv6.Tiny    # ~6 MB (Recommended default)
-# or dotnet add package RustODotnet.Models.PPOCRv6.Small   # ~30 MB
-# or dotnet add package RustODotnet.Models.PPOCRv6.Medium  # ~134 MB
-# or dotnet add package RustODotnet.Models.PPOCRv5.Mobile  # ~28 MB
-# or dotnet add package RustODotnet.Models.PPOCRv4.Mobile  # ~23 MB
-```
-
 ```csharp
-using System;
-using RustODotnet;
-
-// 1. Basic OCR (automatically discovers models in models/ folder)
-using var ocr = new RustO();
-var results = ocr.RecognizeFile("invoice.jpg");
-
-foreach (var res in results)
-{
-    Console.WriteLine($"Text: '{res.Text}' (Confidence: {res.Score:P1})");
-    Console.WriteLine($"  Frame: X={res.Frame.Left}, Y={res.Frame.Top}, W={res.Frame.Width}, H={res.Frame.Height}");
-}
-
-// 2. Spatial layout formatted output (preserves columns, tables, paragraphs)
-string spatialText = ocr.RecognizeFileToSpatialText("invoice.jpg");
-Console.WriteLine(spatialText);
+using var ocr = RustO.Initialize();
+var result = ocr.DetectText(new UriImageSource("invoice.jpg"));
 ```
 
 ---
+
 
 ### 3. React Native
 
@@ -152,19 +102,25 @@ dependencies {
 
 **JavaScript / TypeScript Usage:**
 ```typescript
-import { initialize, detectText, detectTextToSpatialText } from 'react-native-rusto';
+import { initialize, detectText } from 'react-native-rusto';
 
-// Initialize with bundled default models (no parameters needed!)
+// Initialize bundled default models once.
 await initialize();
 
-// Detect text with bounding frames
-const results = await detectText('/path/to/image.jpg');
+// `{ uri }` accepts an absolute path, file: URI, or Android content:// URI.
+const results = await detectText(
+  { uri: '/path/to/image.jpg' },
+  { output: 'lines', lineYThreshold: 0.5, wordXThreshold: 0.4 },
+);
 results.forEach((r) => {
   console.log(`${r.text} (${r.score}) - Frame:`, r.frame);
 });
 
-// Or extract visual spatial layout text
-const spatialText = await detectTextToSpatialText('/path/to/image.jpg', 0.5, 1.0);
+// Spatial layout text comes from same API.
+const spatialText = await detectText(
+  { uri: '/path/to/image.jpg' },
+  { output: 'spatial', lineYThreshold: 0.5, wordXThreshold: 0.4 },
+);
 console.log(spatialText);
 ```
 
@@ -172,72 +128,23 @@ console.log(spatialText);
 
 ### 4. iOS (Swift)
 
-Add to your `Podfile`:
-
-```ruby
-target 'YourApp' do
-  pod 'RustO'
-  pod 'RustO-Models-PPOCRv6-Tiny' # Pre-packaged models
-end
-```
-
 ```swift
-import RustO
-
-// Initialize with automatic model discovery
-let ocr = try RustO()
-
-let results = try ocr.recognizeFile("receipt.jpg")
-for res in results {
-    print("\(res.text) (\(res.score)): frame=\(res.frame.left),\(res.frame.top),\(res.frame.width)x\(res.frame.height)")
-}
-
-// Spatial formatted layout output
-let spatialText = try ocr.recognizeFileToSpatialText("receipt.jpg")
-print(spatialText)
+let ocr = try RustO.initialize()
+let result = try ocr.detectText(.uri("receipt.jpg"))
 ```
 
 ---
+
 
 ### 5. Android (Kotlin)
 
-Add JitPack repository to `settings.gradle`:
-
-```groovy
-dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-        maven { url 'https://jitpack.io' }
-    }
-}
-```
-
-Add dependencies to `app/build.gradle`:
-
-```groovy
-dependencies {
-    implementation 'com.github.byrizki.rusto-rs:rusto-android:v0.2.1'
-    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.1'
-}
-```
-
 ```kotlin
-import com.byrizki.rusto.RustO
-
-// Initialize engine from Android context assets
-val ocr = RustO.create(context)
-
-val results = ocr.recognizeFile("/path/to/image.jpg")
-for (res in results) {
-    println("${res.text} (score: ${res.score}) at [${res.frame.left}, ${res.frame.top}]")
-}
-
-val spatialText = ocr.recognizeFileToSpatialText("/path/to/image.jpg")
-println(spatialText)
+val ocr = RustO.initialize(context)
+val result = ocr.detectText(ImageSource.Uri("/path/to/image.jpg"))
 ```
 
 ---
+
 
 ### 6. Command Line Interface (CLI)
 
@@ -245,8 +152,8 @@ println(spatialText)
 # JSON output (default)
 cargo run --release -- --det-model det.mnn --rec-model rec.mnn --dict dict.txt image.jpg
 
-# Spatial formatted text output
-cargo run --release -- --det-model det.mnn --rec-model rec.mnn --dict dict.txt --format spatial image.jpg
+# Ordered text output
+cargo run --release -- --det-model det.mnn --rec-model rec.mnn --dict dict.txt --format text-ordered image.jpg
 
 # TSV / Plain text output
 cargo run --release -- --det-model det.mnn --rec-model rec.mnn --dict dict.txt --format tsv image.jpg
@@ -320,14 +227,14 @@ bash scripts/download_models.sh --model ppocrv5 --lang arabic --output-dir model
 
 ---
 
-## ⚙️ Configuration Reference (`RustOConfig`)
+## ⚙️ Configuration Reference (`InitializeConfig`)
 
-`RustOConfig` provides granular control over the OCR pipeline:
+`InitializeConfig` provides granular control over the OCR pipeline:
 
 ```rust
-use rusto::RustOConfig;
+use rusto::InitializeConfig;
 
-let config = RustOConfig::ppv6("models/det.mnn", "models/rec.mnn", "models/dict.txt")
+let config = InitializeConfig::ppv6("models/det.mnn", "models/rec.mnn", "models/dict.txt")
     // Detection parameters
     .with_det_thresh(0.3)          // Pixel binarization threshold
     .with_det_box_thresh(0.6)      // Box confidence threshold
@@ -349,10 +256,10 @@ let config = RustOConfig::ppv6("models/det.mnn", "models/rec.mnn", "models/dict.
 
 ### Template Presets
 
-- `RustOConfig::ppv6(...)` — Pre-configured for PP-OCRv6 (`limit_side_len=736`, `limit_type="min"`, `unclip_ratio=2.0`)
-- `RustOConfig::ppv5(...)` — Pre-configured for PP-OCRv5 (`limit_side_len=736`, `limit_type="min"`, `unclip_ratio=2.0`)
-- `RustOConfig::ppv4(...)` — Pre-configured for PP-OCRv4 (`limit_side_len=960`, `limit_type="max"`, `unclip_ratio=1.5`)
-- `RustOConfig::ppv3(...)` — Pre-configured for PP-OCRv3 (`limit_side_len=960`, `limit_type="max"`, `unclip_ratio=1.5`)
+- `InitializeConfig::ppv6(...)` — Pre-configured for PP-OCRv6 (`limit_side_len=736`, `limit_type="min"`, `unclip_ratio=2.0`)
+- `InitializeConfig::ppv5(...)` — Pre-configured for PP-OCRv5 (`limit_side_len=736`, `limit_type="min"`, `unclip_ratio=2.0`)
+- `InitializeConfig::ppv4(...)` — Pre-configured for PP-OCRv4 (`limit_side_len=960`, `limit_type="max"`, `unclip_ratio=1.5`)
+- `InitializeConfig::ppv3(...)` — Pre-configured for PP-OCRv3 (`limit_side_len=960`, `limit_type="max"`, `unclip_ratio=1.5`)
 
 ---
 
@@ -377,7 +284,7 @@ Tested on standard document images across platforms:
 rusto-rs/
 ├── src/                        # Rust Core Engine
 │   ├── lib.rs                  # Public API & exports
-│   ├── config.rs               # RustOConfig & template presets (PPV6, PPV5, PPV4, PPV3)
+│   ├── config.rs               # InitializeConfig & template presets (PPV6, PPV5, PPV4, PPV3)
 │   ├── det.rs                  # DBNet text detection
 │   ├── rec.rs                  # CTC text recognition
 │   ├── orient.rs               # Orientation classification

@@ -1,10 +1,8 @@
 package com.byrizki.rusto
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.net.Uri
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.URLDecoder
 
@@ -83,7 +81,7 @@ data class LayoutConfig(
     val xThresholdMultiplier: Float? = null
 )
 
-data class RustOConfig(
+data class InitializeConfig(
     val template: String? = null,
     val detection: DetectionConfig? = null,
     val recognition: RecognitionConfig? = null,
@@ -171,306 +169,152 @@ data class RustOConfig(
 
 class RustOException(message: String) : Exception(message)
 
+enum class OutputGranularity(val wireValue: String) {
+    LINES("lines"), WORDS("words"), SPATIAL("spatial");
+}
+
+data class OcrRunOptions(
+    val output: OutputGranularity = OutputGranularity.LINES,
+    val lineYThreshold: Float? = null,
+    val wordXThreshold: Float? = null,
+    val textScore: Float? = null,
+    val classification: Boolean? = null,
+    val orientation: Boolean? = null,
+) {
+    internal fun toJson(): String {
+        require(lineYThreshold == null || lineYThreshold.isFinite() && lineYThreshold >= 0f) {
+            "lineYThreshold must be finite and non-negative."
+        }
+        require(wordXThreshold == null || wordXThreshold.isFinite() && wordXThreshold >= 0f) {
+            "wordXThreshold must be finite and non-negative."
+        }
+        require(textScore == null || textScore.isFinite() && textScore in 0f..1f) {
+            "textScore must be finite and between 0 and 1."
+        }
+        return JSONObject().apply {
+            put("output", output.wireValue)
+            lineYThreshold?.let { put("lineYThreshold", it.toDouble()) }
+            wordXThreshold?.let { put("wordXThreshold", it.toDouble()) }
+            textScore?.let { put("textScore", it.toDouble()) }
+            classification?.let { put("classification", it) }
+            orientation?.let { put("orientation", it) }
+        }.toString()
+    }
+}
+
+sealed interface ImageSource {
+    data class Uri(val value: String) : ImageSource
+    data class Bytes(val value: ByteArray) : ImageSource
+}
+
+sealed interface DetectTextResult {
+    data class Structured(val items: List<TextResult>) : DetectTextResult
+    data class Spatial(val text: String) : DetectTextResult
+}
+
 class RustO private constructor(
-    private val nativeHandle: Long
+    private val context: Context,
+    private var nativeHandle: Long,
 ) : AutoCloseable {
 
     companion object {
-        init {
-            System.loadLibrary("rusto")
-        }
+        init { System.loadLibrary("rusto") }
 
-        @JvmStatic
-        external fun nativeVersion(): String
+        @JvmStatic private external fun nativeInitialize(configJson: String): Long
+        @JvmStatic private external fun nativeDetectTextFile(handle: Long, imagePath: String, optionsJson: String, resultsOut: LongArray, countOut: IntArray): Int
+        @JvmStatic private external fun nativeDetectTextData(handle: Long, imageData: ByteArray, optionsJson: String, resultsOut: LongArray, countOut: IntArray): Int
+        @JvmStatic private external fun nativeDetectTextFileSpatial(handle: Long, imagePath: String, optionsJson: String): String?
+        @JvmStatic private external fun nativeDetectTextDataSpatial(handle: Long, imageData: ByteArray, optionsJson: String): String?
+        @JvmStatic private external fun nativeGetResult(resultsPtr: Long, index: Int, textOut: Array<String>, scoreOut: FloatArray, boxOut: FloatArray)
+        @JvmStatic private external fun nativeFreeResults(resultsPtr: Long, count: Int)
+        @JvmStatic private external fun nativeFree(handle: Long)
 
-        @JvmStatic
-        private external fun nativeNewWithConfig(
-            configJson: String
-        ): Long
-
-        @JvmStatic
-        private external fun nativeOcrFile(
-            handle: Long,
-            imagePath: String,
-            resultsOut: LongArray,
-            countOut: IntArray
-        ): Int
-
-        @JvmStatic
-        private external fun nativeOcrData(
-            handle: Long,
-            imageData: ByteArray,
-            resultsOut: LongArray,
-            countOut: IntArray
-        ): Int
-
-        @JvmStatic
-        private external fun nativeGetResult(
-            resultsPtr: Long,
-            index: Int,
-            textOut: Array<String>,
-            scoreOut: FloatArray,
-            boxOut: FloatArray
-        )
-
-        @JvmStatic
-        private external fun nativeOcrFileWithOutput(
-            handle: Long,
-            imagePath: String
-        ): Long
-
-        @JvmStatic
-        private external fun nativeOcrDataWithOutput(
-            handle: Long,
-            imageData: ByteArray
-        ): Long
-
-        @JvmStatic
-        private external fun nativeOutputToRaw(
-            output: Long
-        ): String?
-
-        @JvmStatic
-        private external fun nativeOutputToCsv(
-            output: Long
-        ): String?
-
-        @JvmStatic
-        private external fun nativeOutputToTextWithPosition(
-            output: Long
-        ): String?
-
-        @JvmStatic
-        private external fun nativeOutputToSpatialText(
-            output: Long,
-            yThresholdMultiplier: Float,
-            xThresholdMultiplier: Float
-        ): String?
-
-        @JvmStatic
-        private external fun nativeFreeOutput(
-            output: Long
-        )
-
-        @JvmStatic
-        private external fun nativeFreeResults(resultsPtr: Long, count: Int)
-
-        @JvmStatic
-        private external fun nativeFree(handle: Long)
-
-        fun create(
-            context: Context,
-            config: RustOConfig = RustOConfig()
-        ): RustO {
-            val configJson = config.toJson(context)
-            val handle = nativeNewWithConfig(configJson)
-            if (handle == 0L) {
-                throw RustOException("Failed to initialize RustO with config")
-            }
-            return RustO(handle)
+        fun initialize(context: Context, config: InitializeConfig = InitializeConfig()): RustO {
+            val handle = nativeInitialize(config.toJson(context))
+            if (handle == 0L) throw RustOException("Failed to initialize RustO with config")
+            return RustO(context.applicationContext, handle)
         }
 
         internal fun copyAssetToCache(context: Context, assetName: String): String {
             val cacheFile = File(context.cacheDir, assetName)
             if (cacheFile.exists() && cacheFile.length() > 0) return cacheFile.absolutePath
-
             cacheFile.parentFile?.mkdirs()
             val tmpFile = File(cacheFile.parent, "${cacheFile.name}.tmp")
             try {
-                context.assets.open(assetName).use { input ->
-                    tmpFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
+                context.assets.open(assetName).use { input -> tmpFile.outputStream().use(input::copyTo) }
                 tmpFile.renameTo(cacheFile)
             } catch (e: java.io.IOException) {
                 tmpFile.delete()
-                throw RustOException("Model asset not found or unreadable: '$assetName'. " +
-                    "Ensure the file is bundled in assets or provide an absolute path. Cause: ${e.message}")
+                throw RustOException("Model asset not found or unreadable: '$assetName'. Cause: ${e.message}")
             }
             return cacheFile.absolutePath
         }
     }
 
-    val version: String
-        get() = nativeVersion()
+    fun detectText(source: ImageSource, options: OcrRunOptions = OcrRunOptions()): DetectTextResult {
+        check(nativeHandle != 0L) { "RustO is closed." }
+        val optionsJson = options.toJson()
+        return when (options.output) {
+            OutputGranularity.SPATIAL -> DetectTextResult.Spatial(detectSpatial(source, optionsJson))
+            OutputGranularity.LINES, OutputGranularity.WORDS -> DetectTextResult.Structured(detectStructured(source, optionsJson))
+        }
+    }
 
-    fun recognizeFile(imagePath: String): List<TextResult> {
-        val cleanPath = cleanPath(imagePath)
+    private fun detectStructured(source: ImageSource, optionsJson: String): List<TextResult> {
         val resultsOut = LongArray(1)
         val countOut = IntArray(1)
-
-        val status = nativeOcrFile(nativeHandle, cleanPath, resultsOut, countOut)
-        if (status != 0) {
-            throw RustOException("OCR recognition failed with status: $status")
+        val status = when (source) {
+            is ImageSource.Bytes -> nativeDetectTextData(nativeHandle, source.value, optionsJson, resultsOut, countOut)
+            is ImageSource.Uri -> withUriInput(source.value) { path, bytes ->
+                if (bytes != null) nativeDetectTextData(nativeHandle, bytes, optionsJson, resultsOut, countOut)
+                else nativeDetectTextFile(nativeHandle, path!!, optionsJson, resultsOut, countOut)
+            }
         }
+        if (status != 0) throw RustOException("OCR detection failed with status: $status")
+        try { return parseResults(resultsOut[0], countOut[0]) }
+        finally { nativeFreeResults(resultsOut[0], countOut[0]) }
+    }
 
-        try {
-            return parseResults(resultsOut[0], countOut[0])
-        } finally {
-            nativeFreeResults(resultsOut[0], countOut[0])
+    private fun detectSpatial(source: ImageSource, optionsJson: String): String = when (source) {
+        is ImageSource.Bytes -> nativeDetectTextDataSpatial(nativeHandle, source.value, optionsJson)
+        is ImageSource.Uri -> withUriInput(source.value) { path, bytes ->
+            if (bytes != null) nativeDetectTextDataSpatial(nativeHandle, bytes, optionsJson)
+            else nativeDetectTextFileSpatial(nativeHandle, path!!, optionsJson)
         }
-    }
+    } ?: throw RustOException("OCR detection failed")
 
-    fun recognize(context: Context, uri: Uri): List<TextResult> {
-        if (uri.scheme == "content") {
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                ?: throw RustOException("Failed to open URI: $uri")
-            return recognize(bytes)
+    private inline fun <T> withUriInput(value: String, action: (String?, ByteArray?) -> T): T {
+        require(value.isNotBlank()) { "Image URI must be non-empty." }
+        if (value.startsWith("content://")) {
+            val bytes = context.contentResolver.openInputStream(Uri.parse(value))?.use { it.readBytes() }
+                ?: throw RustOException("Failed to open URI: $value")
+            return action(null, bytes)
         }
-        val path = uri.path ?: uri.toString()
-        return recognizeFile(path)
-    }
-
-    fun recognize(imageData: ByteArray): List<TextResult> {
-        val resultsOut = LongArray(1)
-        val countOut = IntArray(1)
-
-        val status = nativeOcrData(nativeHandle, imageData, resultsOut, countOut)
-        if (status != 0) {
-            throw RustOException("OCR recognition failed with status: $status")
-        }
-
-        try {
-            return parseResults(resultsOut[0], countOut[0])
-        } finally {
-            nativeFreeResults(resultsOut[0], countOut[0])
-        }
-    }
-
-    fun recognize(bitmap: Bitmap): List<TextResult> {
-        val stream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)
-        return recognize(stream.toByteArray())
-    }
-
-    fun recognizeFileToRaw(imagePath: String): String {
-        return runWithOutput(cleanPath(imagePath)) { nativeOutputToRaw(it) ?: "" }
-    }
-
-    fun recognizeFileToCsv(imagePath: String): String {
-        return runWithOutput(cleanPath(imagePath)) { nativeOutputToCsv(it) ?: "" }
-    }
-
-    fun recognizeFileToTextWithPosition(imagePath: String): String {
-        return runWithOutput(cleanPath(imagePath)) { nativeOutputToTextWithPosition(it) ?: "" }
-    }
-
-    fun recognizeFileToSpatialText(
-        imagePath: String,
-        yThresholdMultiplier: Float = 0f,
-        xThresholdMultiplier: Float = 0f
-    ): String {
-        return runWithOutput(cleanPath(imagePath)) {
-            nativeOutputToSpatialText(it, yThresholdMultiplier, xThresholdMultiplier) ?: ""
-        }
-    }
-
-    fun recognizeToRaw(imageData: ByteArray): String {
-        return runWithOutput(imageData) { nativeOutputToRaw(it) ?: "" }
-    }
-
-    fun recognizeToCsv(imageData: ByteArray): String {
-        return runWithOutput(imageData) { nativeOutputToCsv(it) ?: "" }
-    }
-
-    fun recognizeToTextWithPosition(imageData: ByteArray): String {
-        return runWithOutput(imageData) { nativeOutputToTextWithPosition(it) ?: "" }
-    }
-
-    fun recognizeToSpatialText(
-        imageData: ByteArray,
-        yThresholdMultiplier: Float = 0f,
-        xThresholdMultiplier: Float = 0f
-    ): String {
-        return runWithOutput(imageData) {
-            nativeOutputToSpatialText(it, yThresholdMultiplier, xThresholdMultiplier) ?: ""
-        }
-    }
-
-    private fun cleanPath(imagePath: String): String {
-        var clean = imagePath.trim()
-        if (clean.startsWith("file://")) {
-            val uri = Uri.parse(clean)
-            clean = uri.path ?: clean.removePrefix("file://")
-        } else if (clean.startsWith("file:")) {
-            clean = clean.removePrefix("file:")
-        }
-        try {
-            clean = URLDecoder.decode(clean, "UTF-8")
-        } catch (_: Exception) {}
-        return clean
-    }
-
-    private inline fun runWithOutput(imagePath: String, action: (Long) -> String): String {
-        val output = nativeOcrFileWithOutput(nativeHandle, imagePath)
-        if (output == 0L) {
-            throw RustOException("OCR recognition failed")
-        }
-        try {
-            return action(output)
-        } finally {
-            nativeFreeOutput(output)
-        }
-    }
-
-    private inline fun runWithOutput(imageData: ByteArray, action: (Long) -> String): String {
-        val output = nativeOcrDataWithOutput(nativeHandle, imageData)
-        if (output == 0L) {
-            throw RustOException("OCR recognition failed")
-        }
-        try {
-            return action(output)
-        } finally {
-            nativeFreeOutput(output)
-        }
+        var path = value.trim()
+        if (path.startsWith("file://")) path = Uri.parse(path).path ?: path.removePrefix("file://")
+        else if (path.startsWith("file:")) path = path.removePrefix("file:")
+        path = try { URLDecoder.decode(path, "UTF-8") } catch (_: Exception) { path }
+        require(File(path).isFile) { "Image file not found: $value" }
+        return action(path, null)
     }
 
     private fun parseResults(resultsPtr: Long, count: Int): List<TextResult> {
         val results = ArrayList<TextResult>(count)
-
         val textOut = arrayOf("")
         val scoreOut = FloatArray(1)
         val boxOut = FloatArray(8)
-
         for (i in 0 until count) {
             nativeGetResult(resultsPtr, i, textOut, scoreOut, boxOut)
-
-            val boxPoints = listOf(
-                Point2D(boxOut[0], boxOut[1]),
-                Point2D(boxOut[2], boxOut[3]),
-                Point2D(boxOut[4], boxOut[5]),
-                Point2D(boxOut[6], boxOut[7])
-            )
-
-            val minX = minOf(boxOut[0], boxOut[2], boxOut[4], boxOut[6])
-            val maxX = maxOf(boxOut[0], boxOut[2], boxOut[4], boxOut[6])
-            val minY = minOf(boxOut[1], boxOut[3], boxOut[5], boxOut[7])
-            val maxY = maxOf(boxOut[1], boxOut[3], boxOut[5], boxOut[7])
-
-            val frame = Frame(
-                width = maxX - minX,
-                height = maxY - minY,
-                top = minY,
-                left = minX
-            )
-
-            results.add(
-                TextResult(
-                    text = textOut[0],
-                    score = scoreOut[0],
-                    boxPoints = boxPoints,
-                    frame = frame
-                )
-            )
+            val points = listOf(Point2D(boxOut[0], boxOut[1]), Point2D(boxOut[2], boxOut[3]), Point2D(boxOut[4], boxOut[5]), Point2D(boxOut[6], boxOut[7]))
+            results += TextResult(textOut[0], scoreOut[0], points)
         }
-
         return results
     }
 
     override fun close() {
         if (nativeHandle != 0L) {
             nativeFree(nativeHandle)
+            nativeHandle = 0L
         }
     }
 }

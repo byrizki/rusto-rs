@@ -63,59 +63,37 @@ dependencies {
 
 ## Usage
 
-### Basic Usage (with bundled models)
-
 ```typescript
-import { initialize, detectText, getVersion } from 'react-native-rusto';
+import { detectText, initialize } from 'react-native-rusto';
 
-// Initialize with bundled default models (no parameters needed!)
-await initialize();
+await initialize(); // PP-OCRv6 bundled defaults
 
-// Detect text from image file
-const results = await detectText('/path/to/image.jpg');
-
-results.forEach((result) => {
-  console.log(`Text: ${result.text}`);
-  console.log(`Score: ${result.score}`);
-  console.log(`Frame: ${result.frame.left}, ${result.frame.top}, ${result.frame.width}x${result.frame.height}`);
-  console.log(`Box: ${JSON.stringify(result.box_points)}`);
-});
-
-// Get library version
-const version = await getVersion();
-console.log(`RustO version: ${version}`);
+const lines = await detectText({ uri: '/absolute/path/receipt.jpg' });
+const words = await detectText(
+  { uri: 'file:///absolute/path/receipt.jpg' },
+  { output: 'words', lineYThreshold: 0.5, wordXThreshold: 0.4 },
+);
+const spatial = await detectText(
+  { base64: encodedImage },
+  { output: 'spatial', lineYThreshold: 0.5, wordXThreshold: 0.4 },
+);
+const fromBytes = await detectText({ bytes: new Uint8Array(imageBytes) });
 ```
 
-### Advanced Usage (with RustOConfig)
+`detectText` accepts exactly one source: `{ uri }`, `{ base64 }`, or `{ bytes }` (`Uint8Array` / `ArrayBuffer`). `{ uri }` accepts an absolute filesystem path, `file:` URI, or Android `content://` URI.
+
+`output` defaults to `lines`, returning `TextResult[]`. `words` returns word boxes. `spatial` returns a formatted string. `lineYThreshold` groups vertically aligned regions; `wordXThreshold` controls word and spatial gaps.
+
+Static model setup belongs in `initialize`:
 
 ```typescript
-import { initialize, detectText, detectTextToSpatialText } from 'react-native-rusto';
-
-// Initialize with unified grouped RustOConfig
 await initialize({
-  template: 'ppv6',
-  detection: {
-    modelPath: 'det.mnn',
-    thresh: 0.3,
-    boxThresh: 0.5,
-  },
-  recognition: {
-    modelPath: 'rec.mnn',
-    dictPath: 'dict.txt',
-    scoreThresh: 0.6,
-  },
-  layout: {
-    yThresholdMultiplier: 0.5,
-    xThresholdMultiplier: 0.4,
-  },
+  preset: 'ppv6',
+  models: { detection: 'det.mnn', recognition: 'rec.mnn', dictionary: 'dict.txt' },
 });
-
-// Or extract spatial text with custom XY thresholds
-const spatialText = await detectTextToSpatialText('/path/to/image.jpg', 0.5, 0.4);
-console.log(spatialText);
 ```
 
-### Model Bundling
+## Model Bundling
 
 Model files can be bundled with your app. See [BUNDLING.md](./BUNDLING.md) for detailed instructions on how to:
 - Bundle models with Android AAR
@@ -124,113 +102,15 @@ Model files can be bundled with your app. See [BUNDLING.md](./BUNDLING.md) for d
 
 ## API
 
-### `initialize(config?: RustOConfig): Promise<boolean>`
+### `initialize(config?: InitializeConfig): Promise<void>`
 
-Initialize the RustO engine with optional `RustOConfig` configuration.
+Loads static OCR model resources. `preset` defaults to `ppv6`. Optional `models` keys are `detection`, `recognition`, `dictionary`, `classification`, and `orientation`.
 
-**Parameters:**
-- `config`: Optional `RustOConfig` configuration object (supports template presets and specific property overrides).
+### `detectText(source, options?)`
 
-**Returns:** `true` on successful initialization
+Runs one request. Source contains exactly one of `uri`, `base64`, or `bytes`. `uri` accepts an absolute filesystem path, `file:` URI, or Android `content://` URI. Options include `output: 'lines' | 'words' | 'spatial'`, `lineYThreshold`, `wordXThreshold`, `textScore`, `classification`, and `orientation`.
 
-### `detectText(imagePath: string): Promise<TextResult[]>`
-
-Perform OCR on an image file.
-
-**Returns:** Array of `TextResult` objects
-
-### `detectTextFromBytes(imageData: string): Promise<TextResult[]>`
-
-Perform OCR on base64-encoded image data.
-
-**Returns:** Array of `TextResult` objects
-
-### `detectTextToSpatialText(imagePath: string, yThresholdMultiplier?: number, xThresholdMultiplier?: number): Promise<string>`
-
-Export OCR text formatted according to spatial position, with configurable line grouping (`yThresholdMultiplier`) and word/column spacing (`xThresholdMultiplier`).
-
-### `getVersion(): Promise<string>`
-
-Get the RustO library version.
-
-### Types
-
-```typescript
-interface Frame {
-  width: number;
-  height: number;
-  top: number;
-  left: number;
-}
-
-interface TextResult {
-  text: string;
-  score: number;
-  box_points: [[number, number], [number, number], [number, number], [number, number]];
-  frame: Frame;
-}
-
-interface DetectionConfig {
-  enabled?: boolean;    // Enable/disable detection stage (default: true)
-  modelPath?: string;   // Path to text detection model (e.g. 'det.mnn')
-  thresh?: number;      // Binarization threshold (default: 0.3)
-  boxThresh?: number;   // Box score threshold (default: 0.6 in v6/v4/v3, 0.5 in v5)
-  unclipRatio?: number; // Polygon expansion ratio (default: 2.0 in v6/v5, 1.5 in v4/v3)
-  limitSideLen?: number;// Max image side length limit (default: 736 in v6/v5, 960 in v4/v3)
-  limitType?: string;   // Side limit type: 'min' | 'max'
-  useDilation?: boolean;// Apply morphological dilation (default: true in v6/v5, false in v4/v3)
-}
-
-interface RecognitionConfig {
-  enabled?: boolean;            // Enable/disable recognition stage (default: true)
-  modelPath?: string;           // Path to text recognition model (e.g. 'rec.mnn')
-  dictPath?: string;            // Path to dictionary file (e.g. 'dict.txt')
-  scoreThresh?: number;         // Min text confidence score (default: 0.5)
-  returnWordBox?: boolean;      // Return word-level boxes (default: false)
-  returnSingleCharBox?: boolean;// Return character-level boxes (default: false)
-}
-
-/** Line Classification (CLS) — Available ONLY on PP-OCRv4 & PP-OCRv5 */
-interface ClassificationConfig {
-  enabled?: boolean;    // Enable line classifier (default: false, v4/v5 only)
-  modelPath?: string;   // Path to line orientation model (v4/v5 only)
-  thresh?: number;      // Min confidence threshold (default: 0.9, v4/v5 only)
-}
-
-interface OrientationConfig {
-  enabled?: boolean;    // Enable document orientation correction (default: false)
-  modelPath?: string;   // Path to document orientation model
-  thresh?: number;      // Min orientation confidence threshold (default: 0.5)
-}
-
-interface UnwarpConfig {
-  enabled?: boolean;    // Enable document unwarping (default: false)
-  modelPath?: string;   // Path to document unwarping model
-}
-
-interface PreprocessingConfig {
-  minHeight?: number;   // Minimum text box height in pixels (default: 30.0)
-  maxSideLen?: number;  // Maximum image side length (default: 2000.0)
-  minSideLen?: number;  // Minimum image side length (default: 30.0)
-  debugImages?: boolean;// Return intermediate debug images (default: false)
-}
-
-interface LayoutConfig {
-  yThresholdMultiplier?: number;// Y line grouping threshold (default: 0.5)
-  xThresholdMultiplier?: number;// X word spacing threshold (default: 0.4)
-}
-
-interface RustOConfig {
-  template?: 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3' | string;
-  detection?: DetectionConfig;
-  recognition?: RecognitionConfig;
-  classification?: ClassificationConfig; // NOTE: Only in v4 & v5
-  orientation?: OrientationConfig;
-  unwarp?: UnwarpConfig;
-  preprocessing?: PreprocessingConfig;
-  layout?: LayoutConfig;
-}
-```
+`lines` and `words` return `TextResult[]`; `spatial` returns `string`.
 
 ## Platform Support
 

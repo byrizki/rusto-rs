@@ -6,7 +6,7 @@ use opencv::{core, imgproc, prelude::*};
 #[cfg(not(feature = "use-opencv"))]
 use crate::image_impl::{self, Mat, Rect};
 
-use crate::config::RustOConfig;
+use crate::config::InitializeConfig;
 use crate::engine::EngineError;
 use crate::layout::{LayoutDetector, LayoutRegion, LayoutType};
 use crate::rusto_ocr::RustO;
@@ -15,7 +15,7 @@ use crate::types::LayoutConfig;
 
 pub struct DocPipelineConfig {
     pub layout: LayoutConfig,
-    pub ocr: RustOConfig,
+    pub ocr: InitializeConfig,
     pub table_detector: Option<TableDetectorConfig>,
     pub table_recognizer: Option<TableStructureConfig>,
 }
@@ -41,7 +41,7 @@ pub struct DocResult {
 impl DocPipeline {
     pub fn new(config: DocPipelineConfig) -> Result<Self, EngineError> {
         let layout = LayoutDetector::new(config.layout)?;
-        let ocr = RustO::new(config.ocr)?;
+        let ocr = RustO::initialize(config.ocr)?;
         
         // Initialize table recognition components if configured
         let table_detector = if let Some(detector_config) = config.table_detector {
@@ -102,7 +102,10 @@ impl DocPipeline {
                 | LayoutType::Equation => {
                     // Crop and OCR
                     let crop = self.crop_image(&img, &region)?;
-                    let ocr_res = self.ocr.run_on_mat(&crop)?;
+                    let ocr_res = self.ocr.run_on_mat_with_options(
+                        &crop,
+                        &crate::OcrRunOptions::default(),
+                    )?;
 
                     // Combine text lines
                     let text = ocr_res.txts.join(" ");
@@ -183,7 +186,10 @@ impl DocPipeline {
                 // Crop and OCR the cell
                 match self.crop_image(&table_crop, &cell_region) {
                     Ok(cell_crop) => {
-                        match self.ocr.run_on_mat(&cell_crop) {
+                        match self.ocr.run_on_mat_with_options(
+                            &cell_crop,
+                            &crate::OcrRunOptions::default(),
+                        ) {
                             Ok(ocr_res) => {
                                 cell.text = ocr_res.txts.join(" ");
                             }

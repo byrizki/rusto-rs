@@ -14,13 +14,20 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use rusto::RustO;
+//! use rusto::{DetectTextResult, ImageSource, OcrRunOptions, RustO, InitializeConfig};
 //!
-//! let mut ocr = RustO::new_ppv5("models/det.mnn", "models/rec.mnn", "models/dict.txt")?;
-//! let result = ocr.run("image.jpg")?;
+//! let mut ocr = RustO::initialize(InitializeConfig::ppv5(
+//!     "models/det.mnn", "models/rec.mnn", "models/dict.txt",
+//! ))?;
+//! let result = ocr.detect_text(
+//!     &ImageSource::Path("image.jpg".into()),
+//!     &OcrRunOptions::default(),
+//! )?;
 //!
-//! for (text, score) in result.txts.iter().zip(result.scores.iter()) {
-//!     println!("{}: {:.3}", text, score);
+//! if let DetectTextResult::Structured(results) = result {
+//!     for result in results {
+//!         println!("{}: {:.3}", result.text, result.score);
+//!     }
 //! }
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
@@ -50,18 +57,15 @@ mod contours;
 pub mod ffi;
 
 // Public API exports
-pub use config::{ModelPreset, RustOConfig, PPV3_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG};
+pub use config::{ModelPreset, InitializeConfig, PPV3_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG};
 pub use det::TextDetector;
 pub use doc_pipeline::{DocBlock, DocPipeline, DocPipelineConfig, DocResult};
 pub use layout::{LayoutDetector, LayoutOutput, LayoutRegion, LayoutType};
 pub use orient::{OrientClassifier, OrientOutput, Orientation};
 pub use rec::{TextRecOutput, TextRecognizer, WordInfo, WordType};
-pub use rusto_ocr::{RustO, RustOOutput};
+pub use rusto_ocr::{DetectTextResult, ImageSource, OcrRunOptions, OutputGranularity, RustO};
 pub use table::{TableDetector, TableDetectorConfig, TableModelType, TableStructure, TableStructureConfig, TableStructureRecognizer};
 pub use types::{ClsConfig, DetConfig, Frame, GlobalConfig, LayoutConfig, OrientConfig, RecConfig};
-
-// Alias for compatibility
-pub use RustO as RapidOcr;
 
 // Re-export for easier access
 pub use crate::engine::EngineError;

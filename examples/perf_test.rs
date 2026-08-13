@@ -1,10 +1,10 @@
-use rusto::{RustO, RustOConfig};
+use rusto::{DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, RustO};
 use std::time::Instant;
 
 fn main() {
     println!("=== RustO Performance Test ===\n");
     
-    let config = RustOConfig::new_ppv5(
+    let config = InitializeConfig::ppv5(
         "models/PPOCR_v5/det.mnn",
         "models/PPOCR_v5/rec.mnn",
         "models/PPOCR_v5/dict.txt"
@@ -12,7 +12,7 @@ fn main() {
     
     println!("Initializing OCR engine...");
     let init_start = Instant::now();
-    let mut ocr = RustO::new(config).expect("Failed to create OCR");
+    let mut ocr = RustO::initialize(config).expect("Failed to create OCR");
     println!("Initialization took: {:?}\n", init_start.elapsed());
     
     let test_images = vec![
@@ -29,7 +29,7 @@ fn main() {
         
         // Warmup run
         println!("  Warmup run...");
-        let _ = ocr.run(path);
+        let _ = ocr.detect_text(&ImageSource::Path(path.into()), &OcrRunOptions::default());
         
         // Timed runs
         let num_runs = 5;
@@ -37,14 +37,18 @@ fn main() {
         
         for i in 1..=num_runs {
             let start = Instant::now();
-            let results = ocr.run(path).expect("OCR failed");
+            let results = ocr.detect_text(&ImageSource::Path(path.into()), &OcrRunOptions::default()).expect("OCR failed");
             let elapsed = start.elapsed();
             times.push(elapsed);
             
-            println!("  Run {}: {:?} - {} text regions detected", i, elapsed, results.boxes.len());
-            if i == 1 && !results.txts.is_empty() {
-                println!("    Sample result: {} (score: {:.3})", 
-                         results.txts[0], results.scores[0]);
+            match results {
+                DetectTextResult::Structured(items) => {
+                    println!("  Run {}: {:?} - {} text regions detected", i, elapsed, items.len());
+                    if i == 1 && !items.is_empty() {
+                        println!("    Sample result: {} (score: {:.3})", items[0].text, items[0].score);
+                    }
+                }
+                DetectTextResult::Spatial(_) => unreachable!("default output is structured"),
             }
         }
         

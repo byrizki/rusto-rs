@@ -1,4 +1,6 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "use-opencv")]
 use opencv::{
@@ -10,7 +12,7 @@ use opencv::{
 use crate::image_impl::{Mat, Point2f};
 
 use crate::cal_rec_boxes::CalRecBoxes;
-use crate::config::RustOConfig;
+use crate::config::InitializeConfig;
 use crate::det::TextDetector;
 use crate::engine::EngineError;
 use crate::geometry::{
@@ -21,10 +23,47 @@ use crate::orient::{OrientClassifier, Orientation};
 use crate::rec::{TextRecOutput, TextRecognizer};
 use crate::types::GlobalConfig;
 
-pub struct RustOOutput {
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum OutputGranularity {
+    #[default]
+    Lines,
+    Words,
+    Spatial,
+}
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrRunOptions {
+    #[serde(default)]
+    pub output: OutputGranularity,
+    pub line_y_threshold: Option<f32>,
+    pub word_x_threshold: Option<f32>,
+    pub text_score: Option<f32>,
+    pub classification: Option<bool>,
+    pub orientation: Option<bool>,
+}
+
+/// Image input accepted by the canonical `RustO::detect_text` API.
+#[derive(Clone, Debug)]
+pub enum ImageSource {
+    Path(PathBuf),
+    Bytes(Vec<u8>),
+}
+
+/// Result returned by the canonical `RustO::detect_text` API.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DetectTextResult {
+    Structured(Vec<crate::TextResult>),
+    Spatial(String),
+}
+
+#[allow(dead_code)]
+pub(crate) struct RustOOutput {
     pub boxes: Vec<[Point2f; 4]>,
     pub txts: Vec<String>,
     pub scores: Vec<f32>,
+    /// Aligned words for each recognized detection box. Each inner vector is
+    /// one recognizer line; its element boundaries include explicit whitespace.
     pub word_results: Vec<Vec<(String, f32, [Point2f; 4])>>,
     pub orientation: Option<Orientation>,
     pub elapse_det: f64,
@@ -46,8 +85,8 @@ pub struct RustO {
 }
 
 impl RustO {
-    /// Create a new OCR engine with the given configuration
-    pub fn new(config: RustOConfig) -> Result<Self, EngineError> {
+    /// Initialize an OCR engine with static model/session configuration.
+    pub fn initialize(config: InitializeConfig) -> Result<Self, EngineError> {
         let det = TextDetector::new(config.det.clone())?;
         let rec = TextRecognizer::new(config.rec.clone())?;
         let cal_rec_boxes = CalRecBoxes::new();
@@ -90,28 +129,74 @@ impl RustO {
         })
     }
 
-    /// Convenience constructor for PPOCRv5 models with minimal configuration
-    pub fn new_ppv5<P: AsRef<Path>>(
-        det_model: P,
-        rec_model: P,
-        dict_path: P,
-    ) -> Result<Self, EngineError> {
-        let config = RustOConfig::new_ppv5(
-            det_model.as_ref().to_path_buf(),
-            rec_model.as_ref().to_path_buf(),
-            dict_path.as_ref().to_path_buf(),
-        );
-        Self::new(config)
+    /// Detect text from a file path or in-memory image bytes.
+    ///
+    /// `lines` and `words` produce structured results; `spatial` produces
+    /// formatted spatial text. Request options never mutate this engine.
+    pub fn detect_text(
+        &mut self,
+        source: &ImageSource,
+        options: &OcrRunOptions,
+    ) -> Result<DetectTextResult, EngineError> {
+        let output = match source {
+            ImageSource::Path(path) => self.run_with_options(path, options)?,
+            ImageSource::Bytes(bytes) => {
+                #[cfg(not(feature = "use-opencv"))]
+                {
+                    let image = image::load_from_memory(bytes)
+                        .map_err(|error| EngineError::ImageError(error.to_string()))?;
+                    self.run_on_mat_with_options(&Mat::new(image), options)?
+                }
+                #[cfg(feature = "use-opencv")]
+                {
+                    return Err(EngineError::ImageError(
+                        "in-memory image sources require the pure Rust image backend".into(),
+                    ));
+                }
+            }
+        };
+        match options.output {
+            OutputGranularity::Spatial => Ok(DetectTextResult::Spatial(
+                output.to_spatial_text(options.line_y_threshold, options.word_x_threshold),
+            )),
+            OutputGranularity::Lines | OutputGranularity::Words => Ok(
+                DetectTextResult::Structured(output.to_text_results_with_options(options)),
+            ),
+        }
     }
 
-    /// Run OCR on an image file (convenience wrapper for run_on_mat)
-    pub fn run<P: AsRef<Path>>(&mut self, image_path: P) -> Result<RustOOutput, EngineError> {
+    pub(crate) fn run_with_options<P: AsRef<Path>>(
+        &mut self,
+        image_path: P,
+        options: &OcrRunOptions,
+    ) -> Result<RustOOutput, EngineError> {
         use crate::image_impl::imread;
         let img = imread(image_path)?;
-        self.run_on_mat(&img)
+        self.run_on_mat_with_options(&img, options)
+    }
+    pub(crate) fn run_on_mat_with_options(
+        &mut self,
+        img: &Mat,
+        options: &OcrRunOptions,
+    ) -> Result<RustOOutput, EngineError> {
+        let mut effective = self.global.clone();
+        effective.return_word_box = options.output == OutputGranularity::Words;
+        effective.return_single_char_box = false;
+        effective.use_cls = options.classification.unwrap_or(false) && self.cls.is_some();
+        effective.use_orient = options.orientation.unwrap_or(false) && self.orient.is_some();
+        effective.use_unwarp = false;
+        if let Some(value) = options.text_score {
+            effective.text_score = value;
+        }
+        self.run_on_mat_with_global(img, &effective)
     }
 
-    pub fn run_on_mat(&mut self, img: &Mat) -> Result<RustOOutput, EngineError> {
+
+    fn run_on_mat_with_global(
+        &mut self,
+        img: &Mat,
+        global: &GlobalConfig,
+    ) -> Result<RustOOutput, EngineError> {
         let size = img.size()?;
         let ori_h = size.height;
         let ori_w = size.width;
@@ -123,7 +208,7 @@ impl RustO {
         // Step 1: Orientation classification and correction (if enabled)
         // Apply to ENTIRE image before detection
         let mut working_img = img.clone();
-        if self.global.use_orient && self.orient.is_some() {
+        if global.use_orient && self.orient.is_some() {
             if let Some(orient_classifier) = &mut self.orient {
                 let orient_result = orient_classifier.classify(img)?;
                 elapse_orient = orient_result.elapse;
@@ -131,7 +216,7 @@ impl RustO {
                 // Apply rotation for internal processing if orientation detected
                 if orient_result.orientation.degrees() != 0 {
                     let rotated = orient_result.orientation.rotate_image(&working_img)?;
-                    if self.global.debug_images {
+                    if global.debug_images {
                         debug_oriented_image = Some(rotated.clone());
                     }
                     working_img = rotated;
@@ -149,11 +234,8 @@ impl RustO {
         let mut op_record: OpRecord = OpRecord::new();
 
         // Step 2: Global resize within bounds (use corrected image)
-        let (resized, ratio_h, ratio_w) = resize_image_within_bounds(
-            &working_img,
-            self.global.min_side_len,
-            self.global.max_side_len,
-        )?;
+        let (resized, ratio_h, ratio_w) =
+            resize_image_within_bounds(&working_img, global.min_side_len, global.max_side_len)?;
         let mut m = std::collections::BTreeMap::new();
         m.insert("ratio_h".to_string(), ratio_h);
         m.insert("ratio_w".to_string(), ratio_w);
@@ -163,8 +245,8 @@ impl RustO {
         let (padded, op_record) = apply_vertical_padding(
             &resized,
             op_record,
-            self.global.width_height_ratio,
-            self.global.min_height,
+            global.width_height_ratio,
+            global.min_height,
         )?;
 
         // Detection (boxes are in padded-image coordinates here)
@@ -183,8 +265,8 @@ impl RustO {
                     elapse_rec: 0.0,
                     elapse_orient,
                     debug_oriented_image,
-                    y_threshold_multiplier: self.global.y_threshold_multiplier,
-                    x_threshold_multiplier: self.global.x_threshold_multiplier,
+                    y_threshold_multiplier: global.y_threshold_multiplier,
+                    x_threshold_multiplier: global.x_threshold_multiplier,
                 });
             }
         };
@@ -198,7 +280,7 @@ impl RustO {
 
         // Step 4.5: Text Line Orientation Classification (CLS) on cropped images
         // If enabled, classify each crop and rotate if needed (0 vs 180 degrees)
-        if self.global.use_cls && self.cls.is_some() {
+        if global.use_cls && self.cls.is_some() {
             if let Some(cls_classifier) = &mut self.cls {
                 for crop in &mut crop_imgs {
                     if let Ok(cls_result) = cls_classifier.classify(crop) {
@@ -221,13 +303,12 @@ impl RustO {
         map_boxes_to_original(&mut boxes, &op_record, ori_h, ori_w);
 
         // Recognition
-        let rec_res: TextRecOutput = self.rec.run(&crop_imgs, self.global.return_word_box)?;
+        let rec_res: TextRecOutput = self.rec.run(&crop_imgs, global.return_word_box)?;
 
         // Optional word boxes (computed before we move fields out of rec_res)
-        let word_results_all: Vec<Vec<(String, f32, [Point2f; 4])>> = if self.global.return_word_box
-        {
+        let word_results_all: Vec<Vec<(String, f32, [Point2f; 4])>> = if global.return_word_box {
             self.cal_rec_boxes
-                .calc_word_boxes(&boxes, &rec_res, self.global.return_single_char_box)
+                .calc_word_boxes(&boxes, &rec_res, global.return_single_char_box)
         } else {
             vec![Vec::new(); boxes.len()]
         };
@@ -246,7 +327,7 @@ impl RustO {
             .zip(txts.drain(..).zip(scores.drain(..)))
             .enumerate()
         {
-            if s < self.global.text_score {
+            if s < global.text_score {
                 continue;
             }
             f_boxes.push(b);
@@ -270,21 +351,150 @@ impl RustO {
             elapse_rec: rec_res.elapse,
             elapse_orient,
             debug_oriented_image,
-            y_threshold_multiplier: self.global.y_threshold_multiplier,
-            x_threshold_multiplier: self.global.x_threshold_multiplier,
+            y_threshold_multiplier: global.y_threshold_multiplier,
+            x_threshold_multiplier: global.x_threshold_multiplier,
         })
     }
 
-    /// Set optional orient classifier
-    pub fn with_orient(mut self, orient: OrientClassifier) -> Self {
-        self.orient = Some(orient);
-        self
+}
+
+struct AlignedWord {
+    result: crate::TextResult,
+    /// Recognizer emitted whitespace before this entry. Spatial merging must
+    /// never cross this boundary.
+    whitespace_before: bool,
+}
+
+fn group_words(
+    word_lines: Vec<Vec<crate::TextResult>>,
+    line_y_threshold: f32,
+    word_x_threshold: f32,
+) -> Vec<crate::TextResult> {
+    let mut words: Vec<AlignedWord> = word_lines
+        .into_iter()
+        .flat_map(|line| {
+            line.into_iter()
+                .enumerate()
+                .map(|(index, result)| AlignedWord {
+                    result,
+                    whitespace_before: index > 0,
+                })
+        })
+        .collect();
+    if words.is_empty() {
+        return Vec::new();
+    }
+    let mut heights: Vec<f32> = words.iter().map(|word| word.result.frame.height).collect();
+    heights.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let line_tolerance = heights[heights.len() / 2] * line_y_threshold;
+    words.sort_by(|a, b| {
+        a.result
+            .frame
+            .top
+            .partial_cmp(&b.result.frame.top)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(
+                a.result
+                    .frame
+                    .left
+                    .partial_cmp(&b.result.frame.left)
+                    .unwrap_or(std::cmp::Ordering::Equal),
+            )
+    });
+    let mut lines: Vec<Vec<AlignedWord>> = Vec::new();
+    for word in words {
+        if let Some(line) = lines.last_mut() {
+            let center = line
+                .iter()
+                .map(|item| item.result.frame.top + item.result.frame.height / 2.0)
+                .sum::<f32>()
+                / line.len() as f32;
+            if ((word.result.frame.top + word.result.frame.height / 2.0) - center).abs()
+                <= line_tolerance
+            {
+                line.push(word);
+                continue;
+            }
+        }
+        lines.push(vec![word]);
+    }
+    lines
+        .into_iter()
+        .flat_map(|mut line| {
+            line.sort_by(|a, b| {
+                a.result
+                    .frame
+                    .left
+                    .partial_cmp(&b.result.frame.left)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            let mut grouped: Vec<Vec<crate::TextResult>> = Vec::new();
+            for word in line {
+                let char_width = (word.result.frame.width
+                    / word.result.text.chars().count().max(1) as f32)
+                    .max(1e-6);
+                if !word.whitespace_before {
+                    if let Some(current) = grouped.last_mut() {
+                        let previous = current.last().expect("non-empty word group");
+                        let gap =
+                            word.result.frame.left - (previous.frame.left + previous.frame.width);
+                        if gap <= char_width * word_x_threshold {
+                            current.push(word.result);
+                            continue;
+                        }
+                    }
+                }
+                grouped.push(vec![word.result]);
+            }
+            grouped
+                .into_iter()
+                .map(|group| merge_text_results(group, ""))
+        })
+        .collect()
+}
+
+fn merge_text_results(mut entries: Vec<crate::TextResult>, separator: &str) -> crate::TextResult {
+    entries.sort_by(|a, b| {
+        a.frame
+            .left
+            .partial_cmp(&b.frame.left)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let text = entries
+        .iter()
+        .map(|item| item.text.as_str())
+        .collect::<Vec<_>>()
+        .join(separator);
+    let score = entries.iter().map(|item| item.score).fold(1.0, f32::min);
+    let left = entries
+        .iter()
+        .map(|item| item.frame.left)
+        .fold(f32::INFINITY, f32::min);
+    let top = entries
+        .iter()
+        .map(|item| item.frame.top)
+        .fold(f32::INFINITY, f32::min);
+    let right = entries
+        .iter()
+        .map(|item| item.frame.left + item.frame.width)
+        .fold(f32::NEG_INFINITY, f32::max);
+    let bottom = entries
+        .iter()
+        .map(|item| item.frame.top + item.frame.height)
+        .fold(f32::NEG_INFINITY, f32::max);
+    let box_points = [(left, top), (right, top), (right, bottom), (left, bottom)];
+    crate::TextResult {
+        text,
+        score,
+        box_points,
+        frame: crate::Frame::from_points(&box_points),
     }
 }
 
+#[allow(dead_code)]
 impl RustOOutput {
     /// Convert output into a list of TextResult with bounding box and frame
-    pub fn to_text_results(&self) -> Vec<crate::TextResult> {
+    pub(crate) fn to_text_results(&self) -> Vec<crate::TextResult> {
         let mut results = Vec::with_capacity(self.boxes.len());
         for (i, bbox) in self.boxes.iter().enumerate() {
             if i >= self.txts.len() || i >= self.scores.len() {
@@ -307,11 +517,118 @@ impl RustOOutput {
         results
     }
 
+    pub(crate) fn to_text_results_with_options(&self, options: &OcrRunOptions) -> Vec<crate::TextResult> {
+        if options.output == OutputGranularity::Words {
+            let word_lines: Vec<Vec<crate::TextResult>> = self
+                .word_results
+                .iter()
+                .map(|words| {
+                    words
+                        .iter()
+                        .map(|(text, score, quad)| {
+                            let box_points = [
+                                (quad[0].x, quad[0].y),
+                                (quad[1].x, quad[1].y),
+                                (quad[2].x, quad[2].y),
+                                (quad[3].x, quad[3].y),
+                            ];
+                            crate::TextResult {
+                                text: text.clone(),
+                                score: *score,
+                                box_points,
+                                frame: crate::Frame::from_points(&box_points),
+                            }
+                        })
+                        .collect()
+                })
+                .collect();
+            return group_words(
+                word_lines,
+                options.line_y_threshold.unwrap_or(0.5),
+                options.word_x_threshold.unwrap_or(0.4),
+            );
+        }
+        let mut entries = self.to_text_results();
+        if entries.is_empty() {
+            return entries;
+        }
+        let mut heights: Vec<f32> = entries.iter().map(|entry| entry.frame.height).collect();
+        heights.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let tolerance = heights[heights.len() / 2] * options.line_y_threshold.unwrap_or(0.5);
+        entries.sort_by(|a, b| {
+            a.frame
+                .top
+                .partial_cmp(&b.frame.top)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(
+                    a.frame
+                        .left
+                        .partial_cmp(&b.frame.left)
+                        .unwrap_or(std::cmp::Ordering::Equal),
+                )
+        });
+        let mut lines: Vec<Vec<crate::TextResult>> = Vec::new();
+        for entry in entries {
+            if let Some(line) = lines.last_mut() {
+                let y = line
+                    .iter()
+                    .map(|item| item.frame.top + item.frame.height / 2.0)
+                    .sum::<f32>()
+                    / line.len() as f32;
+                if ((entry.frame.top + entry.frame.height / 2.0) - y).abs() <= tolerance {
+                    line.push(entry);
+                    continue;
+                }
+            }
+            lines.push(vec![entry]);
+        }
+        lines
+            .into_iter()
+            .map(|mut line| {
+                line.sort_by(|a, b| {
+                    a.frame
+                        .left
+                        .partial_cmp(&b.frame.left)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+                let text = line
+                    .iter()
+                    .map(|item| item.text.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let score = line.iter().map(|item| item.score).fold(1.0, f32::min);
+                let left = line
+                    .iter()
+                    .map(|item| item.frame.left)
+                    .fold(f32::INFINITY, f32::min);
+                let top = line
+                    .iter()
+                    .map(|item| item.frame.top)
+                    .fold(f32::INFINITY, f32::min);
+                let right = line
+                    .iter()
+                    .map(|item| item.frame.left + item.frame.width)
+                    .fold(f32::NEG_INFINITY, f32::max);
+                let bottom = line
+                    .iter()
+                    .map(|item| item.frame.top + item.frame.height)
+                    .fold(f32::NEG_INFINITY, f32::max);
+                let box_points = [(left, top), (right, top), (right, bottom), (left, bottom)];
+                crate::TextResult {
+                    text,
+                    score,
+                    box_points,
+                    frame: crate::Frame::from_points(&box_points),
+                }
+            })
+            .collect()
+    }
+
     /// Export raw OCR results as ASCII format
     /// Format: [x,y] confidence% text
     /// X,Y are from top-left point of bounding box
     /// Sorted by Y position first, then X position (follows raw_to_csv.py)
-    pub fn to_raw(&self) -> String {
+    pub(crate) fn to_raw(&self) -> String {
         if self.boxes.is_empty() {
             return String::new();
         }
@@ -352,7 +669,7 @@ impl RustOOutput {
     /// Export OCR results as CSV format
     /// Format: line_id,column_id,text
     /// Groups text by Y position into lines, then by X gaps into columns
-    pub fn to_csv(&self) -> String {
+    pub(crate) fn to_csv(&self) -> String {
         if self.boxes.is_empty() {
             return "line_id,column_id,text\n".to_string();
         }
@@ -477,7 +794,7 @@ impl RustOOutput {
     }
 
     /// Export results as plain text with position info
-    pub fn to_text_with_position(&self) -> String {
+    pub(crate) fn to_text_with_position(&self) -> String {
         let mut result = String::new();
 
         // Sort by position
@@ -518,22 +835,22 @@ impl RustOOutput {
     }
 
     /// Export OCR results as spatial text with intelligent spacing and line breaks
-    /// 
+    ///
     /// This method formats text based on the spatial position of bounding boxes,
     /// constructing lines by mapping spatial coordinates to character positions.
     /// It ensures that all separate bounding boxes are separated by at least one space.
-    /// 
+    ///
     /// # Parameters
-    /// 
+    ///
     /// * `y_threshold_multiplier` - Multiplier for average box height to determine line breaks.
     ///   Default is 0.5. Higher values create fewer line breaks.
     /// * `x_threshold_multiplier` - Unused in this new algorithm (kept for API compatibility).
     ///   Spacing is now determined by exact spatial mapping + minimum separation.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// Formatted text string with spaces and newlines inserted based on spatial positioning.
-    pub fn to_spatial_text(
+    pub(crate) fn to_spatial_text(
         &self,
         y_threshold_multiplier: Option<f32>,
         x_threshold_multiplier: Option<f32>,
@@ -566,8 +883,12 @@ impl RustOOutput {
             .map(|(bbox, text)| {
                 let x = bbox[0].x;
                 let y = bbox[0].y;
-                let width = (bbox[1].x - bbox[0].x).abs().max((bbox[2].x - bbox[3].x).abs());
-                let height = (bbox[3].y - bbox[0].y).abs().max((bbox[2].y - bbox[1].y).abs());
+                let width = (bbox[1].x - bbox[0].x)
+                    .abs()
+                    .max((bbox[2].x - bbox[3].x).abs());
+                let height = (bbox[3].y - bbox[0].y)
+                    .abs()
+                    .max((bbox[2].y - bbox[1].y).abs());
                 Token {
                     x,
                     y,
@@ -618,7 +939,7 @@ impl RustOOutput {
         for token in tokens {
             if !current_line.is_empty() {
                 let current_line_avg_y = current_line_y_sum / current_line.len() as f32;
-                
+
                 if (token.y - current_line_avg_y).abs() <= y_tolerance {
                     current_line.push(token.clone());
                     current_line_y_sum += token.y;
@@ -637,11 +958,10 @@ impl RustOOutput {
         }
 
         // Build output using cursor-based approach
-     // Note: Need to verify if `prev_line_avg_y` below needs update to `prev_line_avg_cy` logic.
-     // In the existing code block below this chunk, `prev_line_avg_y` uses `t.y`.
-     // I should leave `t.y` logic for blank lines or update it?
-     // The chunk ends before that logic, so I'm safe, but I should check the subsequent context.
-
+        // Note: Need to verify if `prev_line_avg_y` below needs update to `prev_line_avg_cy` logic.
+        // In the existing code block below this chunk, `prev_line_avg_y` uses `t.y`.
+        // I should leave `t.y` logic for blank lines or update it?
+        // The chunk ends before that logic, so I'm safe, but I should check the subsequent context.
 
         // Build output using cursor-based approach
         let mut result = String::new();
@@ -649,7 +969,11 @@ impl RustOOutput {
 
         // Determine the global min_x to avoid huge left padding
         let min_x = if !lines.is_empty() {
-             lines.iter().flatten().map(|t| t.x).fold(f32::INFINITY, f32::min)
+            lines
+                .iter()
+                .flatten()
+                .map(|t| t.x)
+                .fold(f32::INFINITY, f32::min)
         } else {
             0.0
         };
@@ -665,7 +989,8 @@ impl RustOOutput {
                 let vertical_gap = current_line_avg_y - prev_y;
                 // If gap is significantly larger than 1 line height, add blank lines
                 if vertical_gap > median_height * 1.5 {
-                    let num_blank_lines = ((vertical_gap - median_height) / median_height).round() as usize;
+                    let num_blank_lines =
+                        ((vertical_gap - median_height) / median_height).round() as usize;
                     for _ in 0..num_blank_lines.max(1) - 1 {
                         result.push('\n');
                     }
@@ -680,14 +1005,14 @@ impl RustOOutput {
             // Render line
             let mut current_char_pos: f32 = 0.0;
             let mut prev_token_end_x: f32 = min_x;
-            
+
             for (i, token) in line_sorted.iter().enumerate() {
                 // Determine target position in characters relative to min_x
-                // But we don't want strict grid alignment for the *start* of the line, 
+                // But we don't want strict grid alignment for the *start* of the line,
                 // just relative spacing. Or do we want indentation?
                 // Let's preserve indentation relative to min_x.
                 let target_char_pos = (token.x - min_x) / avg_char_width;
-                
+
                 // Calculate spaces to add
                 let spaces_needed = if i == 0 {
                     // For first item, just indentation (can be 0)
@@ -695,19 +1020,19 @@ impl RustOOutput {
                 } else {
                     // For subsequent items, check physical gap
                     let physical_gap = token.x - prev_token_end_x;
-                    
+
                     if physical_gap < x_gap_threshold {
-                         // Compact spacing for small gaps (standard word separation)
-                         1.0
+                        // Compact spacing for small gaps (standard word separation)
+                        1.0
                     } else {
-                         // Spatial spacing for large gaps
-                         target_char_pos - current_char_pos
+                        // Spatial spacing for large gaps
+                        target_char_pos - current_char_pos
                     }
                 };
-                
+
                 // Enforce minimum 1 space separation for subsequent items
                 let spaces_to_insert = if i > 0 {
-                     spaces_needed.round().max(1.0) as usize
+                    spaces_needed.round().max(1.0) as usize
                 } else {
                     // Indentation
                     spaces_needed.round() as usize
@@ -718,7 +1043,7 @@ impl RustOOutput {
                 }
 
                 result.push_str(&token.text);
-                
+
                 // Update cursor position:
                 current_char_pos += spaces_to_insert as f32 + token.text.len() as f32;
                 prev_token_end_x = token.x + token.width;

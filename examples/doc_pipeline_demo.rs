@@ -1,6 +1,6 @@
 use clap::Parser;
 use rusto::{
-    DocPipeline, DocPipelineConfig, LayoutConfig, RustOConfig, TableDetectorConfig,
+    DocPipeline, DocPipelineConfig, LayoutConfig, InitializeConfig, TableDetectorConfig,
     TableModelType, TableStructureConfig,
 };
 use std::fs;
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let layout_config = LayoutConfig::default(args.layout_model.clone());
-    let ocr_config = RustOConfig::new_ppv5(args.det_model, args.rec_model, args.keys_path);
+    let ocr_config = InitializeConfig::ppv5(args.det_model, args.rec_model, args.keys_path);
 
     // Configure table recognition if enabled
     let (table_detector, table_recognizer) = if args.table {

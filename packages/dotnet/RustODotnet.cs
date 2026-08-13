@@ -154,7 +154,7 @@ namespace RustODotnet
         public float? XThresholdMultiplier { get; set; }
     }
 
-    public class RustOConfig
+    public class InitializeConfig
     {
         [JsonPropertyName("template")]
         public string Template { get; set; }
@@ -173,19 +173,75 @@ namespace RustODotnet
         [JsonPropertyName("layout")]
         public LayoutConfig Layout { get; set; }
 
-        public RustOConfig() { }
+        public InitializeConfig() { }
 
-        public static RustOConfig Ppv6(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
-            new RustOConfig { Template = "ppv6", Detection = detection, Recognition = recognition };
+        public static InitializeConfig Ppv6(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
+            new InitializeConfig { Template = "ppv6", Detection = detection, Recognition = recognition };
 
-        public static RustOConfig Ppv5(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
-            new RustOConfig { Template = "ppv5", Detection = detection, Recognition = recognition };
+        public static InitializeConfig Ppv5(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
+            new InitializeConfig { Template = "ppv5", Detection = detection, Recognition = recognition };
 
-        public static RustOConfig Ppv4(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
-            new RustOConfig { Template = "ppv4", Detection = detection, Recognition = recognition };
+        public static InitializeConfig Ppv4(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
+            new InitializeConfig { Template = "ppv4", Detection = detection, Recognition = recognition };
 
-        public static RustOConfig Ppv3(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
-            new RustOConfig { Template = "ppv3", Detection = detection, Recognition = recognition };
+        public static InitializeConfig Ppv3(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
+            new InitializeConfig { Template = "ppv3", Detection = detection, Recognition = recognition };
+    }
+
+    /// <summary>
+    /// Per-request OCR output and pipeline options. These options do not alter
+    /// engine configuration or later requests.
+    /// </summary>
+    public enum OutputGranularity
+    {
+        Lines,
+        Words,
+        Spatial,
+    }
+
+    /// <summary>Per-request OCR output and pipeline options.</summary>
+    public class OcrRunOptions
+    {
+        [JsonIgnore]
+        public OutputGranularity Output { get; set; } = OutputGranularity.Lines;
+
+        [JsonPropertyName("output")]
+        public string OutputWireValue => Output.ToString().ToLowerInvariant();
+
+        [JsonPropertyName("lineYThreshold")]
+        public float? LineYThreshold { get; set; }
+        [JsonPropertyName("wordXThreshold")]
+        public float? WordXThreshold { get; set; }
+        [JsonPropertyName("textScore")]
+        public float? TextScore { get; set; }
+        [JsonPropertyName("classification")]
+        public bool? Classification { get; set; }
+        [JsonPropertyName("orientation")]
+        public bool? Orientation { get; set; }
+    }
+
+    public abstract class ImageSource { }
+    public sealed class UriImageSource : ImageSource
+    {
+        public string Value { get; }
+        public UriImageSource(string value) => Value = value ?? throw new ArgumentNullException(nameof(value));
+    }
+    public sealed class BytesImageSource : ImageSource
+    {
+        public byte[] Value { get; }
+        public BytesImageSource(byte[] value) => Value = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
+    public abstract class DetectTextResult { }
+    public sealed class StructuredDetectTextResult : DetectTextResult
+    {
+        public IReadOnlyList<TextResult> Items { get; }
+        public StructuredDetectTextResult(IReadOnlyList<TextResult> items) => Items = items;
+    }
+    public sealed class SpatialDetectTextResult : DetectTextResult
+    {
+        public string Text { get; }
+        public SpatialDetectTextResult(string text) => Text = text;
     }
 
     public class RustOException : Exception
@@ -207,9 +263,9 @@ namespace RustODotnet
             }
         }
 
-        public RustO(RustOConfig config = null)
+        private RustO(InitializeConfig config)
         {
-            config ??= new RustOConfig();
+            config ??= new InitializeConfig();
             config.Detection ??= new DetectionConfig();
             config.Recognition ??= new RecognitionConfig();
 
@@ -233,83 +289,54 @@ namespace RustODotnet
                 DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             };
             string json = JsonSerializer.Serialize(config, options);
-            _handle = rocr_new_with_config(json);
+            _handle = rocr_initialize(json);
             if (_handle == IntPtr.Zero)
             {
                 throw new RustOException("Failed to initialize RustO with config");
             }
         }
+        public static RustO Initialize(InitializeConfig config = null) => new RustO(config);
+
         private const string LibName = "rusto";
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr rocr_new(
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string detModelPath,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string recModelPath,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string dictPath
-        );
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr rocr_new_with_config(
+        private static extern IntPtr rocr_initialize(
             [MarshalAs(UnmanagedType.LPUTF8Str)] string configJson
         );
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int rocr_ocr_file(
+        private static extern int rocr_detect_text_file(
             IntPtr handle,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string imagePath,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string optionsJson,
             out IntPtr results,
             out nuint count
         );
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int rocr_ocr_file_with_output(
+        private static extern IntPtr rocr_detect_text_file_spatial(
             IntPtr handle,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string imagePath,
-            out IntPtr output
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string optionsJson
         );
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int rocr_ocr_data(
+        private static extern int rocr_detect_text_data(
             IntPtr handle,
             byte[] imageData,
             nuint imageLen,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string optionsJson,
             out IntPtr results,
             out nuint count
         );
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int rocr_ocr_data_with_output(
+        private static extern IntPtr rocr_detect_text_data_spatial(
             IntPtr handle,
             byte[] imageData,
             nuint imageLen,
-            out IntPtr output
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string optionsJson
         );
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr rocr_output_to_raw(IntPtr output);
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr rocr_output_to_csv(IntPtr output);
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr rocr_output_to_text_with_position(IntPtr output);
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr rocr_output_to_spatial_text(
-            IntPtr output,
-            float yThresholdMultiplier,
-            float xThresholdMultiplier
-        );
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int rocr_output_get_results(
-            IntPtr output,
-            out IntPtr results,
-            out nuint count
-        );
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern void rocr_free_output(IntPtr output);
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
         private static extern void rocr_free_string(IntPtr str);
@@ -351,152 +378,106 @@ namespace RustODotnet
             return path;
         }
 
-        public List<TextResult> RecognizeFile(string imagePath)
+        public DetectTextResult DetectText(ImageSource source, OcrRunOptions options = null)
         {
             ThrowIfDisposed();
+            options ??= new OcrRunOptions();
+            return options.Output == OutputGranularity.Spatial
+                ? new SpatialDetectTextResult(DetectSpatialText(source, options))
+                : new StructuredDetectTextResult(DetectStructuredText(source, options));
+        }
 
-            int status = rocr_ocr_file(_handle, imagePath, out IntPtr resultsPtr, out nuint count);
-            if (status != 0)
+        private List<TextResult> DetectStructuredText(ImageSource source, OcrRunOptions options)
+        {
+            string optionsJson = SerializeStructuredOptions(options);
+            int status;
+            IntPtr resultsPtr;
+            nuint count;
+            switch (source)
             {
-                throw new RustOException($"OCR failed with status code: {status}");
+                case UriImageSource uri:
+                    status = rocr_detect_text_file(_handle, uri.Value, optionsJson, out resultsPtr, out count);
+                    break;
+                case BytesImageSource bytes when bytes.Value != null:
+                    status = rocr_detect_text_data(_handle, bytes.Value, (nuint)bytes.Value.Length, optionsJson, out resultsPtr, out count);
+                    break;
+                default:
+                    throw new ArgumentException("ImageSource must contain a URI or image bytes.", nameof(source));
             }
+            if (status != 0) throw new RustOException($"Text detection failed with status code: {status}");
+            try { return MarshalResults(resultsPtr, checked((int)count)); }
+            finally { rocr_free_results(resultsPtr, count); }
+        }
 
-            try
+        private string DetectSpatialText(ImageSource source, OcrRunOptions options)
+        {
+            string optionsJson = SerializeSpatialOptions(options);
+            IntPtr textPtr = source switch
             {
-                return MarshalResults(resultsPtr, (int)count);
+                UriImageSource uri => rocr_detect_text_file_spatial(_handle, uri.Value, optionsJson),
+                BytesImageSource bytes when bytes.Value != null => rocr_detect_text_data_spatial(_handle, bytes.Value, (nuint)bytes.Value.Length, optionsJson),
+                _ => throw new ArgumentException("ImageSource must contain a URI or image bytes.", nameof(source)),
+            };
+            if (textPtr == IntPtr.Zero) throw new RustOException("Text detection failed while producing spatial text.");
+            try { return Marshal.PtrToStringUTF8(textPtr) ?? string.Empty; }
+            finally { rocr_free_string(textPtr); }
+        }
+
+        private static string SerializeStructuredOptions(OcrRunOptions options)
+        {
+            ValidateOptions(options, allowSpatial: false);
+            return SerializeOptions(options, options.Output);
+        }
+
+        private static string SerializeSpatialOptions(OcrRunOptions options)
+        {
+            options ??= new OcrRunOptions();
+            ValidateOptions(options, allowSpatial: true);
+            return SerializeOptions(options, OutputGranularity.Spatial);
+        }
+
+        private static string SerializeOptions(OcrRunOptions options, OutputGranularity output)
+        {
+            var serialized = new OcrRunOptions
+            {
+                Output = output,
+                LineYThreshold = options.LineYThreshold,
+                WordXThreshold = options.WordXThreshold,
+                TextScore = options.TextScore,
+                Classification = options.Classification,
+                Orientation = options.Orientation,
+            };
+            return JsonSerializer.Serialize(serialized, new JsonSerializerOptions
+            {
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            });
+        }
+
+        private static void ValidateOptions(OcrRunOptions options, bool allowSpatial)
+        {
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            OutputGranularity output = options.Output;
+            if (!allowSpatial && output == OutputGranularity.Spatial)
+            {
+                throw new RustOException("Structured recognition does not support output 'spatial'. Use DetectText with OutputGranularity.Spatial.");
             }
-            finally
+            if (!allowSpatial && output != OutputGranularity.Lines && output != OutputGranularity.Words)
             {
-                rocr_free_results(resultsPtr, count);
+                throw new RustOException($"Invalid output '{output}'. Use OutputGranularity.Lines or OutputGranularity.Words.");
             }
-        }
-
-        public List<TextResult> Recognize(byte[] imageData)
-        {
-            ThrowIfDisposed();
-
-            int status = rocr_ocr_data(_handle, imageData, (nuint)imageData.Length, 
-                out IntPtr resultsPtr, out nuint count);
-            if (status != 0)
+            ValidateNonNegative(options.LineYThreshold, nameof(options.LineYThreshold));
+            ValidateNonNegative(options.WordXThreshold, nameof(options.WordXThreshold));
+            if (options.TextScore.HasValue && (!float.IsFinite(options.TextScore.Value) || options.TextScore.Value < 0 || options.TextScore.Value > 1))
             {
-                throw new RustOException($"OCR failed with status code: {status}");
-            }
-
-            try
-            {
-                return MarshalResults(resultsPtr, (int)count);
-            }
-            finally
-            {
-                rocr_free_results(resultsPtr, count);
-            }
-        }
-
-        public string RecognizeFileToRaw(string imagePath)
-        {
-            ThrowIfDisposed();
-            return RecognizeFileWithFormat(imagePath, rocr_output_to_raw);
-        }
-
-        public string RecognizeFileToCsv(string imagePath)
-        {
-            ThrowIfDisposed();
-            return RecognizeFileWithFormat(imagePath, rocr_output_to_csv);
-        }
-
-        public string RecognizeFileToTextWithPosition(string imagePath)
-        {
-            ThrowIfDisposed();
-            return RecognizeFileWithFormat(imagePath, rocr_output_to_text_with_position);
-        }
-
-        public string RecognizeFileToSpatialText(
-            string imagePath,
-            float yThresholdMultiplier = 0.0f,
-            float xThresholdMultiplier = 0.0f)
-        {
-            ThrowIfDisposed();
-            return RecognizeFileWithFormat(imagePath, output => 
-                rocr_output_to_spatial_text(output, yThresholdMultiplier, xThresholdMultiplier));
-        }
-
-        public string RecognizeToRaw(byte[] imageData)
-        {
-            ThrowIfDisposed();
-            return RecognizeWithFormat(imageData, rocr_output_to_raw);
-        }
-
-        public string RecognizeToCsv(byte[] imageData)
-        {
-            ThrowIfDisposed();
-            return RecognizeWithFormat(imageData, rocr_output_to_csv);
-        }
-
-        public string RecognizeToTextWithPosition(byte[] imageData)
-        {
-            ThrowIfDisposed();
-            return RecognizeWithFormat(imageData, rocr_output_to_text_with_position);
-        }
-
-        public string RecognizeToSpatialText(
-            byte[] imageData,
-            float yThresholdMultiplier = 0.0f,
-            float xThresholdMultiplier = 0.0f)
-        {
-            ThrowIfDisposed();
-            return RecognizeWithFormat(imageData, output => 
-                rocr_output_to_spatial_text(output, yThresholdMultiplier, xThresholdMultiplier));
-        }
-
-        private string RecognizeFileWithFormat(string imagePath, Func<IntPtr, IntPtr> formatFunc)
-        {
-            int status = rocr_ocr_file_with_output(_handle, imagePath, out IntPtr outputPtr);
-            if (status != 0)
-            {
-                throw new RustOException($"OCR failed with status code: {status}");
-            }
-
-            try
-            {
-                IntPtr strPtr = formatFunc(outputPtr);
-                try
-                {
-                    return Marshal.PtrToStringUTF8(strPtr) ?? string.Empty;
-                }
-                finally
-                {
-                    rocr_free_string(strPtr);
-                }
-            }
-            finally
-            {
-                rocr_free_output(outputPtr);
+                throw new RustOException("TextScore must be finite and between 0 and 1.");
             }
         }
 
-        private string RecognizeWithFormat(byte[] imageData, Func<IntPtr, IntPtr> formatFunc)
+        private static void ValidateNonNegative(float? value, string name)
         {
-            int status = rocr_ocr_data_with_output(_handle, imageData, (nuint)imageData.Length, out IntPtr outputPtr);
-            if (status != 0)
+            if (value.HasValue && (!float.IsFinite(value.Value) || value.Value < 0))
             {
-                throw new RustOException($"OCR failed with status code: {status}");
-            }
-
-            try
-            {
-                IntPtr strPtr = formatFunc(outputPtr);
-                try
-                {
-                    return Marshal.PtrToStringUTF8(strPtr) ?? string.Empty;
-                }
-                finally
-                {
-                    rocr_free_string(strPtr);
-                }
-            }
-            finally
-            {
-                rocr_free_output(outputPtr);
+                throw new RustOException($"{name} must be finite and non-negative.");
             }
         }
 

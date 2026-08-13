@@ -1,6 +1,5 @@
 use clap::{Parser, ValueEnum};
-use rusto::rusto_ocr::RustO as RustOCR;
-use rusto::{OrientClassifier, OrientConfig};
+use rusto::{DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, RustO};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -62,83 +61,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     // Initialize base OCR using the advanced API
-    let mut ocr = RustOCR::new_ppv5(&cli.det_model, &cli.rec_model, &cli.dict)?;
+    let mut ocr = RustO::initialize(InitializeConfig::ppv5(&cli.det_model, &cli.rec_model, &cli.dict))?;
 
-    // Add optional features
-    if cli.enable_orient {
-        if let Some(orient_path) = cli.orient_model {
-            eprintln!("Loading orientation classifier...");
-            let orient_config = OrientConfig::default(orient_path);
-            let orient = OrientClassifier::new(orient_config)?;
-            ocr.global.use_orient = true;
-            ocr = ocr.with_orient(orient);
-            eprintln!("✓ Orientation classifier enabled");
-        } else {
-            eprintln!("Warning: --enable-orient specified but --orient-model not provided");
-        }
+    if cli.enable_orient || cli.orient_model.is_some() || cli.enable_unwarp || cli.unwarp_model.is_some() {
+        eprintln!("Warning: CLI optional stages are not configured by this canonical API command.");
     }
 
     // Layout detection removed
 
     // Run OCR
     eprintln!("Processing image...");
-    let result = ocr.run(&cli.image)?;
+    let detected = ocr.detect_text(
+        &ImageSource::Path(cli.image.clone()),
+        &OcrRunOptions::default(),
+    )?;
+    let DetectTextResult::Structured(results) = detected else {
+        unreachable!("default OCR output is structured lines");
+    };
     eprintln!("✓ OCR completed");
 
-    // Output results based on format
+    // Output projected text results.
     match cli.format {
-        OutputFormat::Json => {
-            let json_output = serde_json::json!({
-                "boxes": result.boxes.iter().map(|b| vec![
-                    vec![b[0].x, b[0].y],
-                    vec![b[1].x, b[1].y],
-                    vec![b[2].x, b[2].y],
-                    vec![b[3].x, b[3].y],
-                ]).collect::<Vec<_>>(),
-                "txts": result.txts,
-                "scores": result.scores,
-                "orientation": result.orientation.as_ref().map(|o| o.degrees()),
-                // "layout_regions" removed
-                "elapse": {
-                    "detection": result.elapse_det,
-                    "recognition": result.elapse_rec,
-                    "orientation": result.elapse_orient,
-                    // "layout" removed
-                },
-            });
-            println!("{}", serde_json::to_string_pretty(&json_output)?);
-        }
-        OutputFormat::Text => {
-            for text in &result.txts {
-                println!("{}", text);
+        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&results)?),
+        OutputFormat::Text | OutputFormat::TextOrdered => {
+            for result in &results {
+                println!("{}", result.text);
             }
         }
         OutputFormat::Tsv => {
-            for (i, text) in result.txts.iter().enumerate() {
-                let bbox = &result.boxes[i];
-                let score = result.scores[i];
-                let box_str = format!(
-                    "{:.1},{:.1},{:.1},{:.1},{:.1},{:.1},{:.1},{:.1}",
-                    bbox[0].x,
-                    bbox[0].y,
-                    bbox[1].x,
-                    bbox[1].y,
-                    bbox[2].x,
-                    bbox[2].y,
-                    bbox[3].x,
-                    bbox[3].y,
+            for result in &results {
+                let box_points = result.box_points;
+                println!(
+                    "{}\t{:.3}\t{:.1},{:.1},{:.1},{:.1},{:.1},{:.1},{:.1},{:.1}",
+                    result.text,
+                    result.score,
+                    box_points[0].0,
+                    box_points[0].1,
+                    box_points[1].0,
+                    box_points[1].1,
+                    box_points[2].0,
+                    box_points[2].1,
+                    box_points[3].0,
+                    box_points[3].1,
                 );
-                println!("{}\t{:.3}\t{}", text, score, box_str);
             }
         }
         OutputFormat::Markdown => {
-            // Markdown format removed - use plain text with code block
             println!("```");
-            println!("{}", result.to_raw());
+            for result in &results {
+                println!("{}", result.text);
+            }
             println!("```");
-        }
-        OutputFormat::TextOrdered => {
-            println!("{}", result.to_raw());
         }
     }
 

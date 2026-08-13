@@ -58,7 +58,7 @@ sourceSets {
 }
 ```
 
-When the app runs, the `RustO.create()` method automatically extracts these assets from the APK to the app's cache directory.
+When the app runs, the `RustO.initialize()` method automatically extracts these assets from the APK to the app's cache directory.
 
 ---
 
@@ -114,8 +114,8 @@ import { initialize, detectText } from 'react-native-rusto';
 // Initialize with bundled models
 await initialize();
 
-// Perform OCR
-const results = await detectText('/path/to/image.jpg');
+// Perform OCR. `{ uri }` accepts an absolute filesystem path or file: URI.
+const results = await detectText({ uri: '/path/to/image.jpg' });
 ```
 
 ### With Custom Model Paths
@@ -123,14 +123,12 @@ const results = await detectText('/path/to/image.jpg');
 You can specify custom model paths in config:
 
 ```typescript
-// Initialize with custom models
+// Initialize with custom models.
 await initialize({
-  detection: {
-    modelPath: '/custom/path/det_model.mnn',
-  },
-  recognition: {
-    modelPath: '/custom/path/rec_model.mnn',
-    dictPath: '/custom/path/dictionary.txt',
+  models: {
+    detection: '/custom/path/det_model.mnn',
+    recognition: '/custom/path/rec_model.mnn',
+    dictionary: '/custom/path/dictionary.txt',
   },
 });
 ```
@@ -140,11 +138,11 @@ await initialize({
 You can override only specific models:
 
 ```typescript
-// Use bundled det.mnn and rec.mnn, but custom dictionary
-await initialize({ recognition: { dictPath: '/custom/path/my_dict.txt' } });
+// Use bundled detector and recognizer, but custom dictionary.
+await initialize({ models: { dictionary: '/custom/path/my_dict.txt' } });
 
-// Or use custom det model with bundled rec.mnn and dict.txt
-await initialize({ detection: { modelPath: '/custom/det.mnn' } });
+// Or use custom detector with bundled recognizer and dictionary.
+await initialize({ models: { detection: '/custom/det.mnn' } });
 ```
 
 ---
