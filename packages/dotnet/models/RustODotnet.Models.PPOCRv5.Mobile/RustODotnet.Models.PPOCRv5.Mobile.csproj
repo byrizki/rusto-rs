@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>RustODotnet.Models.PPOCRv5.Mobile</PackageId>
-    <Version>0.1.7</Version>
+    <Version>0.2.0</Version>
     <Authors>RustO Contributors</Authors>
     <Description>PP-OCRv5 mobile pre-trained MNN models for RustODotnet (~28 MB)</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

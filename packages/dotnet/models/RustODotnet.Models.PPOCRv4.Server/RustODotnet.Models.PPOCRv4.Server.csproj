@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>RustODotnet.Models.PPOCRv4.Server</PackageId>
-    <Version>0.1.7</Version>
+    <Version>0.2.0</Version>
     <Authors>RustO Contributors</Authors>
     <Description>PP-OCRv4 server pre-trained high-accuracy MNN models with orientation classifier for RustODotnet (~300 MB)</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
