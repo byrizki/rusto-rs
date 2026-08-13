@@ -28,6 +28,15 @@ done
 
 MODELSCOPE_BASE="https://www.modelscope.cn/api/v1/models/RapidAI/RapidOCR/repo?Revision=master&FilePath="
 
+# Wait for a list of PIDs; returns 1 if any failed
+wait_jobs() {
+    local failed=0
+    for pid in "$@"; do
+        wait "$pid" || failed=1
+    done
+    return $failed
+}
+
 download_file_to() {
     local dest_dir="$1"
     local filename="$2"
@@ -56,15 +65,23 @@ download_ppocrv6() {
     local dir="$2"
     echo "=== Downloading PP-OCRv6 ($tier tier) models ==="
     echo "Destination: $dir"
-    
-    download_file_to "$dir" "det.mnn" "mnn%2FPP-OCRv6%2Fdet%2FPP-OCRv6_det_${tier}.mnn"
-    download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_${tier}.mnn"
-    
+
+    local pids=()
+
+    download_file_to "$dir" "det.mnn" "mnn%2FPP-OCRv6%2Fdet%2FPP-OCRv6_det_${tier}.mnn" &
+    pids+=($!)
+
+    download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_${tier}.mnn" &
+    pids+=($!)
+
     if [ "$tier" = "tiny" ]; then
-        download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_tiny%2Fppocrv6_tiny_dict.txt"
+        download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_tiny%2Fppocrv6_tiny_dict.txt" &
     else
-        download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_small%2Fppocrv6_dict.txt"
+        download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_small%2Fppocrv6_dict.txt" &
     fi
+    pids+=($!)
+
+    wait_jobs "${pids[@]}"
 }
 
 download_ppocrv5() {
@@ -72,16 +89,28 @@ download_ppocrv5() {
     local dir="$2"
     echo "=== Downloading PP-OCRv5 ($tier tier) models ==="
     echo "Destination: $dir"
-    
-    download_file_to "$dir" "det.mnn" "mnn%2FPP-OCRv5%2Fdet%2Fch_PP-OCRv5_det_${tier}.mnn"
-    download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv5%2Frec%2Fch_PP-OCRv5_rec_${tier}.mnn"
-    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv5%2Frec%2Fch_PP-OCRv5_rec_${tier}%2Fppocrv5_dict.txt"
+
+    local pids=()
+
+    download_file_to "$dir" "det.mnn" "mnn%2FPP-OCRv5%2Fdet%2Fch_PP-OCRv5_det_${tier}.mnn" &
+    pids+=($!)
+
+    download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv5%2Frec%2Fch_PP-OCRv5_rec_${tier}.mnn" &
+    pids+=($!)
+
+    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv5%2Frec%2Fch_PP-OCRv5_rec_${tier}%2Fppocrv5_dict.txt" &
+    pids+=($!)
 
     # English rec model is only available for the mobile tier
     if [ "$tier" = "mobile" ]; then
-        download_file_to "$dir" "rec_en.mnn" "mnn%2FPP-OCRv5%2Frec%2Fen_PP-OCRv5_rec_${tier}.mnn"
-        download_file_to "$dir" "dict_en.txt" "paddle%2FPP-OCRv5%2Frec%2Fen_PP-OCRv5_rec_${tier}%2Fppocrv5_en_dict.txt"
+        download_file_to "$dir" "rec_en.mnn" "mnn%2FPP-OCRv5%2Frec%2Fen_PP-OCRv5_rec_${tier}.mnn" &
+        pids+=($!)
+
+        download_file_to "$dir" "dict_en.txt" "paddle%2FPP-OCRv5%2Frec%2Fen_PP-OCRv5_rec_${tier}%2Fppocrv5_en_dict.txt" &
+        pids+=($!)
     fi
+
+    wait_jobs "${pids[@]}"
 }
 
 download_ppocrv5_lang() {
@@ -89,9 +118,16 @@ download_ppocrv5_lang() {
     local dir="$2"
     echo "=== Downloading PP-OCRv5 ($lang) model ==="
     echo "Destination: $dir"
-    
-    download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv5%2Frec%2F${lang}_PP-OCRv5_rec_mobile.mnn"
-    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv5%2Frec%2F${lang}_PP-OCRv5_rec_mobile%2Fppocrv5_${lang}_dict.txt"
+
+    local pids=()
+
+    download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv5%2Frec%2F${lang}_PP-OCRv5_rec_mobile.mnn" &
+    pids+=($!)
+
+    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv5%2Frec%2F${lang}_PP-OCRv5_rec_mobile%2Fppocrv5_${lang}_dict.txt" &
+    pids+=($!)
+
+    wait_jobs "${pids[@]}"
 }
 
 download_ppocrv4() {
@@ -99,13 +135,31 @@ download_ppocrv4() {
     local dir="$2"
     echo "=== Downloading PP-OCRv4 ($tier tier) models ==="
     echo "Destination: $dir"
-    
-    download_file_to "$dir" "det.mnn" "mnn%2FPP-OCRv4%2Fdet%2Fch_PP-OCRv4_det_${tier}.mnn"
-    download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fch_PP-OCRv4_rec_${tier}.mnn"
-    download_file_to "$dir" "rec_en.mnn" "mnn%2FPP-OCRv4%2Frec%2Fen_PP-OCRv4_rec_${tier}.mnn"
-    download_file_to "$dir" "cls.mnn" "mnn%2FPP-OCRv4%2Fcls%2Fch_ppocr_mobile_v2.0_cls_${tier}.mnn"
-    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fch_PP-OCRv4_rec_${tier}%2Fppocr_keys_v1.txt"
-    download_file_to "$dir" "dict_en.txt" "paddle%2FPP-OCRv4%2Frec%2Fen_PP-OCRv4_rec_${tier}%2Fen_dict.txt"
+
+    local pids=()
+
+    download_file_to "$dir" "det.mnn" "mnn%2FPP-OCRv4%2Fdet%2Fch_PP-OCRv4_det_${tier}.mnn" &
+    pids+=($!)
+
+    download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fch_PP-OCRv4_rec_${tier}.mnn" &
+    pids+=($!)
+
+    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fch_PP-OCRv4_rec_${tier}%2Fppocr_keys_v1.txt" &
+    pids+=($!)
+
+    # English rec model and cls are only available for the mobile tier
+    if [ "$tier" = "mobile" ]; then
+        download_file_to "$dir" "rec_en.mnn" "mnn%2FPP-OCRv4%2Frec%2Fen_PP-OCRv4_rec_${tier}.mnn" &
+        pids+=($!)
+
+        download_file_to "$dir" "dict_en.txt" "paddle%2FPP-OCRv4%2Frec%2Fen_PP-OCRv4_rec_${tier}%2Fen_dict.txt" &
+        pids+=($!)
+
+        download_file_to "$dir" "cls.mnn" "mnn%2FPP-OCRv4%2Fcls%2Fch_ppocr_mobile_v2.0_cls_${tier}.mnn" &
+        pids+=($!)
+    fi
+
+    wait_jobs "${pids[@]}"
 }
 
 download_ppocrv4_lang() {
@@ -114,44 +168,60 @@ download_ppocrv4_lang() {
     echo "=== Downloading PP-OCRv4 ($lang) model ==="
     echo "Destination: $dir"
 
+    local pids=()
+
     case "$lang" in
         japan)
-            download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fjapan_PP-OCRv4_rec_mobile.mnn"
-            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fjapan_PP-OCRv4_rec_mobile%2Fjapan_dict.txt"
+            download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fjapan_PP-OCRv4_rec_mobile.mnn" &
+            pids+=($!)
+            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fjapan_PP-OCRv4_rec_mobile%2Fjapan_dict.txt" &
+            pids+=($!)
             ;;
         chinese_cht|chinese-cht)
-            download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fchinese_cht_PP-OCRv3_rec_mobile.mnn"
-            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fchinese_cht_PP-OCRv3_rec_mobile%2Fchinese_cht_dict.txt"
+            download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fchinese_cht_PP-OCRv3_rec_mobile.mnn" &
+            pids+=($!)
+            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fchinese_cht_PP-OCRv3_rec_mobile%2Fchinese_cht_dict.txt" &
+            pids+=($!)
             ;;
         kannada|ka)
-            download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fka_PP-OCRv4_rec_mobile.mnn"
-            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fkannada_PP-OCRv4_rec_mobile%2Fka_dict.txt"
+            download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fka_PP-OCRv4_rec_mobile.mnn" &
+            pids+=($!)
+            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fkannada_PP-OCRv4_rec_mobile%2Fka_dict.txt" &
+            pids+=($!)
             ;;
         *)
-            download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2F${lang}_PP-OCRv4_rec_mobile.mnn"
-            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2F${lang}_PP-OCRv4_rec_mobile%2F${lang}_dict.txt"
+            download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2F${lang}_PP-OCRv4_rec_mobile.mnn" &
+            pids+=($!)
+            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2F${lang}_PP-OCRv4_rec_mobile%2F${lang}_dict.txt" &
+            pids+=($!)
             ;;
     esac
+
+    wait_jobs "${pids[@]}"
 }
 
 V5_LANGS=("arabic" "cyrillic" "devanagari" "el" "eslav" "korean" "latin" "ta" "te" "th")
 V4_LANGS=("japan" "chinese_cht" "kannada")
 
 if [ "$DOWNLOAD_ALL" = true ]; then
-    download_ppocrv6 "tiny" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_tiny}"
-    download_ppocrv6 "small" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_small}"
-    download_ppocrv6 "medium" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_medium}"
-    download_ppocrv5 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_mobile}"
-    download_ppocrv5 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_server}"
-    download_ppocrv4 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_mobile}"
-    download_ppocrv4 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_server}"
+    tier_pids=()
+
+    download_ppocrv6 "tiny"   "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_tiny}"   & tier_pids+=($!)
+    download_ppocrv6 "small"  "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_small}"  & tier_pids+=($!)
+    download_ppocrv6 "medium" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_medium}" & tier_pids+=($!)
+    download_ppocrv5 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_mobile}" & tier_pids+=($!)
+    download_ppocrv5 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_server}" & tier_pids+=($!)
+    download_ppocrv4 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_mobile}" & tier_pids+=($!)
+    download_ppocrv4 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_server}" & tier_pids+=($!)
 
     for lang in "${V5_LANGS[@]}"; do
-        download_ppocrv5_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$lang}"
+        download_ppocrv5_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$lang}" & tier_pids+=($!)
     done
     for lang in "${V4_LANGS[@]}"; do
-        download_ppocrv4_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$lang}"
+        download_ppocrv4_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$lang}" & tier_pids+=($!)
     done
+
+    wait_jobs "${tier_pids[@]}"
 else
     case "$MODEL_TYPE" in
         ppocrv6)
