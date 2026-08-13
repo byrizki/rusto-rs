@@ -1,6 +1,6 @@
 [package]
 name = "rusto-mnn-sys"
-version = "0.1.7"
+version = "0.2.0"
 edition = "2021"
 description = "Low-level FFI bindings to MNN library"
 license = "MIT"

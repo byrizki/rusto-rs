@@ -9,7 +9,7 @@
 [![NuGet](https://img.shields.io/nuget/v/RustODotnet.svg?logo=nuget&logoColor=white&color=004880)](https://www.nuget.org/packages/RustODotnet)
 [![npm](https://img.shields.io/npm/v/react-native-rusto.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/react-native-rusto)
 [![CocoaPods](https://img.shields.io/cocoapods/v/RustO.svg?logo=cocoapods&logoColor=white&color=EE3322)](https://cocoapods.org/pods/RustO)
-[![Maven Central](https://img.shields.io/badge/Maven_Central-0.1.7-C71A36?logo=apache-maven&logoColor=white)](https://central.sonatype.com/artifact/com.byrizki.rusto/rusto-android)
+[![Maven Central](https://img.shields.io/maven-central/v/com.byrizki.rusto/rusto-android.svg?logo=apache-maven&logoColor=white&color=C71A36)](https://central.sonatype.com/artifact/com.byrizki.rusto/rusto-android)
 [![Build & Release](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml/badge.svg)](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
