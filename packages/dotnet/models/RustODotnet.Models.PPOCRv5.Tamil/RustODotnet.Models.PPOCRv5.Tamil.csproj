@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>RustODotnet.Models.PPOCRv5.Tamil</PackageId>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <Authors>RustO Contributors</Authors>
     <Description>PP-OCRv5 Tamil pre-trained MNN recognition model for RustODotnet</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

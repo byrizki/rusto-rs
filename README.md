@@ -146,7 +146,7 @@ cd ios && pod install
 ```groovy
 dependencies {
     // Add your preferred OCR model package:
-    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.0'
+    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.1'
 }
 ```
 
@@ -217,8 +217,8 @@ Add dependencies to `app/build.gradle`:
 
 ```groovy
 dependencies {
-    implementation 'com.github.byrizki.rusto-rs:rusto-android:v0.2.0'
-    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.0'
+    implementation 'com.github.byrizki.rusto-rs:rusto-android:v0.2.1'
+    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.1'
 }
 ```
 

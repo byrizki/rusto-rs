@@ -433,31 +433,26 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
     
-    # 7. packages/ios/RustO.podspec
-    replace_in_file(
-        REPO_ROOT / "packages" / "ios" / "RustO.podspec",
-        r'(s\.version\s*=\s*\')[^\']+(\')',
-        rf'\g<1>{new_ver}\g<2>',
-        dry_run,
-        staged_files
-    )
-    
-    # 8. packages/react-native/package.json
-    update_json_file(
-        REPO_ROOT / "packages" / "react-native" / "package.json",
-        new_ver,
-        dry_run,
-        staged_files
-    )
-    
-    # 9. packages/react-native/package-lock.json
-    if (REPO_ROOT / "packages" / "react-native" / "package-lock.json").exists():
-        update_json_file(
-            REPO_ROOT / "packages" / "react-native" / "package-lock.json",
-            new_ver,
+    # 7. packages/ios/**/*.podspec (binding package and every model subpackage)
+    ios_dir = REPO_ROOT / "packages" / "ios"
+    for podspec_file in ios_dir.rglob("*.podspec"):
+        replace_in_file(
+            podspec_file,
+            r'(s\.version\s*=\s*\')[^\']+(\')',
+            rf'\g<1>{new_ver}\g<2>',
             dry_run,
             staged_files
         )
+    
+    # 8. packages/**/package.json and sibling package-lock.json files.
+    # Excludes vendored dependencies because search starts at first-party packages/.
+    packages_dir = REPO_ROOT / "packages"
+    for package_json_file in packages_dir.rglob("package.json"):
+        update_json_file(package_json_file, new_ver, dry_run, staged_files)
+
+        package_lock_file = package_json_file.with_name("package-lock.json")
+        if package_lock_file.exists():
+            update_json_file(package_lock_file, new_ver, dry_run, staged_files)
         
     # 10. packages/react-native/android/build.gradle
     replace_in_file(
@@ -475,23 +470,26 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         staged_files
     )
     
-    # 11. packages/dotnet/RustODotnet.csproj
-    replace_in_file(
-        REPO_ROOT / "packages" / "dotnet" / "RustODotnet.csproj",
-        r'(<Version>)[^<]+(</Version>)',
-        rf'\g<1>{new_ver}\g<2>',
-        dry_run,
-        staged_files
-    )
+    # 11. packages/dotnet/**/*.csproj (binding package and every model subpackage)
+    dotnet_dir = REPO_ROOT / "packages" / "dotnet"
+    for csproj_file in dotnet_dir.rglob("*.csproj"):
+        replace_in_file(
+            csproj_file,
+            r'(<Version>)[^<]+(</Version>)',
+            rf'\g<1>{new_ver}\g<2>',
+            dry_run,
+            staged_files
+        )
     
-    # 12. packages/dotnet/RustODotnet.nuspec
-    replace_in_file(
-        REPO_ROOT / "packages" / "dotnet" / "RustODotnet.nuspec",
-        r'(<version>)[^<]+(</version>)',
-        rf'\g<1>{new_ver}\g<2>',
-        dry_run,
-        staged_files
-    )
+    # 12. packages/dotnet/**/*.nuspec
+    for nuspec_file in dotnet_dir.rglob("*.nuspec"):
+        replace_in_file(
+            nuspec_file,
+            r'(<version>)[^<]+(</version>)',
+            rf'\g<1>{new_ver}\g<2>',
+            dry_run,
+            staged_files
+        )
     
     # 13. README.md & packages/react-native/README.md
     replace_in_file(

@@ -51,11 +51,11 @@ In your `android/app/build.gradle`, add the corresponding model package dependen
 ```groovy
 dependencies {
     // Add your preferred OCR models:
-    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.0'     // ~6 MB (recommended default)
-    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-small:v0.2.0'    // ~30 MB
-    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-medium:v0.2.0'   // ~134 MB
-    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv5-mobile:v0.2.0'   // ~28 MB
-    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv4-mobile:v0.2.0'   // ~23 MB
+    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.1'     // ~6 MB (recommended default)
+    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-small:v0.2.1'    // ~30 MB
+    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-medium:v0.2.1'   // ~134 MB
+    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv5-mobile:v0.2.1'   // ~28 MB
+    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv4-mobile:v0.2.1'   // ~23 MB
 }
 ```
 

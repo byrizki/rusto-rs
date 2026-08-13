@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>RustODotnet.Models.PPOCRv5.Server</PackageId>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <Authors>RustO Contributors</Authors>
     <Description>PP-OCRv5 server pre-trained high-accuracy MNN models for RustODotnet (~270 MB)</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
