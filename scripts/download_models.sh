@@ -56,7 +56,7 @@ download_file_to() {
         return 0
     fi
 
-    echo "❌ Failed to download $filename"
+    echo "❌ Failed to download $filename (dest: $dest)"
     return 1
 }
 
@@ -144,7 +144,8 @@ download_ppocrv4() {
     download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fch_PP-OCRv4_rec_${tier}.mnn" &
     pids+=($!)
 
-    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fch_PP-OCRv4_rec_${tier}%2Fppocr_keys_v1.txt" &
+    # dict.txt only exists in the mobile rec directory on ModelScope; shared by both tiers
+    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fch_PP-OCRv4_rec_mobile%2Fppocr_keys_v1.txt" &
     pids+=($!)
 
     # English rec model and cls are only available for the mobile tier
