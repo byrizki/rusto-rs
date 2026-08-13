@@ -9,10 +9,17 @@ before_install:
     mkdir -p packages/android/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86,x86_64}
     if [ -n "$TAG" ]; then
       echo "Fetching pre-built native libraries for $TAG..."
-      curl -sSL -f "https://github.com/byrizki/rusto-rs/releases/download/${TAG}/rusto-android-arm64-v8a.tar.gz" | tar -xz -C packages/android/src/main/jniLibs/arm64-v8a/ 2>/dev/null || true
-      curl -sSL -f "https://github.com/byrizki/rusto-rs/releases/download/${TAG}/rusto-android-armeabi-v7a.tar.gz" | tar -xz -C packages/android/src/main/jniLibs/armeabi-v7a/ 2>/dev/null || true
-      curl -sSL -f "https://github.com/byrizki/rusto-rs/releases/download/${TAG}/rusto-android-x86.tar.gz" | tar -xz -C packages/android/src/main/jniLibs/x86/ 2>/dev/null || true
-      curl -sSL -f "https://github.com/byrizki/rusto-rs/releases/download/${TAG}/rusto-android-x86_64.tar.gz" | tar -xz -C packages/android/src/main/jniLibs/x86_64/ 2>/dev/null || true
+      if curl -sSL -f "https://github.com/byrizki/rusto-rs/releases/download/${TAG}/rusto-android-release.aar" -o /tmp/rusto-android.aar 2>/dev/null; then
+        echo "Successfully downloaded rusto-android-release.aar, extracting jniLibs..."
+        unzip -o -q /tmp/rusto-android.aar "jni/*" -d /tmp/aar_extract
+        cp -r /tmp/aar_extract/jni/* packages/android/src/main/jniLibs/
+      else
+        echo "Fallback: Downloading individual tar.gz ABI archives..."
+        curl -sSL -f "https://github.com/byrizki/rusto-rs/releases/download/${TAG}/rusto-android-arm64-v8a.tar.gz" | tar -xz -C packages/android/src/main/jniLibs/arm64-v8a/ 2>/dev/null || true
+        curl -sSL -f "https://github.com/byrizki/rusto-rs/releases/download/${TAG}/rusto-android-armeabi-v7a.tar.gz" | tar -xz -C packages/android/src/main/jniLibs/armeabi-v7a/ 2>/dev/null || true
+        curl -sSL -f "https://github.com/byrizki/rusto-rs/releases/download/${TAG}/rusto-android-x86.tar.gz" | tar -xz -C packages/android/src/main/jniLibs/x86/ 2>/dev/null || true
+        curl -sSL -f "https://github.com/byrizki/rusto-rs/releases/download/${TAG}/rusto-android-x86_64.tar.gz" | tar -xz -C packages/android/src/main/jniLibs/x86_64/ 2>/dev/null || true
+      fi
     fi
 
 install:

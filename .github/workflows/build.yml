@@ -540,7 +540,7 @@ jobs:
           mkdir -p releases
           cd artifacts
 
-          for dir in rusto-x86_64-* rusto-aarch64-*; do
+          for dir in rusto-x86_64-* rusto-aarch64-* rusto-android-*; do
             if [ -d "$dir" ]; then
               cd "$dir"
               tar czf "../../releases/${dir}.tar.gz" *

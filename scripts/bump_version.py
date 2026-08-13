@@ -416,21 +416,22 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         staged_files
     )
     
-    # 6. packages/android/build.gradle
-    replace_in_file(
-        REPO_ROOT / "packages" / "android" / "build.gradle",
-        r'(versionName\s+")[^"]+(")',
-        rf'\g<1>{new_ver}\g<2>',
-        dry_run,
-        staged_files
-    )
-    replace_in_file(
-        REPO_ROOT / "packages" / "android" / "build.gradle",
-        r"(coordinates\('[^']+',\s*'[^']+',\s*')[^']+(\'\))",
-        rf"\g<1>{new_ver}\g<2>",
-        dry_run,
-        staged_files
-    )
+    # 6. packages/android/**/build.gradle (root and all 20 model submodules)
+    for bg_file in (REPO_ROOT / "packages" / "android").rglob("build.gradle"):
+        replace_in_file(
+            bg_file,
+            r'(versionName\s+")[^"]+(")',
+            rf'\g<1>{new_ver}\g<2>',
+            dry_run,
+            staged_files
+        )
+        replace_in_file(
+            bg_file,
+            r"(coordinates\('[^']+',\s*'[^']+',\s*')[^']+(\'\))",
+            rf"\g<1>{new_ver}\g<2>",
+            dry_run,
+            staged_files
+        )
     
     # 7. packages/ios/RustO.podspec
     replace_in_file(
@@ -469,7 +470,7 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
     replace_in_file(
         REPO_ROOT / "packages" / "react-native" / "android" / "build.gradle",
         r"(safeExtGet\('RustoAndroid_version',\s*')[^']+(\'\))",
-        rf"\g<1>{new_ver}\g<2>",
+        rf"\g<1>v{new_ver}\g<2>",
         dry_run,
         staged_files
     )
@@ -492,7 +493,7 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         staged_files
     )
     
-    # 13. README.md
+    # 13. README.md & packages/react-native/README.md
     replace_in_file(
         REPO_ROOT / "README.md",
         r'(\*\*Version\*\*:\s*)[^\s]+',
@@ -500,6 +501,21 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         dry_run,
         staged_files
     )
+    replace_in_file(
+        REPO_ROOT / "README.md",
+        r'(com\.github\.byrizki\.rusto-rs:rusto-[^:]+:v)[0-9A-Za-z.-]+',
+        rf'\g<1>{new_ver}',
+        dry_run,
+        staged_files
+    )
+    if (REPO_ROOT / "packages" / "react-native" / "README.md").exists():
+        replace_in_file(
+            REPO_ROOT / "packages" / "react-native" / "README.md",
+            r'(com\.github\.byrizki\.rusto-rs:rusto-[^:]+:v)[0-9A-Za-z.-]+',
+            rf'\g<1>{new_ver}',
+            dry_run,
+            staged_files
+        )
 
     # 14. .github/workflows/publish.yml (default workflow_dispatch version)
     if (REPO_ROOT / ".github" / "workflows" / "publish.yml").exists():

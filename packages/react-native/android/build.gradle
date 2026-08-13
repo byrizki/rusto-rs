@@ -73,6 +73,7 @@ repositories {
   mavenLocal()
   google()
   mavenCentral()
+  maven { url 'https://jitpack.io' }
   flatDir {
     dirs 'libs'
   }
@@ -93,8 +94,8 @@ dependencies {
     // Standalone / bundled mode using prebuilt AAR in libs/
     implementation fileTree(dir: 'libs', include: ['*.aar', '*.jar'])
   } else {
-    // Fallback to Maven Central coordinate
-    def rustoAndroidVersion = safeExtGet('RustoAndroid_version', '0.2.0')
-    implementation "com.byrizki.rusto:rusto-android:$rustoAndroidVersion"
+    // Fallback to JitPack coordinate
+    def rustoAndroidVersion = safeExtGet('RustoAndroid_version', 'v0.2.0')
+    implementation "com.github.byrizki.rusto-rs:rusto-android:$rustoAndroidVersion"
   }
 }

@@ -23,7 +23,7 @@ android {
 
 mavenPublishing {
 
-    coordinates('com.byrizki.rusto', 'rusto-models-ppocrv6-small', '0.1.7')
+    coordinates('com.github.byrizki.rusto-rs', 'rusto-models-ppocrv6-small', '0.1.7')
 
     pom {
         name = 'RustO! Models PP-OCRv6 Small'

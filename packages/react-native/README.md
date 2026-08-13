@@ -34,18 +34,28 @@ Then install the CocoaPods:
 cd ios && pod install
 ```
 
-### 2. Android Setup
+In your `android/build.gradle` (or `settings.gradle`), ensure `jitpack.io` repository is added:
+
+```groovy
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+}
+```
 
 In your `android/app/build.gradle`, add the corresponding model package dependency under `dependencies`:
 
 ```groovy
 dependencies {
     // Add your preferred OCR models:
-    implementation 'com.byrizki.rusto:rusto-models-ppocrv6-tiny:0.1.7'     // ~6 MB (recommended default)
-    // or implementation 'com.byrizki.rusto:rusto-models-ppocrv6-small:0.1.7'    // ~30 MB
-    // or implementation 'com.byrizki.rusto:rusto-models-ppocrv6-medium:0.1.7'   // ~134 MB
-    // or implementation 'com.byrizki.rusto:rusto-models-ppocrv5-mobile:0.1.7'   // ~28 MB
-    // or implementation 'com.byrizki.rusto:rusto-models-ppocrv4-mobile:0.1.7'   // ~23 MB
+    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.0'     // ~6 MB (recommended default)
+    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-small:v0.2.0'    // ~30 MB
+    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-medium:v0.2.0'   // ~134 MB
+    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv5-mobile:v0.2.0'   // ~28 MB
+    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv4-mobile:v0.2.0'   // ~23 MB
 }
 ```
 

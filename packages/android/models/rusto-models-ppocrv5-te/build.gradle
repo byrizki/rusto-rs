@@ -23,7 +23,7 @@ android {
 
 mavenPublishing {
 
-    coordinates('com.byrizki.rusto', 'rusto-models-ppocrv5-te', '0.2.0')
+    coordinates('com.github.byrizki.rusto-rs', 'rusto-models-ppocrv5-te', '0.2.0')
 
     pom {
         name = 'RustO! Models PP-OCRv5 Telugu'

@@ -59,7 +59,7 @@ dependencies {
 
 mavenPublishing {
 
-    coordinates('com.byrizki.rusto', 'rusto-android', '0.2.0')
+    coordinates('com.github.byrizki.rusto-rs', 'rusto-android', '0.2.0')
 
     pom {
         name = 'RustO! Android'
