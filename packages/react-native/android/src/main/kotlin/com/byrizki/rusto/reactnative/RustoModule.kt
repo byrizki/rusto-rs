@@ -10,9 +10,16 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.ReadableType
 import com.facebook.react.bridge.WritableArray
+import com.byrizki.rusto.ClassificationConfig
+import com.byrizki.rusto.DetectionConfig
+import com.byrizki.rusto.LayoutConfig
+import com.byrizki.rusto.OrientationConfig
+import com.byrizki.rusto.PreprocessingConfig
+import com.byrizki.rusto.RecognitionConfig
 import com.byrizki.rusto.RustO
 import com.byrizki.rusto.RustOConfig
 import com.byrizki.rusto.TextResult
+import com.byrizki.rusto.UnwarpConfig
 import java.io.File
 import java.io.FileNotFoundException
 import java.net.URLDecoder
