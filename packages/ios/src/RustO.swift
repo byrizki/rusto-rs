@@ -191,11 +191,20 @@ public class RustO {
             return filename
         }
         
-        if let bundlePath = Bundle.main.path(forResource: "RustoModels", ofType: "bundle"),
-           let bundle = Bundle(path: bundlePath) {
-            let name = filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
-            let ext = String(filename.split(separator: ".").last ?? "")
-            if let filePath = bundle.path(forResource: name, ofType: ext) {
+        let name = filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
+        let ext = String(filename.split(separator: ".").last ?? "")
+        
+        let bundleNames = [
+            "RustOModels", "RustoModels",
+            "RustOModels_PPOCRv6_Tiny", "RustOModels_PPOCRv6_Small", "RustOModels_PPOCRv6_Medium",
+            "RustOModels_PPOCRv5_Mobile", "RustOModels_PPOCRv5_Server",
+            "RustOModels_PPOCRv4_Mobile", "RustOModels_PPOCRv4_Server"
+        ]
+        
+        for bName in bundleNames {
+            if let bundlePath = Bundle.main.path(forResource: bName, ofType: "bundle"),
+               let bundle = Bundle(path: bundlePath),
+               let filePath = bundle.path(forResource: name, ofType: ext) {
                 return filePath
             }
         }

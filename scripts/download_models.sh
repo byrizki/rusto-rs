@@ -1,67 +1,47 @@
 #!/bin/bash
-# Script to download default bundled OCR models on the fly
-# Priority:
-# 1. https://github.com/byrizki/rusto-rs-models/releases
-# 2. https://www.modelscope.cn/models/RapidAI/RapidOCR
+# Script to download OCR models directly from ModelScope
+# Source: https://www.modelscope.cn/models/RapidAI/RapidOCR
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-OUTPUT_DIR="$REPO_ROOT/models/PPOCR_v6"
+MODEL_TYPE="ppocrv6"
 TIER="tiny"
-VERSION="v1.0.0"
+OUTPUT_DIR=""
+DOWNLOAD_ALL=false
 
 # Parse optional arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --output-dir) OUTPUT_DIR="$2"; shift ;;
+        --all) DOWNLOAD_ALL=true ;;
+        --model) MODEL_TYPE="$2"; shift ;;
         --tier) TIER="$2"; shift ;;
-        --version) VERSION="$2"; shift ;;
+        --output-dir) OUTPUT_DIR="$2"; shift ;;
         *) OUTPUT_DIR="$1" ;;
     esac
     shift
 done
 
-mkdir -p "$OUTPUT_DIR"
-
-echo "=== Downloading PP-OCRv6 ($TIER tier) models ==="
-echo "Destination: $OUTPUT_DIR"
-
-GH_RELEASE_URL="https://github.com/byrizki/rusto-rs-models/releases/download/$VERSION"
-GH_LATEST_URL="https://github.com/byrizki/rusto-rs-models/releases/latest/download"
 MODELSCOPE_BASE="https://www.modelscope.cn/api/v1/models/RapidAI/RapidOCR/repo?Revision=master&FilePath="
 
-download_file() {
-    local filename="$1"
-    local gh_name="$2"
+download_file_to() {
+    local dest_dir="$1"
+    local filename="$2"
     local ms_path="$3"
-    local dest="$OUTPUT_DIR/$filename"
+    local dest="$dest_dir/$filename"
+
+    mkdir -p "$dest_dir"
 
     if [ -f "$dest" ] && [ -s "$dest" ]; then
         echo "✓ Already exists: $filename ($(du -h "$dest" | cut -f1))"
         return 0
     fi
 
-    echo "Downloading $filename..."
-    
-    # 1. Try specific GitHub release
-    if curl -sLf "$GH_RELEASE_URL/$gh_name" -o "$dest" 2>/dev/null && [ -s "$dest" ]; then
-        echo "✓ Downloaded from GitHub release ($VERSION): $filename"
-        return 0
-    fi
-
-    # 2. Try latest GitHub release
-    if curl -sLf "$GH_LATEST_URL/$gh_name" -o "$dest" 2>/dev/null && [ -s "$dest" ]; then
-        echo "✓ Downloaded from GitHub release (latest): $filename"
-        return 0
-    fi
-
-    # 3. Fallback to ModelScope
-    echo "  Downloading from ModelScope fallback..."
-    if curl -L -f "$MODELSCOPE_BASE$ms_path" -o "$dest"; then
-        echo "✓ Downloaded from ModelScope: $filename"
+    echo "Downloading $filename from ModelScope..."
+    if curl -sSL -f "$MODELSCOPE_BASE$ms_path" -o "$dest"; then
+        echo "✓ Downloaded: $filename ($(du -h "$dest" | cut -f1))"
         return 0
     fi
 
@@ -69,19 +49,74 @@ download_file() {
     return 1
 }
 
-# Download detection model
-download_file "det.mnn" "ppocrv6_det_${TIER}.mnn" "mnn%2FPP-OCRv6%2Fdet%2FPP-OCRv6_det_${TIER}.mnn"
+download_ppocrv6() {
+    local tier="$1"
+    local dir="$2"
+    echo "=== Downloading PP-OCRv6 ($tier tier) models ==="
+    echo "Destination: $dir"
+    
+    download_file_to "$dir" "det.mnn" "mnn%2FPP-OCRv6%2Fdet%2FPP-OCRv6_det_${tier}.mnn"
+    download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_${tier}.mnn"
+    
+    if [ "$tier" = "tiny" ]; then
+        download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_tiny%2Fppocrv6_tiny_dict.txt"
+    else
+        download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_small%2Fppocrv6_dict.txt"
+    fi
+}
 
-# Download recognition model
-download_file "rec.mnn" "ppocrv6_rec_${TIER}.mnn" "mnn%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_${TIER}.mnn"
+download_ppocrv5() {
+    local tier="${1:-mobile}"
+    local dir="$2"
+    echo "=== Downloading PP-OCRv5 ($tier tier) models ==="
+    echo "Destination: $dir"
+    
+    download_file_to "$dir" "det.mnn" "mnn%2FPP-OCRv5%2Fdet%2Fch_PP-OCRv5_det_${tier}.mnn"
+    download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv5%2Frec%2Fch_PP-OCRv5_rec_${tier}.mnn"
+    download_file_to "$dir" "rec_en.mnn" "mnn%2FPP-OCRv5%2Frec%2Fen_PP-OCRv5_rec_${tier}.mnn"
+    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv5%2Frec%2Fch_PP-OCRv5_rec_${tier}%2Fppocrv5_dict.txt"
+    download_file_to "$dir" "dict_en.txt" "paddle%2FPP-OCRv5%2Frec%2Fen_PP-OCRv5_rec_${tier}%2Fppocrv5_en_dict.txt"
+}
 
-# Download dictionary
-if [ "$TIER" = "tiny" ]; then
-    download_file "dict.txt" "ppocrv6_tiny_dict.txt" "paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_tiny%2Fppocrv6_tiny_dict.txt"
+download_ppocrv4() {
+    local tier="${1:-mobile}"
+    local dir="$2"
+    echo "=== Downloading PP-OCRv4 ($tier tier) models ==="
+    echo "Destination: $dir"
+    
+    download_file_to "$dir" "det.mnn" "mnn%2FPP-OCRv4%2Fdet%2Fch_PP-OCRv4_det_${tier}.mnn"
+    download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fch_PP-OCRv4_rec_${tier}.mnn"
+    download_file_to "$dir" "rec_en.mnn" "mnn%2FPP-OCRv4%2Frec%2Fen_PP-OCRv4_rec_${tier}.mnn"
+    download_file_to "$dir" "cls.mnn" "mnn%2FPP-OCRv4%2Fcls%2Fch_ppocr_mobile_v2.0_cls_${tier}.mnn"
+    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fch_PP-OCRv4_rec_${tier}%2Fppocr_keys_v1.txt"
+    download_file_to "$dir" "dict_en.txt" "paddle%2FPP-OCRv4%2Frec%2Fen_PP-OCRv4_rec_${tier}%2Fen_dict.txt"
+}
+
+if [ "$DOWNLOAD_ALL" = true ]; then
+    download_ppocrv6 "tiny" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_tiny}"
+    download_ppocrv6 "small" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_small}"
+    download_ppocrv6 "medium" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_medium}"
+    download_ppocrv5 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_mobile}"
+    download_ppocrv5 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_server}"
+    download_ppocrv4 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_mobile}"
+    download_ppocrv4 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_server}"
 else
-    download_file "dict.txt" "ppocrv6_dict.txt" "paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_small%2Fppocrv6_dict.txt"
+    case "$MODEL_TYPE" in
+        ppocrv6)
+            download_ppocrv6 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6}"
+            ;;
+        ppocrv5)
+            download_ppocrv5 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5}"
+            ;;
+        ppocrv4)
+            download_ppocrv4 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4}"
+            ;;
+        *)
+            echo "Unknown model type: $MODEL_TYPE"
+            exit 1
+            ;;
+    esac
 fi
 
 echo ""
-echo "✅ Models ready in $OUTPUT_DIR"
-ls -lh "$OUTPUT_DIR"
+echo "✅ Download complete"

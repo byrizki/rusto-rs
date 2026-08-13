@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>RustODotnet.Models.PPOCRv4.Server</PackageId>
+    <Version>0.1.7</Version>
+    <Authors>RustO Contributors</Authors>
+    <Description>PP-OCRv4 server pre-trained high-accuracy MNN models with orientation classifier for RustODotnet (~300 MB)</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/byrizki/rusto-rs</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/byrizki/rusto-rs</PackageProjectUrl>
+    <PackageTags>OCR;PaddleOCR;MNN;PP-OCRv4;Models;Server</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="models\**\*" Pack="true" PackagePath="content\models\" />
+    <None Include="buildTransitive\$(PackageId).targets" Pack="true" PackagePath="buildTransitive\$(PackageId).targets" />
+    <None Include="buildTransitive\$(PackageId).targets" Pack="true" PackagePath="build\$(PackageId).targets" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -15,9 +15,65 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Build iOS XCFramework
+  # Build iOS Rust Libraries (Parallel Matrix)
+  build-ios-libs:
+    name: Build iOS Lib - ${{ matrix.target }}
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target:
+          - aarch64-apple-ios
+          - aarch64-apple-ios-sim
+          - x86_64-apple-ios
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Setup environment
+        run: |
+          echo "Building MNN from source"
+          echo "IPHONEOS_DEPLOYMENT_TARGET=12.0" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
+
+      - name: Build for iOS target
+        run: cargo build --release --target ${{ matrix.target }} --features ffi
+
+      - name: Package MNN static prebuilt
+        shell: bash
+        run: |
+          mkdir -p mnn-prebuilt-pkg
+          LIB_MNN=$(find target/${{ matrix.target }}/release/build -type f -name "libMNN.a" | head -n 1)
+          if [ -n "$LIB_MNN" ]; then
+            cp "$LIB_MNN" mnn-prebuilt-pkg/
+            tar -czf "mnn-static-${{ matrix.target }}.tar.gz" -C mnn-prebuilt-pkg $(basename "$LIB_MNN")
+          else
+            echo "::warning::libMNN static library not found for ${{ matrix.target }}"
+          fi
+
+      - name: Upload MNN prebuilt artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-static-${{ matrix.target }}
+          path: mnn-static-${{ matrix.target }}.tar.gz
+          if-no-files-found: ignore
+
+      - name: Upload iOS target library
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-ios-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/librusto.a
+
+  # Package iOS XCFramework
   build-ios:
     name: Build RustO iOS XCFramework
+    needs: [build-ios-libs]
     runs-on: macos-latest
 
     steps:
@@ -30,36 +86,21 @@ jobs:
           chmod +x scripts/download_models.sh
           bash scripts/download_models.sh
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Add iOS targets
-        run: |
-          rustup target add aarch64-apple-ios
-          rustup target add aarch64-apple-ios-sim
-          rustup target add x86_64-apple-ios
-
-      - name: Setup environment
-        run: |
-          echo "Building MNN from source"
-          echo "IPHONEOS_DEPLOYMENT_TARGET=12.0" >> $GITHUB_ENV
-          echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
-
-      - name: Build for iOS targets
-        run: |
-          cargo build --release --target aarch64-apple-ios --features ffi
-          cargo build --release --target aarch64-apple-ios-sim --features ffi
-          cargo build --release --target x86_64-apple-ios --features ffi
+      - name: Download iOS Rust artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rusto-ios-*
+          path: artifacts/ios
 
       - name: Create XCFramework
         run: |
           mkdir -p build/ios-device build/ios-simulator
 
-          cp target/aarch64-apple-ios/release/librusto.a build/ios-device/
+          cp artifacts/ios/rusto-ios-aarch64-apple-ios/librusto.a build/ios-device/
 
           lipo -create \
-            target/aarch64-apple-ios-sim/release/librusto.a \
-            target/x86_64-apple-ios/release/librusto.a \
+            artifacts/ios/rusto-ios-aarch64-apple-ios-sim/librusto.a \
+            artifacts/ios/rusto-ios-x86_64-apple-ios/librusto.a \
             -output build/ios-simulator/librusto.a
 
           xcodebuild -create-xcframework \
@@ -67,82 +108,78 @@ jobs:
             -library build/ios-simulator/librusto.a \
             -output build/RustO.xcframework
 
-          # Copy model files to React Native iOS models directory (for RN bundling)
-          echo "=== Preparing models for React Native bundling ==="
-          mkdir -p packages/react-native/ios/models
-
-          echo "Copying model files..."
-          cp models/PPOCR_v6/det.mnn packages/react-native/ios/models/
-          cp models/PPOCR_v6/rec.mnn packages/react-native/ios/models/
-          cp models/PPOCR_v6/dict.txt packages/react-native/ios/models/
-
-          echo "\nFiles in React Native iOS models/:"
-          ls -lh packages/react-native/ios/models/ || echo "No files copied"
-
-
-          # Create resource bundle for standalone iOS XCFramework
-          echo "=== Preparing iOS Release Artifact ==="
-          mkdir -p build/Resources
-          
-          echo "Copying models to build/Resources..."
-          cp models/PPOCR_v6/det.mnn build/Resources/
-          cp models/PPOCR_v6/rec.mnn build/Resources/
-          cp models/PPOCR_v6/dict.txt build/Resources/
-          
           echo "Copying Swift sources..."
           mkdir -p build/src
           cp -r packages/ios/src/* build/src/
           
           echo "Copying LICENSE..."
           cp LICENSE build/
-          
-          echo "\nFiles in build/:"
-          ls -R build/
 
-          # Package XCFramework, Resources, src, and LICENSE
           cd build
-          zip -r RustO.xcframework.zip RustO.xcframework Resources src LICENSE
+          zip -r RustO.xcframework.zip RustO.xcframework src LICENSE
           cd ..
+
+      - name: Package iOS Model Bundles
+        run: |
+          chmod +x scripts/download_models.sh
+          bash scripts/download_models.sh --all
+
+          package_model_zip() {
+            local model_src="$1"
+            local zip_name="$2"
+            local tmp_dir="build/tmp_$zip_name"
+            mkdir -p "$tmp_dir"
+            cp -r "$model_src"/* "$tmp_dir/"
+            cd "$tmp_dir"
+            zip -r "../../build/$zip_name.zip" .
+            cd ../..
+            rm -rf "$tmp_dir"
+          }
+
+          package_model_zip "models/PPOCR_v6_tiny" "RustO-Models-PPOCRv6-Tiny"
+          package_model_zip "models/PPOCR_v6_small" "RustO-Models-PPOCRv6-Small"
+          package_model_zip "models/PPOCR_v6_medium" "RustO-Models-PPOCRv6-Medium"
+          package_model_zip "models/PPOCR_v5_mobile" "RustO-Models-PPOCRv5-Mobile"
+          package_model_zip "models/PPOCR_v5_server" "RustO-Models-PPOCRv5-Server"
+          package_model_zip "models/PPOCR_v4_mobile" "RustO-Models-PPOCRv4-Mobile"
+          package_model_zip "models/PPOCR_v4_server" "RustO-Models-PPOCRv4-Server"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: rusto-ios-xcframework
-          path: build/RustO.xcframework.zip
+          path: |
+            build/RustO.xcframework.zip
+            build/RustO-Models-*.zip
 
-  # Build Android AAR
-  build-android:
-    name: Build RustO Android AAR
+  # Build Android Rust Libraries (Parallel Matrix)
+  build-android-libs:
+    name: Build Android Lib - ${{ matrix.abi }}
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-linux-android
+            abi: arm64-v8a
+          - target: armv7-linux-androideabi
+            abi: armeabi-v7a
+          - target: i686-linux-android
+            abi: x86
+          - target: x86_64-linux-android
+            abi: x86_64
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Download default PP-OCRv6 models
-        run: |
-          chmod +x scripts/download_models.sh
-          bash scripts/download_models.sh
-
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake libpthread-stubs0-dev
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "17"
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Android targets
-        run: |
-          rustup target add aarch64-linux-android
-          rustup target add armv7-linux-androideabi
-          rustup target add i686-linux-android
-          rustup target add x86_64-linux-android
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
@@ -156,7 +193,7 @@ jobs:
           echo "NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
           echo "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
-      - name: Build for Android targets
+      - name: Build for Android target
         env:
           CC_aarch64_linux_android: aarch64-linux-android21-clang
           CXX_aarch64_linux_android: aarch64-linux-android21-clang++
@@ -170,43 +207,96 @@ jobs:
           CC_x86_64_linux_android: x86_64-linux-android21-clang
           CXX_x86_64_linux_android: x86_64-linux-android21-clang++
           AR_x86_64_linux_android: llvm-ar
+        run: cargo build --release --target ${{ matrix.target }} --features ffi
+
+      - name: Package MNN static prebuilt
+        shell: bash
         run: |
-          cargo build --release --target aarch64-linux-android --features ffi
-          cargo build --release --target armv7-linux-androideabi --features ffi
-          cargo build --release --target i686-linux-android --features ffi
-          cargo build --release --target x86_64-linux-android --features ffi
+          mkdir -p mnn-prebuilt-pkg
+          LIB_MNN=$(find target/${{ matrix.target }}/release/build -type f -name "libMNN.a" | head -n 1)
+          if [ -n "$LIB_MNN" ]; then
+            cp "$LIB_MNN" mnn-prebuilt-pkg/
+            tar -czf "mnn-static-${{ matrix.target }}.tar.gz" -C mnn-prebuilt-pkg $(basename "$LIB_MNN")
+          else
+            echo "::warning::libMNN static library not found for ${{ matrix.target }}"
+          fi
 
+      - name: Upload MNN prebuilt artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-static-${{ matrix.target }}
+          path: mnn-static-${{ matrix.target }}.tar.gz
+          if-no-files-found: ignore
+
+      - name: Upload Android target library
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-android-${{ matrix.abi }}
+          path: target/${{ matrix.target }}/release/librusto.so
+
+  # Package Android AAR
+  build-android:
+    name: Build RustO Android AAR
+    needs: [build-android-libs]
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download all OCR models
+        run: |
+          chmod +x scripts/download_models.sh
+          bash scripts/download_models.sh --all
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Download Android Rust artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rusto-android-*
+          path: artifacts/android
+
+      - name: Copy libraries and assets
+        run: |
           mkdir -p packages/android/src/main/jniLibs/{arm64-v8a,armeabi-v7a,x86,x86_64}
-          cp target/aarch64-linux-android/release/librusto.so packages/android/src/main/jniLibs/arm64-v8a/
-          cp target/armv7-linux-androideabi/release/librusto.so packages/android/src/main/jniLibs/armeabi-v7a/
-          cp target/i686-linux-android/release/librusto.so packages/android/src/main/jniLibs/x86/
-          cp target/x86_64-linux-android/release/librusto.so packages/android/src/main/jniLibs/x86_64/
+          cp artifacts/android/rusto-android-arm64-v8a/librusto.so packages/android/src/main/jniLibs/arm64-v8a/
+          cp artifacts/android/rusto-android-armeabi-v7a/librusto.so packages/android/src/main/jniLibs/armeabi-v7a/
+          cp artifacts/android/rusto-android-x86/librusto.so packages/android/src/main/jniLibs/x86/
+          cp artifacts/android/rusto-android-x86_64/librusto.so packages/android/src/main/jniLibs/x86_64/
 
-          # Copy model files to main Android package and React Native package
-          echo "=== Copying model files for bundling ==="
-          mkdir -p packages/android/src/main/assets
-          mkdir -p packages/react-native/android/src/main/assets
+          # Copy models into respective Android model submodules
+          mkdir -p packages/android/models/rusto-models-ppocrv6-tiny/src/main/assets
+          cp -r models/PPOCR_v6_tiny/* packages/android/models/rusto-models-ppocrv6-tiny/src/main/assets/
 
-          echo "Copying to packages/android/src/main/assets/..."
-          cp models/PPOCR_v6/det.mnn packages/android/src/main/assets/
-          cp models/PPOCR_v6/rec.mnn packages/android/src/main/assets/
-          cp models/PPOCR_v6/dict.txt packages/android/src/main/assets/
+          mkdir -p packages/android/models/rusto-models-ppocrv6-small/src/main/assets
+          cp -r models/PPOCR_v6_small/* packages/android/models/rusto-models-ppocrv6-small/src/main/assets/
 
-          echo "Copying to packages/react-native/android/src/main/assets/..."
-          cp models/PPOCR_v6/det.mnn packages/react-native/android/src/main/assets/
-          cp models/PPOCR_v6/rec.mnn packages/react-native/android/src/main/assets/
-          cp models/PPOCR_v6/dict.txt packages/react-native/android/src/main/assets/
+          mkdir -p packages/android/models/rusto-models-ppocrv6-medium/src/main/assets
+          cp -r models/PPOCR_v6_medium/* packages/android/models/rusto-models-ppocrv6-medium/src/main/assets/
 
-          echo "\nFiles in Android package assets/:"
-          ls -lh packages/android/src/main/assets/ || echo "No files copied"
-          echo "\nFiles in React Native Android package assets/:"
-          ls -lh packages/react-native/android/src/main/assets/ || echo "No files copied"
+          mkdir -p packages/android/models/rusto-models-ppocrv5-mobile/src/main/assets
+          cp -r models/PPOCR_v5_mobile/* packages/android/models/rusto-models-ppocrv5-mobile/src/main/assets/
+
+          mkdir -p packages/android/models/rusto-models-ppocrv5-server/src/main/assets
+          cp -r models/PPOCR_v5_server/* packages/android/models/rusto-models-ppocrv5-server/src/main/assets/
+
+          mkdir -p packages/android/models/rusto-models-ppocrv4-mobile/src/main/assets
+          cp -r models/PPOCR_v4_mobile/* packages/android/models/rusto-models-ppocrv4-mobile/src/main/assets/
+
+          mkdir -p packages/android/models/rusto-models-ppocrv4-server/src/main/assets
+          cp -r models/PPOCR_v4_server/* packages/android/models/rusto-models-ppocrv4-server/src/main/assets/
 
       - name: Make Gradle Wrapper executable
         working-directory: packages/android
-        run: chmod +x gradlew
+        run: chmod +x gradlew || true
 
-      - name: Build AAR
+      - name: Build AARs
         working-directory: packages/android
         run: |
           if [ -f "gradlew" ]; then
@@ -219,7 +309,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rusto-android-aar
-          path: packages/android/build/outputs/aar/*.aar
+          path: packages/android/**/build/outputs/aar/*.aar
 
   # Build .NET NuGet package
   build-dotnet:
@@ -258,36 +348,28 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libpthread-stubs0-dev
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust_target }}
 
-      - name: Setup environment
+      - name: Build for target
         shell: bash
-        run: |
-          echo "Building MNN from source"
-          if [[ "${{ matrix.os }}" == "macos" ]]; then
-            echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
-          fi
-
-      - name: Build native library
         run: cargo build --release --target ${{ matrix.rust_target }} --features ffi
 
-      - name: Create runtimes directory
-        shell: bash
-        run: mkdir -p packages/dotnet/runtimes/${{ matrix.target }}/native
-
-      - name: Copy library (Unix)
-        if: matrix.os != 'windows'
-        run: |
-          cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
-
-      - name: Copy library (Windows)
-        if: matrix.os == 'windows'
+      - name: Copy native library
         shell: bash
         run: |
-          cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
+          mkdir -p packages/dotnet/runtimes/${{ matrix.target }}/native
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
+          else
+            cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
+          fi
 
       - name: Package MNN static prebuilt
         shell: bash
@@ -340,65 +422,75 @@ jobs:
         run: |
           mkdir -p packages/dotnet/runtimes
           for dir in artifacts/rusto-dotnet-*; do
-            # Extract target name from artifact directory (e.g., rusto-dotnet-linux-x64 -> linux-x64)
             target=$(basename "$dir" | sed 's/rusto-dotnet-//')
             echo "Processing artifact: $dir (target: $target)"
             
-            # The artifact contains native/* directly, we need to copy to runtimes/{target}/native/
             if [ -d "$dir/native" ]; then
               mkdir -p "packages/dotnet/runtimes/$target"
               cp -rv "$dir/native" "packages/dotnet/runtimes/$target/"
               echo "Copied native files for $target"
-            else
-              echo "Warning: No native directory found in $dir"
-              echo "Contents of $dir:"
-              ls -la "$dir" || true
             fi
           done
 
-          echo ""
-          echo "=== Final runtimes structure ==="
-          find packages/dotnet/runtimes -type f || echo "No runtime files found"
-
-      - name: Download default PP-OCRv6 models
+      - name: Download all OCR models
         run: |
           chmod +x scripts/download_models.sh
-          bash scripts/download_models.sh
+          bash scripts/download_models.sh --all
 
-      - name: Copy model files to package
+      - name: Prepare model packages
         run: |
-          echo "=== Copying model files to NuGet package ==="
-          mkdir -p packages/dotnet/models
-          cp models/PPOCR_v6/det.mnn packages/dotnet/models/
-          cp models/PPOCR_v6/rec.mnn packages/dotnet/models/
-          cp models/PPOCR_v6/dict.txt packages/dotnet/models/
-          echo "\nFiles in packages/dotnet/models/:"
-          ls -lh packages/dotnet/models/ || echo "No files copied"
+          echo "=== Copying model files to model NuGet packages ==="
+          
+          # Setup PPOCRv6 Tiny models
+          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv6.Tiny/models
+          cp models/PPOCR_v6_tiny/* packages/dotnet/models/RustODotnet.Models.PPOCRv6.Tiny/models/
 
-      - name: Build Project package
-        working-directory: packages/dotnet
+          # Setup PPOCRv6 Small models
+          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv6.Small/models
+          cp models/PPOCR_v6_small/* packages/dotnet/models/RustODotnet.Models.PPOCRv6.Small/models/
+
+          # Setup PPOCRv6 Medium models
+          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv6.Medium/models
+          cp models/PPOCR_v6_medium/* packages/dotnet/models/RustODotnet.Models.PPOCRv6.Medium/models/
+
+          # Setup PPOCRv5 Mobile models
+          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv5.Mobile/models
+          cp models/PPOCR_v5_mobile/* packages/dotnet/models/RustODotnet.Models.PPOCRv5.Mobile/models/
+
+          # Setup PPOCRv5 Server models
+          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv5.Server/models
+          cp models/PPOCR_v5_server/* packages/dotnet/models/RustODotnet.Models.PPOCRv5.Server/models/
+
+          # Setup PPOCRv4 Mobile models
+          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv4.Mobile/models
+          cp models/PPOCR_v4_mobile/* packages/dotnet/models/RustODotnet.Models.PPOCRv4.Mobile/models/
+
+          # Setup PPOCRv4 Server models
+          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv4.Server/models
+          cp models/PPOCR_v4_server/* packages/dotnet/models/RustODotnet.Models.PPOCRv4.Server/models/
+
+      - name: Build and Pack NuGet Packages
         run: |
-          echo "=== Building .NET package ==="
-          echo "Current directory: $(pwd)"
-          echo "\nFiles in runtimes/:"
-          find runtimes/ -type f | head -20
-          echo "\nFiles in models/:"
-          ls -lh models/ || echo "No models directory"
-          echo "\nBuilding..."
-          dotnet build -c Release || echo "Build will be done manually"
+          mkdir -p nupkg
+          
+          echo "=== Packing Core Runtime ==="
+          cd packages/dotnet
+          dotnet build RustODotnet.csproj -c Release
+          dotnet pack RustODotnet.csproj -c Release -o ../../nupkg -v detailed
+          cd ../..
 
-      - name: Pack NuGet package
-        working-directory: packages/dotnet
-        run: |
-          echo "=== Packing NuGet package ==="
-          echo "Project file contents:"
-          cat RustO.csproj | grep -A 5 "<ItemGroup>" || true
-          echo "\nPacking to ../../nupkg"
-          dotnet pack -c Release -o ../../nupkg -v detailed || echo "NuGet pack will be done manually"
-          echo "\nGenerated packages:"
-          ls -lh ../../nupkg/ || echo "No packages generated"
+          echo "=== Packing Model Packages ==="
+          for proj in packages/dotnet/models/*/*.csproj; do
+            if [ -f "$proj" ]; then
+              echo "Packing $proj..."
+              dotnet pack "$proj" -c Release -o nupkg -v detailed
+            fi
+          done
 
-      - name: Upload NuGet package
+          echo "\n=== Generated Packages ==="
+          ls -lh nupkg/*.nupkg
+
+      - name: Upload NuGet packages
         uses: actions/upload-artifact@v4
         with:
           name: rusto-dotnet-nupkg
@@ -409,61 +501,16 @@ jobs:
   # package React Native
   package-react-native:
     name: Package React Native
-    needs: [build-ios, build-android]
     runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Download default PP-OCRv6 models
-        run: |
-          chmod +x scripts/download_models.sh
-          bash scripts/download_models.sh
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "18"
           registry-url: "https://registry.npmjs.org"
-
-      # Download iOS XCFramework
-      - name: Download iOS artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: rusto-ios-xcframework
-          path: artifacts/ios
-
-      # Download Android AAR
-      - name: Download Android artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: rusto-android-aar
-          path: artifacts/android
-
-      - name: Prepare React Native package
-        run: |
-          # Setup directories
-          mkdir -p packages/react-native/ios
-          mkdir -p packages/react-native/android/libs
-
-          # Extract and copy iOS XCFramework
-          unzip artifacts/ios/RustO.xcframework.zip -d artifacts/ios/temp
-          cp -r artifacts/ios/temp/RustO.xcframework packages/react-native/ios/
-
-          # Copy model files for iOS bundling
-          echo "Copying models for iOS bundling..."
-          mkdir -p packages/react-native/ios/models
-          cp models/PPOCR_v6/det.mnn packages/react-native/ios/models/
-          cp models/PPOCR_v6/rec.mnn packages/react-native/ios/models/
-          cp models/PPOCR_v6/dict.txt packages/react-native/ios/models/
-
-          echo "Files in React Native iOS models/:"
-          ls -lh packages/react-native/ios/models/ || echo "No files copied"
-
-          # Copy Android AAR
-          cp artifacts/android/*.aar packages/react-native/android/libs/RustO.aar
 
       - name: Pack NPM package
         working-directory: packages/react-native
@@ -507,11 +554,11 @@ jobs:
           done
 
           if [ -d "rusto-ios-xcframework" ]; then
-            cp rusto-ios-xcframework/RustO.xcframework.zip ../releases/ || true
+            cp rusto-ios-xcframework/*.zip ../releases/ || true
           fi
 
           if [ -d "rusto-android-aar" ]; then
-            cp rusto-android-aar/*.aar ../releases/ || true
+            find rusto-android-aar -name "*.aar" -exec cp {} ../releases/ \;
           fi
 
           if [ -d "rusto-dotnet-nupkg" ]; then

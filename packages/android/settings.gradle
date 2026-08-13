@@ -13,3 +13,24 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "rusto-android"
+
+include ':rusto-models-ppocrv6-tiny'
+project(':rusto-models-ppocrv6-tiny').projectDir = file('models/rusto-models-ppocrv6-tiny')
+
+include ':rusto-models-ppocrv6-small'
+project(':rusto-models-ppocrv6-small').projectDir = file('models/rusto-models-ppocrv6-small')
+
+include ':rusto-models-ppocrv6-medium'
+project(':rusto-models-ppocrv6-medium').projectDir = file('models/rusto-models-ppocrv6-medium')
+
+include ':rusto-models-ppocrv5-mobile'
+project(':rusto-models-ppocrv5-mobile').projectDir = file('models/rusto-models-ppocrv5-mobile')
+
+include ':rusto-models-ppocrv5-server'
+project(':rusto-models-ppocrv5-server').projectDir = file('models/rusto-models-ppocrv5-server')
+
+include ':rusto-models-ppocrv4-mobile'
+project(':rusto-models-ppocrv4-mobile').projectDir = file('models/rusto-models-ppocrv4-mobile')
+
+include ':rusto-models-ppocrv4-server'
+project(':rusto-models-ppocrv4-server').projectDir = file('models/rusto-models-ppocrv4-server')

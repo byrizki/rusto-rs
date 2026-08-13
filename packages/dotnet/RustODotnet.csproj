@@ -23,19 +23,7 @@
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
 
     <None Include="runtimes\**\*" Pack="true" PackagePath="runtimes\" />
-    
-    <!-- Model files packaged in content folder (not contentFiles to avoid compile) -->
-    <None Include="models\**\*.mnn" Pack="true" PackagePath="content\models\">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </None>
-    <None Include="models\**\*.txt" Pack="true" PackagePath="content\models\">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </None>
-    
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
-    
-    <!-- Include MSBuild targets file for automatic model file copying -->
-    <None Include="buildTransitive\RustODotnet.targets" Pack="true" PackagePath="buildTransitive\" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

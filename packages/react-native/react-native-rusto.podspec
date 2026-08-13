@@ -22,18 +22,8 @@ Pod::Spec.new do |s|
     'SWIFT_COMPILATION_MODE' => 'wholemodule'
   }
 
-  # Link the locally included XCFramework
-  s.vendored_frameworks = 'ios/RustO.xcframework'
-  
-  # Bundle model files as resources
-  s.resource_bundles = {
-    'RustoModels' => [
-      'ios/models/*.mnn',
-      'ios/models/*.txt'
-    ]
-  }
-
   s.dependency "React-Core"
+  s.dependency "RustO", "#{s.version}"
 
   # Don't install the dependencies when we run `pod install` in the old architecture.
   if ENV['RCT_NEW_ARCH_ENABLED'] == '1' then

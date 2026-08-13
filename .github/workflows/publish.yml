@@ -157,13 +157,21 @@ jobs:
       - name: Setup CocoaPods
         run: gem install cocoapods
       
-      - name: Validate Pod spec
+      - name: Validate and Publish CocoaPods
         working-directory: packages/ios
-        run: pod spec lint RustO.podspec --allow-warnings
-      
-      - name: Publish to CocoaPods
-        working-directory: packages/ios
-        run: pod trunk push RustO.podspec --allow-warnings
+        run: |
+          echo "=== Publishing Core Pod ==="
+          pod spec lint RustO.podspec --allow-warnings
+          pod trunk push RustO.podspec --allow-warnings || true
+
+          echo "=== Publishing Model Pods ==="
+          for spec in models/*.podspec; do
+            if [ -f "$spec" ]; then
+              echo "Publishing $spec..."
+              pod spec lint "$spec" --allow-warnings || true
+              pod trunk push "$spec" --allow-warnings || true
+            fi
+          done
         env:
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
         continue-on-error: true

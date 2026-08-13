@@ -336,11 +336,23 @@ class RustoModule: NSObject {
         }
         
         var sourcePath: String?
-        if let bundlePath = Bundle(for: type(of: self)).path(forResource: "RustoModels", ofType: "bundle"),
-           let bundle = Bundle(path: bundlePath) {
-            let name = filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
-            let ext = String(filename.split(separator: ".").last ?? "")
-            sourcePath = bundle.path(forResource: name, ofType: ext)
+        let name = filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
+        let ext = String(filename.split(separator: ".").last ?? "")
+        
+        let bundleNames = [
+            "RustOModels", "RustoModels",
+            "RustOModels_PPOCRv6_Tiny", "RustOModels_PPOCRv6_Small", "RustOModels_PPOCRv6_Medium",
+            "RustOModels_PPOCRv5_Mobile", "RustOModels_PPOCRv5_Server",
+            "RustOModels_PPOCRv4_Mobile", "RustOModels_PPOCRv4_Server"
+        ]
+        
+        for bName in bundleNames {
+            if let bundlePath = Bundle(for: type(of: self)).path(forResource: bName, ofType: "bundle") ?? Bundle.main.path(forResource: bName, ofType: "bundle"),
+               let bundle = Bundle(path: bundlePath),
+               let filePath = bundle.path(forResource: name, ofType: ext) {
+                sourcePath = filePath
+                break
+            }
         }
         
         if sourcePath == nil {

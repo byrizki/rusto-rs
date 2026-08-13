@@ -8,22 +8,48 @@ React Native bindings for the RustO! OCR library.
 npm install react-native-rusto
 # or
 yarn add react-native-rusto
+# or
+pnpm add react-native-rusto
 ```
 
-### iOS Setup
+### 1. iOS Setup
 
+In your `ios/Podfile`, choose and add the model package you want to bundle (e.g. PP-OCRv6 Tiny, Small, Medium, PP-OCRv5, or PP-OCRv4):
+
+```ruby
+target 'YourApp' do
+  # ... other pods
+
+  # Add your preferred OCR models:
+  pod 'RustO-Models-PPOCRv6-Tiny'    # ~6 MB (recommended default)
+  # or pod 'RustO-Models-PPOCRv6-Small'   # ~30 MB
+  # or pod 'RustO-Models-PPOCRv6-Medium'  # ~134 MB
+  # or pod 'RustO-Models-PPOCRv5-Mobile'  # ~28 MB
+  # or pod 'RustO-Models-PPOCRv4-Mobile'  # ~23 MB
+end
+```
+
+Then install the CocoaPods:
 ```bash
 cd ios && pod install
 ```
 
-Make sure to place the `RustO.xcframework` in the `ios/` directory.
+### 2. Android Setup
 
-### Android Setup
+In your `android/app/build.gradle`, add the corresponding model package dependency under `dependencies`:
 
-The Android native library will be linked automatically. Ensure that:
+```groovy
+dependencies {
+    // Add your preferred OCR models:
+    implementation 'com.byrizki.rusto:rusto-models-ppocrv6-tiny:0.1.7'     // ~6 MB (recommended default)
+    // or implementation 'com.byrizki.rusto:rusto-models-ppocrv6-small:0.1.7'    // ~30 MB
+    // or implementation 'com.byrizki.rusto:rusto-models-ppocrv6-medium:0.1.7'   // ~134 MB
+    // or implementation 'com.byrizki.rusto:rusto-models-ppocrv5-mobile:0.1.7'   // ~28 MB
+    // or implementation 'com.byrizki.rusto:rusto-models-ppocrv4-mobile:0.1.7'   // ~23 MB
+}
+```
 
-1. The main `rusto-android` package is available in your project
-2. Your project includes the native `.so` libraries in the correct architecture folders
+> **Note:** If you want to use custom models or load models dynamically from device storage, you don't need to install any model package. You can pass absolute filesystem paths directly to `initialize()`.
 
 ## Usage
 

@@ -17,7 +17,12 @@
     "*.podspec",
     "!lib/typescript/example",
     "!android/build",
+    "!android/libs",
+    "!android/src/main/assets/*.mnn",
+    "!android/src/main/assets/*.txt",
     "!ios/build",
+    "!ios/RustO.xcframework",
+    "!ios/models",
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__"
