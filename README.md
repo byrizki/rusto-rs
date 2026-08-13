@@ -9,7 +9,7 @@
 [![NuGet](https://img.shields.io/nuget/v/RustODotnet.svg?logo=nuget&logoColor=white&color=004880)](https://www.nuget.org/packages/RustODotnet)
 [![npm](https://img.shields.io/npm/v/react-native-rusto.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/react-native-rusto)
 [![CocoaPods](https://img.shields.io/cocoapods/v/RustO.svg?logo=cocoapods&logoColor=white&color=EE3322)](https://cocoapods.org/pods/RustO)
-[![Maven Central](https://img.shields.io/maven-central/v/com.byrizki.rusto/rusto-android.svg?logo=apache-maven&logoColor=white&color=C71A36)](https://central.sonatype.com/artifact/com.byrizki.rusto/rusto-android)
+[![JitPack](https://jitpack.io/v/byrizki/rusto-rs.svg)](https://jitpack.io/#byrizki/rusto-rs)
 [![Build & Release](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml/badge.svg)](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -38,7 +38,7 @@
 | **.NET / C#** | `dotnet add package RustODotnet` ([NuGet](https://www.nuget.org/packages/RustODotnet)) | Managed .NET library + Windows/Linux/macOS native runtimes |
 | **React Native** | `npm install react-native-rusto` ([npm](https://www.npmjs.com/package/react-native-rusto)) | Cross-platform React Native TypeScript bridge |
 | **iOS** | `pod 'RustO'` ([CocoaPods](https://cocoapods.org/pods/RustO)) | Swift library + Universal XCFramework (Device & Simulator) |
-| **Android** | `com.byrizki.rusto:rusto-android` ([Maven Central](https://central.sonatype.com/artifact/com.byrizki.rusto/rusto-android)) | Kotlin library + AAR with ARM64, ARMv7, x86, x86_64 |
+| **Android** | `com.github.byrizki.rusto-rs:rusto-android` ([JitPack](https://jitpack.io/#byrizki/rusto-rs)) | Kotlin library + AAR with ARM64, ARMv7, x86, x86_64 |
 | **C / Native** | `librusto.so` / `librusto.dylib` / `rusto.dll` | C FFI shared libraries for custom integrations |
 
 ---
@@ -201,12 +201,24 @@ print(spatialText)
 
 ### 5. Android (Kotlin)
 
-Add to `android/app/build.gradle`:
+Add JitPack repository to `settings.gradle`:
+
+```groovy
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+}
+```
+
+Add dependencies to `app/build.gradle`:
 
 ```groovy
 dependencies {
-    implementation 'com.byrizki.rusto:rusto-android:0.1.7'
-    implementation 'com.byrizki.rusto:rusto-models-ppocrv6-tiny:0.1.7'
+    implementation 'com.github.byrizki.rusto-rs:rusto-android:v0.2.0'
+    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.0'
 }
 ```
 

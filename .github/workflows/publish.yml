@@ -29,11 +29,6 @@ on:
         type: boolean
         required: false
         default: true
-      publish_maven:
-        description: 'Publish to Maven Central'
-        type: boolean
-        required: false
-        default: true
 
 jobs:
   # Publish to crates.io
@@ -181,42 +176,3 @@ jobs:
         env:
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
         continue-on-error: true
-
-  # Publish Android AAR to Maven Central (optional - requires setup)
-  publish-maven:
-    name: Publish to Maven Central
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event.inputs.publish_maven == 'true'
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      
-      - name: Download AAR from release
-        run: |
-          VERSION="${{ github.event.inputs.version || github.ref_name }}"
-          VERSION="${VERSION#v}"
-          gh release download "v${VERSION}" -p "*.aar" -D packages/android/build/outputs/aar
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Publish to Maven Central
-        working-directory: packages/android
-        run: |
-          chmod +x gradlew
-          KEY_ID="${{ secrets.SIGNING_KEY_ID }}"
-          if [ -n "$KEY_ID" ] && [ ${#KEY_ID} -gt 8 ]; then
-            export ORG_GRADLE_PROJECT_signingInMemoryKeyId="${KEY_ID: -8}"
-          elif [ -n "$KEY_ID" ]; then
-            export ORG_GRADLE_PROJECT_signingInMemoryKeyId="$KEY_ID"
-          fi
-          ./gradlew publishAllPublicationsToMavenCentralRepository --no-configuration-cache
-        env:
-          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_USERNAME }}
-          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_PASSWORD }}
-          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
-          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}

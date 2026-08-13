@@ -22,8 +22,6 @@ android {
 }
 
 mavenPublishing {
-    publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL, true)
-    signAllPublications()
 
     coordinates('com.byrizki.rusto', 'rusto-models-ppocrv5-cyrillic', '0.2.0')
 
