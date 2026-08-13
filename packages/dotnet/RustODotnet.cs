@@ -66,116 +66,126 @@ namespace RustODotnet
         }
     }
 
+    public class DetectionConfig
+    {
+        [JsonPropertyName("enabled")]
+        public bool? Enabled { get; set; }
+        [JsonPropertyName("modelPath")]
+        public string ModelPath { get; set; }
+        [JsonPropertyName("thresh")]
+        public float? Thresh { get; set; }
+        [JsonPropertyName("boxThresh")]
+        public float? BoxThresh { get; set; }
+        [JsonPropertyName("unclipRatio")]
+        public float? UnclipRatio { get; set; }
+        [JsonPropertyName("limitSideLen")]
+        public int? LimitSideLen { get; set; }
+        [JsonPropertyName("limitType")]
+        public string LimitType { get; set; }
+        [JsonPropertyName("useDilation")]
+        public bool? UseDilation { get; set; }
+    }
+
+    public class RecognitionConfig
+    {
+        [JsonPropertyName("enabled")]
+        public bool? Enabled { get; set; }
+        [JsonPropertyName("modelPath")]
+        public string ModelPath { get; set; }
+        [JsonPropertyName("dictPath")]
+        public string DictPath { get; set; }
+        [JsonPropertyName("scoreThresh")]
+        public float? ScoreThresh { get; set; }
+        [JsonPropertyName("returnWordBox")]
+        public bool? ReturnWordBox { get; set; }
+        [JsonPropertyName("returnSingleCharBox")]
+        public bool? ReturnSingleCharBox { get; set; }
+    }
+
+    /// <summary>
+    /// Line Classification Configuration (CLS)
+    /// NOTE: Text line orientation classifier (180° rotation) is ONLY available on PP-OCRv4 and PP-OCRv5.
+    /// </summary>
+    public class ClassificationConfig
+    {
+        [JsonPropertyName("enabled")]
+        public bool? Enabled { get; set; }
+        [JsonPropertyName("modelPath")]
+        public string ModelPath { get; set; }
+        [JsonPropertyName("thresh")]
+        public float? Thresh { get; set; }
+    }
+
+    public class OrientationConfig
+    {
+        [JsonPropertyName("enabled")]
+        public bool? Enabled { get; set; }
+        [JsonPropertyName("modelPath")]
+        public string ModelPath { get; set; }
+        [JsonPropertyName("thresh")]
+        public float? Thresh { get; set; }
+    }
+
+    public class UnwarpConfig
+    {
+        [JsonPropertyName("enabled")]
+        public bool? Enabled { get; set; }
+        [JsonPropertyName("modelPath")]
+        public string ModelPath { get; set; }
+    }
+
+    public class PreprocessingConfig
+    {
+        [JsonPropertyName("minHeight")]
+        public float? MinHeight { get; set; }
+        [JsonPropertyName("maxSideLen")]
+        public float? MaxSideLen { get; set; }
+        [JsonPropertyName("minSideLen")]
+        public float? MinSideLen { get; set; }
+        [JsonPropertyName("debugImages")]
+        public bool? DebugImages { get; set; }
+    }
+
+    public class LayoutConfig
+    {
+        [JsonPropertyName("yThresholdMultiplier")]
+        public float? YThresholdMultiplier { get; set; }
+        [JsonPropertyName("xThresholdMultiplier")]
+        public float? XThresholdMultiplier { get; set; }
+    }
+
     public class RustOConfig
     {
         [JsonPropertyName("template")]
-        public string Template { get; set; } = "ppv6";
-
-        [JsonPropertyName("detModelPath")]
-        public string DetModelPath { get; set; } = "det.mnn";
-
-        [JsonPropertyName("recModelPath")]
-        public string RecModelPath { get; set; } = "rec.mnn";
-
-        [JsonPropertyName("dictPath")]
-        public string DictPath { get; set; } = "dict.txt";
-
-        [JsonPropertyName("clsModelPath")]
-        public string ClsModelPath { get; set; }
-
-        [JsonPropertyName("orientModelPath")]
-        public string OrientModelPath { get; set; }
-
-        [JsonPropertyName("unwarpModelPath")]
-        public string UnwarpModelPath { get; set; }
-
-        [JsonPropertyName("orientThreshold")]
-        public float? OrientThreshold { get; set; }
-
-        [JsonPropertyName("clsThreshold")]
-        public float? ClsThreshold { get; set; }
-
-        [JsonPropertyName("textScore")]
-        public float TextScore { get; set; } = 0.5f;
-
-        [JsonPropertyName("detThresh")]
-        public float DetThresh { get; set; } = 0.3f;
-
-        [JsonPropertyName("detBoxThresh")]
-        public float DetBoxThresh { get; set; } = 0.6f;
-
-        [JsonPropertyName("limitSideLen")]
-        public int LimitSideLen { get; set; } = 736;
-
-        [JsonPropertyName("limitType")]
-        public string LimitType { get; set; } = "min";
-
-        [JsonPropertyName("unclipRatio")]
-        public float UnclipRatio { get; set; } = 2.0f;
-
-        [JsonPropertyName("useDilation")]
-        public bool UseDilation { get; set; } = true;
-
-        [JsonPropertyName("useDet")]
-        public bool UseDet { get; set; } = true;
-
-        [JsonPropertyName("useRec")]
-        public bool UseRec { get; set; } = true;
-
-        [JsonPropertyName("useCls")]
-        public bool UseCls { get; set; } = false;
-
-        [JsonPropertyName("useOrient")]
-        public bool UseOrient { get; set; } = false;
-
-        [JsonPropertyName("useUnwarp")]
-        public bool UseUnwarp { get; set; } = false;
-
-        [JsonPropertyName("debugImages")]
-        public bool DebugImages { get; set; } = false;
-
-        [JsonPropertyName("minHeight")]
-        public float MinHeight { get; set; } = 30.0f;
-
-        [JsonPropertyName("maxSideLen")]
-        public float MaxSideLen { get; set; } = 2000.0f;
-
-        [JsonPropertyName("minSideLen")]
-        public float MinSideLen { get; set; } = 30.0f;
-
-        [JsonPropertyName("returnWordBox")]
-        public bool ReturnWordBox { get; set; } = false;
-
-        [JsonPropertyName("returnSingleCharBox")]
-        public bool ReturnSingleCharBox { get; set; } = false;
-
-        [JsonPropertyName("yThresholdMultiplier")]
-        public float? YThresholdMultiplier { get; set; }
-
-        [JsonPropertyName("xThresholdMultiplier")]
-        public float? XThresholdMultiplier { get; set; }
+        public string Template { get; set; }
+        [JsonPropertyName("detection")]
+        public DetectionConfig Detection { get; set; }
+        [JsonPropertyName("recognition")]
+        public RecognitionConfig Recognition { get; set; }
+        [JsonPropertyName("classification")]
+        public ClassificationConfig Classification { get; set; }
+        [JsonPropertyName("orientation")]
+        public OrientationConfig Orientation { get; set; }
+        [JsonPropertyName("unwarp")]
+        public UnwarpConfig Unwarp { get; set; }
+        [JsonPropertyName("preprocessing")]
+        public PreprocessingConfig Preprocessing { get; set; }
+        [JsonPropertyName("layout")]
+        public LayoutConfig Layout { get; set; }
 
         public RustOConfig() { }
 
-        public RustOConfig(string detModelPath, string recModelPath, string dictPath, string template = "ppv6")
-        {
-            Template = template;
-            DetModelPath = detModelPath;
-            RecModelPath = recModelPath;
-            DictPath = dictPath;
-        }
+        public static RustOConfig Ppv6(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
+            new RustOConfig { Template = "ppv6", Detection = detection, Recognition = recognition };
 
-        public static RustOConfig Ppv6(string det = "det.mnn", string rec = "rec.mnn", string dict = "dict.txt") =>
-            new RustOConfig(det, rec, dict, "ppv6") { DetBoxThresh = 0.6f };
+        public static RustOConfig Ppv5(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
+            new RustOConfig { Template = "ppv5", Detection = detection, Recognition = recognition };
 
-        public static RustOConfig Ppv5(string det = "det.mnn", string rec = "rec.mnn", string dict = "dict.txt") =>
-            new RustOConfig(det, rec, dict, "ppv5");
+        public static RustOConfig Ppv4(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
+            new RustOConfig { Template = "ppv4", Detection = detection, Recognition = recognition };
 
-        public static RustOConfig Ppv4(string det = "det.mnn", string rec = "rec.mnn", string dict = "dict.txt") =>
-            new RustOConfig(det, rec, dict, "ppv4") { LimitSideLen = 960, LimitType = "max", UnclipRatio = 1.5f, UseDilation = false, DetBoxThresh = 0.6f };
-
-        public static RustOConfig Ppv3(string det = "det.mnn", string rec = "rec.mnn", string dict = "dict.txt") =>
-            new RustOConfig(det, rec, dict, "ppv3") { LimitSideLen = 960, LimitType = "max", UnclipRatio = 1.5f, UseDilation = false, DetBoxThresh = 0.6f };
+        public static RustOConfig Ppv3(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
+            new RustOConfig { Template = "ppv3", Detection = detection, Recognition = recognition };
     }
 
     public class RustOException : Exception
@@ -183,8 +193,52 @@ namespace RustODotnet
         public RustOException(string message) : base(message) { }
     }
 
-    public sealed class RustO : IDisposable
+    public class RustO : IDisposable
     {
+        private IntPtr _handle;
+        private bool _disposed;
+
+        public static string Version
+        {
+            get
+            {
+                IntPtr versionPtr = rocr_version();
+                return Marshal.PtrToStringUTF8(versionPtr) ?? "unknown";
+            }
+        }
+
+        public RustO(RustOConfig config = null)
+        {
+            config ??= new RustOConfig();
+            config.Detection ??= new DetectionConfig();
+            config.Recognition ??= new RecognitionConfig();
+
+            var detName = config.Detection.ModelPath ?? "det.mnn";
+            var recName = config.Recognition.ModelPath ?? "rec.mnn";
+            var dictName = config.Recognition.DictPath ?? "dict.txt";
+
+            config.Detection.ModelPath = ResolveModelPath(detName);
+            config.Recognition.ModelPath = ResolveModelPath(recName);
+            config.Recognition.DictPath = ResolveModelPath(dictName);
+
+            if (config.Classification?.ModelPath != null)
+                config.Classification.ModelPath = ResolveModelPath(config.Classification.ModelPath);
+            if (config.Orientation?.ModelPath != null)
+                config.Orientation.ModelPath = ResolveModelPath(config.Orientation.ModelPath);
+            if (config.Unwarp?.ModelPath != null)
+                config.Unwarp.ModelPath = ResolveModelPath(config.Unwarp.ModelPath);
+
+            var options = new JsonSerializerOptions
+            {
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+            string json = JsonSerializer.Serialize(config, options);
+            _handle = rocr_new_with_config(json);
+            if (_handle == IntPtr.Zero)
+            {
+                throw new RustOException("Failed to initialize RustO with config");
+            }
+        }
         private const string LibName = "rusto";
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
@@ -268,55 +322,6 @@ namespace RustODotnet
 
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr rocr_version();
-
-        private IntPtr _handle;
-        private bool _disposed;
-
-        public static string Version
-        {
-            get
-            {
-                IntPtr versionPtr = rocr_version();
-                return Marshal.PtrToStringUTF8(versionPtr) ?? "unknown";
-            }
-        }
-
-        public RustO(RustOConfig config)
-        {
-            if (config == null) throw new ArgumentNullException(nameof(config));
-
-            config.DetModelPath = ResolveModelPath(config.DetModelPath ?? "det.mnn");
-            config.RecModelPath = ResolveModelPath(config.RecModelPath ?? "rec.mnn");
-            config.DictPath = ResolveModelPath(config.DictPath ?? "dict.txt");
-
-            if (config.ClsModelPath != null) config.ClsModelPath = ResolveModelPath(config.ClsModelPath);
-            if (config.OrientModelPath != null) config.OrientModelPath = ResolveModelPath(config.OrientModelPath);
-            if (config.UnwarpModelPath != null) config.UnwarpModelPath = ResolveModelPath(config.UnwarpModelPath);
-
-            string json = JsonSerializer.Serialize(config);
-            _handle = rocr_new_with_config(json);
-            if (_handle == IntPtr.Zero)
-            {
-                throw new RustOException("Failed to initialize RustO with config");
-            }
-        }
-
-        public RustO(string detModelPath = null, string recModelPath = null, string dictPath = null)
-        {
-            detModelPath ??= "det.mnn";
-            recModelPath ??= "rec.mnn";
-            dictPath ??= "dict.txt";
-
-            detModelPath = ResolveModelPath(detModelPath);
-            recModelPath = ResolveModelPath(recModelPath);
-            dictPath = ResolveModelPath(dictPath);
-
-            _handle = rocr_new(detModelPath, recModelPath, dictPath);
-            if (_handle == IntPtr.Zero)
-            {
-                throw new RustOException($"Failed to initialize RustO with models: {detModelPath}, {recModelPath}, {dictPath}");
-            }
-        }
 
         private static string ResolveModelPath(string path)
         {

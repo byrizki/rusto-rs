@@ -30,68 +30,135 @@ data class TextResult(
     }
 )
 
-data class RustOConfig(
-    val template: String = "ppv6",
-    val detModelPath: String = "det.mnn",
-    val recModelPath: String = "rec.mnn",
-    val dictPath: String = "dict.txt",
-    val clsModelPath: String? = null,
-    val orientModelPath: String? = null,
-    val unwarpModelPath: String? = null,
-    val orientThreshold: Float? = null,
-    val clsThreshold: Float? = null,
-    val textScore: Float = 0.5f,
-    val detThresh: Float = 0.3f,
-    val detBoxThresh: Float = 0.6f,
-    val limitSideLen: Int = 736,
-    val limitType: String = "min",
-    val unclipRatio: Float = 2.0f,
-    val useDilation: Boolean = true,
-    val useDet: Boolean = true,
-    val useRec: Boolean = true,
-    val useCls: Boolean = false,
-    val useOrient: Boolean = false,
-    val useUnwarp: Boolean = false,
-    val debugImages: Boolean = false,
-    val minHeight: Float = 30.0f,
-    val maxSideLen: Float = 2000.0f,
-    val minSideLen: Float = 30.0f,
-    val returnWordBox: Boolean = false,
-    val returnSingleCharBox: Boolean = false,
+data class DetectionConfig(
+    val enabled: Boolean? = null,
+    val modelPath: String? = null,
+    val thresh: Float? = null,
+    val boxThresh: Float? = null,
+    val unclipRatio: Float? = null,
+    val limitSideLen: Int? = null,
+    val limitType: String? = null,
+    val useDilation: Boolean? = null
+)
+
+data class RecognitionConfig(
+    val enabled: Boolean? = null,
+    val modelPath: String? = null,
+    val dictPath: String? = null,
+    val scoreThresh: Float? = null,
+    val returnWordBox: Boolean? = null,
+    val returnSingleCharBox: Boolean? = null
+)
+
+/**
+ * Line Classification Configuration (CLS)
+ * NOTE: Text line orientation classifier (180° rotation) is ONLY available on PP-OCRv4 and PP-OCRv5.
+ */
+data class ClassificationConfig(
+    val enabled: Boolean? = null,
+    val modelPath: String? = null,
+    val thresh: Float? = null
+)
+
+data class OrientationConfig(
+    val enabled: Boolean? = null,
+    val modelPath: String? = null,
+    val thresh: Float? = null
+)
+
+data class UnwarpConfig(
+    val enabled: Boolean? = null,
+    val modelPath: String? = null
+)
+
+data class PreprocessingConfig(
+    val minHeight: Float? = null,
+    val maxSideLen: Float? = null,
+    val minSideLen: Float? = null,
+    val debugImages: Boolean? = null
+)
+
+data class LayoutConfig(
     val yThresholdMultiplier: Float? = null,
     val xThresholdMultiplier: Float? = null
+)
+
+data class RustOConfig(
+    val template: String? = null,
+    val detection: DetectionConfig? = null,
+    val recognition: RecognitionConfig? = null,
+    val classification: ClassificationConfig? = null,
+    val orientation: OrientationConfig? = null,
+    val unwarp: UnwarpConfig? = null,
+    val preprocessing: PreprocessingConfig? = null,
+    val layout: LayoutConfig? = null
 ) {
     fun toJson(context: Context): String {
         val json = JSONObject()
-        json.put("template", template)
-        json.put("detModelPath", resolveModel(context, detModelPath))
-        json.put("recModelPath", resolveModel(context, recModelPath))
-        json.put("dictPath", resolveModel(context, dictPath))
-        clsModelPath?.let { json.put("clsModelPath", resolveModel(context, it)) }
-        orientModelPath?.let { json.put("orientModelPath", resolveModel(context, it)) }
-        unwarpModelPath?.let { json.put("unwarpModelPath", resolveModel(context, it)) }
-        orientThreshold?.let { json.put("orientThreshold", it.toDouble()) }
-        clsThreshold?.let { json.put("clsThreshold", it.toDouble()) }
-        json.put("textScore", textScore.toDouble())
-        json.put("detThresh", detThresh.toDouble())
-        json.put("detBoxThresh", detBoxThresh.toDouble())
-        json.put("limitSideLen", limitSideLen)
-        json.put("limitType", limitType)
-        json.put("unclipRatio", unclipRatio.toDouble())
-        json.put("useDilation", useDilation)
-        json.put("useDet", useDet)
-        json.put("useRec", useRec)
-        json.put("useCls", useCls)
-        json.put("useOrient", useOrient)
-        json.put("useUnwarp", useUnwarp)
-        json.put("debugImages", debugImages)
-        json.put("minHeight", minHeight.toDouble())
-        json.put("maxSideLen", maxSideLen.toDouble())
-        json.put("minSideLen", minSideLen.toDouble())
-        json.put("returnWordBox", returnWordBox)
-        json.put("returnSingleCharBox", returnSingleCharBox)
-        yThresholdMultiplier?.let { json.put("yThresholdMultiplier", it.toDouble()) }
-        xThresholdMultiplier?.let { json.put("xThresholdMultiplier", it.toDouble()) }
+        template?.let { json.put("template", it) }
+
+        val detObj = JSONObject()
+        val detPath = detection?.modelPath ?: "det.mnn"
+        detObj.put("modelPath", resolveModel(context, detPath))
+        detection?.enabled?.let { detObj.put("enabled", it) }
+        detection?.thresh?.let { detObj.put("thresh", it.toDouble()) }
+        detection?.boxThresh?.let { detObj.put("boxThresh", it.toDouble()) }
+        detection?.unclipRatio?.let { detObj.put("unclipRatio", it.toDouble()) }
+        detection?.limitSideLen?.let { detObj.put("limitSideLen", it) }
+        detection?.limitType?.let { detObj.put("limitType", it) }
+        detection?.useDilation?.let { detObj.put("useDilation", it) }
+        json.put("detection", detObj)
+
+        val recObj = JSONObject()
+        val recPath = recognition?.modelPath ?: "rec.mnn"
+        val dictPath = recognition?.dictPath ?: "dict.txt"
+        recObj.put("modelPath", resolveModel(context, recPath))
+        recObj.put("dictPath", resolveModel(context, dictPath))
+        recognition?.enabled?.let { recObj.put("enabled", it) }
+        recognition?.scoreThresh?.let { recObj.put("scoreThresh", it.toDouble()) }
+        recognition?.returnWordBox?.let { recObj.put("returnWordBox", it) }
+        recognition?.returnSingleCharBox?.let { recObj.put("returnSingleCharBox", it) }
+        json.put("recognition", recObj)
+
+        classification?.let { cls ->
+            val clsObj = JSONObject()
+            cls.enabled?.let { clsObj.put("enabled", it) }
+            cls.modelPath?.let { clsObj.put("modelPath", resolveModel(context, it)) }
+            cls.thresh?.let { clsObj.put("thresh", it.toDouble()) }
+            if (clsObj.length() > 0) json.put("classification", clsObj)
+        }
+
+        orientation?.let { orient ->
+            val orientObj = JSONObject()
+            orient.enabled?.let { orientObj.put("enabled", it) }
+            orient.modelPath?.let { orientObj.put("modelPath", resolveModel(context, it)) }
+            orient.thresh?.let { orientObj.put("thresh", it.toDouble()) }
+            if (orientObj.length() > 0) json.put("orientation", orientObj)
+        }
+
+        unwarp?.let { unw ->
+            val unwObj = JSONObject()
+            unw.enabled?.let { unwObj.put("enabled", it) }
+            unw.modelPath?.let { unwObj.put("modelPath", resolveModel(context, it)) }
+            if (unwObj.length() > 0) json.put("unwarp", unwObj)
+        }
+
+        preprocessing?.let { prep ->
+            val prepObj = JSONObject()
+            prep.minHeight?.let { prepObj.put("minHeight", it.toDouble()) }
+            prep.maxSideLen?.let { prepObj.put("maxSideLen", it.toDouble()) }
+            prep.minSideLen?.let { prepObj.put("minSideLen", it.toDouble()) }
+            prep.debugImages?.let { prepObj.put("debugImages", it) }
+            if (prepObj.length() > 0) json.put("preprocessing", prepObj)
+        }
+
+        layout?.let { lay ->
+            val layObj = JSONObject()
+            lay.yThresholdMultiplier?.let { layObj.put("yThresholdMultiplier", it.toDouble()) }
+            lay.xThresholdMultiplier?.let { layObj.put("xThresholdMultiplier", it.toDouble()) }
+            if (layObj.length() > 0) json.put("layout", layObj)
+        }
+
         return json.toString()
     }
 
@@ -115,13 +182,6 @@ class RustO private constructor(
 
         @JvmStatic
         external fun nativeVersion(): String
-
-        @JvmStatic
-        private external fun nativeNew(
-            detModelPath: String,
-            recModelPath: String,
-            dictPath: String
-        ): Long
 
         @JvmStatic
         private external fun nativeNewWithConfig(
@@ -200,7 +260,7 @@ class RustO private constructor(
 
         fun create(
             context: Context,
-            config: RustOConfig
+            config: RustOConfig = RustOConfig()
         ): RustO {
             val configJson = config.toJson(context)
             val handle = nativeNewWithConfig(configJson)
@@ -210,32 +270,23 @@ class RustO private constructor(
             return RustO(handle)
         }
 
-        fun create(
-            context: Context,
-            detModel: String = "det.mnn",
-            recModel: String = "rec.mnn",
-            dict: String = "dict.txt"
-        ): RustO {
-            val detPath = copyAssetToCache(context, detModel)
-            val recPath = copyAssetToCache(context, recModel)
-            val dictPath = copyAssetToCache(context, dict)
-
-            val handle = nativeNew(detPath, recPath, dictPath)
-            if (handle == 0L) {
-                throw RustOException("Failed to initialize RustO")
-            }
-            return RustO(handle)
-        }
-
         internal fun copyAssetToCache(context: Context, assetName: String): String {
             val cacheFile = File(context.cacheDir, assetName)
-            if (!cacheFile.exists()) {
-                cacheFile.parentFile?.mkdirs()
+            if (cacheFile.exists() && cacheFile.length() > 0) return cacheFile.absolutePath
+
+            cacheFile.parentFile?.mkdirs()
+            val tmpFile = File(cacheFile.parent, "${cacheFile.name}.tmp")
+            try {
                 context.assets.open(assetName).use { input ->
-                    cacheFile.outputStream().use { output ->
+                    tmpFile.outputStream().use { output ->
                         input.copyTo(output)
                     }
                 }
+                tmpFile.renameTo(cacheFile)
+            } catch (e: java.io.IOException) {
+                tmpFile.delete()
+                throw RustOException("Model asset not found or unreadable: '$assetName'. " +
+                    "Ensure the file is bundled in assets or provide an absolute path. Cause: ${e.message}")
             }
             return cacheFile.absolutePath
         }

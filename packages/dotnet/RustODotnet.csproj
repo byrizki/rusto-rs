@@ -19,6 +19,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="models\**" />
+    <EmbeddedResource Remove="models\**" />
+    <None Remove="models\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Needed by netstandard2.1; net6.0+ provides this from shared framework. -->
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
 

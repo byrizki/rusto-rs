@@ -96,66 +96,102 @@ impl Default for RustOConfig {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default, Clone, Debug)]
+struct DetectionConfigJson {
+    #[serde(alias = "useDet", alias = "use_det")]
+    enabled: Option<bool>,
+    #[serde(alias = "modelPath", alias = "detModelPath", alias = "model_path", alias = "det_model_path")]
+    model_path: Option<PathBuf>,
+    #[serde(alias = "detThresh", alias = "det_thresh")]
+    thresh: Option<f32>,
+    #[serde(alias = "boxThresh", alias = "detBoxThresh", alias = "box_thresh", alias = "det_box_thresh")]
+    box_thresh: Option<f32>,
+    #[serde(alias = "unclipRatio", alias = "unclip_ratio")]
+    unclip_ratio: Option<f32>,
+    #[serde(alias = "limitSideLen", alias = "limit_side_len")]
+    limit_side_len: Option<i32>,
+    #[serde(alias = "limitType", alias = "limit_type")]
+    limit_type: Option<String>,
+    #[serde(alias = "useDilation", alias = "use_dilation")]
+    use_dilation: Option<bool>,
+}
+
+#[derive(Deserialize, Default, Clone, Debug)]
+struct RecognitionConfigJson {
+    #[serde(alias = "useRec", alias = "use_rec")]
+    enabled: Option<bool>,
+    #[serde(alias = "modelPath", alias = "recModelPath", alias = "model_path", alias = "rec_model_path")]
+    model_path: Option<PathBuf>,
+    #[serde(alias = "dictPath", alias = "dict_path")]
+    dict_path: Option<PathBuf>,
+    #[serde(alias = "scoreThresh", alias = "textScore", alias = "score_thresh", alias = "text_score")]
+    score_thresh: Option<f32>,
+    #[serde(alias = "returnWordBox", alias = "return_word_box")]
+    return_word_box: Option<bool>,
+    #[serde(alias = "returnSingleCharBox", alias = "return_single_char_box")]
+    return_single_char_box: Option<bool>,
+}
+
+#[derive(Deserialize, Default, Clone, Debug)]
+struct ClassificationConfigJson {
+    #[serde(alias = "useCls", alias = "use_cls")]
+    enabled: Option<bool>,
+    #[serde(alias = "modelPath", alias = "clsModelPath", alias = "model_path", alias = "cls_model_path")]
+    model_path: Option<PathBuf>,
+    #[serde(alias = "thresh", alias = "clsThreshold", alias = "cls_thresh", alias = "cls_threshold")]
+    threshold: Option<f32>,
+}
+
+#[derive(Deserialize, Default, Clone, Debug)]
+struct OrientationConfigJson {
+    #[serde(alias = "useOrient", alias = "use_orient")]
+    enabled: Option<bool>,
+    #[serde(alias = "modelPath", alias = "orientModelPath", alias = "model_path", alias = "orient_model_path")]
+    model_path: Option<PathBuf>,
+    #[serde(alias = "thresh", alias = "orientThreshold", alias = "orient_thresh", alias = "orient_threshold")]
+    threshold: Option<f32>,
+}
+
+#[derive(Deserialize, Default, Clone, Debug)]
+struct UnwarpConfigJson {
+    #[serde(alias = "useUnwarp", alias = "use_unwarp")]
+    enabled: Option<bool>,
+    #[serde(alias = "modelPath", alias = "unwarpModelPath", alias = "model_path", alias = "unwarp_model_path")]
+    model_path: Option<PathBuf>,
+}
+
+#[derive(Deserialize, Default, Clone, Debug)]
+struct PreprocessingConfigJson {
+    #[serde(alias = "minHeight", alias = "min_height")]
+    min_height: Option<f32>,
+    #[serde(alias = "maxSideLen", alias = "max_side_len")]
+    max_side_len: Option<f32>,
+    #[serde(alias = "minSideLen", alias = "min_side_len")]
+    min_side_len: Option<f32>,
+    #[serde(alias = "debugImages", alias = "debug_images")]
+    debug_images: Option<bool>,
+}
+
+#[derive(Deserialize, Default, Clone, Debug)]
+struct LayoutConfigJson {
+    #[serde(alias = "yThresholdMultiplier", alias = "y_threshold_multiplier")]
+    y_threshold_multiplier: Option<f32>,
+    #[serde(alias = "xThresholdMultiplier", alias = "x_threshold_multiplier")]
+    x_threshold_multiplier: Option<f32>,
+}
+
+#[derive(Deserialize, Default, Clone, Debug)]
 struct FlatConfig {
     #[serde(alias = "template")]
     template: Option<String>,
-    #[serde(alias = "detModelPath")]
-    det_model_path: Option<PathBuf>,
-    #[serde(alias = "recModelPath")]
-    rec_model_path: Option<PathBuf>,
-    #[serde(alias = "dictPath")]
-    dict_path: Option<PathBuf>,
-    #[serde(alias = "orientModelPath")]
-    orient_model_path: Option<PathBuf>,
-    #[serde(alias = "clsModelPath")]
-    cls_model_path: Option<PathBuf>,
-    #[serde(alias = "unwarpModelPath")]
-    unwarp_model_path: Option<PathBuf>,
-    #[serde(alias = "orientThreshold")]
-    orient_threshold: Option<f32>,
-    #[serde(alias = "clsThreshold")]
-    cls_threshold: Option<f32>,
-    #[serde(alias = "textScore")]
-    text_score: Option<f32>,
-    #[serde(alias = "detThresh")]
-    det_thresh: Option<f32>,
-    #[serde(alias = "detBoxThresh")]
-    det_box_thresh: Option<f32>,
-    #[serde(alias = "limitSideLen")]
-    limit_side_len: Option<i32>,
-    #[serde(alias = "limitType")]
-    limit_type: Option<String>,
-    #[serde(alias = "unclipRatio")]
-    unclip_ratio: Option<f32>,
-    #[serde(alias = "useDilation")]
-    use_dilation: Option<bool>,
-    #[serde(alias = "useDet")]
-    use_det: Option<bool>,
-    #[serde(alias = "useRec")]
-    use_rec: Option<bool>,
-    #[serde(alias = "useCls")]
-    use_cls: Option<bool>,
-    #[serde(alias = "useOrient")]
-    use_orient: Option<bool>,
-    #[serde(alias = "useUnwarp")]
-    use_unwarp: Option<bool>,
-    #[serde(alias = "debugImages")]
-    debug_images: Option<bool>,
-    #[serde(alias = "minHeight")]
-    min_height: Option<f32>,
-    #[serde(alias = "maxSideLen")]
-    max_side_len: Option<f32>,
-    #[serde(alias = "minSideLen")]
-    min_side_len: Option<f32>,
-    #[serde(alias = "returnWordBox")]
-    return_word_box: Option<bool>,
-    #[serde(alias = "returnSingleCharBox")]
-    return_single_char_box: Option<bool>,
-    #[serde(alias = "yThresholdMultiplier")]
-    y_threshold_multiplier: Option<f32>,
-    #[serde(alias = "xThresholdMultiplier")]
-    x_threshold_multiplier: Option<f32>,
+
+    detection: Option<DetectionConfigJson>,
+    recognition: Option<RecognitionConfigJson>,
+    classification: Option<ClassificationConfigJson>,
+    orientation: Option<OrientationConfigJson>,
+    unwarp: Option<UnwarpConfigJson>,
+    preprocessing: Option<PreprocessingConfigJson>,
+    layout: Option<LayoutConfigJson>,
 }
 
 impl RustOConfig {
@@ -179,7 +215,7 @@ impl RustOConfig {
         let rec_path = rec_model_path.into();
         let dict = dict_path.into();
 
-        let mut det = DetConfig::ppv6(det_path);
+        let mut det = DetConfig::default(det_path);
         det.limit_side_len = preset.det_limit_side_len;
         det.limit_type = preset.det_limit_type.to_string();
         det.thresh = preset.det_thresh;
@@ -187,7 +223,7 @@ impl RustOConfig {
         det.unclip_ratio = preset.det_unclip_ratio;
         det.use_dilation = preset.det_use_dilation;
 
-        let mut rec = RecConfig::ppv6(rec_path);
+        let mut rec = RecConfig::default(rec_path);
         rec.rec_keys_path = Some(dict);
         rec.rec_img_shape = preset.rec_img_shape;
         rec.rec_batch_num = preset.rec_batch_num;
@@ -259,18 +295,21 @@ impl RustOConfig {
         Self::from_preset(PPV3_MODEL_CONFIG, det_model_path, rec_model_path, dict_path)
     }
 
-    /// Parse configuration from a JSON string (supports both structured and flat JSON formats)
+    /// Parse configuration from a JSON string (supports direct structured and grouped JSON formats)
     pub fn from_json(json_str: &str) -> Result<Self, serde_json::Error> {
-        // Try structured format first
+        // Try direct structured format first
         if let Ok(config) = serde_json::from_str::<RustOConfig>(json_str) {
             return Ok(config);
         }
 
-        // Fall back to flat format
+        // Fall back to grouped format
         let flat: FlatConfig = serde_json::from_str(json_str)?;
-        let det_path = flat.det_model_path.unwrap_or_else(|| PathBuf::from("det.mnn"));
-        let rec_path = flat.rec_model_path.unwrap_or_else(|| PathBuf::from("rec.mnn"));
-        let dict_path = flat.dict_path.unwrap_or_else(|| PathBuf::from("dict.txt"));
+        let det_path = flat.detection.as_ref().and_then(|d| d.model_path.clone())
+            .unwrap_or_else(|| PathBuf::from("det.mnn"));
+        let rec_path = flat.recognition.as_ref().and_then(|r| r.model_path.clone())
+            .unwrap_or_else(|| PathBuf::from("rec.mnn"));
+        let dict_path = flat.recognition.as_ref().and_then(|r| r.dict_path.clone())
+            .unwrap_or_else(|| PathBuf::from("dict.txt"));
 
         let preset = match flat.template.as_deref() {
             Some("ppv5") | Some("PPOCRv5") | Some("v5") | Some("pp-ocrv5") => PPV5_MODEL_CONFIG,
@@ -281,84 +320,89 @@ impl RustOConfig {
 
         let mut config = Self::from_preset(preset, det_path, rec_path, dict_path);
 
-        if let Some(orient_path) = flat.orient_model_path {
-            if let Some(thresh) = flat.orient_threshold {
-                config = config.with_orientation_threshold(orient_path, thresh);
+        let orient_path = flat.orientation.as_ref().and_then(|o| o.model_path.clone());
+        let orient_thresh = flat.orientation.as_ref().and_then(|o| o.threshold);
+        if let Some(path) = orient_path {
+            if let Some(thresh) = orient_thresh {
+                config = config.with_orientation_threshold(path, thresh);
             } else {
-                config = config.with_orientation(orient_path);
+                config = config.with_orientation(path);
             }
         }
 
-        if let Some(cls_path) = flat.cls_model_path {
-            if let Some(thresh) = flat.cls_threshold {
-                config = config.with_cls_threshold(cls_path, thresh);
+        let cls_path = flat.classification.as_ref().and_then(|c| c.model_path.clone());
+        let cls_thresh = flat.classification.as_ref().and_then(|c| c.threshold);
+        if let Some(path) = cls_path {
+            if let Some(thresh) = cls_thresh {
+                config = config.with_cls_threshold(path, thresh);
             } else {
-                config = config.with_cls(cls_path);
+                config = config.with_cls(path);
             }
         }
 
-        if let Some(unwarp_path) = flat.unwarp_model_path {
-            config = config.with_unwarp(unwarp_path);
+        let unwarp_path = flat.unwarp.as_ref().and_then(|u| u.model_path.clone());
+        if let Some(path) = unwarp_path {
+            config = config.with_unwarp(path);
         }
 
-        if let Some(score) = flat.text_score {
+        if let Some(score) = flat.recognition.as_ref().and_then(|r| r.score_thresh) {
             config.global.text_score = score;
         }
-        if let Some(thresh) = flat.det_thresh {
+        if let Some(thresh) = flat.detection.as_ref().and_then(|d| d.thresh) {
             config.det.thresh = thresh;
         }
-        if let Some(box_thresh) = flat.det_box_thresh {
+        if let Some(box_thresh) = flat.detection.as_ref().and_then(|d| d.box_thresh) {
             config.det.box_thresh = box_thresh;
         }
-        if let Some(side_len) = flat.limit_side_len {
+        if let Some(side_len) = flat.detection.as_ref().and_then(|d| d.limit_side_len) {
             config.det.limit_side_len = side_len;
         }
-        if let Some(limit_type) = flat.limit_type {
+        if let Some(limit_type) = flat.detection.as_ref().and_then(|d| d.limit_type.clone()) {
             config.det.limit_type = limit_type;
         }
-        if let Some(unclip) = flat.unclip_ratio {
+        if let Some(unclip) = flat.detection.as_ref().and_then(|d| d.unclip_ratio) {
             config.det.unclip_ratio = unclip;
         }
-        if let Some(dilation) = flat.use_dilation {
+        if let Some(dilation) = flat.detection.as_ref().and_then(|d| d.use_dilation) {
             config.det.use_dilation = dilation;
         }
-        if let Some(use_det) = flat.use_det {
+        if let Some(use_det) = flat.detection.as_ref().and_then(|d| d.enabled) {
             config.global.use_det = use_det;
         }
-        if let Some(use_rec) = flat.use_rec {
+        if let Some(use_rec) = flat.recognition.as_ref().and_then(|r| r.enabled) {
             config.global.use_rec = use_rec;
         }
-        if let Some(use_cls) = flat.use_cls {
+        if let Some(use_cls) = flat.classification.as_ref().and_then(|c| c.enabled) {
             config.global.use_cls = use_cls;
         }
-        if let Some(use_orient) = flat.use_orient {
+        if let Some(use_orient) = flat.orientation.as_ref().and_then(|o| o.enabled) {
             config.global.use_orient = use_orient;
         }
-        if let Some(use_unwarp) = flat.use_unwarp {
+        if let Some(use_unwarp) = flat.unwarp.as_ref().and_then(|u| u.enabled) {
             config.global.use_unwarp = use_unwarp;
         }
-        if let Some(debug) = flat.debug_images {
+        if let Some(debug) = flat.preprocessing.as_ref().and_then(|p| p.debug_images) {
             config.global.debug_images = debug;
         }
-        if let Some(min_h) = flat.min_height {
+        if let Some(min_h) = flat.preprocessing.as_ref().and_then(|p| p.min_height) {
             config.global.min_height = min_h;
         }
-        if let Some(max_s) = flat.max_side_len {
+        if let Some(max_s) = flat.preprocessing.as_ref().and_then(|p| p.max_side_len) {
             config.global.max_side_len = max_s;
         }
-        if let Some(min_s) = flat.min_side_len {
+        if let Some(min_s) = flat.preprocessing.as_ref().and_then(|p| p.min_side_len) {
             config.global.min_side_len = min_s;
         }
-        if let Some(word_box) = flat.return_word_box {
+        if let Some(word_box) = flat.recognition.as_ref().and_then(|r| r.return_word_box) {
             config.global.return_word_box = word_box;
         }
-        if let Some(char_box) = flat.return_single_char_box {
+        if let Some(char_box) = flat.recognition.as_ref().and_then(|r| r.return_single_char_box) {
             config.global.return_single_char_box = char_box;
         }
-        if let Some(y_mult) = flat.y_threshold_multiplier {
+        if let Some(y_mult) = flat.layout.as_ref().and_then(|l| l.y_threshold_multiplier) {
             config.global.y_threshold_multiplier = Some(y_mult);
         }
-        if let Some(x_mult) = flat.x_threshold_multiplier {
+        if let Some(x_mult) = flat.layout.as_ref().and_then(|l| l.x_threshold_multiplier) {
             config.global.x_threshold_multiplier = Some(x_mult);
         }
 

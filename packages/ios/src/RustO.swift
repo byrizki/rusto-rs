@@ -46,73 +46,149 @@ public struct TextResult {
     }
 }
 
-public struct RustOConfig: Codable {
-    public var template: String = "ppv6"
-    public var detModelPath: String = "det.mnn"
-    public var recModelPath: String = "rec.mnn"
-    public var dictPath: String = "dict.txt"
-    public var clsModelPath: String? = nil
-    public var orientModelPath: String? = nil
-    public var unwarpModelPath: String? = nil
-    public var orientThreshold: Float? = nil
-    public var clsThreshold: Float? = nil
-    public var textScore: Float = 0.5
-    public var detThresh: Float = 0.3
-    public var detBoxThresh: Float = 0.6
-    public var limitSideLen: Int = 736
-    public var limitType: String = "min"
-    public var unclipRatio: Float = 2.0
-    public var useDilation: Bool = true
-    public var useDet: Bool = true
-    public var useRec: Bool = true
-    public var useCls: Bool = false
-    public var useOrient: Bool = false
-    public var useUnwarp: Bool = false
-    public var debugImages: Bool = false
-    public var minHeight: Float = 30.0
-    public var maxSideLen: Float = 2000.0
-    public var minSideLen: Float = 30.0
-    public var returnWordBox: Bool = false
-    public var returnSingleCharBox: Bool = false
+public struct DetectionConfig: Codable {
+    public var enabled: Bool? = nil
+    public var modelPath: String? = nil
+    public var thresh: Float? = nil
+    public var boxThresh: Float? = nil
+    public var unclipRatio: Float? = nil
+    public var limitSideLen: Int? = nil
+    public var limitType: String? = nil
+    public var useDilation: Bool? = nil
+
+    public init(enabled: Bool? = nil, modelPath: String? = nil, thresh: Float? = nil, boxThresh: Float? = nil, unclipRatio: Float? = nil, limitSideLen: Int? = nil, limitType: String? = nil, useDilation: Bool? = nil) {
+        self.enabled = enabled
+        self.modelPath = modelPath
+        self.thresh = thresh
+        self.boxThresh = boxThresh
+        self.unclipRatio = unclipRatio
+        self.limitSideLen = limitSideLen
+        self.limitType = limitType
+        self.useDilation = useDilation
+    }
+}
+
+public struct RecognitionConfig: Codable {
+    public var enabled: Bool? = nil
+    public var modelPath: String? = nil
+    public var dictPath: String? = nil
+    public var scoreThresh: Float? = nil
+    public var returnWordBox: Bool? = nil
+    public var returnSingleCharBox: Bool? = nil
+
+    public init(enabled: Bool? = nil, modelPath: String? = nil, dictPath: String? = nil, scoreThresh: Float? = nil, returnWordBox: Bool? = nil, returnSingleCharBox: Bool? = nil) {
+        self.enabled = enabled
+        self.modelPath = modelPath
+        self.dictPath = dictPath
+        self.scoreThresh = scoreThresh
+        self.returnWordBox = returnWordBox
+        self.returnSingleCharBox = returnSingleCharBox
+    }
+}
+
+/// NOTE: Available ONLY on PP-OCRv4 and PP-OCRv5
+public struct ClassificationConfig: Codable {
+    public var enabled: Bool? = nil
+    public var modelPath: String? = nil
+    public var thresh: Float? = nil
+
+    public init(enabled: Bool? = nil, modelPath: String? = nil, thresh: Float? = nil) {
+        self.enabled = enabled
+        self.modelPath = modelPath
+        self.thresh = thresh
+    }
+}
+
+public struct OrientationConfig: Codable {
+    public var enabled: Bool? = nil
+    public var modelPath: String? = nil
+    public var thresh: Float? = nil
+
+    public init(enabled: Bool? = nil, modelPath: String? = nil, thresh: Float? = nil) {
+        self.enabled = enabled
+        self.modelPath = modelPath
+        self.thresh = thresh
+    }
+}
+
+public struct UnwarpConfig: Codable {
+    public var enabled: Bool? = nil
+    public var modelPath: String? = nil
+
+    public init(enabled: Bool? = nil, modelPath: String? = nil) {
+        self.enabled = enabled
+        self.modelPath = modelPath
+    }
+}
+
+public struct PreprocessingConfig: Codable {
+    public var minHeight: Float? = nil
+    public var maxSideLen: Float? = nil
+    public var minSideLen: Float? = nil
+    public var debugImages: Bool? = nil
+
+    public init(minHeight: Float? = nil, maxSideLen: Float? = nil, minSideLen: Float? = nil, debugImages: Bool? = nil) {
+        self.minHeight = minHeight
+        self.maxSideLen = maxSideLen
+        self.minSideLen = minSideLen
+        self.debugImages = debugImages
+    }
+}
+
+public struct LayoutConfig: Codable {
     public var yThresholdMultiplier: Float? = nil
     public var xThresholdMultiplier: Float? = nil
 
+    public init(yThresholdMultiplier: Float? = nil, xThresholdMultiplier: Float? = nil) {
+        self.yThresholdMultiplier = yThresholdMultiplier
+        self.xThresholdMultiplier = xThresholdMultiplier
+    }
+}
+
+public struct RustOConfig: Codable {
+    public var template: String? = nil
+    public var detection: DetectionConfig? = nil
+    public var recognition: RecognitionConfig? = nil
+    public var classification: ClassificationConfig? = nil
+    public var orientation: OrientationConfig? = nil
+    public var unwarp: UnwarpConfig? = nil
+    public var preprocessing: PreprocessingConfig? = nil
+    public var layout: LayoutConfig? = nil
+
     public init(
-        detModelPath: String = "det.mnn",
-        recModelPath: String = "rec.mnn",
-        dictPath: String = "dict.txt",
-        template: String = "ppv6"
+        template: String? = nil,
+        detection: DetectionConfig? = nil,
+        recognition: RecognitionConfig? = nil,
+        classification: ClassificationConfig? = nil,
+        orientation: OrientationConfig? = nil,
+        unwarp: UnwarpConfig? = nil,
+        preprocessing: PreprocessingConfig? = nil,
+        layout: LayoutConfig? = nil
     ) {
         self.template = template
-        self.detModelPath = detModelPath
-        self.recModelPath = recModelPath
-        self.dictPath = dictPath
+        self.detection = detection
+        self.recognition = recognition
+        self.classification = classification
+        self.orientation = orientation
+        self.unwarp = unwarp
+        self.preprocessing = preprocessing
+        self.layout = layout
     }
 
-    public static func ppv6(det: String = "det.mnn", rec: String = "rec.mnn", dict: String = "dict.txt") -> RustOConfig {
-        RustOConfig(detModelPath: det, recModelPath: rec, dictPath: dict, template: "ppv6")
+    public static func ppv6(detection: DetectionConfig? = nil, recognition: RecognitionConfig? = nil) -> RustOConfig {
+        RustOConfig(template: "ppv6", detection: detection, recognition: recognition)
     }
 
-    public static func ppv5(det: String = "det.mnn", rec: String = "rec.mnn", dict: String = "dict.txt") -> RustOConfig {
-        RustOConfig(detModelPath: det, recModelPath: rec, dictPath: dict, template: "ppv5")
+    public static func ppv5(detection: DetectionConfig? = nil, recognition: RecognitionConfig? = nil) -> RustOConfig {
+        RustOConfig(template: "ppv5", detection: detection, recognition: recognition)
     }
 
-    public static func ppv4(det: String = "det.mnn", rec: String = "rec.mnn", dict: String = "dict.txt") -> RustOConfig {
-        var cfg = RustOConfig(detModelPath: det, recModelPath: rec, dictPath: dict, template: "ppv4")
-        cfg.limitSideLen = 960
-        cfg.limitType = "max"
-        cfg.unclipRatio = 1.5
-        cfg.useDilation = false
-        return cfg
+    public static func ppv4(detection: DetectionConfig? = nil, recognition: RecognitionConfig? = nil) -> RustOConfig {
+        RustOConfig(template: "ppv4", detection: detection, recognition: recognition)
     }
 
-    public static func ppv3(det: String = "det.mnn", rec: String = "rec.mnn", dict: String = "dict.txt") -> RustOConfig {
-        var cfg = RustOConfig(detModelPath: det, recModelPath: rec, dictPath: dict, template: "ppv3")
-        cfg.limitSideLen = 960
-        cfg.limitType = "max"
-        cfg.unclipRatio = 1.5
-        cfg.useDilation = false
-        return cfg
+    public static func ppv3(detection: DetectionConfig? = nil, recognition: RecognitionConfig? = nil) -> RustOConfig {
+        RustOConfig(template: "ppv3", detection: detection, recognition: recognition)
     }
 }
 
@@ -134,20 +210,32 @@ public class RustO {
         return String(cString: versionPtr)
     }
 
-    public init(config: RustOConfig) throws {
+    public init(config: RustOConfig = RustOConfig()) throws {
         var resolvedConfig = config
-        resolvedConfig.detModelPath = resolveModelPath(config.detModelPath) ?? config.detModelPath
-        resolvedConfig.recModelPath = resolveModelPath(config.recModelPath) ?? config.recModelPath
-        resolvedConfig.dictPath = resolveModelPath(config.dictPath) ?? config.dictPath
 
-        if let cls = config.clsModelPath {
-            resolvedConfig.clsModelPath = resolveModelPath(cls) ?? cls
+        var det = config.detection ?? DetectionConfig()
+        let detName = det.modelPath ?? "det.mnn"
+        det.modelPath = resolveModelPath(detName) ?? detName
+        resolvedConfig.detection = det
+
+        var rec = config.recognition ?? RecognitionConfig()
+        let recName = rec.modelPath ?? "rec.mnn"
+        let dictName = rec.dictPath ?? "dict.txt"
+        rec.modelPath = resolveModelPath(recName) ?? recName
+        rec.dictPath = resolveModelPath(dictName) ?? dictName
+        resolvedConfig.recognition = rec
+
+        if var clsCfg = config.classification, let clsPath = clsCfg.modelPath {
+            clsCfg.modelPath = resolveModelPath(clsPath) ?? clsPath
+            resolvedConfig.classification = clsCfg
         }
-        if let orient = config.orientModelPath {
-            resolvedConfig.orientModelPath = resolveModelPath(orient) ?? orient
+        if var orientCfg = config.orientation, let orientPath = orientCfg.modelPath {
+            orientCfg.modelPath = resolveModelPath(orientPath) ?? orientPath
+            resolvedConfig.orientation = orientCfg
         }
-        if let unwarp = config.unwarpModelPath {
-            resolvedConfig.unwarpModelPath = resolveModelPath(unwarp) ?? unwarp
+        if var unwarpCfg = config.unwarp, let unwarpPath = unwarpCfg.modelPath {
+            unwarpCfg.modelPath = resolveModelPath(unwarpPath) ?? unwarpPath
+            resolvedConfig.unwarp = unwarpCfg
         }
 
         let encoder = JSONEncoder()
@@ -157,30 +245,6 @@ public class RustO {
         }
 
         handle = rocr_new_with_config(jsonStr)
-        guard handle != nil else {
-            throw RustOError.initializationFailed
-        }
-    }
-
-    public init(
-        detModelPath: String? = nil,
-        recModelPath: String? = nil,
-        dictPath: String? = nil
-    ) throws {
-        let detPath = detModelPath ?? resolveModelPath("det.mnn")
-        let recPath = recModelPath ?? resolveModelPath("rec.mnn")
-        let dictFile = dictPath ?? resolveModelPath("dict.txt")
-        
-        guard let detPath = detPath, let recPath = recPath, let dictFile = dictFile else {
-            throw RustOError.invalidPath
-        }
-        
-        handle = rocr_new(
-            detPath,
-            recPath,
-            dictFile
-        )
-
         guard handle != nil else {
             throw RustOError.initializationFailed
         }

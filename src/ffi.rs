@@ -91,7 +91,7 @@ pub unsafe extern "C" fn rocr_new(
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let config = RustOConfig::new_ppv5(det_model, rec_model, dict);
+    let config = RustOConfig::new(det_model, rec_model, dict);
 
     match RustO::new(config) {
         Ok(ocr) => Box::into_raw(Box::new(ROCRHandle { inner: ocr })),
@@ -530,7 +530,7 @@ pub unsafe extern "C" fn Java_com_byrizki_rusto_RustO_nativeNew(
         Err(_) => return 0,
     };
 
-    let config = RustOConfig::new_ppv5(det, rec, dict);
+    let config = RustOConfig::new(det, rec, dict);
     match RustO::new(config) {
         Ok(ocr) => Box::into_raw(Box::new(ROCRHandle { inner: ocr })) as jlong,
         Err(_) => 0,

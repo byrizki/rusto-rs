@@ -31,73 +31,108 @@ export interface TextResult {
   frame: Frame;
 }
 
-export interface RustOConfig {
-  /** Template / model preset architecture: 'ppv6', 'ppv5', 'ppv4', or 'ppv3' (default: 'ppv6') */
-  template?: 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3' | string;
+export interface DetectionConfig {
+  /** Enable/disable text detection stage (default: true) */
+  enabled?: boolean;
   /** Path to text detection model (e.g. 'det.mnn') */
-  detModelPath?: string;
+  modelPath?: string;
+  /** Detection binarization threshold (0.0 - 1.0, default: 0.3) */
+  thresh?: number;
+  /** Detection box score threshold (0.0 - 1.0, default: 0.6 for v6/v4/v3, 0.5 for v5) */
+  boxThresh?: number;
+  /** Polygon expansion unclip ratio (default: 2.0 for v6/v5, 1.5 for v4/v3) */
+  unclipRatio?: number;
+  /** Max image side length limit for detection (default: 736 for v6/v5, 960 for v4/v3) */
+  limitSideLen?: number;
+  /** Side limit type: 'min' or 'max' (default: 'min' for v6/v5, 'max' for v4/v3) */
+  limitType?: 'min' | 'max' | string;
+  /** Whether to apply morphological dilation (default: true for v6/v5, false for v4/v3) */
+  useDilation?: boolean;
+}
+
+export interface RecognitionConfig {
+  /** Enable/disable text recognition stage (default: true) */
+  enabled?: boolean;
   /** Path to text recognition model (e.g. 'rec.mnn') */
-  recModelPath?: string;
+  modelPath?: string;
   /** Path to dictionary file (e.g. 'dict.txt') */
   dictPath?: string;
-  /** Path to text line orientation classification model (CLS) */
-  clsModelPath?: string;
-  /** Path to document orientation model */
-  orientModelPath?: string;
-  /** Path to text rectification / unwarp model */
-  unwarpModelPath?: string;
-  /** Minimum confidence threshold for document orientation (0.0 - 1.0) */
-  orientThreshold?: number;
-  /** Minimum confidence threshold for text line classification (0.0 - 1.0) */
-  clsThreshold?: number;
   /** Minimum text confidence score (0.0 - 1.0, default: 0.5) */
-  textScore?: number;
-  /** Detection binarization threshold (0.0 - 1.0, default: 0.3) */
-  detThresh?: number;
-  /** Detection box score threshold (0.0 - 1.0, default: 0.5) */
-  detBoxThresh?: number;
-  /** Max image side length limit for detection (default: 736) */
-  limitSideLen?: number;
-  /** Side limit type: 'min' or 'max' (default: 'min') */
-  limitType?: string;
-  /** Polygon expansion unclip ratio (default: 2.0) */
-  unclipRatio?: number;
-  /** Whether to apply morphological dilation (default: true) */
-  useDilation?: boolean;
-  /** Enable/disable text detection (default: true) */
-  useDet?: boolean;
-  /** Enable/disable text recognition (default: true) */
-  useRec?: boolean;
-  /** Enable/disable line classification (default: false) */
-  useCls?: boolean;
+  scoreThresh?: number;
+  /** Return word-level bounding boxes (default: false) */
+  returnWordBox?: boolean;
+  /** Return character-level bounding boxes (default: false) */
+  returnSingleCharBox?: boolean;
+}
+
+/**
+ * Line Classification Configuration (CLS)
+ * NOTE: Text line orientation classifier (180° rotation) is ONLY available on PP-OCRv4 and PP-OCRv5.
+ */
+export interface ClassificationConfig {
+  /** Enable/disable line classification (default: false). NOTE: Available ONLY on PP-OCRv4 and PP-OCRv5 */
+  enabled?: boolean;
+  /** Path to text line classification model (e.g. 'cls.mnn'). NOTE: Available ONLY on PP-OCRv4 and PP-OCRv5 */
+  modelPath?: string;
+  /** Minimum confidence threshold for classification (0.0 - 1.0, default: 0.9). NOTE: Available ONLY on PP-OCRv4 and PP-OCRv5 */
+  thresh?: number;
+}
+
+export interface OrientationConfig {
   /** Enable/disable document orientation correction (default: false) */
-  useOrient?: boolean;
+  enabled?: boolean;
+  /** Path to document orientation model (e.g. 'orient.mnn') */
+  modelPath?: string;
+  /** Minimum confidence threshold for document orientation (0.0 - 1.0, default: 0.5) */
+  thresh?: number;
+}
+
+export interface UnwarpConfig {
   /** Enable/disable document unwarping (default: false) */
-  useUnwarp?: boolean;
-  /** Enable debug images in output (default: false) */
-  debugImages?: boolean;
+  enabled?: boolean;
+  /** Path to document unwarping model (e.g. 'unwarp.mnn') */
+  modelPath?: string;
+}
+
+export interface PreprocessingConfig {
   /** Minimum text box height in pixels (default: 30.0) */
   minHeight?: number;
   /** Maximum image side length for processing (default: 2000.0) */
   maxSideLen?: number;
   /** Minimum image side length for processing (default: 30.0) */
   minSideLen?: number;
-  /** Return word-level bounding boxes (default: false) */
-  returnWordBox?: boolean;
-  /** Return character-level bounding boxes (default: false) */
-  returnSingleCharBox?: boolean;
+  /** Enable debug images in output (default: false) */
+  debugImages?: boolean;
+}
+
+export interface LayoutConfig {
   /** Y threshold multiplier for line grouping in spatial text (default: 0.5) */
   yThresholdMultiplier?: number;
   /** X threshold multiplier for word/column gap separation in spatial text (default: 0.4) */
   xThresholdMultiplier?: number;
 }
 
+export interface RustOConfig {
+  /** Template / model preset architecture: 'ppv6', 'ppv5', 'ppv4', or 'ppv3' (default: 'ppv6') */
+  template?: 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3' | string;
+  /** Text detection (DET) stage configuration */
+  detection?: DetectionConfig;
+  /** Text recognition (REC) stage configuration */
+  recognition?: RecognitionConfig;
+  /** Text line orientation classification (CLS) configuration. NOTE: Available ONLY on PP-OCRv4 and PP-OCRv5 */
+  classification?: ClassificationConfig;
+  /** Document orientation (ORIENT) configuration */
+  orientation?: OrientationConfig;
+  /** Document unwarping (UNWARP) configuration */
+  unwarp?: UnwarpConfig;
+  /** Preprocessing & image constraints configuration */
+  preprocessing?: PreprocessingConfig;
+  /** Spatial layout formatting configuration */
+  layout?: LayoutConfig;
+}
+
 export interface RustoInterface {
-  initialize(
-    configOrDetModel?: RustOConfig | string,
-    recModel?: string,
-    dict?: string
-  ): Promise<boolean>;
+  initialize(config?: RustOConfig): Promise<boolean>;
   detectText(imagePath: string): Promise<TextResult[]>;
   detectTextFromBytes(imageData: string): Promise<TextResult[]>;
   detectTextToRaw(imagePath: string): Promise<string>;
@@ -119,15 +154,8 @@ export interface RustoInterface {
   getVersion(): Promise<string>;
 }
 
-export function initialize(
-  configOrDetModel?: RustOConfig | string,
-  recModel?: string,
-  dict?: string
-): Promise<boolean> {
-  if (typeof configOrDetModel === 'object' && configOrDetModel !== null) {
-    return Rusto.initialize(configOrDetModel);
-  }
-  return Rusto.initialize(configOrDetModel, recModel, dict);
+export function initialize(config?: RustOConfig): Promise<boolean> {
+  return Rusto.initialize(config ?? {});
 }
 
 export function detectText(imagePath: string): Promise<TextResult[]> {

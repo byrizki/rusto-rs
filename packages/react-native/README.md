@@ -81,16 +81,23 @@ console.log(`RustO version: ${version}`);
 ```typescript
 import { initialize, detectText, detectTextToSpatialText } from 'react-native-rusto';
 
-// Initialize with unified RustOConfig
+// Initialize with unified grouped RustOConfig
 await initialize({
-  detModelPath: 'det.mnn',
-  recModelPath: 'rec.mnn',
-  dictPath: 'dict.txt',
-  textScore: 0.6,
-  detThresh: 0.3,
-  detBoxThresh: 0.5,
-  yThresholdMultiplier: 0.5,
-  xThresholdMultiplier: 0.4,
+  template: 'ppv6',
+  detection: {
+    modelPath: 'det.mnn',
+    thresh: 0.3,
+    boxThresh: 0.5,
+  },
+  recognition: {
+    modelPath: 'rec.mnn',
+    dictPath: 'dict.txt',
+    scoreThresh: 0.6,
+  },
+  layout: {
+    yThresholdMultiplier: 0.5,
+    xThresholdMultiplier: 0.4,
+  },
 });
 
 // Or extract spatial text with custom XY thresholds
@@ -107,14 +114,12 @@ Model files can be bundled with your app. See [BUNDLING.md](./BUNDLING.md) for d
 
 ## API
 
-### `initialize(configOrDetModel?: RustOConfig | string, recModel?: string, dict?: string): Promise<boolean>`
+### `initialize(config?: RustOConfig): Promise<boolean>`
 
-Initialize the RustO engine with a `RustOConfig` object or individual model files.
+Initialize the RustO engine with optional `RustOConfig` configuration.
 
 **Parameters:**
-- `configOrDetModel`: A `RustOConfig` configuration object, or path to detection model file (default: `'det.mnn'`)
-- `recModel`: Path to recognition model file (default: `'rec.mnn'`)
-- `dict`: Path to dictionary file (default: `'dict.txt'`)
+- `config`: Optional `RustOConfig` configuration object (supports template presets and specific property overrides).
 
 **Returns:** `true` on successful initialization
 
@@ -155,35 +160,65 @@ interface TextResult {
   frame: Frame;
 }
 
+interface DetectionConfig {
+  enabled?: boolean;    // Enable/disable detection stage (default: true)
+  modelPath?: string;   // Path to text detection model (e.g. 'det.mnn')
+  thresh?: number;      // Binarization threshold (default: 0.3)
+  boxThresh?: number;   // Box score threshold (default: 0.6 in v6/v4/v3, 0.5 in v5)
+  unclipRatio?: number; // Polygon expansion ratio (default: 2.0 in v6/v5, 1.5 in v4/v3)
+  limitSideLen?: number;// Max image side length limit (default: 736 in v6/v5, 960 in v4/v3)
+  limitType?: string;   // Side limit type: 'min' | 'max'
+  useDilation?: boolean;// Apply morphological dilation (default: true in v6/v5, false in v4/v3)
+}
+
+interface RecognitionConfig {
+  enabled?: boolean;            // Enable/disable recognition stage (default: true)
+  modelPath?: string;           // Path to text recognition model (e.g. 'rec.mnn')
+  dictPath?: string;            // Path to dictionary file (e.g. 'dict.txt')
+  scoreThresh?: number;         // Min text confidence score (default: 0.5)
+  returnWordBox?: boolean;      // Return word-level boxes (default: false)
+  returnSingleCharBox?: boolean;// Return character-level boxes (default: false)
+}
+
+/** Line Classification (CLS) — Available ONLY on PP-OCRv4 & PP-OCRv5 */
+interface ClassificationConfig {
+  enabled?: boolean;    // Enable line classifier (default: false, v4/v5 only)
+  modelPath?: string;   // Path to line orientation model (v4/v5 only)
+  thresh?: number;      // Min confidence threshold (default: 0.9, v4/v5 only)
+}
+
+interface OrientationConfig {
+  enabled?: boolean;    // Enable document orientation correction (default: false)
+  modelPath?: string;   // Path to document orientation model
+  thresh?: number;      // Min orientation confidence threshold (default: 0.5)
+}
+
+interface UnwarpConfig {
+  enabled?: boolean;    // Enable document unwarping (default: false)
+  modelPath?: string;   // Path to document unwarping model
+}
+
+interface PreprocessingConfig {
+  minHeight?: number;   // Minimum text box height in pixels (default: 30.0)
+  maxSideLen?: number;  // Maximum image side length (default: 2000.0)
+  minSideLen?: number;  // Minimum image side length (default: 30.0)
+  debugImages?: boolean;// Return intermediate debug images (default: false)
+}
+
+interface LayoutConfig {
+  yThresholdMultiplier?: number;// Y line grouping threshold (default: 0.5)
+  xThresholdMultiplier?: number;// X word spacing threshold (default: 0.4)
+}
+
 interface RustOConfig {
-  detModelPath?: string;
-  recModelPath?: string;
-  dictPath?: string;
-  clsModelPath?: string;
-  orientModelPath?: string;
-  unwarpModelPath?: string;
-  orientThreshold?: number;
-  clsThreshold?: number;
-  textScore?: number;
-  detThresh?: number;
-  detBoxThresh?: number;
-  limitSideLen?: number;
-  limitType?: string;
-  unclipRatio?: number;
-  useDilation?: boolean;
-  useDet?: boolean;
-  useRec?: boolean;
-  useCls?: boolean;
-  useOrient?: boolean;
-  useUnwarp?: boolean;
-  debugImages?: boolean;
-  minHeight?: number;
-  maxSideLen?: number;
-  minSideLen?: number;
-  returnWordBox?: boolean;
-  returnSingleCharBox?: boolean;
-  yThresholdMultiplier?: number;
-  xThresholdMultiplier?: number;
+  template?: 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3' | string;
+  detection?: DetectionConfig;
+  recognition?: RecognitionConfig;
+  classification?: ClassificationConfig; // NOTE: Only in v4 & v5
+  orientation?: OrientationConfig;
+  unwarp?: UnwarpConfig;
+  preprocessing?: PreprocessingConfig;
+  layout?: LayoutConfig;
 }
 ```
 

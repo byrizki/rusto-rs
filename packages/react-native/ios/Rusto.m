@@ -2,9 +2,7 @@
 
 @interface RCT_EXTERN_MODULE(Rusto, NSObject)
 
-RCT_EXTERN_METHOD(initialize:(nullable id)configOrDet
-                  recModel:(nullable NSString *)recModel
-                  dict:(nullable NSString *)dict
+RCT_EXTERN_METHOD(initialize:(nullable NSDictionary *)config
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 

@@ -120,15 +120,19 @@ const results = await detectText('/path/to/image.jpg');
 
 ### With Custom Model Paths
 
-You can still specify custom model paths if needed:
+You can specify custom model paths in config:
 
 ```typescript
 // Initialize with custom models
-await initialize(
-  '/custom/path/det_model.mnn',
-  '/custom/path/rec_model.mnn',
-  '/custom/path/dictionary.txt'
-);
+await initialize({
+  detection: {
+    modelPath: '/custom/path/det_model.mnn',
+  },
+  recognition: {
+    modelPath: '/custom/path/rec_model.mnn',
+    dictPath: '/custom/path/dictionary.txt',
+  },
+});
 ```
 
 ### Partial Override
@@ -137,10 +141,10 @@ You can override only specific models:
 
 ```typescript
 // Use bundled det.mnn and rec.mnn, but custom dictionary
-await initialize(null, null, '/custom/path/my_dict.txt');
+await initialize({ recognition: { dictPath: '/custom/path/my_dict.txt' } });
 
-// Or use default for some
-await initialize('/custom/det.mnn'); // Uses bundled rec.mnn and dict.txt
+// Or use custom det model with bundled rec.mnn and dict.txt
+await initialize({ detection: { modelPath: '/custom/det.mnn' } });
 ```
 
 ---

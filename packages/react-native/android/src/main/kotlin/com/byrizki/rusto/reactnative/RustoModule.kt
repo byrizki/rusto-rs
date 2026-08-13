@@ -27,29 +27,13 @@ class RustoModule(private val reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
-    fun initialize(configOrDet: Dynamic, recModel: String?, dict: String?, promise: Promise) {
+    fun initialize(configMap: ReadableMap?, promise: Promise) {
         try {
             rustoInstance?.close()
             rustoInstance = null
 
-            if (configOrDet.type == ReadableType.Map) {
-                val map = configOrDet.asMap()
-                val config = parseConfigFromMap(map)
-                rustoInstance = RustO.create(reactContext, config)
-                promise.resolve(true)
-                return
-            }
-
-            val detModelPath = if (configOrDet.type == ReadableType.String) configOrDet.asString() else "det.mnn"
-            val recModelPath = recModel ?: "rec.mnn"
-            val dictPath = dict ?: "dict.txt"
-
-            rustoInstance = RustO.create(
-                reactContext,
-                detModelPath,
-                recModelPath,
-                dictPath
-            )
+            val config = if (configMap != null) parseConfigFromMap(configMap) else RustOConfig()
+            rustoInstance = RustO.create(reactContext, config)
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("INIT_ERROR", "Failed to initialize RustO: ${e.message}", e)
@@ -57,35 +41,85 @@ class RustoModule(private val reactContext: ReactApplicationContext) :
     }
 
     private fun parseConfigFromMap(map: ReadableMap): RustOConfig {
+        val detMap = if (map.hasKey("detection") && !map.isNull("detection")) map.getMap("detection") else null
+        val detection = detMap?.let {
+            DetectionConfig(
+                enabled = if (it.hasKey("enabled") && !it.isNull("enabled")) it.getBoolean("enabled") else null,
+                modelPath = if (it.hasKey("modelPath") && !it.isNull("modelPath")) it.getString("modelPath") else null,
+                thresh = if (it.hasKey("thresh") && !it.isNull("thresh")) it.getDouble("thresh").toFloat() else null,
+                boxThresh = if (it.hasKey("boxThresh") && !it.isNull("boxThresh")) it.getDouble("boxThresh").toFloat() else null,
+                unclipRatio = if (it.hasKey("unclipRatio") && !it.isNull("unclipRatio")) it.getDouble("unclipRatio").toFloat() else null,
+                limitSideLen = if (it.hasKey("limitSideLen") && !it.isNull("limitSideLen")) it.getInt("limitSideLen") else null,
+                limitType = if (it.hasKey("limitType") && !it.isNull("limitType")) it.getString("limitType") else null,
+                useDilation = if (it.hasKey("useDilation") && !it.isNull("useDilation")) it.getBoolean("useDilation") else null
+            )
+        }
+
+        val recMap = if (map.hasKey("recognition") && !map.isNull("recognition")) map.getMap("recognition") else null
+        val recognition = recMap?.let {
+            RecognitionConfig(
+                enabled = if (it.hasKey("enabled") && !it.isNull("enabled")) it.getBoolean("enabled") else null,
+                modelPath = if (it.hasKey("modelPath") && !it.isNull("modelPath")) it.getString("modelPath") else null,
+                dictPath = if (it.hasKey("dictPath") && !it.isNull("dictPath")) it.getString("dictPath") else null,
+                scoreThresh = if (it.hasKey("scoreThresh") && !it.isNull("scoreThresh")) it.getDouble("scoreThresh").toFloat() else null,
+                returnWordBox = if (it.hasKey("returnWordBox") && !it.isNull("returnWordBox")) it.getBoolean("returnWordBox") else null,
+                returnSingleCharBox = if (it.hasKey("returnSingleCharBox") && !it.isNull("returnSingleCharBox")) it.getBoolean("returnSingleCharBox") else null
+            )
+        }
+
+        val clsMap = if (map.hasKey("classification") && !map.isNull("classification")) map.getMap("classification") else null
+        val classification = clsMap?.let {
+            ClassificationConfig(
+                enabled = if (it.hasKey("enabled") && !it.isNull("enabled")) it.getBoolean("enabled") else null,
+                modelPath = if (it.hasKey("modelPath") && !it.isNull("modelPath")) it.getString("modelPath") else null,
+                thresh = if (it.hasKey("thresh") && !it.isNull("thresh")) it.getDouble("thresh").toFloat() else null
+            )
+        }
+
+        val orientMap = if (map.hasKey("orientation") && !map.isNull("orientation")) map.getMap("orientation") else null
+        val orientation = orientMap?.let {
+            OrientationConfig(
+                enabled = if (it.hasKey("enabled") && !it.isNull("enabled")) it.getBoolean("enabled") else null,
+                modelPath = if (it.hasKey("modelPath") && !it.isNull("modelPath")) it.getString("modelPath") else null,
+                thresh = if (it.hasKey("thresh") && !it.isNull("thresh")) it.getDouble("thresh").toFloat() else null
+            )
+        }
+
+        val unwarpMap = if (map.hasKey("unwarp") && !map.isNull("unwarp")) map.getMap("unwarp") else null
+        val unwarp = unwarpMap?.let {
+            UnwarpConfig(
+                enabled = if (it.hasKey("enabled") && !it.isNull("enabled")) it.getBoolean("enabled") else null,
+                modelPath = if (it.hasKey("modelPath") && !it.isNull("modelPath")) it.getString("modelPath") else null
+            )
+        }
+
+        val prepMap = if (map.hasKey("preprocessing") && !map.isNull("preprocessing")) map.getMap("preprocessing") else null
+        val preprocessing = prepMap?.let {
+            PreprocessingConfig(
+                minHeight = if (it.hasKey("minHeight") && !it.isNull("minHeight")) it.getDouble("minHeight").toFloat() else null,
+                maxSideLen = if (it.hasKey("maxSideLen") && !it.isNull("maxSideLen")) it.getDouble("maxSideLen").toFloat() else null,
+                minSideLen = if (it.hasKey("minSideLen") && !it.isNull("minSideLen")) it.getDouble("minSideLen").toFloat() else null,
+                debugImages = if (it.hasKey("debugImages") && !it.isNull("debugImages")) it.getBoolean("debugImages") else null
+            )
+        }
+
+        val layoutMap = if (map.hasKey("layout") && !map.isNull("layout")) map.getMap("layout") else null
+        val layout = layoutMap?.let {
+            LayoutConfig(
+                yThresholdMultiplier = if (it.hasKey("yThresholdMultiplier") && !it.isNull("yThresholdMultiplier")) it.getDouble("yThresholdMultiplier").toFloat() else null,
+                xThresholdMultiplier = if (it.hasKey("xThresholdMultiplier") && !it.isNull("xThresholdMultiplier")) it.getDouble("xThresholdMultiplier").toFloat() else null
+            )
+        }
+
         return RustOConfig(
-            detModelPath = if (map.hasKey("detModelPath")) map.getString("detModelPath") ?: "det.mnn" else "det.mnn",
-            recModelPath = if (map.hasKey("recModelPath")) map.getString("recModelPath") ?: "rec.mnn" else "rec.mnn",
-            dictPath = if (map.hasKey("dictPath")) map.getString("dictPath") ?: "dict.txt" else "dict.txt",
-            clsModelPath = if (map.hasKey("clsModelPath")) map.getString("clsModelPath") else null,
-            orientModelPath = if (map.hasKey("orientModelPath")) map.getString("orientModelPath") else null,
-            unwarpModelPath = if (map.hasKey("unwarpModelPath")) map.getString("unwarpModelPath") else null,
-            orientThreshold = if (map.hasKey("orientThreshold")) map.getDouble("orientThreshold").toFloat() else null,
-            clsThreshold = if (map.hasKey("clsThreshold")) map.getDouble("clsThreshold").toFloat() else null,
-            textScore = if (map.hasKey("textScore")) map.getDouble("textScore").toFloat() else 0.5f,
-            detThresh = if (map.hasKey("detThresh")) map.getDouble("detThresh").toFloat() else 0.3f,
-            detBoxThresh = if (map.hasKey("detBoxThresh")) map.getDouble("detBoxThresh").toFloat() else 0.5f,
-            limitSideLen = if (map.hasKey("limitSideLen")) map.getInt("limitSideLen") else 736,
-            limitType = if (map.hasKey("limitType")) map.getString("limitType") ?: "min" else "min",
-            unclipRatio = if (map.hasKey("unclipRatio")) map.getDouble("unclipRatio").toFloat() else 2.0f,
-            useDilation = if (map.hasKey("useDilation")) map.getBoolean("useDilation") else true,
-            useDet = if (map.hasKey("useDet")) map.getBoolean("useDet") else true,
-            useRec = if (map.hasKey("useRec")) map.getBoolean("useRec") else true,
-            useCls = if (map.hasKey("useCls")) map.getBoolean("useCls") else false,
-            useOrient = if (map.hasKey("useOrient")) map.getBoolean("useOrient") else false,
-            useUnwarp = if (map.hasKey("useUnwarp")) map.getBoolean("useUnwarp") else false,
-            debugImages = if (map.hasKey("debugImages")) map.getBoolean("debugImages") else false,
-            minHeight = if (map.hasKey("minHeight")) map.getDouble("minHeight").toFloat() else 30.0f,
-            maxSideLen = if (map.hasKey("maxSideLen")) map.getDouble("maxSideLen").toFloat() else 2000.0f,
-            minSideLen = if (map.hasKey("minSideLen")) map.getDouble("minSideLen").toFloat() else 30.0f,
-            returnWordBox = if (map.hasKey("returnWordBox")) map.getBoolean("returnWordBox") else false,
-            returnSingleCharBox = if (map.hasKey("returnSingleCharBox")) map.getBoolean("returnSingleCharBox") else false,
-            yThresholdMultiplier = if (map.hasKey("yThresholdMultiplier")) map.getDouble("yThresholdMultiplier").toFloat() else null,
-            xThresholdMultiplier = if (map.hasKey("xThresholdMultiplier")) map.getDouble("xThresholdMultiplier").toFloat() else null
+            template = if (map.hasKey("template") && !map.isNull("template")) map.getString("template") else null,
+            detection = detection,
+            recognition = recognition,
+            classification = classification,
+            orientation = orientation,
+            unwarp = unwarp,
+            preprocessing = preprocessing,
+            layout = layout
         )
     }
 

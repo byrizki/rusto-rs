@@ -12,75 +12,54 @@ class RustoModule: NSObject {
     }
     
     @objc
-    func initialize(_ configOrDet: Any?,
-                   recModel: String?,
-                   dict: String?,
+    func initialize(_ configDict: [String: Any]?,
                    resolver resolve: @escaping RCTPromiseResolveBlock,
                    rejecter reject: @escaping RCTPromiseRejectBlock) {
-        
-        if let configDict = configOrDet as? [String: Any] {
-            if let existing = rustoInstance {
-                rocr_free(existing)
-                rustoInstance = nil
-            }
-            
-            var resolvedConfig = configDict
-            let detModelName = (configDict["detModelPath"] as? String) ?? "det.mnn"
-            let recModelName = (configDict["recModelPath"] as? String) ?? "rec.mnn"
-            let dictName = (configDict["dictPath"] as? String) ?? "dict.txt"
-            
-            resolvedConfig["detModelPath"] = getResourcePath(detModelName) ?? detModelName
-            resolvedConfig["recModelPath"] = getResourcePath(recModelName) ?? recModelName
-            resolvedConfig["dictPath"] = getResourcePath(dictName) ?? dictName
-            
-            if let cls = configDict["clsModelPath"] as? String {
-                resolvedConfig["clsModelPath"] = getResourcePath(cls) ?? cls
-            }
-            if let orient = configDict["orientModelPath"] as? String {
-                resolvedConfig["orientModelPath"] = getResourcePath(orient) ?? orient
-            }
-            if let unwarp = configDict["unwarpModelPath"] as? String {
-                resolvedConfig["unwarpModelPath"] = getResourcePath(unwarp) ?? unwarp
-            }
-            
-            guard let jsonData = try? JSONSerialization.data(withJSONObject: resolvedConfig),
-                  let jsonStr = String(data: jsonData, encoding: .utf8) else {
-                reject("INIT_ERROR", "Failed to serialize configuration", nil)
-                return
-            }
-            
-            rustoInstance = rocr_new_with_config(jsonStr)
-            if rustoInstance == nil {
-                reject("INIT_ERROR", "Failed to initialize RustO with config", nil)
-            } else {
-                resolve(true)
-            }
-            return
-        }
-        
-        let detModelStr = configOrDet as? String
-        let detModelName = detModelStr ?? "det.mnn"
-        let recModelName = recModel ?? "rec.mnn"
-        let dictName = dict ?? "dict.txt"
-        
-        let detPath = getResourcePath(detModelName)
-        let recPath = getResourcePath(recModelName)
-        let dictPath = getResourcePath(dictName)
-        
-        guard let detPath = detPath, let recPath = recPath, let dictPath = dictPath else {
-            reject("INIT_ERROR", "Failed to find model files: \(detModelName), \(recModelName), \(dictName)", nil)
-            return
-        }
         
         if let existing = rustoInstance {
             rocr_free(existing)
             rustoInstance = nil
         }
         
-        rustoInstance = rocr_new(detPath, recPath, dictPath)
+        var resolvedConfig = configDict ?? [:]
+
+        var detDict = (resolvedConfig["detection"] as? [String: Any]) ?? [:]
+        let detModelName = (detDict["modelPath"] as? String) ?? "det.mnn"
+        detDict["modelPath"] = getResourcePath(detModelName) ?? detModelName
+        resolvedConfig["detection"] = detDict
+
+        var recDict = (resolvedConfig["recognition"] as? [String: Any]) ?? [:]
+        let recModelName = (recDict["modelPath"] as? String) ?? "rec.mnn"
+        let dictName = (recDict["dictPath"] as? String) ?? "dict.txt"
+        recDict["modelPath"] = getResourcePath(recModelName) ?? recModelName
+        recDict["dictPath"] = getResourcePath(dictName) ?? dictName
+        resolvedConfig["recognition"] = recDict
+
+        if var clsDict = resolvedConfig["classification"] as? [String: Any],
+           let clsPath = clsDict["modelPath"] as? String {
+            clsDict["modelPath"] = getResourcePath(clsPath) ?? clsPath
+            resolvedConfig["classification"] = clsDict
+        }
+        if var orientDict = resolvedConfig["orientation"] as? [String: Any],
+           let orientPath = orientDict["modelPath"] as? String {
+            orientDict["modelPath"] = getResourcePath(orientPath) ?? orientPath
+            resolvedConfig["orientation"] = orientDict
+        }
+        if var unwarpDict = resolvedConfig["unwarp"] as? [String: Any],
+           let unwarpPath = unwarpDict["modelPath"] as? String {
+            unwarpDict["modelPath"] = getResourcePath(unwarpPath) ?? unwarpPath
+            resolvedConfig["unwarp"] = unwarpDict
+        }
         
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: resolvedConfig),
+              let jsonStr = String(data: jsonData, encoding: .utf8) else {
+            reject("INIT_ERROR", "Failed to serialize configuration", nil)
+            return
+        }
+        
+        rustoInstance = rocr_new_with_config(jsonStr)
         if rustoInstance == nil {
-            reject("INIT_ERROR", "Failed to initialize RustO", nil)
+            reject("INIT_ERROR", "Failed to initialize RustO with config", nil)
         } else {
             resolve(true)
         }

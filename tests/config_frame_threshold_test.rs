@@ -64,33 +64,60 @@ fn test_rusto_config_builders() {
     assert_eq!(config.global.min_side_len, 50.0);
 }
 
+
+
 #[test]
-fn test_rusto_config_flat_json() {
+fn test_rusto_config_grouped_json() {
     let json_str = r#"{
-        "detModelPath": "models/custom_det.mnn",
-        "recModelPath": "models/custom_rec.mnn",
-        "dictPath": "models/custom_dict.txt",
-        "textScore": 0.65,
-        "detThresh": 0.35,
-        "detBoxThresh": 0.55,
-        "yThresholdMultiplier": 0.75,
-        "xThresholdMultiplier": 1.45,
-        "useCls": true,
-        "clsModelPath": "models/cls.mnn"
+        "template": "ppv5",
+        "detection": {
+            "modelPath": "models/custom_det.mnn",
+            "thresh": 0.38,
+            "boxThresh": 0.58,
+            "unclipRatio": 1.8,
+            "enabled": true
+        },
+        "recognition": {
+            "modelPath": "models/custom_rec.mnn",
+            "dictPath": "models/custom_dict.txt",
+            "scoreThresh": 0.72,
+            "returnWordBox": true,
+            "enabled": true
+        },
+        "classification": {
+            "modelPath": "models/v5_cls.mnn",
+            "threshold": 0.88,
+            "enabled": true
+        },
+        "layout": {
+            "yThresholdMultiplier": 0.62,
+            "xThresholdMultiplier": 1.25
+        },
+        "preprocessing": {
+            "minHeight": 28.0,
+            "maxSideLen": 1800.0,
+            "debugImages": true
+        }
     }"#;
 
-    let config = RustOConfig::from_json(json_str).expect("Parse flat JSON");
+    let config = RustOConfig::from_json(json_str).expect("Parse grouped JSON");
     assert_eq!(config.det.model_path.to_str().unwrap(), "models/custom_det.mnn");
     assert_eq!(config.rec.model_path.to_str().unwrap(), "models/custom_rec.mnn");
     assert_eq!(config.rec.rec_keys_path.unwrap().to_str().unwrap(), "models/custom_dict.txt");
-    assert_eq!(config.global.text_score, 0.65);
-    assert_eq!(config.det.thresh, 0.35);
-    assert_eq!(config.det.box_thresh, 0.55);
-    assert_eq!(config.global.y_threshold_multiplier, Some(0.75));
-    assert_eq!(config.global.x_threshold_multiplier, Some(1.45));
+    assert_eq!(config.det.thresh, 0.38);
+    assert_eq!(config.det.box_thresh, 0.58);
+    assert_eq!(config.det.unclip_ratio, 1.8);
+    assert_eq!(config.global.text_score, 0.72);
+    assert!(config.global.return_word_box);
     assert!(config.global.use_cls);
     assert!(config.cls.is_some());
-    assert_eq!(config.cls.unwrap().model_path.to_str().unwrap(), "models/cls.mnn");
+    assert_eq!(config.cls.as_ref().unwrap().model_path.to_str().unwrap(), "models/v5_cls.mnn");
+    assert_eq!(config.cls.as_ref().unwrap().cls_thresh, 0.88);
+    assert_eq!(config.global.y_threshold_multiplier, Some(0.62));
+    assert_eq!(config.global.x_threshold_multiplier, Some(1.25));
+    assert_eq!(config.global.min_height, 28.0);
+    assert_eq!(config.global.max_side_len, 1800.0);
+    assert!(config.global.debug_images);
 }
 
 #[test]
