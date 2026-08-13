@@ -9,6 +9,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 MODEL_TYPE="ppocrv6"
 TIER="tiny"
+LANG=""
 OUTPUT_DIR=""
 DOWNLOAD_ALL=false
 
@@ -18,6 +19,7 @@ while [[ "$#" -gt 0 ]]; do
         --all) DOWNLOAD_ALL=true ;;
         --model) MODEL_TYPE="$2"; shift ;;
         --tier) TIER="$2"; shift ;;
+        --lang) LANG="$2"; shift ;;
         --output-dir) OUTPUT_DIR="$2"; shift ;;
         *) OUTPUT_DIR="$1" ;;
     esac
@@ -73,9 +75,23 @@ download_ppocrv5() {
     
     download_file_to "$dir" "det.mnn" "mnn%2FPP-OCRv5%2Fdet%2Fch_PP-OCRv5_det_${tier}.mnn"
     download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv5%2Frec%2Fch_PP-OCRv5_rec_${tier}.mnn"
-    download_file_to "$dir" "rec_en.mnn" "mnn%2FPP-OCRv5%2Frec%2Fen_PP-OCRv5_rec_${tier}.mnn"
     download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv5%2Frec%2Fch_PP-OCRv5_rec_${tier}%2Fppocrv5_dict.txt"
-    download_file_to "$dir" "dict_en.txt" "paddle%2FPP-OCRv5%2Frec%2Fen_PP-OCRv5_rec_${tier}%2Fppocrv5_en_dict.txt"
+
+    # English rec model is only available for the mobile tier
+    if [ "$tier" = "mobile" ]; then
+        download_file_to "$dir" "rec_en.mnn" "mnn%2FPP-OCRv5%2Frec%2Fen_PP-OCRv5_rec_${tier}.mnn"
+        download_file_to "$dir" "dict_en.txt" "paddle%2FPP-OCRv5%2Frec%2Fen_PP-OCRv5_rec_${tier}%2Fppocrv5_en_dict.txt"
+    fi
+}
+
+download_ppocrv5_lang() {
+    local lang="$1"
+    local dir="$2"
+    echo "=== Downloading PP-OCRv5 ($lang) model ==="
+    echo "Destination: $dir"
+    
+    download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv5%2Frec%2F${lang}_PP-OCRv5_rec_mobile.mnn"
+    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv5%2Frec%2F${lang}_PP-OCRv5_rec_mobile%2Fppocrv5_${lang}_dict.txt"
 }
 
 download_ppocrv4() {
@@ -92,6 +108,35 @@ download_ppocrv4() {
     download_file_to "$dir" "dict_en.txt" "paddle%2FPP-OCRv4%2Frec%2Fen_PP-OCRv4_rec_${tier}%2Fen_dict.txt"
 }
 
+download_ppocrv4_lang() {
+    local lang="$1"
+    local dir="$2"
+    echo "=== Downloading PP-OCRv4 ($lang) model ==="
+    echo "Destination: $dir"
+
+    case "$lang" in
+        japan)
+            download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fjapan_PP-OCRv4_rec_mobile.mnn"
+            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fjapan_PP-OCRv4_rec_mobile%2Fjapan_dict.txt"
+            ;;
+        chinese_cht|chinese-cht)
+            download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fchinese_cht_PP-OCRv3_rec_mobile.mnn"
+            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fchinese_cht_PP-OCRv3_rec_mobile%2Fchinese_cht_dict.txt"
+            ;;
+        kannada|ka)
+            download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2Fka_PP-OCRv4_rec_mobile.mnn"
+            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fkannada_PP-OCRv4_rec_mobile%2Fka_dict.txt"
+            ;;
+        *)
+            download_file_to "$dir" "rec.mnn" "mnn%2FPP-OCRv4%2Frec%2F${lang}_PP-OCRv4_rec_mobile.mnn"
+            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2F${lang}_PP-OCRv4_rec_mobile%2F${lang}_dict.txt"
+            ;;
+    esac
+}
+
+V5_LANGS=("arabic" "cyrillic" "devanagari" "el" "eslav" "korean" "latin" "ta" "te" "th")
+V4_LANGS=("japan" "chinese_cht" "kannada")
+
 if [ "$DOWNLOAD_ALL" = true ]; then
     download_ppocrv6 "tiny" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_tiny}"
     download_ppocrv6 "small" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_small}"
@@ -100,16 +145,31 @@ if [ "$DOWNLOAD_ALL" = true ]; then
     download_ppocrv5 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_server}"
     download_ppocrv4 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_mobile}"
     download_ppocrv4 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_server}"
+
+    for lang in "${V5_LANGS[@]}"; do
+        download_ppocrv5_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$lang}"
+    done
+    for lang in "${V4_LANGS[@]}"; do
+        download_ppocrv4_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$lang}"
+    done
 else
     case "$MODEL_TYPE" in
         ppocrv6)
             download_ppocrv6 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6}"
             ;;
         ppocrv5)
-            download_ppocrv5 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5}"
+            if [ -n "$LANG" ]; then
+                download_ppocrv5_lang "$LANG" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$LANG}"
+            else
+                download_ppocrv5 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5}"
+            fi
             ;;
         ppocrv4)
-            download_ppocrv4 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4}"
+            if [ -n "$LANG" ]; then
+                download_ppocrv4_lang "$LANG" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$LANG}"
+            else
+                download_ppocrv4 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4}"
+            fi
             ;;
         *)
             echo "Unknown model type: $MODEL_TYPE"

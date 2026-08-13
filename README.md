@@ -256,18 +256,54 @@ RustO! supports all PaddleOCR model series in lightweight MNN format:
 | **PP-OCRv4** | **Mobile** | ~23 MB | PP-OCRv4 mobile models with orientation/direction classifier. |
 | **PP-OCRv4** | **Server** | ~300 MB | PP-OCRv4 server models with orientation/direction classifier. |
 
+### 🌐 Multi-Language Support Across Model Versions
+
+- **PP-OCRv6 (Recommended Default)**: Uses a **unified 50-language dictionary** (`ppocrv6_dict.txt`) and multilingual model architecture. All language scripts (Latin, Cyrillic, CJK, Devanagari, Arabic, etc.) are supported out-of-the-box in the base `PPOCRv6` packages without needing separate language model downloads.
+- **PP-OCRv5 & PP-OCRv4**: Use dedicated language recognition models (`rec.mnn` + `dict.txt`) for specific non-Chinese scripts. Text detection (`det.mnn`) remains language-agnostic.
+
+#### PP-OCRv5 Language Packages
+
+| Language / Script | Key | Rec Size | Android Package | iOS Podspec | .NET NuGet Package |
+|---|---|---|---|---|---|
+| **Arabic** | `arabic` | ~7.6 MB | `rusto-models-ppocrv5-arabic` | `RustO-Models-PPOCRv5-Arabic` | `RustODotnet.Models.PPOCRv5.Arabic` |
+| **Cyrillic** (Russian, Ukrainian, etc.) | `cyrillic` | ~7.7 MB | `rusto-models-ppocrv5-cyrillic` | `RustO-Models-PPOCRv5-Cyrillic` | `RustODotnet.Models.PPOCRv5.Cyrillic` |
+| **Devanagari** (Hindi, Marathi, etc.) | `devanagari` | ~7.5 MB | `rusto-models-ppocrv5-devanagari` | `RustO-Models-PPOCRv5-Devanagari` | `RustODotnet.Models.PPOCRv5.Devanagari` |
+| **East Slavic** | `eslav` | ~7.5 MB | `rusto-models-ppocrv5-eslav` | `RustO-Models-PPOCRv5-EastSlavic` | `RustODotnet.Models.PPOCRv5.EastSlavic` |
+| **Greek** | `el` | ~7.4 MB | `rusto-models-ppocrv5-el` | `RustO-Models-PPOCRv5-Greek` | `RustODotnet.Models.PPOCRv5.Greek` |
+| **Korean** | `korean` | ~12.8 MB | `rusto-models-ppocrv5-korean` | `RustO-Models-PPOCRv5-Korean` | `RustODotnet.Models.PPOCRv5.Korean` |
+| **Latin** (Spanish, French, German, etc.) | `latin` | ~7.5 MB | `rusto-models-ppocrv5-latin` | `RustO-Models-PPOCRv5-Latin` | `RustODotnet.Models.PPOCRv5.Latin` |
+| **Tamil** | `ta` | ~7.5 MB | `rusto-models-ppocrv5-ta` | `RustO-Models-PPOCRv5-Tamil` | `RustODotnet.Models.PPOCRv5.Tamil` |
+| **Telugu** | `te` | ~7.5 MB | `rusto-models-ppocrv5-te` | `RustO-Models-PPOCRv5-Telugu` | `RustODotnet.Models.PPOCRv5.Telugu` |
+| **Thai** | `th` | ~7.5 MB | `rusto-models-ppocrv5-th` | `RustO-Models-PPOCRv5-Thai` | `RustODotnet.Models.PPOCRv5.Thai` |
+
+#### Additional PP-OCRv4 Language Models (Available via Downloader)
+
+PP-OCRv4 includes additional specialized language models on ModelScope (e.g. Japanese, Traditional Chinese, Kannada):
+
+| Language / Script | Key | Rec Size | ModelScope Name |
+|---|---|---|---|
+| **Japanese** | `japan` | ~9.3 MB | `japan_PP-OCRv4_rec_mobile.mnn` |
+| **Traditional Chinese** | `chinese_cht` | ~10.6 MB | `chinese_cht_PP-OCRv3_rec_mobile.mnn` |
+| **Kannada** | `ka` | ~7.3 MB | `ka_PP-OCRv4_rec_mobile.mnn` |
+| **Korean (v4)** | `korean` | ~22.5 MB | `korean_PP-OCRv4_rec_mobile.mnn` |
+| **Tamil (v4)** | `ta` | ~20.9 MB | `ta_PP-OCRv4_rec_mobile.mnn` |
+| **Telugu (v4)** | `te` | ~20.9 MB | `te_PP-OCRv4_rec_mobile.mnn` |
+
 ### Downloading Models on the Fly
 
 You can use the built-in downloader to fetch pre-converted MNN models directly from [ModelScope RapidOCR](https://www.modelscope.cn/models/RapidAI/RapidOCR):
 
 ```bash
-# Download all models for all tiers
+# Download all models for all tiers and languages
 bash scripts/download_models.sh --all
 
 # Download specific model tier
 bash scripts/download_models.sh --model ppocrv6 --tier tiny --output-dir models/PPOCR_v6
 bash scripts/download_models.sh --model ppocrv5 --tier mobile --output-dir models/PPOCR_v5
 bash scripts/download_models.sh --model ppocrv4 --tier mobile --output-dir models/PPOCR_v4
+
+# Download specific language model
+bash scripts/download_models.sh --model ppocrv5 --lang arabic --output-dir models/PPOCR_v5_arabic
 ```
 
 ---

@@ -34,3 +34,42 @@ project(':rusto-models-ppocrv4-mobile').projectDir = file('models/rusto-models-p
 
 include ':rusto-models-ppocrv4-server'
 project(':rusto-models-ppocrv4-server').projectDir = file('models/rusto-models-ppocrv4-server')
+
+include ':rusto-models-ppocrv5-arabic'
+project(':rusto-models-ppocrv5-arabic').projectDir = file('models/rusto-models-ppocrv5-arabic')
+
+include ':rusto-models-ppocrv5-cyrillic'
+project(':rusto-models-ppocrv5-cyrillic').projectDir = file('models/rusto-models-ppocrv5-cyrillic')
+
+include ':rusto-models-ppocrv5-devanagari'
+project(':rusto-models-ppocrv5-devanagari').projectDir = file('models/rusto-models-ppocrv5-devanagari')
+
+include ':rusto-models-ppocrv5-el'
+project(':rusto-models-ppocrv5-el').projectDir = file('models/rusto-models-ppocrv5-el')
+
+include ':rusto-models-ppocrv5-eslav'
+project(':rusto-models-ppocrv5-eslav').projectDir = file('models/rusto-models-ppocrv5-eslav')
+
+include ':rusto-models-ppocrv5-korean'
+project(':rusto-models-ppocrv5-korean').projectDir = file('models/rusto-models-ppocrv5-korean')
+
+include ':rusto-models-ppocrv5-latin'
+project(':rusto-models-ppocrv5-latin').projectDir = file('models/rusto-models-ppocrv5-latin')
+
+include ':rusto-models-ppocrv5-ta'
+project(':rusto-models-ppocrv5-ta').projectDir = file('models/rusto-models-ppocrv5-ta')
+
+include ':rusto-models-ppocrv5-te'
+project(':rusto-models-ppocrv5-te').projectDir = file('models/rusto-models-ppocrv5-te')
+
+include ':rusto-models-ppocrv5-th'
+project(':rusto-models-ppocrv5-th').projectDir = file('models/rusto-models-ppocrv5-th')
+
+include ':rusto-models-ppocrv4-japan'
+project(':rusto-models-ppocrv4-japan').projectDir = file('models/rusto-models-ppocrv4-japan')
+
+include ':rusto-models-ppocrv4-chinese-cht'
+project(':rusto-models-ppocrv4-chinese-cht').projectDir = file('models/rusto-models-ppocrv4-chinese-cht')
+
+include ':rusto-models-ppocrv4-kannada'
+project(':rusto-models-ppocrv4-kannada').projectDir = file('models/rusto-models-ppocrv4-kannada')

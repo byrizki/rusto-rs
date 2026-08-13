@@ -81,11 +81,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Download default PP-OCRv6 models
-        run: |
-          chmod +x scripts/download_models.sh
-          bash scripts/download_models.sh
-
       - name: Download iOS Rust artifacts
         uses: actions/download-artifact@v4
         with:
@@ -130,9 +125,7 @@ jobs:
             local tmp_dir="build/tmp_$zip_name"
             mkdir -p "$tmp_dir"
             cp -r "$model_src"/* "$tmp_dir/"
-            cd "$tmp_dir"
-            zip -r "../../build/$zip_name.zip" .
-            cd ../..
+            (cd "$tmp_dir" && zip -r "../../build/$zip_name.zip" .)
             rm -rf "$tmp_dir"
           }
 
@@ -143,6 +136,21 @@ jobs:
           package_model_zip "models/PPOCR_v5_server" "RustO-Models-PPOCRv5-Server"
           package_model_zip "models/PPOCR_v4_mobile" "RustO-Models-PPOCRv4-Mobile"
           package_model_zip "models/PPOCR_v4_server" "RustO-Models-PPOCRv4-Server"
+
+          package_model_zip "models/PPOCR_v5_arabic" "RustO-Models-PPOCRv5-Arabic"
+          package_model_zip "models/PPOCR_v5_cyrillic" "RustO-Models-PPOCRv5-Cyrillic"
+          package_model_zip "models/PPOCR_v5_devanagari" "RustO-Models-PPOCRv5-Devanagari"
+          package_model_zip "models/PPOCR_v5_el" "RustO-Models-PPOCRv5-Greek"
+          package_model_zip "models/PPOCR_v5_eslav" "RustO-Models-PPOCRv5-EastSlavic"
+          package_model_zip "models/PPOCR_v5_korean" "RustO-Models-PPOCRv5-Korean"
+          package_model_zip "models/PPOCR_v5_latin" "RustO-Models-PPOCRv5-Latin"
+          package_model_zip "models/PPOCR_v5_ta" "RustO-Models-PPOCRv5-Tamil"
+          package_model_zip "models/PPOCR_v5_te" "RustO-Models-PPOCRv5-Telugu"
+          package_model_zip "models/PPOCR_v5_th" "RustO-Models-PPOCRv5-Thai"
+
+          package_model_zip "models/PPOCR_v4_japan" "RustO-Models-PPOCRv4-Japanese"
+          package_model_zip "models/PPOCR_v4_chinese_cht" "RustO-Models-PPOCRv4-TraditionalChinese"
+          package_model_zip "models/PPOCR_v4_kannada" "RustO-Models-PPOCRv4-Kannada"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -157,6 +165,7 @@ jobs:
     name: Build Android Lib - ${{ matrix.abi }}
     runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: aarch64-linux-android
@@ -270,27 +279,21 @@ jobs:
           cp artifacts/android/rusto-android-x86/librusto.so packages/android/src/main/jniLibs/x86/
           cp artifacts/android/rusto-android-x86_64/librusto.so packages/android/src/main/jniLibs/x86_64/
 
-          # Copy models into respective Android model submodules
-          mkdir -p packages/android/models/rusto-models-ppocrv6-tiny/src/main/assets
-          cp -r models/PPOCR_v6_tiny/* packages/android/models/rusto-models-ppocrv6-tiny/src/main/assets/
-
-          mkdir -p packages/android/models/rusto-models-ppocrv6-small/src/main/assets
-          cp -r models/PPOCR_v6_small/* packages/android/models/rusto-models-ppocrv6-small/src/main/assets/
-
-          mkdir -p packages/android/models/rusto-models-ppocrv6-medium/src/main/assets
-          cp -r models/PPOCR_v6_medium/* packages/android/models/rusto-models-ppocrv6-medium/src/main/assets/
-
-          mkdir -p packages/android/models/rusto-models-ppocrv5-mobile/src/main/assets
-          cp -r models/PPOCR_v5_mobile/* packages/android/models/rusto-models-ppocrv5-mobile/src/main/assets/
-
-          mkdir -p packages/android/models/rusto-models-ppocrv5-server/src/main/assets
-          cp -r models/PPOCR_v5_server/* packages/android/models/rusto-models-ppocrv5-server/src/main/assets/
-
-          mkdir -p packages/android/models/rusto-models-ppocrv4-mobile/src/main/assets
-          cp -r models/PPOCR_v4_mobile/* packages/android/models/rusto-models-ppocrv4-mobile/src/main/assets/
-
-          mkdir -p packages/android/models/rusto-models-ppocrv4-server/src/main/assets
-          cp -r models/PPOCR_v4_server/* packages/android/models/rusto-models-ppocrv4-server/src/main/assets/
+          # Copy models into each Android model submodule
+          # PPOCR_v6_tiny -> lowercase -> sed ppocr_v -> ppocrv -> tr _ - -> ppocrv6-tiny
+          for model_dir in models/PPOCR_*; do
+            if [ -d "$model_dir" ]; then
+              base_name=$(basename "$model_dir" | tr '[:upper:]' '[:lower:]' | sed 's/ppocr_v/ppocrv/' | tr '_' '-')
+              pkg_dir="packages/android/models/rusto-models-$base_name"
+              if [ -d "$pkg_dir" ]; then
+                mkdir -p "$pkg_dir/src/main/assets"
+                cp -r "$model_dir"/* "$pkg_dir/src/main/assets/"
+                echo "Copied $model_dir -> $pkg_dir/src/main/assets/"
+              else
+                echo "Warning: No Android package found for $model_dir (tried $pkg_dir)"
+              fi
+            fi
+          done
 
       - name: Make Gradle Wrapper executable
         working-directory: packages/android
@@ -365,11 +368,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p packages/dotnet/runtimes/${{ matrix.target }}/native
-          if [ "${{ matrix.os }}" = "windows" ]; then
-            cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
-          else
-            cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} packages/dotnet/runtimes/${{ matrix.target }}/native/
-          fi
+          cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} \
+             packages/dotnet/runtimes/${{ matrix.target }}/native/
 
       - name: Package MNN static prebuilt
         shell: bash
@@ -424,11 +424,13 @@ jobs:
           for dir in artifacts/rusto-dotnet-*; do
             target=$(basename "$dir" | sed 's/rusto-dotnet-//')
             echo "Processing artifact: $dir (target: $target)"
-            
-            if [ -d "$dir/native" ]; then
-              mkdir -p "packages/dotnet/runtimes/$target"
-              cp -rv "$dir/native" "packages/dotnet/runtimes/$target/"
+            src="$dir/packages/dotnet/runtimes/$target/native"
+            if [ -d "$src" ]; then
+              mkdir -p "packages/dotnet/runtimes/$target/native"
+              cp -rv "$src"/. "packages/dotnet/runtimes/$target/native/"
               echo "Copied native files for $target"
+            else
+              echo "Warning: native dir not found at $src"
             fi
           done
 
@@ -440,34 +442,27 @@ jobs:
       - name: Prepare model packages
         run: |
           echo "=== Copying model files to model NuGet packages ==="
-          
-          # Setup PPOCRv6 Tiny models
-          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv6.Tiny/models
-          cp models/PPOCR_v6_tiny/* packages/dotnet/models/RustODotnet.Models.PPOCRv6.Tiny/models/
-
-          # Setup PPOCRv6 Small models
-          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv6.Small/models
-          cp models/PPOCR_v6_small/* packages/dotnet/models/RustODotnet.Models.PPOCRv6.Small/models/
-
-          # Setup PPOCRv6 Medium models
-          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv6.Medium/models
-          cp models/PPOCR_v6_medium/* packages/dotnet/models/RustODotnet.Models.PPOCRv6.Medium/models/
-
-          # Setup PPOCRv5 Mobile models
-          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv5.Mobile/models
-          cp models/PPOCR_v5_mobile/* packages/dotnet/models/RustODotnet.Models.PPOCRv5.Mobile/models/
-
-          # Setup PPOCRv5 Server models
-          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv5.Server/models
-          cp models/PPOCR_v5_server/* packages/dotnet/models/RustODotnet.Models.PPOCRv5.Server/models/
-
-          # Setup PPOCRv4 Mobile models
-          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv4.Mobile/models
-          cp models/PPOCR_v4_mobile/* packages/dotnet/models/RustODotnet.Models.PPOCRv4.Mobile/models/
-
-          # Setup PPOCRv4 Server models
-          mkdir -p packages/dotnet/models/RustODotnet.Models.PPOCRv4.Server/models
-          cp models/PPOCR_v4_server/* packages/dotnet/models/RustODotnet.Models.PPOCRv4.Server/models/
+          for proj_dir in packages/dotnet/models/*; do
+            if [ -d "$proj_dir" ]; then
+              proj_name=$(basename "$proj_dir")
+              # Map NuGet project name to model folder name
+              # e.g., RustODotnet.Models.PPOCRv5.Arabic -> models/PPOCR_v5_arabic
+              # e.g., RustODotnet.Models.PPOCRv5.Greek -> models/PPOCR_v5_el
+              # e.g., RustODotnet.Models.PPOCRv5.EastSlavic -> models/PPOCR_v5_eslav
+              model_name=$(echo "$proj_name" | sed 's/RustODotnet.Models.//' | sed 's/\./_/g' | tr '[:upper:]' '[:lower:]' \
+                | sed 's/ppocrv/PPOCR_v/' \
+                | sed 's/greek/el/' | sed 's/eastslavic/eslav/' | sed 's/tamil/ta/' | sed 's/telugu/te/' | sed 's/thai/th/' \
+                | sed 's/japanese/japan/' | sed 's/traditionalchinese/chinese_cht/')
+              
+              if [ -d "models/$model_name" ]; then
+                mkdir -p "$proj_dir/models"
+                cp -r "models/$model_name"/* "$proj_dir/models/"
+                echo "Copied models/$model_name -> $proj_dir/models/"
+              else
+                echo "Warning: models/$model_name not found for $proj_name"
+              fi
+            fi
+          done
 
       - name: Build and Pack NuGet Packages
         run: |
@@ -487,7 +482,7 @@ jobs:
             fi
           done
 
-          echo "\n=== Generated Packages ==="
+          printf '\n=== Generated Packages ===\n'
           ls -lh nupkg/*.nupkg
 
       - name: Upload NuGet packages

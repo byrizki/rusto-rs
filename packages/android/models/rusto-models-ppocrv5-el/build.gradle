@@ -1,0 +1,55 @@
+plugins {
+    id 'com.android.library'
+    id 'com.vanniktech.maven.publish'
+}
+
+android {
+    namespace 'com.byrizki.rusto.models.ppocrv5.el'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "0.2.0"
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/main/assets']
+        }
+    }
+}
+
+mavenPublishing {
+    publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.CENTRAL_PORTAL, true)
+    signAllPublications()
+
+    coordinates('com.byrizki.rusto', 'rusto-models-ppocrv5-el', '0.2.0')
+
+    pom {
+        name = 'RustO! Models PP-OCRv5 Greek'
+        description = 'PP-OCRv5 Greek pre-trained MNN recognition model for RustO! Android'
+        url = 'https://github.com/byrizki/rusto-rs'
+
+        licenses {
+            license {
+                name = 'MIT License'
+                url = 'https://opensource.org/licenses/MIT'
+            }
+        }
+
+        developers {
+            developer {
+                id = 'rusto'
+                name = 'RustO Contributors'
+            }
+        }
+
+        scm {
+            connection = 'scm:git:git://github.com/byrizki/rusto-rs.git'
+            developerConnection = 'scm:git:ssh://github.com/byrizki/rusto-rs.git'
+            url = 'https://github.com/byrizki/rusto-rs'
+        }
+    }
+}
