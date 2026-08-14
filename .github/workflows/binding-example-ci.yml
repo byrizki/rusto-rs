@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       build_run_id:
-        description: 'Successful Build & Release workflow run ID (blank = latest successful run)'
+        description: 'Build & Release workflow run ID; failed runs allowed if required artifacts uploaded (blank = latest successful run)'
         required: false
         type: string
   workflow_call:
@@ -50,16 +50,29 @@ jobs:
           fi
 
           test -n "$run_json"
-          test "$(jq -r '.conclusion' <<<"$run_json")" = success
           test "$(jq -r '.path' <<<"$run_json")" = .github/workflows/build.yml
 
           run_id="$(jq -r '.id' <<<"$run_json")"
           head_sha="$(jq -r '.head_sha' <<<"$run_json")"
+          conclusion="$(jq -r '.conclusion' <<<"$run_json")"
+          status="$(jq -r '.status' <<<"$run_json")"
           test "$run_id" != null
           test "$head_sha" != null
+          test "$status" = completed
+
+          if [ -z "$REQUESTED_RUN_ID" ]; then
+            test "$conclusion" = success
+            label="latest successful"
+          else
+            # Explicit ID is intentional recovery mode. Artifact-producing
+            # jobs may pass even when this workflow's example-validation job
+            # fails, so accept completed failures and download their artifacts.
+            label="explicit completed ($conclusion)"
+          fi
+
           echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
           echo "head-sha=$head_sha" >> "$GITHUB_OUTPUT"
-          echo "Using successful Build & Release run $run_id at $head_sha"
+          echo "Using $label Build & Release run $run_id at $head_sha"
 
   react-native-js:
     name: React Native ${{ matrix.app }} JS contract
