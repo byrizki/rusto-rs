@@ -70,7 +70,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: rusto-react-native-package
-          path: examples/react-native-${{ matrix.app }}/artifacts/rusto-react-native-package
+          path: artifacts/rusto-react-native-package
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -125,7 +125,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: rusto-react-native-package
-          path: examples/react-native-${{ matrix.app }}/artifacts/rusto-react-native-package
+          path: artifacts/rusto-react-native-package
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
