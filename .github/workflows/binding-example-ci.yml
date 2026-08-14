@@ -210,7 +210,9 @@ jobs:
       ${{ always() && ((github.event_name == 'workflow_dispatch' &&
       needs.resolve-release-artifact-run.result == 'success') ||
       (github.event_name != 'workflow_dispatch' && inputs.release-artifact-validation)) }}
-    runs-on: macos-14
+    # RN 0.81's CocoaPods scripts require Xcode 16.1+. macos-15 supplies it;
+    # macos-14 image currently selects Xcode 15.4.
+    runs-on: macos-15
     strategy:
       fail-fast: false
       matrix:
