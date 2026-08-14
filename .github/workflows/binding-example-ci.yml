@@ -38,15 +38,12 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: yarn
           cache-dependency-path: packages/react-native/yarn.lock
-      - name: Activate pinned Yarn 3.6.1
-        run: |
-          corepack enable
-          corepack prepare yarn@3.6.1 --activate
-          yarn --version
+      - name: Verify Yarn Classic
+        run: yarn --version
       - name: Install and build React Native package
         working-directory: packages/react-native
         run: |
-          YARN_ENABLE_SCRIPTS=false yarn install --immutable
+          yarn install --ignore-scripts --non-interactive
           yarn prepare
       - run: yarn test --silent
         working-directory: packages/react-native
@@ -79,18 +76,15 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: yarn
           cache-dependency-path: examples/react-native-${{ matrix.app }}/yarn.lock
-      - name: Activate pinned Yarn 3.6.1
-        run: |
-          corepack enable
-          corepack prepare yarn@3.6.1 --activate
-          yarn --version
+      - name: Verify Yarn Classic
+        run: yarn --version
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
       - name: Install consumer dependencies from current release NPM artifact
-        run: YARN_ENABLE_SCRIPTS=false yarn install --immutable --mode=skip-build
+        run: yarn install --ignore-scripts --non-interactive
       - name: Stage current release AAR
         run: |
           mkdir -p node_modules/react-native-rusto/android/libs
@@ -137,16 +131,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: yarn
           cache-dependency-path: examples/react-native-${{ matrix.app }}/yarn.lock
-      - name: Activate pinned Yarn 3.6.1
-        run: |
-          corepack enable
-          corepack prepare yarn@3.6.1 --activate
-          yarn --version
+      - name: Verify Yarn Classic
+        run: yarn --version
       - name: Install CocoaPods
         run: gem install cocoapods
       - name: Install consumer dependencies from current release NPM artifact
         working-directory: examples/react-native-${{ matrix.app }}
-        run: YARN_ENABLE_SCRIPTS=false yarn install --immutable --mode=skip-build
+        run: yarn install --ignore-scripts --non-interactive
       - name: Stage current release XCFramework
         run: |
           rm -rf packages/ios/RustO.xcframework

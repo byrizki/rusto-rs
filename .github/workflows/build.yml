@@ -507,21 +507,18 @@ jobs:
           node-version: "18"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Activate pinned Yarn 3.6.1
-        run: |
-          corepack enable
-          corepack prepare yarn@3.6.1 --activate
-          yarn --version
+      - name: Verify Yarn Classic
+        run: yarn --version
 
       - name: Install React Native package build dependencies
         working-directory: packages/react-native
-        run: YARN_ENABLE_SCRIPTS=false yarn install --immutable
+        run: yarn install --ignore-scripts --non-interactive
 
       - name: Build and pack NPM package
         working-directory: packages/react-native
         run: |
           yarn prepare
-          yarn pack --out ../react-native-rusto.tgz
+          yarn pack --filename ../react-native-rusto.tgz
 
       - name: Upload NPM package
         uses: actions/upload-artifact@v4
