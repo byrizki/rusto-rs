@@ -7,6 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Restore from build.yml's current RustODotnet nupkg artifact. -->
-    <PackageReference Include="RustODotnet" Version="0.2.1" />
+    <PackageReference Include="RustODotnet" Version="0.2.2" />
   </ItemGroup>
 </Project>

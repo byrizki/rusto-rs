@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>RustODotnet.Models.PPOCRv5.Thai</PackageId>
-    <Version>0.2.1</Version>
+    <Version>0.2.2</Version>
     <Authors>RustO Contributors</Authors>
     <Description>PP-OCRv5 Thai pre-trained MNN recognition model for RustODotnet</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

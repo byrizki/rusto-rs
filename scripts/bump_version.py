@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 RustO! Version Bump Script
-Updates versions across all crates, native packages (Android, iOS, .NET), React Native, and documentation.
+Updates versions across all crates, publishable packages, binding consumer examples, workflows, and documentation.
 Automatically stages all updated versioned files in git.
 
 Usage:
@@ -444,15 +444,20 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
     
-    # 8. packages/**/package.json and sibling package-lock.json files.
-    # Excludes vendored dependencies because search starts at first-party packages/.
-    packages_dir = REPO_ROOT / "packages"
-    for package_json_file in packages_dir.rglob("package.json"):
-        update_json_file(package_json_file, new_ver, dry_run, staged_files)
+    # 8. Publishable package manifests/locks and React Native consumer app manifests/locks.
+    # Search only first-party roots; never traverse node_modules or vendored content.
+    manifest_roots = [REPO_ROOT / "packages", REPO_ROOT / "examples"]
+    for manifest_root in manifest_roots:
+        if not manifest_root.exists():
+            continue
+        for package_json_file in manifest_root.rglob("package.json"):
+            if "node_modules" in package_json_file.parts:
+                continue
+            update_json_file(package_json_file, new_ver, dry_run, staged_files)
 
-        package_lock_file = package_json_file.with_name("package-lock.json")
-        if package_lock_file.exists():
-            update_json_file(package_lock_file, new_ver, dry_run, staged_files)
+            package_lock_file = package_json_file.with_name("package-lock.json")
+            if package_lock_file.exists():
+                update_json_file(package_lock_file, new_ver, dry_run, staged_files)
         
     # 10. packages/react-native/android/build.gradle
     replace_in_file(
@@ -490,8 +495,21 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             dry_run,
             staged_files
         )
+
+    # 13. Consumer examples restore RustODotnet from the release nupkg.
+    # Update only binding reference, never unrelated xUnit/Test SDK dependencies.
+    examples_dotnet_dir = REPO_ROOT / "examples" / "dotnet"
+    if examples_dotnet_dir.exists():
+        for csproj_file in examples_dotnet_dir.rglob("*.csproj"):
+            replace_in_file(
+                csproj_file,
+                r'(<PackageReference\s+Include="RustODotnet"\s+Version=")[^"]+("\s*/?>)',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files
+            )
     
-    # 13. README.md & packages/react-native/README.md
+    # 14. README.md & packages/react-native/README.md
     replace_in_file(
         REPO_ROOT / "README.md",
         r'(\*\*Version\*\*:\s*)[^\s]+',
@@ -515,7 +533,7 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
 
-    # 14. .github/workflows/publish.yml (default workflow_dispatch version)
+    # 15. .github/workflows/publish.yml (default workflow_dispatch version)
     if (REPO_ROOT / ".github" / "workflows" / "publish.yml").exists():
         replace_in_file(
             REPO_ROOT / ".github" / "workflows" / "publish.yml",
@@ -525,7 +543,7 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
 
-    # 15. CHANGELOG.md (auto-generated from git commits)
+    # 16. CHANGELOG.md (auto-generated from git commits)
     if (REPO_ROOT / "CHANGELOG.md").exists():
         update_changelog_file(
             REPO_ROOT / "CHANGELOG.md",

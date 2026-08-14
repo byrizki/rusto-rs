@@ -5,6 +5,15 @@ All notable changes to RustO! will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-08-14
+
+### Changed
+- Add example build gate
+- Optimize & rename public apis
+
+### Fixed
+- Fix rn kotlin bridge
+
 ## [0.2.1] - 2026-08-13
 
 ### Changed
@@ -118,7 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Project Status
 
-**Version**: 0.2.1  
+**Version**: 0.2.2  
 **Status**: Production Ready  
 **Accuracy**: 99.3% OpenCV parity  
-**Last Updated**: August 13, 2026
+**Last Updated**: August 14, 2026
