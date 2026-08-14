@@ -36,8 +36,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: yarn
-          cache-dependency-path: packages/react-native/yarn.lock
       - name: Verify Yarn Classic
         run: yarn --version
       - name: Install and build React Native package
@@ -74,8 +72,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: yarn
-          cache-dependency-path: examples/react-native-${{ matrix.app }}/yarn.lock
       - name: Verify Yarn Classic
         run: yarn --version
       - uses: actions/setup-java@v4
@@ -83,6 +79,24 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
+      # Current release tarball has a new content hash on every build. Remove
+      # only its generated Yarn-v1 lock stanza, then resolve it from downloaded
+      # artifact; all registry dependency lock entries remain pinned.
+      - name: Resolve current release NPM artifact checksum
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          lock = Path("yarn.lock")
+          text = lock.read_text()
+          prefix = '"react-native-rusto@file:../../artifacts/rusto-react-native-package/react-native-rusto.tgz":\n'
+          start = text.find(prefix)
+          if start < 0:
+              raise SystemExit("missing react-native-rusto artifact stanza in yarn.lock")
+          end = text.find("\n\n", start)
+          if end < 0:
+              raise SystemExit("unterminated react-native-rusto artifact stanza in yarn.lock")
+          lock.write_text(text[:start] + text[end + 2:])
+          PY
       - name: Install consumer dependencies from current release NPM artifact
         run: yarn install --ignore-scripts --non-interactive
       - name: Stage current release AAR
@@ -129,12 +143,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: yarn
-          cache-dependency-path: examples/react-native-${{ matrix.app }}/yarn.lock
       - name: Verify Yarn Classic
         run: yarn --version
       - name: Install CocoaPods
         run: gem install cocoapods
+      # Current release tarball has a new content hash on every build. Remove
+      # only its generated Yarn-v1 lock stanza, then resolve it from downloaded
+      # artifact; all registry dependency lock entries remain pinned.
+      - name: Resolve current release NPM artifact checksum
+        working-directory: examples/react-native-${{ matrix.app }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          lock = Path("yarn.lock")
+          text = lock.read_text()
+          prefix = '"react-native-rusto@file:../../artifacts/rusto-react-native-package/react-native-rusto.tgz":\n'
+          start = text.find(prefix)
+          if start < 0:
+              raise SystemExit("missing react-native-rusto artifact stanza in yarn.lock")
+          end = text.find("\n\n", start)
+          if end < 0:
+              raise SystemExit("unterminated react-native-rusto artifact stanza in yarn.lock")
+          lock.write_text(text[:start] + text[end + 2:])
+          PY
       - name: Install consumer dependencies from current release NPM artifact
         working-directory: examples/react-native-${{ matrix.app }}
         run: yarn install --ignore-scripts --non-interactive
