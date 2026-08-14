@@ -507,8 +507,11 @@ jobs:
           node-version: "18"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Enable pinned Yarn
-        run: corepack enable
+      - name: Activate pinned Yarn 3.6.1
+        run: |
+          corepack enable
+          corepack prepare yarn@3.6.1 --activate
+          yarn --version
 
       - name: Install React Native package build dependencies
         working-directory: packages/react-native

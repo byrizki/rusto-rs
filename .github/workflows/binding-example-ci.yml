@@ -38,7 +38,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: yarn
           cache-dependency-path: packages/react-native/yarn.lock
-      - run: corepack enable
+      - name: Activate pinned Yarn 3.6.1
+        run: |
+          corepack enable
+          corepack prepare yarn@3.6.1 --activate
+          yarn --version
       - name: Install and build React Native package
         working-directory: packages/react-native
         run: |
