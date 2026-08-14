@@ -20,10 +20,10 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // React Native 0.70's Gradle plugin is built with Kotlin 1.6.x.
-        // Keep matching AGP/Gradle/Kotlin; RustO AAR is prebuilt in release CI.
+        // RN 0.70 supports this AGP/Gradle pair. RustO AAR is built with
+        // Kotlin 1.9, so consumer compiler must read Kotlin 1.9 metadata.
         classpath("com.android.tools.build:gradle:7.2.1")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.6.10")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.20")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("de.undercouch:gradle-download-task:5.0.1")
         // NOTE: Do not place your application dependencies here; they belong

@@ -17,7 +17,7 @@ Pod::Spec.new do |s|
   s.source_files = "ios/**/*.{h,m,mm,swift}"
   
   s.swift_version = '5.0'
-  s.pod_target_xcconfig = {
+  pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'SWIFT_COMPILATION_MODE' => 'wholemodule'
   }
@@ -25,13 +25,14 @@ Pod::Spec.new do |s|
   s.dependency "React-Core"
   s.dependency "RustO", "#{s.version}"
 
-  # Don't install the dependencies when we run `pod install` in the old architecture.
+  # Don't install dependencies for old architecture. CocoaPods exposes this
+  # setting as a writer only; retain base config in Ruby then assign once.
   if ENV['RCT_NEW_ARCH_ENABLED'] == '1' then
     s.compiler_flags = folly_compiler_flags + " -DRCT_NEW_ARCH_ENABLED=1"
-    s.pod_target_xcconfig = (s.pod_target_xcconfig || {}).merge({
-        "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\"",
-        "OTHER_CPLUSPLUSFLAGS" => "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1",
-        "CLANG_CXX_LANGUAGE_STANDARD" => "c++17"
+    pod_target_xcconfig = pod_target_xcconfig.merge({
+      "HEADER_SEARCH_PATHS" => "\"$(PODS_ROOT)/boost\"",
+      "OTHER_CPLUSPLUSFLAGS" => "-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1",
+      "CLANG_CXX_LANGUAGE_STANDARD" => "c++17"
     })
     s.dependency "React-Codegen"
     s.dependency "RCT-Folly"
@@ -39,4 +40,6 @@ Pod::Spec.new do |s|
     s.dependency "RCTTypeSafety"
     s.dependency "ReactCommon/turbomodule/core"
   end
+
+  s.pod_target_xcconfig = pod_target_xcconfig
 end

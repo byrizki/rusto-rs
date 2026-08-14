@@ -107,9 +107,22 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
     private fun toWritableArray(results: List<TextResult>): WritableArray = Arguments.createArray().apply {
         results.forEach { result ->
             pushMap(Arguments.createMap().apply {
-                putString("text", result.text); putDouble("score", result.score.toDouble())
-                putArray("box_points", Arguments.createArray().apply { result.boxPoints.forEach { point -> pushArray(Arguments.createArray().apply { pushDouble(point.x.toDouble()); pushDouble(point.y.toDouble()) }) }) })
-                putMap("frame", Arguments.createMap().apply { putDouble("width", result.frame.width.toDouble()); putDouble("height", result.frame.height.toDouble()); putDouble("top", result.frame.top.toDouble()); putDouble("left", result.frame.left.toDouble()) })
+                putString("text", result.text)
+                putDouble("score", result.score.toDouble())
+                putArray("box_points", Arguments.createArray().apply {
+                    result.boxPoints.forEach { point ->
+                        pushArray(Arguments.createArray().apply {
+                            pushDouble(point.x.toDouble())
+                            pushDouble(point.y.toDouble())
+                        })
+                    }
+                })
+                putMap("frame", Arguments.createMap().apply {
+                    putDouble("width", result.frame.width.toDouble())
+                    putDouble("height", result.frame.height.toDouble())
+                    putDouble("top", result.frame.top.toDouble())
+                    putDouble("left", result.frame.left.toDouble())
+                })
             })
         }
     }
