@@ -30,13 +30,15 @@ android {
         }
     }
     
+    // Android apps on RN 0.70 use D8 from AGP 7.x. Java 11 keeps published
+    // Kotlin bytecode below class-file 56 and avoids D8 sealed-class failure.
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
-    
+
     kotlinOptions {
-        jvmTarget = '17'
+        jvmTarget = '11'
     }
 
     sourceSets {

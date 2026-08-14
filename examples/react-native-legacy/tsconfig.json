@@ -1,16 +1,5 @@
 {
-  "compilerOptions": {
-    "allowJs": false,
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "jsx": "react-native",
-    "lib": ["es2017"],
-    "moduleResolution": "node",
-    "noEmit": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "target": "esnext"
-  },
+  "extends": "@react-native/typescript-config/tsconfig.json",
   "include": ["App.tsx", "index.js"],
   "exclude": ["node_modules", "android", "ios"]
 }

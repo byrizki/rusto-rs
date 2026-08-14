@@ -71,7 +71,9 @@ repositories {
 }
 
 dependencies {
-  implementation 'com.facebook.react:react-native:+'
+  // Version comes from consumer React Native Gradle Plugin. `react-android`
+  // is current artifact name and works across RN 0.75+ consumers.
+  implementation 'com.facebook.react:react-android'
   implementation "org.jetbrains.kotlin:kotlin-stdlib:${safeExtGet('kotlinVersion', '1.9.20')}"
   implementation "androidx.core:core-ktx:${safeExtGet('coreKtxVersion', '1.12.0')}"
   

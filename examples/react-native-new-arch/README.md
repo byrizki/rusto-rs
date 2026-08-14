@@ -1,18 +1,19 @@
 # RustO React Native New Architecture consumer
 
-React Native 0.70.15 source consumer. `android/gradle.properties` pins
-`newArchEnabled=true`; `ios/Podfile` pins `RCT_NEW_ARCH_ENABLED=1`.
+React Native **0.81.6** consumer. `android/gradle.properties` pins
+`newArchEnabled=true`. It validates compile/link compatibility with current
+RustO release artifacts while New Architecture is enabled.
 
 ```bash
-npm ci
-npm test
-npm run typecheck
+yarn install --ignore-scripts --non-interactive
+yarn test
+yarn typecheck
 (cd android && ./gradlew :app:assembleDebug)
 ```
 
-Release CI first builds current AAR/XCFramework/NPM artifacts, then compiles this
-consumer against those artifacts. For local iOS testing, place a built
-`RustO.xcframework` in `../../packages/ios/`, then install pods and compile:
+Release CI downloads current AAR, XCFramework, and npm tarball artifacts before
+compiling this app. For local iOS testing, place built `RustO.xcframework` in
+`../../packages/ios/`, then:
 
 ```bash
 (cd ios && pod install)
@@ -21,6 +22,6 @@ xcodebuild -workspace ios/RustONewArchExample.xcworkspace -scheme RustONewArchEx
   -destination 'platform=iOS Simulator,name=iPhone 15' build
 ```
 
-This gate proves compile/link compatibility while New Architecture is enabled. Current
-library remains bridge-module based; no TurboModule/codegen spec is claimed. App
-does not invoke OCR automatically; models/native runtime are runtime requirements.
+RustO remains bridge-module based; this app does **not** claim TurboModule or
+codegen implementation. App does not invoke real OCR automatically. Models and
+native runtime required for inference.

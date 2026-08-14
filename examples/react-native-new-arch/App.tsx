@@ -13,7 +13,7 @@ const config: InitializeConfig = { preset: 'ppv6' };
  * Compile-only consumer sample. It never starts OCR automatically: model files
  * and a real user-selected image are application responsibilities.
  */
-export default function App(): JSX.Element {
+export default function App(): React.ReactElement {
   const [status, setStatus] = useState('Ready');
 
   const verifyApiShape = async (): Promise<void> => {

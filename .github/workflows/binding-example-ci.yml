@@ -80,7 +80,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [legacy, new-arch]
+        include:
+          - app: legacy
+            node-version: '18'
+          - app: new-arch
+            node-version: '20'
     defaults:
       run:
         working-directory: examples/react-native-${{ matrix.app }}
@@ -88,7 +92,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ matrix.node-version }}
       - name: Verify Yarn Classic
         run: yarn --version
       - name: Install and build React Native package
@@ -112,7 +116,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [legacy, new-arch]
+        include:
+          - app: legacy
+            node-version: '18'
+          - app: new-arch
+            node-version: '20'
     defaults:
       run:
         working-directory: examples/react-native-${{ matrix.app }}
@@ -144,7 +152,7 @@ jobs:
           path: artifacts/rusto-react-native-package
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ matrix.node-version }}
       - name: Verify Yarn Classic
         run: yarn --version
       - uses: actions/setup-java@v4
@@ -206,7 +214,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [legacy, new-arch]
+        include:
+          - app: legacy
+            node-version: '18'
+          - app: new-arch
+            node-version: '20'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -234,7 +246,7 @@ jobs:
           path: artifacts/rusto-react-native-package
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: ${{ matrix.node-version }}
       - name: Verify Yarn Classic
         run: yarn --version
       - name: Install CocoaPods
