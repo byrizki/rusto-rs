@@ -121,8 +121,11 @@ jobs:
         with:
           # Manual validation checks out artifact-producing source revision.
           ref: ${{ needs.resolve-release-artifact-run.outputs.head-sha || github.sha }}
+      # Job defaults point at consumer app, but checkout creates source tree at
+      # repository root. Override before the first app-directory step exists.
       - name: Download Android artifacts from selected prior run
         if: github.event_name == 'workflow_dispatch'
+        working-directory: ${{ github.workspace }}
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_RUN_ID: ${{ needs.resolve-release-artifact-run.outputs.run-id }}
@@ -209,8 +212,10 @@ jobs:
         with:
           # Manual validation checks out artifact-producing source revision.
           ref: ${{ needs.resolve-release-artifact-run.outputs.head-sha || github.sha }}
+      # Checkout creates source tree at repository root, not matrix default.
       - name: Download iOS artifacts from selected prior run
         if: github.event_name == 'workflow_dispatch'
+        working-directory: ${{ github.workspace }}
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_RUN_ID: ${{ needs.resolve-release-artifact-run.outputs.run-id }}
@@ -308,6 +313,7 @@ jobs:
           ref: ${{ needs.resolve-release-artifact-run.outputs.head-sha || github.sha }}
       - name: Download NuGet artifact from selected prior run
         if: github.event_name == 'workflow_dispatch'
+        working-directory: ${{ github.workspace }}
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_RUN_ID: ${{ needs.resolve-release-artifact-run.outputs.run-id }}
