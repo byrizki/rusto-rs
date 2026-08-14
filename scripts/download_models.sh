@@ -27,6 +27,24 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 MODELSCOPE_BASE="https://www.modelscope.cn/api/v1/models/RapidAI/RapidOCR/repo?Revision=master&FilePath="
+# ModelScope can close large transfers on hosted macOS runners. Downloads use
+# resumable partial files, bounded retry/backoff, and lower group concurrency.
+MODEL_DOWNLOAD_RETRIES="${MODEL_DOWNLOAD_RETRIES:-6}"
+MODEL_DOWNLOAD_CONNECT_TIMEOUT="${MODEL_DOWNLOAD_CONNECT_TIMEOUT:-30}"
+MAX_PARALLEL_MODEL_GROUPS="${MAX_PARALLEL_MODEL_GROUPS:-3}"
+
+if ! [[ "$MODEL_DOWNLOAD_RETRIES" =~ ^[1-9][0-9]*$ ]]; then
+    echo "MODEL_DOWNLOAD_RETRIES must be a positive integer" >&2
+    exit 2
+fi
+if ! [[ "$MODEL_DOWNLOAD_CONNECT_TIMEOUT" =~ ^[1-9][0-9]*$ ]]; then
+    echo "MODEL_DOWNLOAD_CONNECT_TIMEOUT must be a positive integer" >&2
+    exit 2
+fi
+if ! [[ "$MAX_PARALLEL_MODEL_GROUPS" =~ ^[1-9][0-9]*$ ]]; then
+    echo "MAX_PARALLEL_MODEL_GROUPS must be a positive integer" >&2
+    exit 2
+fi
 
 # Wait for a list of PIDs; returns 1 if any failed
 wait_jobs() {
@@ -42,6 +60,8 @@ download_file_to() {
     local filename="$2"
     local ms_path="$3"
     local dest="$dest_dir/$filename"
+    local partial="$dest.part"
+    local attempt=1
 
     mkdir -p "$dest_dir"
 
@@ -50,13 +70,38 @@ download_file_to() {
         return 0
     fi
 
-    echo "Downloading $filename from ModelScope..."
-    if curl -sSL -f "$MODELSCOPE_BASE$ms_path" -o "$dest"; then
-        echo "✓ Downloaded: $filename ($(du -h "$dest" | cut -f1))"
-        return 0
-    fi
+    # Never write a transfer directly to its final path. Failed partial content
+    # must not be mistaken for a completed model by later script invocations.
+    while [ "$attempt" -le "$MODEL_DOWNLOAD_RETRIES" ]; do
+        echo "Downloading $filename from ModelScope (attempt $attempt/$MODEL_DOWNLOAD_RETRIES)..."
 
-    echo "❌ Failed to download $filename (dest: $dest)"
+        local resume_args=()
+        if [ -s "$partial" ]; then
+            resume_args=(--continue-at -)
+            echo "  Resuming partial transfer ($(du -h "$partial" | cut -f1))"
+        fi
+
+        if curl --fail --location --silent --show-error \
+            --connect-timeout "$MODEL_DOWNLOAD_CONNECT_TIMEOUT" \
+            "${resume_args[@]}" \
+            "$MODELSCOPE_BASE$ms_path" \
+            --output "$partial"; then
+            mv "$partial" "$dest"
+            echo "✓ Downloaded: $filename ($(du -h "$dest" | cut -f1))"
+            return 0
+        fi
+
+        if [ "$attempt" -lt "$MODEL_DOWNLOAD_RETRIES" ]; then
+            # 2, 4, 6, 8, 10 second bounded backoff. Jitter prevents all
+            # concurrent model groups reconnecting together.
+            local delay=$((attempt * 2 + RANDOM % 3))
+            echo "  Transfer failed; retrying in ${delay}s..." >&2
+            sleep "$delay"
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    echo "❌ Failed to download $filename after $MODEL_DOWNLOAD_RETRIES attempts (partial retained at: $partial)" >&2
     return 1
 }
 
@@ -206,23 +251,43 @@ V4_LANGS=("japan" "chinese_cht" "kannada")
 
 if [ "$DOWNLOAD_ALL" = true ]; then
     tier_pids=()
+    tier_failed=0
 
-    download_ppocrv6 "tiny"   "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_tiny}"   & tier_pids+=($!)
-    download_ppocrv6 "small"  "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_small}"  & tier_pids+=($!)
-    download_ppocrv6 "medium" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_medium}" & tier_pids+=($!)
-    download_ppocrv5 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_mobile}" & tier_pids+=($!)
-    download_ppocrv5 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_server}" & tier_pids+=($!)
-    download_ppocrv4 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_mobile}" & tier_pids+=($!)
-    download_ppocrv4 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_server}" & tier_pids+=($!)
+    # Each group launches its own model-file downloads. Limit active groups so
+    # `--all` cannot create dozens of simultaneous large ModelScope transfers.
+    start_model_group() {
+        "$@" &
+        tier_pids+=("$!")
+        if [ "${#tier_pids[@]}" -ge "$MAX_PARALLEL_MODEL_GROUPS" ]; then
+            if ! wait "${tier_pids[0]}"; then
+                tier_failed=1
+            fi
+            tier_pids=("${tier_pids[@]:1}")
+        fi
+    }
+
+    start_model_group download_ppocrv6 "tiny"   "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_tiny}"
+    start_model_group download_ppocrv6 "small"  "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_small}"
+    start_model_group download_ppocrv6 "medium" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_medium}"
+    start_model_group download_ppocrv5 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_mobile}"
+    start_model_group download_ppocrv5 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_server}"
+    start_model_group download_ppocrv4 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_mobile}"
+    start_model_group download_ppocrv4 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_server}"
 
     for lang in "${V5_LANGS[@]}"; do
-        download_ppocrv5_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$lang}" & tier_pids+=($!)
+        start_model_group download_ppocrv5_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$lang}"
     done
     for lang in "${V4_LANGS[@]}"; do
-        download_ppocrv4_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$lang}" & tier_pids+=($!)
+        start_model_group download_ppocrv4_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$lang}"
     done
 
-    wait_jobs "${tier_pids[@]}"
+    if ! wait_jobs "${tier_pids[@]}"; then
+        tier_failed=1
+    fi
+    if [ "$tier_failed" -ne 0 ]; then
+        echo "❌ One or more model groups failed" >&2
+        exit 1
+    fi
 else
     case "$MODEL_TYPE" in
         ppocrv6)
