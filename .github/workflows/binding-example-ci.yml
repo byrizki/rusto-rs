@@ -85,15 +85,16 @@ jobs:
             node-version: '18'
           - app: new-arch
             node-version: '20'
-    defaults:
-      run:
-        working-directory: examples/react-native-${{ matrix.app }}
+    # This job tests package source, not consumer app. Do not set a consumer
+    # working directory: a reusable workflow may be invoked from a release SHA
+    # created before example directories existed.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Verify Yarn Classic
+        working-directory: packages/react-native
         run: yarn --version
       - name: Install and build React Native package
         working-directory: packages/react-native
@@ -125,10 +126,9 @@ jobs:
       run:
         working-directory: examples/react-native-${{ matrix.app }}
     steps:
+      # Keep currently selected workflow revision: it owns consumer scaffold and
+      # validation logic. Downloaded artifacts alone come from prior build run.
       - uses: actions/checkout@v4
-        with:
-          # Manual validation checks out artifact-producing source revision.
-          ref: ${{ needs.resolve-release-artifact-run.outputs.head-sha || github.sha }}
       # Job defaults point at consumer app, but checkout creates source tree at
       # repository root. Override before the first app-directory step exists.
       - name: Download Android artifacts from selected prior run
@@ -220,10 +220,9 @@ jobs:
           - app: new-arch
             node-version: '20'
     steps:
+      # Keep currently selected workflow revision: it owns iOS consumer app.
+      # Downloaded artifacts alone come from prior Build & Release run.
       - uses: actions/checkout@v4
-        with:
-          # Manual validation checks out artifact-producing source revision.
-          ref: ${{ needs.resolve-release-artifact-run.outputs.head-sha || github.sha }}
       # Checkout creates source tree at repository root, not matrix default.
       - name: Download iOS artifacts from selected prior run
         if: github.event_name == 'workflow_dispatch'
@@ -319,10 +318,9 @@ jobs:
       (github.event_name != 'workflow_dispatch' && inputs.release-artifact-validation)) }}
     runs-on: ubuntu-22.04
     steps:
+      # Keep currently selected workflow revision: it owns .NET consumer app.
+      # Downloaded package alone comes from prior Build & Release run.
       - uses: actions/checkout@v4
-        with:
-          # Manual validation checks out artifact-producing source revision.
-          ref: ${{ needs.resolve-release-artifact-run.outputs.head-sha || github.sha }}
       - name: Download NuGet artifact from selected prior run
         if: github.event_name == 'workflow_dispatch'
         working-directory: ${{ github.workspace }}
