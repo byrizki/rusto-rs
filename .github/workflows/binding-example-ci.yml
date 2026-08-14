@@ -1,7 +1,14 @@
 name: Binding Example Apps CI
 
 on:
+  # Manual artifact-consumer validation. With no run ID, use most recent
+  # successful Build & Release run. A supplied ID selects exact prior run.
   workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: 'Successful Build & Release workflow run ID (blank = latest successful run)'
+        required: false
+        type: string
   workflow_call:
     inputs:
       release-artifact-validation:
@@ -10,6 +17,7 @@ on:
         type: boolean
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -21,6 +29,38 @@ env:
   JAVA_VERSION: '17'
 
 jobs:
+  resolve-release-artifact-run:
+    name: Resolve Build & Release artifact run
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-22.04
+    outputs:
+      run-id: ${{ steps.resolve.outputs.run-id }}
+      head-sha: ${{ steps.resolve.outputs.head-sha }}
+    steps:
+      - id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_RUN_ID: ${{ inputs.build_run_id }}
+        run: |
+          set -euo pipefail
+          if [ -n "$REQUESTED_RUN_ID" ]; then
+            run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REQUESTED_RUN_ID")"
+          else
+            run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build.yml/runs?status=success&per_page=1" --jq '.workflow_runs[0]')"
+          fi
+
+          test -n "$run_json"
+          test "$(jq -r '.conclusion' <<<"$run_json")" = success
+          test "$(jq -r '.path' <<<"$run_json")" = .github/workflows/build.yml
+
+          run_id="$(jq -r '.id' <<<"$run_json")"
+          head_sha="$(jq -r '.head_sha' <<<"$run_json")"
+          test "$run_id" != null
+          test "$head_sha" != null
+          echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "head-sha=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "Using successful Build & Release run $run_id at $head_sha"
+
   react-native-js:
     name: React Native ${{ matrix.app }} JS contract
     runs-on: ubuntu-22.04
@@ -50,7 +90,11 @@ jobs:
 
   react-native-android-release-artifact:
     name: React Native ${{ matrix.app }} Android release artifact compile
-    if: inputs.release-artifact-validation
+    needs: [resolve-release-artifact-run]
+    if: >-
+      ${{ always() && ((github.event_name == 'workflow_dispatch' &&
+      needs.resolve-release-artifact-run.result == 'success') ||
+      (github.event_name != 'workflow_dispatch' && inputs.release-artifact-validation)) }}
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -61,11 +105,24 @@ jobs:
         working-directory: examples/react-native-${{ matrix.app }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Manual validation checks out artifact-producing source revision.
+          ref: ${{ needs.resolve-release-artifact-run.outputs.head-sha || github.sha }}
+      - name: Download Android artifacts from selected prior run
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_RUN_ID: ${{ needs.resolve-release-artifact-run.outputs.run-id }}
+        run: |
+          gh run download "$ARTIFACT_RUN_ID" --name rusto-android-aar --dir artifacts/rusto-android-aar
+          gh run download "$ARTIFACT_RUN_ID" --name rusto-react-native-package --dir artifacts/rusto-react-native-package
       - uses: actions/download-artifact@v4
+        if: github.event_name != 'workflow_dispatch'
         with:
           name: rusto-android-aar
           path: artifacts/rusto-android-aar
       - uses: actions/download-artifact@v4
+        if: github.event_name != 'workflow_dispatch'
         with:
           name: rusto-react-native-package
           path: artifacts/rusto-react-native-package
@@ -124,7 +181,11 @@ jobs:
 
   react-native-ios-release-artifact:
     name: React Native ${{ matrix.app }} iOS release artifact compile
-    if: inputs.release-artifact-validation
+    needs: [resolve-release-artifact-run]
+    if: >-
+      ${{ always() && ((github.event_name == 'workflow_dispatch' &&
+      needs.resolve-release-artifact-run.result == 'success') ||
+      (github.event_name != 'workflow_dispatch' && inputs.release-artifact-validation)) }}
     runs-on: macos-14
     strategy:
       fail-fast: false
@@ -132,11 +193,24 @@ jobs:
         app: [legacy, new-arch]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Manual validation checks out artifact-producing source revision.
+          ref: ${{ needs.resolve-release-artifact-run.outputs.head-sha || github.sha }}
+      - name: Download iOS artifacts from selected prior run
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_RUN_ID: ${{ needs.resolve-release-artifact-run.outputs.run-id }}
+        run: |
+          gh run download "$ARTIFACT_RUN_ID" --name rusto-ios-xcframework --dir artifacts/rusto-ios-xcframework
+          gh run download "$ARTIFACT_RUN_ID" --name rusto-react-native-package --dir artifacts/rusto-react-native-package
       - uses: actions/download-artifact@v4
+        if: github.event_name != 'workflow_dispatch'
         with:
           name: rusto-ios-xcframework
           path: artifacts/rusto-ios-xcframework
       - uses: actions/download-artifact@v4
+        if: github.event_name != 'workflow_dispatch'
         with:
           name: rusto-react-native-package
           path: artifacts/rusto-react-native-package
@@ -208,11 +282,25 @@ jobs:
 
   dotnet-release-artifact:
     name: .NET release NuGet consumer compile and managed tests
-    if: inputs.release-artifact-validation
+    needs: [resolve-release-artifact-run]
+    if: >-
+      ${{ always() && ((github.event_name == 'workflow_dispatch' &&
+      needs.resolve-release-artifact-run.result == 'success') ||
+      (github.event_name != 'workflow_dispatch' && inputs.release-artifact-validation)) }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Manual validation checks out artifact-producing source revision.
+          ref: ${{ needs.resolve-release-artifact-run.outputs.head-sha || github.sha }}
+      - name: Download NuGet artifact from selected prior run
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_RUN_ID: ${{ needs.resolve-release-artifact-run.outputs.run-id }}
+        run: gh run download "$ARTIFACT_RUN_ID" --name rusto-dotnet-nupkg --dir artifacts/rusto-dotnet-nupkg
       - uses: actions/download-artifact@v4
+        if: github.event_name != 'workflow_dispatch'
         with:
           name: rusto-dotnet-nupkg
           path: artifacts/rusto-dotnet-nupkg
