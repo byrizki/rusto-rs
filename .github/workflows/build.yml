@@ -507,21 +507,24 @@ jobs:
           node-version: "18"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Enable pinned Yarn
+        run: corepack enable
+
       - name: Install React Native package build dependencies
         working-directory: packages/react-native
-        run: npm ci --legacy-peer-deps --ignore-scripts
+        run: YARN_ENABLE_SCRIPTS=false yarn install --immutable
 
       - name: Build and pack NPM package
         working-directory: packages/react-native
         run: |
-          npm run prepare
-          npm pack
+          yarn prepare
+          yarn pack --out ../react-native-rusto.tgz
 
       - name: Upload NPM package
         uses: actions/upload-artifact@v4
         with:
           name: rusto-react-native-package
-          path: packages/react-native/*.tgz
+          path: packages/react-native-rusto.tgz
 
   # Create GitHub Release
   binding-examples:

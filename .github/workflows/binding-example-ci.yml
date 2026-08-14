@@ -36,17 +36,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: examples/react-native-${{ matrix.app }}/package-lock.json
-      # Build type declarations from checkout source. Consumer install skips this
-      # package hook because npm does not install library dev dependencies there.
-      - run: npm ci --legacy-peer-deps --ignore-scripts
+          cache: yarn
+          cache-dependency-path: packages/react-native/yarn.lock
+      - run: corepack enable
+      - name: Install and build React Native package
         working-directory: packages/react-native
-      - run: npm ci --legacy-peer-deps --ignore-scripts
-      - run: npm run prepare
+        run: |
+          YARN_ENABLE_SCRIPTS=false yarn install --immutable
+          yarn prepare
+      - run: yarn test --silent
         working-directory: packages/react-native
-      - run: npm test -- --silent
-      - run: npm run typecheck
+      - run: yarn typecheck
+        working-directory: packages/react-native
 
   react-native-android-release-artifact:
     name: React Native ${{ matrix.app }} Android release artifact compile
@@ -92,9 +93,9 @@ jobs:
           ! grep -Fq "include ':rusto-android'" android/settings.gradle
           npx react-native config > /tmp/react-native-config.json
           node -e "const c=require('/tmp/react-native-config.json'); const p=c.dependencies['react-native-rusto']?.platforms?.android; if (!p?.packageImportPath?.includes('RustoPackage')) process.exit(1)"
-      - name: Assemble debug app against AAR
-        working-directory: examples/react-native-${{ matrix.app }}/android
+      - name: Assemble debug app against release AAR
         run: ./gradlew :app:assembleDebug --stacktrace
+        working-directory: examples/react-native-${{ matrix.app }}/android
       - name: Upload Android failure logs
         if: failure()
         uses: actions/upload-artifact@v4
