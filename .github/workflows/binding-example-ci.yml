@@ -172,7 +172,16 @@ jobs:
       - name: Stage current release XCFramework
         run: |
           rm -rf packages/ios/RustO.xcframework
-          unzip -q artifacts/rusto-ios-xcframework/RustO.xcframework.zip -d packages/ios
+          # Artifact zip contains RustO.xcframework, src/, and LICENSE. Extract
+          # only framework entries so tracked packages/ios/src is never replaced.
+          zipinfo -1 artifacts/rusto-ios-xcframework/RustO.xcframework.zip | \
+            grep '^RustO\.xcframework/' > /tmp/rusto-xcframework-files.txt
+          test -s /tmp/rusto-xcframework-files.txt
+          # macOS BSD unzip has no stdin file-list option. Zip has only one
+          # framework root, so extract that root explicitly.
+          unzip -q artifacts/rusto-ios-xcframework/RustO.xcframework.zip \
+            'RustO.xcframework/*' \
+            -d packages/ios
           test -d packages/ios/RustO.xcframework
       - name: Install pods from current checkout
         working-directory: examples/react-native-${{ matrix.app }}/ios
