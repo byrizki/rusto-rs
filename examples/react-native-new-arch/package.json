@@ -13,7 +13,7 @@
   "dependencies": {
     "react": "18.1.0",
     "react-native": "0.70.15",
-    "react-native-rusto": "file:../../packages/react-native"
+    "react-native-rusto": "file:../../artifacts/rusto-react-native-package/react-native-rusto.tgz"
   },
   "devDependencies": {
     "@babel/core": "^7.12.9",
@@ -32,5 +32,6 @@
   },
   "jest": {
     "preset": "react-native"
-  }
+  },
+  "packageManager": "yarn@3.6.1"
 }

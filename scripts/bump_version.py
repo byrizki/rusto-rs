@@ -444,21 +444,15 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
     
-    # 8. Publishable package manifests/locks and React Native consumer app manifests/locks.
-    # Search only first-party roots; never traverse node_modules or vendored content.
-    manifest_roots = [REPO_ROOT / "packages", REPO_ROOT / "examples"]
-    for manifest_root in manifest_roots:
-        if not manifest_root.exists():
+    # 8. First-party npm package manifests only. React Native examples consume the
+    # current workflow tarball via file: paths, so their manifests and Yarn locks
+    # intentionally do not carry a release version.
+    packages_dir = REPO_ROOT / "packages"
+    for package_json_file in packages_dir.rglob("package.json"):
+        if "node_modules" in package_json_file.parts:
             continue
-        for package_json_file in manifest_root.rglob("package.json"):
-            if "node_modules" in package_json_file.parts:
-                continue
-            update_json_file(package_json_file, new_ver, dry_run, staged_files)
+        update_json_file(package_json_file, new_ver, dry_run, staged_files)
 
-            package_lock_file = package_json_file.with_name("package-lock.json")
-            if package_lock_file.exists():
-                update_json_file(package_lock_file, new_ver, dry_run, staged_files)
-        
     # 10. packages/react-native/android/build.gradle
     replace_in_file(
         REPO_ROOT / "packages" / "react-native" / "android" / "build.gradle",
