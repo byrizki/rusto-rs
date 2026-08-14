@@ -507,10 +507,14 @@ jobs:
           node-version: "18"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Pack NPM package
+      - name: Install React Native package build dependencies
+        working-directory: packages/react-native
+        run: npm ci --legacy-peer-deps --ignore-scripts
+
+      - name: Build and pack NPM package
         working-directory: packages/react-native
         run: |
-          npm install --legacy-peer-deps
+          npm run prepare
           npm pack
 
       - name: Upload NPM package
