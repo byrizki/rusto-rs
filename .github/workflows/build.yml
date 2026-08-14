@@ -520,9 +520,16 @@ jobs:
           path: packages/react-native/*.tgz
 
   # Create GitHub Release
+  binding-examples:
+    name: Validate release binding consumer apps
+    needs: [build-ios, build-android, package-dotnet, package-react-native]
+    uses: ./.github/workflows/binding-example-ci.yml
+    with:
+      release-artifact-validation: true
+
   release:
     name: Create GitHub Release
-    needs: [build-ios, build-android, package-dotnet, package-react-native]
+    needs: [binding-examples, build-ios, build-android, package-dotnet, package-react-native]
     runs-on: ubuntu-22.04
 
     steps:

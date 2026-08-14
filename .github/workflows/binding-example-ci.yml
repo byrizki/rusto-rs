@@ -1,0 +1,184 @@
+name: Binding Example Apps CI
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      release-artifact-validation:
+        description: Validate consumer apps against current build artifacts.
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: binding-examples-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '18'
+  JAVA_VERSION: '17'
+
+jobs:
+  react-native-js:
+    name: React Native ${{ matrix.app }} JS contract
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [legacy, new-arch]
+    defaults:
+      run:
+        working-directory: examples/react-native-${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: examples/react-native-${{ matrix.app }}/package-lock.json
+      # Build type declarations from checkout source. Consumer install skips this
+      # package hook because npm does not install library dev dependencies there.
+      - run: npm ci --legacy-peer-deps --ignore-scripts
+        working-directory: packages/react-native
+      - run: npm ci --legacy-peer-deps --ignore-scripts
+      - run: npm run prepare
+        working-directory: packages/react-native
+      - run: npm test -- --silent
+      - run: npm run typecheck
+
+  react-native-android-release-artifact:
+    name: React Native ${{ matrix.app }} Android release artifact compile
+    if: inputs.release-artifact-validation
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [legacy, new-arch]
+    defaults:
+      run:
+        working-directory: examples/react-native-${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusto-android-aar
+          path: artifacts/rusto-android-aar
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusto-react-native-package
+          path: artifacts/rusto-react-native-package
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: examples/react-native-${{ matrix.app }}/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+      - run: npm ci --legacy-peer-deps --ignore-scripts
+      - name: Install current release NPM package
+        run: npm install --no-save --ignore-scripts --legacy-peer-deps "$GITHUB_WORKSPACE"/artifacts/rusto-react-native-package/*.tgz
+      - name: Stage current release AAR
+        run: |
+          mkdir -p node_modules/react-native-rusto/android/libs
+          find "$GITHUB_WORKSPACE/artifacts/rusto-android-aar" -name '*.aar' -exec cp {} node_modules/react-native-rusto/android/libs/ \;
+          test -n "$(find node_modules/react-native-rusto/android/libs -name '*.aar' -print -quit)"
+      - name: Assert artifact mode and autolinking
+        run: |
+          ! grep -Fq "include ':rusto-android'" android/settings.gradle
+          npx react-native config > /tmp/react-native-config.json
+          node -e "const c=require('/tmp/react-native-config.json'); const p=c.dependencies['react-native-rusto']?.platforms?.android; if (!p?.packageImportPath?.includes('RustoPackage')) process.exit(1)"
+      - name: Assemble debug app against AAR
+        working-directory: examples/react-native-${{ matrix.app }}/android
+        run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Upload Android failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: react-native-${{ matrix.app }}-android-logs
+          path: |
+            examples/react-native-${{ matrix.app }}/android/.gradle/**
+            examples/react-native-${{ matrix.app }}/android/app/build/reports/**
+          if-no-files-found: ignore
+
+  react-native-ios-release-artifact:
+    name: React Native ${{ matrix.app }} iOS release artifact compile
+    if: inputs.release-artifact-validation
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [legacy, new-arch]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusto-ios-xcframework
+          path: artifacts/rusto-ios-xcframework
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusto-react-native-package
+          path: artifacts/rusto-react-native-package
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: examples/react-native-${{ matrix.app }}/package-lock.json
+      - name: Install CocoaPods
+        run: gem install cocoapods
+      - name: Install React Native dependencies
+        working-directory: examples/react-native-${{ matrix.app }}
+        run: npm ci --legacy-peer-deps --ignore-scripts
+      - name: Install current release NPM package
+        working-directory: examples/react-native-${{ matrix.app }}
+        run: npm install --no-save --ignore-scripts --legacy-peer-deps "$GITHUB_WORKSPACE"/artifacts/rusto-react-native-package/*.tgz
+      - name: Stage current release XCFramework
+        run: |
+          rm -rf packages/ios/RustO.xcframework
+          unzip -q artifacts/rusto-ios-xcframework/RustO.xcframework.zip -d packages/ios
+          test -d packages/ios/RustO.xcframework
+      - name: Install pods from current checkout
+        working-directory: examples/react-native-${{ matrix.app }}/ios
+        run: pod install --repo-update
+      - name: Build iOS simulator app against XCFramework
+        working-directory: examples/react-native-${{ matrix.app }}
+        run: >-
+          xcodebuild
+          -workspace ios/RustO${{ matrix.app == 'legacy' && 'LegacyExample' || 'NewArchExample' }}.xcworkspace
+          -scheme RustO${{ matrix.app == 'legacy' && 'LegacyExample' || 'NewArchExample' }}
+          -configuration Debug
+          -sdk iphonesimulator
+          -destination 'platform=iOS Simulator,name=iPhone 15'
+          build
+      - name: Upload iOS failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: react-native-${{ matrix.app }}-ios-logs
+          path: |
+            examples/react-native-${{ matrix.app }}/ios/Podfile.lock
+            examples/react-native-${{ matrix.app }}/ios/Pods/**
+          if-no-files-found: ignore
+
+  dotnet-release-artifact:
+    name: .NET release NuGet consumer compile and managed tests
+    if: inputs.release-artifact-validation
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: rusto-dotnet-nupkg
+          path: artifacts/rusto-dotnet-nupkg
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+          cache: true
+          cache-dependency-path: examples/dotnet/**/*.csproj
+      - run: dotnet restore examples/dotnet/RustODotnet.Example.sln --source artifacts/rusto-dotnet-nupkg/nupkg --source https://api.nuget.org/v3/index.json
+      - run: dotnet build examples/dotnet/RustODotnet.Example.sln --configuration Release --no-restore
+      - run: dotnet test examples/dotnet/RustODotnet.Example.sln --configuration Release --no-build

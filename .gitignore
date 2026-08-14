@@ -51,3 +51,10 @@ packages/react-native/lib
 
 __pycache__/
 *.pyc
+# Generated example-app outputs
+examples/react-native-*/ios/Pods/
+examples/react-native-*/ios/build/
+examples/react-native-*/android/.gradle/
+examples/react-native-*/android/app/build/
+examples/dotnet/**/bin/
+examples/dotnet/**/obj/
