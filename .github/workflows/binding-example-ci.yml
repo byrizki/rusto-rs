@@ -160,6 +160,19 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
+      - name: Normalize downloaded React Native package artifact
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          artifact_dir=artifacts/rusto-react-native-package
+          target="$artifact_dir/react-native-rusto.tgz"
+          tarball="$(find "$artifact_dir" -type f -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+          mkdir -p "$artifact_dir"
+          if [ "$(realpath "$tarball")" != "$(realpath -m "$target")" ]; then
+            cp "$tarball" "$target"
+          fi
+          test -s "$target"
       # Current release tarball has a new content hash on every build. Remove
       # only its generated Yarn-v1 lock stanza, then resolve it from downloaded
       # artifact; all registry dependency lock entries remain pinned.
@@ -252,6 +265,19 @@ jobs:
         run: yarn --version
       - name: Install CocoaPods
         run: gem install cocoapods
+      - name: Normalize downloaded React Native package artifact
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          artifact_dir=artifacts/rusto-react-native-package
+          target="$artifact_dir/react-native-rusto.tgz"
+          tarball="$(find "$artifact_dir" -type f -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+          mkdir -p "$artifact_dir"
+          if [ "$(realpath "$tarball")" != "$(realpath -m "$target")" ]; then
+            cp "$tarball" "$target"
+          fi
+          test -s "$target"
       # Current release tarball has a new content hash on every build. Remove
       # only its generated Yarn-v1 lock stanza, then resolve it from downloaded
       # artifact; all registry dependency lock entries remain pinned.
