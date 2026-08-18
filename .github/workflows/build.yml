@@ -496,10 +496,18 @@ jobs:
   # package React Native
   package-react-native:
     name: Package React Native
+    # Pack bridge Kotlin sources together with Android AAR built from same SHA.
+    needs: [build-android]
     runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download matching Android AAR
+        uses: actions/download-artifact@v4
+        with:
+          name: rusto-android-aar
+          path: artifacts/rusto-android-aar
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -518,6 +526,13 @@ jobs:
         working-directory: packages/react-native
         run: |
           yarn prepare
+          # Consumer artifact compilation needs API types matching this build's
+          # staged Android AAR. Bundle that AAR into package android/libs so
+          # Gradle picks it before any external/JitPack fallback.
+          rm -rf android/libs
+          mkdir -p android/libs
+          find ../../artifacts/rusto-android-aar -type f -name '*-release.aar' -exec cp {} android/libs/ \;
+          test -n "$(find android/libs -maxdepth 1 -name '*.aar' -print -quit)"
           yarn pack --filename ../react-native-rusto.tgz
 
       - name: Upload NPM package
