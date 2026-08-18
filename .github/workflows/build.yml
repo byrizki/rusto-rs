@@ -574,6 +574,9 @@ jobs:
     uses: ./.github/workflows/binding-example-ci.yml
     with:
       release-artifact-validation: true
+      # Reusable workflow runs under its own run ID. Pass caller run ID so
+      # actions/download-artifact fetches this Build & Release artifact set.
+      build-run-id: ${{ github.run_id }}
 
   release:
     name: Create GitHub Release

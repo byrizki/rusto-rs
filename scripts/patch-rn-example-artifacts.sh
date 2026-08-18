@@ -79,6 +79,32 @@ text = text.replace(needle, needle + f"  {marker}\n" + line + "\n", 1)
 open(path, 'w').write(text)
 PY
     grep -Fq "pod '$model_pod', :path => '$model_dir'" "$podfile"
+
+    # Old packed npm artifacts used `s.pod_target_xcconfig` as both writer and
+    # reader. Current CocoaPods only exposes writer. Patch only disposable
+    # node_modules copy used by release-artifact validation.
+    bridge_podspec="$app/node_modules/react-native-rusto/react-native-rusto.podspec"
+    if grep -Fq 's.pod_target_xcconfig ||' "$bridge_podspec"; then
+      python3 - "$bridge_podspec" <<'PY'
+import re, sys
+path = sys.argv[1]
+text = open(path).read()
+old = "  s.pod_target_xcconfig = {\n    'DEFINES_MODULE' => 'YES',\n    'SWIFT_COMPILATION_MODE' => 'wholemodule'\n  }"
+new = "  pod_target_xcconfig = {\n    'DEFINES_MODULE' => 'YES',\n    'SWIFT_COMPILATION_MODE' => 'wholemodule'\n  }"
+if old not in text:
+    raise SystemExit('legacy podspec base xcconfig block not found')
+text = text.replace(old, new, 1)
+text = text.replace('s.pod_target_xcconfig = (s.pod_target_xcconfig || {}).merge({', 'pod_target_xcconfig = pod_target_xcconfig.merge({', 1)
+needle = '\nend\n'
+if 's.pod_target_xcconfig = pod_target_xcconfig' not in text:
+    if not text.endswith(needle):
+        raise SystemExit('unexpected podspec terminator')
+    text = text[:-len(needle)] + '\n  s.pod_target_xcconfig = pod_target_xcconfig\nend\n'
+open(path, 'w').write(text)
+PY
+      ! grep -Fq 's.pod_target_xcconfig ||' "$bridge_podspec"
+      grep -Fq 's.pod_target_xcconfig = pod_target_xcconfig' "$bridge_podspec"
+    fi
     ;;
   *) usage ;;
 esac

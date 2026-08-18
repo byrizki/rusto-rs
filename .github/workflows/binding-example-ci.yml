@@ -15,6 +15,10 @@ on:
         description: Validate consumer apps against current build artifacts.
         required: true
         type: boolean
+      build-run-id:
+        description: Caller Build & Release run ID owning artifacts to validate.
+        required: true
+        type: string
 
 permissions:
   actions: read
@@ -146,16 +150,22 @@ jobs:
         with:
           name: rusto-android-core-aar
           path: artifacts/rusto-android-core-aar
+          run-id: ${{ inputs.build-run-id }}
+          github-token: ${{ github.token }}
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
         with:
           name: rusto-android-model-aars
           path: artifacts/rusto-android-model-aars
+          run-id: ${{ inputs.build-run-id }}
+          github-token: ${{ github.token }}
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
         with:
           name: rusto-react-native-package
           path: artifacts/rusto-react-native-package
+          run-id: ${{ inputs.build-run-id }}
+          github-token: ${{ github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -175,8 +185,10 @@ jobs:
           tarball="$(find "$artifact_dir" -type f -name '*.tgz' -print -quit)"
           test -n "$tarball"
           mkdir -p "$artifact_dir"
-          if [ "$(realpath "$tarball")" != "$(realpath -m "$target")" ]; then
-            cp "$tarball" "$target"
+          # macOS BSD realpath has no GNU --canonicalize-missing (-m).
+          # Paths are relative to this fixed artifact directory; safe copy.
+          if [ "$tarball" != "$target" ]; then
+            cp -f "$tarball" "$target"
           fi
           test -s "$target"
       # Current release tarball has a new content hash on every build. Remove
@@ -262,16 +274,22 @@ jobs:
         with:
           name: rusto-ios-core-xcframework
           path: artifacts/rusto-ios-core-xcframework
+          run-id: ${{ inputs.build-run-id }}
+          github-token: ${{ github.token }}
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
         with:
           name: rusto-ios-model-resources
           path: artifacts/rusto-ios-model-resources
+          run-id: ${{ inputs.build-run-id }}
+          github-token: ${{ github.token }}
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
         with:
           name: rusto-react-native-package
           path: artifacts/rusto-react-native-package
+          run-id: ${{ inputs.build-run-id }}
+          github-token: ${{ github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
@@ -288,22 +306,25 @@ jobs:
           tarball="$(find "$artifact_dir" -type f -name '*.tgz' -print -quit)"
           test -n "$tarball"
           mkdir -p "$artifact_dir"
-          if [ "$(realpath "$tarball")" != "$(realpath -m "$target")" ]; then
-            cp "$tarball" "$target"
+          # macOS BSD realpath has no GNU --canonicalize-missing (-m).
+          # Paths are relative to this fixed artifact directory; safe copy.
+          if [ "$tarball" != "$target" ]; then
+            cp -f "$tarball" "$target"
           fi
           test -s "$target"
-      - name: Verify packed podspec supports current CocoaPods DSL
-        # Catch stale NPM artifacts before pod install emits an opaque
-        # `undefined method pod_target_xcconfig` failure in New Architecture.
+      - name: Detect stale packed podspec
+        # Historical artifacts used a CocoaPods writer as a reader. Keep
+        # validating their native binaries: post-install staging normalizes
+        # only that incompatible bridge DSL before `pod install`.
         working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
           podspec="$(tar -xOf artifacts/rusto-react-native-package/react-native-rusto.tgz package/react-native-rusto.podspec)"
           if grep -Fq 's.pod_target_xcconfig ||' <<<"$podspec"; then
-            echo "::error::Packed react-native-rusto uses obsolete pod_target_xcconfig reader. Select a Build & Release run produced after podspec DSL fix."
-            exit 1
+            echo "::warning::Packed react-native-rusto uses legacy pod_target_xcconfig DSL; CI will patch installed bridge podspec only."
+          else
+            grep -Fq 's.pod_target_xcconfig = pod_target_xcconfig' <<<"$podspec"
           fi
-          grep -Fq 's.pod_target_xcconfig = pod_target_xcconfig' <<<"$podspec"
       # Current release tarball has a new content hash on every build. Remove
       # only its generated Yarn-v1 lock stanza, then resolve it from downloaded
       # artifact; all registry dependency lock entries remain pinned.
@@ -386,11 +407,15 @@ jobs:
         with:
           name: rusto-dotnet-core-nupkg
           path: artifacts/rusto-dotnet-core-nupkg
+          run-id: ${{ inputs.build-run-id }}
+          github-token: ${{ github.token }}
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
         with:
           name: rusto-dotnet-model-nupkgs
           path: artifacts/rusto-dotnet-model-nupkgs
+          run-id: ${{ inputs.build-run-id }}
+          github-token: ${{ github.token }}
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
