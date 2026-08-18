@@ -152,13 +152,25 @@ jobs:
           package_model_zip "models/PPOCR_v4_chinese_cht" "RustO-Models-PPOCRv4-TraditionalChinese"
           package_model_zip "models/PPOCR_v4_kannada" "RustO-Models-PPOCRv4-Kannada"
 
-      - name: Upload artifact
+      - name: Upload core XCFramework artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rusto-ios-xcframework
-          path: |
-            build/RustO.xcframework.zip
-            build/RustO-Models-*.zip
+          name: rusto-ios-core-xcframework
+          path: build/RustO.xcframework.zip
+
+      - name: Upload each iOS model resource artifact
+        run: |
+          set -euo pipefail
+          for model_zip in build/RustO-Models-*.zip; do
+            test -f "$model_zip"
+            model_id="$(basename "$model_zip" .zip | sed 's/^RustO-Models-//' | tr '[:upper:]' '[:lower:]' | tr '_' '-')"
+            mkdir -p "artifacts/ios-models/$model_id"
+            cp "$model_zip" "artifacts/ios-models/$model_id/"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rusto-ios-model-resources
+          path: artifacts/ios-models/
 
   # Build Android Rust Libraries (Parallel Matrix)
   build-android-libs:
@@ -308,11 +320,26 @@ jobs:
             gradle assembleRelease
           fi
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Separate Android core and model AAR artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/android-core artifacts/android-models
+          find packages/android/build/outputs/aar -name '*-release.aar' -exec cp {} artifacts/android-core/ \;
+          test "$(find artifacts/android-core -name '*.aar' | wc -l | tr -d ' ')" = 1
+          for aar in packages/android/models/*/build/outputs/aar/*-release.aar; do
+            test -f "$aar"
+            model_id="$(basename "$aar" | sed -E 's/^rusto-models-//; s/-release\.aar$//')"
+            mkdir -p "artifacts/android-models/$model_id"
+            cp "$aar" "artifacts/android-models/$model_id/"
+          done
+      - uses: actions/upload-artifact@v4
         with:
-          name: rusto-android-aar
-          path: packages/android/**/build/outputs/aar/*.aar
+          name: rusto-android-core-aar
+          path: artifacts/android-core/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rusto-android-model-aars
+          path: artifacts/android-models/
 
   # Build .NET NuGet package
   build-dotnet:
@@ -485,13 +512,27 @@ jobs:
           printf '\n=== Generated Packages ===\n'
           ls -lh nupkg/*.nupkg
 
-      - name: Upload NuGet packages
-        uses: actions/upload-artifact@v4
+      - name: Separate .NET core and model NuGet artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/dotnet-core artifacts/dotnet-models
+          core="$(find nupkg -maxdepth 1 -name 'RustODotnet.[0-9]*.nupkg' -print -quit)"
+          test -n "$core"
+          cp "$core" artifacts/dotnet-core/
+          for nupkg in nupkg/RustODotnet.Models.*.nupkg; do
+            test -f "$nupkg"
+            model_id="$(basename "$nupkg" | sed -E 's/^RustODotnet\.Models\.//; s/\.[0-9]+\.[0-9]+\.[0-9]+\.nupkg$//' | tr '[:upper:]' '[:lower:]' | tr '.' '-')"
+            mkdir -p "artifacts/dotnet-models/$model_id"
+            cp "$nupkg" "artifacts/dotnet-models/$model_id/"
+          done
+      - uses: actions/upload-artifact@v4
         with:
-          name: rusto-dotnet-nupkg
-          path: |
-            nupkg/*.nupkg
-            packages/dotnet/runtimes/**/*
+          name: rusto-dotnet-core-nupkg
+          path: artifacts/dotnet-core/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rusto-dotnet-model-nupkgs
+          path: artifacts/dotnet-models/
 
   # package React Native
   package-react-native:
@@ -562,23 +603,25 @@ jobs:
             fi
           done
 
-          if [ -d "rusto-ios-xcframework" ]; then
-            cp rusto-ios-xcframework/*.zip ../releases/ || true
+          if [ -d "rusto-ios-core-xcframework" ]; then
+            find rusto-ios-core-xcframework -name 'RustO.xcframework.zip' -exec cp {} ../releases/ \;
+          fi
+          if [ -d "rusto-ios-model-resources" ]; then
+            find rusto-ios-model-resources -name 'RustO-Models-*.zip' -exec cp {} ../releases/ \;
           fi
 
-          if [ -d "rusto-android-aar" ]; then
-            find rusto-android-aar -name "*.aar" -exec cp {} ../releases/ \;
+          if [ -d "rusto-android-core-aar" ]; then
+            find rusto-android-core-aar -name "*.aar" -exec cp {} ../releases/ \;
+          fi
+          if [ -d "rusto-android-model-aars" ]; then
+            find rusto-android-model-aars -name "*.aar" -exec cp {} ../releases/ \;
           fi
 
-          if [ -d "rusto-dotnet-nupkg" ]; then
-            cd rusto-dotnet-nupkg
-            if [ -d "nupkg" ]; then
-              cp nupkg/*.nupkg ../../releases/ || true
-            fi
-            if [ -d "packages/dotnet/runtimes" ]; then
-              tar czf "../../releases/rusto-dotnet-runtimes.tar.gz" packages/dotnet/runtimes/
-            fi
-            cd ..
+          if [ -d "rusto-dotnet-core-nupkg" ]; then
+            find rusto-dotnet-core-nupkg -name 'RustODotnet.*.nupkg' -exec cp {} ../releases/ \;
+          fi
+          if [ -d "rusto-dotnet-model-nupkgs" ]; then
+            find rusto-dotnet-model-nupkgs -name 'RustODotnet.Models.*.nupkg' -exec cp {} ../releases/ \;
           fi
 
           if [ -d "rusto-react-native-package" ]; then

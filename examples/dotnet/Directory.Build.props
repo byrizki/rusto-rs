@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- CI supplies version extracted from downloaded local RustODotnet nupkg. -->
+    <RustOArtifactVersion Condition="'$(RustOArtifactVersion)' == ''">0.2.2</RustOArtifactVersion>
+  </PropertyGroup>
+</Project>

@@ -138,13 +138,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_RUN_ID: ${{ needs.resolve-release-artifact-run.outputs.run-id }}
         run: |
-          gh run download "$ARTIFACT_RUN_ID" --name rusto-android-aar --dir artifacts/rusto-android-aar
+          gh run download "$ARTIFACT_RUN_ID" --name rusto-android-core-aar --dir artifacts/rusto-android-core-aar
+          gh run download "$ARTIFACT_RUN_ID" --name rusto-android-model-aars --dir artifacts/rusto-android-model-aars
           gh run download "$ARTIFACT_RUN_ID" --name rusto-react-native-package --dir artifacts/rusto-react-native-package
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
         with:
-          name: rusto-android-aar
-          path: artifacts/rusto-android-aar
+          name: rusto-android-core-aar
+          path: artifacts/rusto-android-core-aar
+      - uses: actions/download-artifact@v4
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          name: rusto-android-model-aars
+          path: artifacts/rusto-android-model-aars
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
         with:
@@ -193,18 +199,13 @@ jobs:
           PY
       - name: Install consumer dependencies from current release NPM artifact
         run: yarn install --ignore-scripts --non-interactive
-      - name: Stage release AAR into installed NPM package
-        # Keep AAR out of published npm package. Consumer validation downloads
-        # both artifacts from same Build & Release run, then stages AAR only
-        # after Yarn expands react-native-rusto into node_modules.
+      - name: Patch installed React Native package with release AARs
         run: |
           set -euo pipefail
-          libs_dir=node_modules/react-native-rusto/android/libs
-          mkdir -p "$libs_dir"
-          find "$GITHUB_WORKSPACE/artifacts/rusto-android-aar" -type f -name '*.aar' -exec cp {} "$libs_dir"/ \;
-          aar="$(find "$libs_dir" -maxdepth 1 -name '*.aar' -print -quit)"
-          test -n "$aar"
-          echo "Using staged RustO AAR: $aar"
+          core="$(find "$GITHUB_WORKSPACE/artifacts/rusto-android-core-aar" -name '*.aar' -print -quit)"
+          model="$(find "$GITHUB_WORKSPACE/artifacts/rusto-android-model-aars/ppocrv6-tiny" -name '*.aar' -print -quit)"
+          "$GITHUB_WORKSPACE/scripts/patch-rn-example-artifacts.sh" \
+            --platform android --app . --core "$core" --model "$model" --version "$(node -p "require('./node_modules/react-native-rusto/package.json').version")"
       - name: Assert artifact mode and autolinking
         run: |
           ! grep -Fq "include ':rusto-android'" android/settings.gradle
@@ -253,13 +254,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_RUN_ID: ${{ needs.resolve-release-artifact-run.outputs.run-id }}
         run: |
-          gh run download "$ARTIFACT_RUN_ID" --name rusto-ios-xcframework --dir artifacts/rusto-ios-xcframework
+          gh run download "$ARTIFACT_RUN_ID" --name rusto-ios-core-xcframework --dir artifacts/rusto-ios-core-xcframework
+          gh run download "$ARTIFACT_RUN_ID" --name rusto-ios-model-resources --dir artifacts/rusto-ios-model-resources
           gh run download "$ARTIFACT_RUN_ID" --name rusto-react-native-package --dir artifacts/rusto-react-native-package
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
         with:
-          name: rusto-ios-xcframework
-          path: artifacts/rusto-ios-xcframework
+          name: rusto-ios-core-xcframework
+          path: artifacts/rusto-ios-core-xcframework
+      - uses: actions/download-artifact@v4
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          name: rusto-ios-model-resources
+          path: artifacts/rusto-ios-model-resources
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
         with:
@@ -285,6 +292,18 @@ jobs:
             cp "$tarball" "$target"
           fi
           test -s "$target"
+      - name: Verify packed podspec supports current CocoaPods DSL
+        # Catch stale NPM artifacts before pod install emits an opaque
+        # `undefined method pod_target_xcconfig` failure in New Architecture.
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          podspec="$(tar -xOf artifacts/rusto-react-native-package/react-native-rusto.tgz package/react-native-rusto.podspec)"
+          if grep -Fq 's.pod_target_xcconfig ||' <<<"$podspec"; then
+            echo "::error::Packed react-native-rusto uses obsolete pod_target_xcconfig reader. Select a Build & Release run produced after podspec DSL fix."
+            exit 1
+          fi
+          grep -Fq 's.pod_target_xcconfig = pod_target_xcconfig' <<<"$podspec"
       # Current release tarball has a new content hash on every build. Remove
       # only its generated Yarn-v1 lock stanza, then resolve it from downloaded
       # artifact; all registry dependency lock entries remain pinned.
@@ -307,38 +326,17 @@ jobs:
       - name: Install consumer dependencies from current release NPM artifact
         working-directory: examples/react-native-${{ matrix.app }}
         run: yarn install --ignore-scripts --non-interactive
-      - name: Stage release XCFramework for local RustO pod
-        # Published bridge package declares RustO CocoaPods dependency. CI uses
-        # same dependency, overridden by consumer Podfile's local packages/ios
-        # pod, whose vendored framework is staged from release artifact.
+      - name: Patch local CocoaPods dependencies with release artifacts
         working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
-          framework_dir=packages/ios/RustO.xcframework
-          rm -rf "$framework_dir"
-          zipinfo -1 artifacts/rusto-ios-xcframework/RustO.xcframework.zip | \
-            grep '^RustO\.xcframework/' > /tmp/rusto-xcframework-files.txt
-          test -s /tmp/rusto-xcframework-files.txt
-          unzip -q artifacts/rusto-ios-xcframework/RustO.xcframework.zip \
-            'RustO.xcframework/*' \
-            -d packages/ios
-          test -d "$framework_dir"
-      - name: Align local RustO podspec with downloaded NPM artifact
-        # CocoaPods requires exact RustO version declared by the packed bridge.
-        # Override only local CI podspec metadata; framework stays release-built.
-        working-directory: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-          tarball=artifacts/rusto-react-native-package/react-native-rusto.tgz
-          version="$(tar -xOf "$tarball" package/package.json | ruby -rjson -e 'puts JSON.parse(STDIN.read).fetch("version")')"
-          ruby - "$version" packages/ios/RustO.podspec <<'RUBY'
-          version, podspec_path = ARGV
-          podspec = File.read(podspec_path)
-          updated = podspec.sub(/s\.version\s*=\s*['"][^'"]+['"]/, "s.version          = '#{version}'")
-          abort "RustO podspec has no version declaration" if updated == podspec
-          File.write(podspec_path, updated)
-          RUBY
-          grep -Fq "s.version          = '$version'" packages/ios/RustO.podspec
+          core="$(find artifacts/rusto-ios-core-xcframework -name 'RustO.xcframework.zip' -print -quit)"
+          model="$(find artifacts/rusto-ios-model-resources/ppocrv6-tiny -name 'RustO-Models-PPOCRv6-Tiny.zip' -print -quit)"
+          version="$(node -p "require('./examples/react-native-${{ matrix.app }}/node_modules/react-native-rusto/package.json').version")"
+          scripts/patch-rn-example-artifacts.sh \
+            --platform ios --app "examples/react-native-${{ matrix.app }}" \
+            --core "$core" --model "$model" --model-pod RustO-Models-PPOCRv6-Tiny \
+            --version "$version"
       - name: Install pods from current checkout
         working-directory: examples/react-native-${{ matrix.app }}/ios
         run: pod install --repo-update
@@ -382,17 +380,36 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_RUN_ID: ${{ needs.resolve-release-artifact-run.outputs.run-id }}
-        run: gh run download "$ARTIFACT_RUN_ID" --name rusto-dotnet-nupkg --dir artifacts/rusto-dotnet-nupkg
+        run: |
+          gh run download "$ARTIFACT_RUN_ID" --name rusto-dotnet-core-nupkg --dir artifacts/rusto-dotnet-core-nupkg
+          gh run download "$ARTIFACT_RUN_ID" --name rusto-dotnet-model-nupkgs --dir artifacts/rusto-dotnet-model-nupkgs
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
         with:
-          name: rusto-dotnet-nupkg
-          path: artifacts/rusto-dotnet-nupkg
+          name: rusto-dotnet-core-nupkg
+          path: artifacts/rusto-dotnet-core-nupkg
+      - uses: actions/download-artifact@v4
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          name: rusto-dotnet-model-nupkgs
+          path: artifacts/rusto-dotnet-model-nupkgs
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
           cache: true
           cache-dependency-path: examples/dotnet/**/*.csproj
-      - run: dotnet restore examples/dotnet/RustODotnet.Example.sln --source artifacts/rusto-dotnet-nupkg/nupkg --source https://api.nuget.org/v3/index.json
-      - run: dotnet build examples/dotnet/RustODotnet.Example.sln --configuration Release --no-restore
-      - run: dotnet test examples/dotnet/RustODotnet.Example.sln --configuration Release --no-build
+      - name: Restore core and model NuGet packages from local artifacts
+        run: |
+          set -euo pipefail
+          core="$(find artifacts/rusto-dotnet-core-nupkg -name 'RustODotnet.*.nupkg' -print -quit)"
+          model="$(find artifacts/rusto-dotnet-model-nupkgs/ppocrv6-tiny -name 'RustODotnet.Models.PPOCRv6.Tiny.*.nupkg' -print -quit)"
+          test -n "$core" && test -n "$model"
+          version="$(basename "$core" | sed -E 's/^RustODotnet\.//; s/\.nupkg$//')"
+          echo "RUSTO_ARTIFACT_VERSION=$version" >> "$GITHUB_ENV"
+          dotnet restore examples/dotnet/RustODotnet.Example.sln \
+            -p:RustOArtifactVersion="$version" \
+            --source artifacts/rusto-dotnet-core-nupkg \
+            --source artifacts/rusto-dotnet-model-nupkgs \
+            --source https://api.nuget.org/v3/index.json
+      - run: dotnet build examples/dotnet/RustODotnet.Example.sln --configuration Release --no-restore -p:RustOArtifactVersion="$RUSTO_ARTIFACT_VERSION"
+      - run: dotnet test examples/dotnet/RustODotnet.Example.sln --configuration Release --no-build -p:RustOArtifactVersion="$RUSTO_ARTIFACT_VERSION"

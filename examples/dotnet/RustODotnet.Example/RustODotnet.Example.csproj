@@ -6,7 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Restore from build.yml's current RustODotnet nupkg artifact. -->
-    <PackageReference Include="RustODotnet" Version="0.2.2" />
+    <!-- CI patches RustOArtifactVersion from downloaded local package artifact. -->
+    <PackageReference Include="RustODotnet" Version="$(RustOArtifactVersion)" />
+    <PackageReference Include="RustODotnet.Models.PPOCRv6.Tiny" Version="$(RustOArtifactVersion)" />
   </ItemGroup>
 </Project>
