@@ -57,10 +57,14 @@ case "$platform" in
     python3 - "$version" "$core_pod/RustO.podspec" "$model_dir/$model_pod.podspec" <<'PY'
 import re, sys
 version, *paths = sys.argv[1:]
+# Podspec aligns fields with spaces (`s.version          =`), so whitespace
+# must be accepted between `version` and `=`. Restrict replacement to first
+# assignment; source URLs using `s.version` stay unchanged.
+pattern = re.compile(r"(s\.version\s*=\s*)['\"][^'\"]+['\"]")
 for path in paths:
     text = open(path).read()
-    changed = re.sub(r"s\.version\s*=\s*['\"][^'\"]+['\"]", f"s.version          = '{version}'", text, count=1)
-    if changed == text:
+    changed, count = pattern.subn(rf"\g<1>'{version}'", text, count=1)
+    if count != 1:
         raise SystemExit(f"no version declaration in {path}")
     open(path, 'w').write(changed)
 PY

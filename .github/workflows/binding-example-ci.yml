@@ -429,10 +429,15 @@ jobs:
           test -n "$core" && test -n "$model"
           version="$(basename "$core" | sed -E 's/^RustODotnet\.//; s/\.nupkg$//')"
           echo "RUSTO_ARTIFACT_VERSION=$version" >> "$GITHUB_ENV"
+          # dotnet resolves relative --source paths from each project directory,
+          # not repository root. Use physical absolute feeds.
+          core_feed="$(pwd)/artifacts/rusto-dotnet-core-nupkg"
+          model_feed="$(pwd)/artifacts/rusto-dotnet-model-nupkgs"
+          test -d "$core_feed" && test -d "$model_feed"
           dotnet restore examples/dotnet/RustODotnet.Example.sln \
             -p:RustOArtifactVersion="$version" \
-            --source artifacts/rusto-dotnet-core-nupkg \
-            --source artifacts/rusto-dotnet-model-nupkgs \
+            --source "$core_feed" \
+            --source "$model_feed" \
             --source https://api.nuget.org/v3/index.json
       - run: dotnet build examples/dotnet/RustODotnet.Example.sln --configuration Release --no-restore -p:RustOArtifactVersion="$RUSTO_ARTIFACT_VERSION"
       - run: dotnet test examples/dotnet/RustODotnet.Example.sln --configuration Release --no-build -p:RustOArtifactVersion="$RUSTO_ARTIFACT_VERSION"
