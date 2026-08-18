@@ -18,7 +18,9 @@ jobs:
   # Build iOS Rust Libraries (Parallel Matrix)
   build-ios-libs:
     name: Build iOS Lib - ${{ matrix.target }}
-    runs-on: macos-latest
+    # Keep artifact object format/toolchain compatible with RN consumer build.
+    # macos-latest advanced to Xcode 26 while examples use macos-15/Xcode 16.
+    runs-on: macos-15
     strategy:
       matrix:
         target:
@@ -74,7 +76,8 @@ jobs:
   build-ios:
     name: Build RustO iOS XCFramework
     needs: [build-ios-libs]
-    runs-on: macos-latest
+    # Package with same Xcode generation as build-ios-libs and CI consumers.
+    runs-on: macos-15
 
     steps:
       - uses: actions/checkout@v4
@@ -103,16 +106,10 @@ jobs:
             -library build/ios-simulator/librusto.a \
             -output build/RustO.xcframework
 
-          echo "Copying Swift sources..."
-          mkdir -p build/src
-          cp -r packages/ios/src/* build/src/
-          
-          echo "Copying LICENSE..."
-          cp LICENSE build/
-
-          cd build
-          zip -r RustO.xcframework.zip RustO.xcframework src LICENSE
-          cd ..
+          # Keep release framework artifact binary-only. Swift sources belong
+          # in CocoaPods/npm source packages; staging them here can hide an ABI
+          # mismatch between current bridge code and older static archives.
+          (cd build && zip -r RustO.xcframework.zip RustO.xcframework)
 
       - name: Package iOS Model Bundles
         run: |
@@ -151,6 +148,23 @@ jobs:
           package_model_zip "models/PPOCR_v4_japan" "RustO-Models-PPOCRv4-Japanese"
           package_model_zip "models/PPOCR_v4_chinese_cht" "RustO-Models-PPOCRv4-TraditionalChinese"
           package_model_zip "models/PPOCR_v4_kannada" "RustO-Models-PPOCRv4-Kannada"
+
+      - name: Verify XCFramework exports canonical FFI ABI
+        run: |
+          set -euo pipefail
+          archives=(build/RustO.xcframework/*/*.a)
+          test "${#archives[@]}" -eq 2
+          for archive in "${archives[@]}"; do
+            test -f "$archive"
+            echo "Checking $archive"
+            symbols="$(strings "$archive")"
+            for symbol in \
+              rocr_initialize rocr_detect_text_file rocr_detect_text_data \
+              rocr_detect_text_file_spatial rocr_detect_text_data_spatial \
+              rocr_free_results rocr_free_string rocr_free rocr_version; do
+              grep -Fxq "_$symbol" <<<"$symbols"
+            done
+          done
 
       - name: Upload core XCFramework artifact
         uses: actions/upload-artifact@v4

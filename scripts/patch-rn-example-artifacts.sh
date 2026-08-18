@@ -47,6 +47,23 @@ case "$platform" in
     rm -rf "$core_pod/RustO.xcframework"
     unzip -q "$core" 'RustO.xcframework/*' -d "$core_pod"
     test -d "$core_pod/RustO.xcframework"
+    # Fail before CocoaPods/Xcode if downloaded archive and checked-out Swift
+    # bridge use different FFI generations. Inspect every static library slice.
+    for archive in "$core_pod"/RustO.xcframework/*/*.a; do
+      test -f "$archive"
+      # `nm` on Linux cannot parse Mach-O object members. `strings` is portable
+      # and sufficient here: Rust's exported no_mangle FFI names are literal.
+      symbols="$(strings "$archive")"
+      for symbol in \
+        rocr_initialize rocr_detect_text_file rocr_detect_text_data \
+        rocr_detect_text_file_spatial rocr_detect_text_data_spatial \
+        rocr_free_results rocr_free_string rocr_free rocr_version; do
+        grep -Fxq "_$symbol" <<<"$symbols" || {
+          echo "::error::Staged RustO XCFramework ABI mismatch: $archive lacks $symbol" >&2
+          exit 1
+        }
+      done
+    done
 
     model_dir="$app/ios/.rusto-artifacts/$model_pod"
     rm -rf "$model_dir"
