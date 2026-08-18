@@ -23,6 +23,8 @@ Pod::Spec.new do |s|
   }
 
   s.dependency "React-Core"
+  # Published consumers resolve matching RustO through CocoaPods. Artifact CI
+  # overrides this with local packages/ios after staging release XCFramework.
   s.dependency "RustO", "#{s.version}"
 
   # Don't install dependencies for old architecture. CocoaPods exposes this

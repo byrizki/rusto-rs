@@ -193,12 +193,18 @@ jobs:
           PY
       - name: Install consumer dependencies from current release NPM artifact
         run: yarn install --ignore-scripts --non-interactive
-      - name: Assert packaged RustO AAR is present
-        # react-native-rusto must package matching Android API classes with its
-        # native bridge. Do not overwrite package AAR with independently staged
-        # artifact: that can pair incompatible Kotlin APIs across release runs.
+      - name: Stage release AAR into installed NPM package
+        # Keep AAR out of published npm package. Consumer validation downloads
+        # both artifacts from same Build & Release run, then stages AAR only
+        # after Yarn expands react-native-rusto into node_modules.
         run: |
-          test -n "$(find node_modules/react-native-rusto/android/libs -maxdepth 1 -name '*.aar' -print -quit)"
+          set -euo pipefail
+          libs_dir=node_modules/react-native-rusto/android/libs
+          mkdir -p "$libs_dir"
+          find "$GITHUB_WORKSPACE/artifacts/rusto-android-aar" -type f -name '*.aar' -exec cp {} "$libs_dir"/ \;
+          aar="$(find "$libs_dir" -maxdepth 1 -name '*.aar' -print -quit)"
+          test -n "$aar"
+          echo "Using staged RustO AAR: $aar"
       - name: Assert artifact mode and autolinking
         run: |
           ! grep -Fq "include ':rusto-android'" android/settings.gradle
@@ -301,24 +307,25 @@ jobs:
       - name: Install consumer dependencies from current release NPM artifact
         working-directory: examples/react-native-${{ matrix.app }}
         run: yarn install --ignore-scripts --non-interactive
-      - name: Stage current release XCFramework
+      - name: Stage release XCFramework for local RustO pod
+        # Published bridge package declares RustO CocoaPods dependency. CI uses
+        # same dependency, overridden by consumer Podfile's local packages/ios
+        # pod, whose vendored framework is staged from release artifact.
+        working-directory: ${{ github.workspace }}
         run: |
-          rm -rf packages/ios/RustO.xcframework
-          # Artifact zip contains RustO.xcframework, src/, and LICENSE. Extract
-          # only framework entries so tracked packages/ios/src is never replaced.
+          set -euo pipefail
+          framework_dir=packages/ios/RustO.xcframework
+          rm -rf "$framework_dir"
           zipinfo -1 artifacts/rusto-ios-xcframework/RustO.xcframework.zip | \
             grep '^RustO\.xcframework/' > /tmp/rusto-xcframework-files.txt
           test -s /tmp/rusto-xcframework-files.txt
-          # macOS BSD unzip has no stdin file-list option. Zip has only one
-          # framework root, so extract that root explicitly.
           unzip -q artifacts/rusto-ios-xcframework/RustO.xcframework.zip \
             'RustO.xcframework/*' \
             -d packages/ios
-          test -d packages/ios/RustO.xcframework
+          test -d "$framework_dir"
       - name: Align local RustO podspec with downloaded NPM artifact
-        # Manual validation can pair current consumer sources with older release
-        # artifacts. CocoaPods requires exact RustO version declared by packaged
-        # react-native-rusto, so make staging podspec describe staged framework.
+        # CocoaPods requires exact RustO version declared by the packed bridge.
+        # Override only local CI podspec metadata; framework stays release-built.
         working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
@@ -343,7 +350,9 @@ jobs:
           -scheme RustO${{ matrix.app == 'legacy' && 'LegacyExample' || 'NewArchExample' }}
           -configuration Debug
           -sdk iphonesimulator
-          -destination 'platform=iOS Simulator,name=iPhone 15'
+          # Hosted images do not guarantee a named iPhone simulator. Generic
+          # simulator destination still compiles/links all iOS simulator slices.
+          -destination 'generic/platform=iOS Simulator'
           build
       - name: Upload iOS failure logs
         if: failure()
