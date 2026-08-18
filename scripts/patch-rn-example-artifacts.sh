@@ -13,8 +13,12 @@ USAGE
 platform= app= core= model= version= model_pod=
 while (($#)); do
   case "$1" in
-    --platform|--app|--core|--model|--version|--model-pod)
-      key=${1#--}; shift; (($#)) || usage; printf -v "$key" '%s' "$1"; shift ;;
+    --platform) shift; (($#)) || usage; platform=$1; shift ;;
+    --app) shift; (($#)) || usage; app=$1; shift ;;
+    --core) shift; (($#)) || usage; core=$1; shift ;;
+    --model) shift; (($#)) || usage; model=$1; shift ;;
+    --version) shift; (($#)) || usage; version=$1; shift ;;
+    --model-pod) shift; (($#)) || usage; model_pod=$1; shift ;;
     *) usage ;;
   esac
 done

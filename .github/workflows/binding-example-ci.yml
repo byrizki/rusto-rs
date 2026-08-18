@@ -138,8 +138,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_RUN_ID: ${{ needs.resolve-release-artifact-run.outputs.run-id }}
         run: |
-          gh run download "$ARTIFACT_RUN_ID" --name rusto-android-core-aar --dir artifacts/rusto-android-core-aar
-          gh run download "$ARTIFACT_RUN_ID" --name rusto-android-model-aars --dir artifacts/rusto-android-model-aars
+          scripts/download-binding-artifacts.sh \
+            --run-id "$ARTIFACT_RUN_ID" --platform android --output artifacts
           gh run download "$ARTIFACT_RUN_ID" --name rusto-react-native-package --dir artifacts/rusto-react-native-package
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
@@ -254,8 +254,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_RUN_ID: ${{ needs.resolve-release-artifact-run.outputs.run-id }}
         run: |
-          gh run download "$ARTIFACT_RUN_ID" --name rusto-ios-core-xcframework --dir artifacts/rusto-ios-core-xcframework
-          gh run download "$ARTIFACT_RUN_ID" --name rusto-ios-model-resources --dir artifacts/rusto-ios-model-resources
+          scripts/download-binding-artifacts.sh \
+            --run-id "$ARTIFACT_RUN_ID" --platform ios --output artifacts
           gh run download "$ARTIFACT_RUN_ID" --name rusto-react-native-package --dir artifacts/rusto-react-native-package
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
@@ -380,9 +380,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_RUN_ID: ${{ needs.resolve-release-artifact-run.outputs.run-id }}
-        run: |
-          gh run download "$ARTIFACT_RUN_ID" --name rusto-dotnet-core-nupkg --dir artifacts/rusto-dotnet-core-nupkg
-          gh run download "$ARTIFACT_RUN_ID" --name rusto-dotnet-model-nupkgs --dir artifacts/rusto-dotnet-model-nupkgs
+        run: scripts/download-binding-artifacts.sh --run-id "$ARTIFACT_RUN_ID" --platform dotnet --output artifacts
       - uses: actions/download-artifact@v4
         if: github.event_name != 'workflow_dispatch'
         with:
