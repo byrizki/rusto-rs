@@ -55,13 +55,15 @@ function bytesToBase64(bytes: unknown): string {
 }
 function normalizeSource(source: ImageSource): { uri?: string; base64?: string } {
   if (!isObject(source)) throw new TypeError('ImageSource must be an object with exactly one of uri, base64, or bytes.');
-  requireOnlyKeys(source, SOURCE_KEYS, 'ImageSource must contain exactly one of uri, base64, or bytes.');
-  const keys = Object.keys(source);
+  // Runtime validation deliberately handles values cast past ImageSource's union type.
+  const rawSource: Record<string, unknown> = source;
+  requireOnlyKeys(rawSource, SOURCE_KEYS, 'ImageSource must contain exactly one of uri, base64, or bytes.');
+  const keys = Object.keys(rawSource);
   if (keys.length !== 1 || !SOURCE_KEYS.includes(keys[0] as typeof SOURCE_KEYS[number])) {
     throw new TypeError('ImageSource must contain exactly one of uri, base64, or bytes.');
   }
   const key = keys[0] as typeof SOURCE_KEYS[number];
-  const value = source[key];
+  const value = rawSource[key];
   if (key === 'bytes') return { base64: bytesToBase64(value) };
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new TypeError(`ImageSource.${key} must be a non-empty string.`);
