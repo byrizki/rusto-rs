@@ -21,9 +21,11 @@ Pod::Spec.new do |s|
   # Swift source files
   s.source_files = 'src/**/*.swift'
   
-  # Use prebuilt XCFramework (multi-arch support: arm64 device + arm64/x86_64 simulator).
-  # Core archive uses distinct name to avoid collision with pod target libRustO.a.
-  s.vendored_libraries = 'RustO.xcframework/**/libRustoCore.a'
+  # XCFramework selects exactly one platform slice. Do not glob individual
+  # static archives: CocoaPods otherwise adds device and simulator libraries,
+  # then rejects their identical libRustoCore.a names.
+  # Core archive name differs from pod target libRustO.a on case-insensitive FS.
+  s.vendored_frameworks = 'RustO.xcframework'
   
   # Frameworks
   s.frameworks = 'Foundation'
