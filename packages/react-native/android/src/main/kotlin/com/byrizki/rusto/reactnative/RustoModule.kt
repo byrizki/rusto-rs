@@ -18,6 +18,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.bridge.ReadableType
 import com.facebook.react.bridge.WritableArray
 
 class RustoModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
@@ -27,8 +28,10 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
     @ReactMethod
     fun initialize(configMap: ReadableMap?, promise: Promise) {
         try {
+            val config = parseInitializeConfig(configMap)
+            val replacement = RustO.initialize(reactContext, config)
             rustoInstance?.close()
-            rustoInstance = RustO.initialize(reactContext, parseInitializeConfig(configMap))
+            rustoInstance = replacement
             promise.resolve(null)
         } catch (e: Exception) {
             promise.reject("INIT_ERROR", "Failed to initialize RustO: ${e.message}", e)
@@ -37,10 +40,23 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
 
     private fun parseInitializeConfig(map: ReadableMap?): InitializeConfig {
         if (map == null) return InitializeConfig()
-        val models = if (map.hasKey("models") && !map.isNull("models")) map.getMap("models") else null
-        fun model(name: String): String? = models?.takeIf { it.hasKey(name) && !it.isNull(name) }?.getString(name)
+        requireOnlyKeys(map, setOf("preset", "models"), "InitializeConfig contains an unknown key.")
+        val template = if (map.hasKey("preset") && !map.isNull("preset")) {
+            require(map.getType("preset") == ReadableType.String) { "InitializeConfig.preset must be a string." }
+            map.getString("preset")!!.also { require(it in setOf("ppv6", "ppv5", "ppv4", "ppv3")) { "InitializeConfig.preset is invalid." } }
+        } else "ppv6"
+        val models = if (map.hasKey("models") && !map.isNull("models")) {
+            require(map.getType("models") == ReadableType.Map) { "InitializeConfig.models must be an object." }
+            map.getMap("models")!!
+        } else null
+        models?.let { requireOnlyKeys(it, setOf("detection", "recognition", "dictionary", "classification", "orientation"), "InitializeConfig.models contains an unknown key.") }
+        fun model(name: String): String? {
+            if (models == null || !models.hasKey(name) || models.isNull(name)) return null
+            require(models.getType(name) == ReadableType.String) { "InitializeConfig.models.$name must be a string." }
+            return models.getString(name)!!.also { require(it.isNotBlank()) { "InitializeConfig.models.$name must be non-empty." } }
+        }
         return InitializeConfig(
-            template = if (map.hasKey("preset") && !map.isNull("preset")) map.getString("preset") else "ppv6",
+            template = template,
             detection = DetectionConfig(modelPath = model("detection") ?: "det.mnn"),
             recognition = RecognitionConfig(modelPath = model("recognition") ?: "rec.mnn", dictPath = model("dictionary") ?: "dict.txt"),
             classification = model("classification")?.let { ClassificationConfig(enabled = true, modelPath = it) },
@@ -59,11 +75,20 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
         } catch (e: IllegalStateException) {
             promise.reject("NOT_INITIALIZED", e.message, e)
         } catch (e: IllegalArgumentException) {
-            val code = if (e.message?.startsWith("Provide exactly one") == true || e.message?.startsWith("Source value") == true) "INVALID_SOURCE" else "INVALID_OPTIONS"
+            val code = when {
+                e.message?.startsWith("Source ") == true -> "INVALID_SOURCE"
+                e.message?.startsWith("Image file not found") == true -> "FILE_NOT_FOUND"
+                else -> "INVALID_OPTIONS"
+            }
             promise.reject(code, e.message, e)
         } catch (e: Exception) {
             promise.reject("OCR_ERROR", "Failed to detect text: ${e.message}", e)
         }
+    }
+
+    private fun requireOnlyKeys(map: ReadableMap, allowed: Set<String>, message: String) {
+        val iterator = map.keySetIterator()
+        while (iterator.hasNextKey()) require(iterator.nextKey() in allowed) { message }
     }
 
     private fun parseSource(source: ReadableMap): ImageSource {
@@ -71,23 +96,35 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
         val iterator = source.keySetIterator()
         val keys = mutableListOf<String>()
         while (iterator.hasNextKey()) keys += iterator.nextKey()
-        require(keys.all { it in allowedKeys } && keys.size == 1) {
-            "Provide exactly one source key: uri or base64."
-        }
+        require(keys.all { it in allowedKeys } && keys.size == 1) { "Source must contain exactly one key: uri or base64." }
         val sourceKey = keys.single()
-        require(!source.isNull(sourceKey) && !source.getString(sourceKey).isNullOrBlank()) {
-            "Source value must be non-empty."
-        }
+        require(!source.isNull(sourceKey) && source.getType(sourceKey) == ReadableType.String) { "Source value must be a non-empty string." }
+        val value = source.getString(sourceKey)!!.trim()
+        require(value.isNotEmpty()) { "Source value must be a non-empty string." }
         return when (sourceKey) {
-            "base64" -> ImageSource.Bytes(decodeBase64(source.getString("base64")!!))
-            else -> ImageSource.Uri(source.getString("uri")!!)
+            "base64" -> ImageSource.Bytes(decodeBase64(value))
+            else -> ImageSource.Uri(value)
         }
     }
 
     private fun parseOptions(options: ReadableMap?): OcrRunOptions {
-        val output = options?.takeIf { it.hasKey("output") && !it.isNull("output") }?.getString("output") ?: "lines"
-        require(output in setOf("lines", "words", "spatial")) { "Invalid output: $output" }
-        fun number(name: String): Double? = options?.takeIf { it.hasKey(name) && !it.isNull(name) }?.getDouble(name)
+        if (options == null) return OcrRunOptions()
+        requireOnlyKeys(options, setOf("output", "lineYThreshold", "wordXThreshold", "textScore", "classification", "orientation"), "DetectTextOptions contains an unknown key.")
+        val output = if (options.hasKey("output") && !options.isNull("output")) {
+            require(options.getType("output") == ReadableType.String) { "DetectTextOptions.output must be a string." }
+            options.getString("output")!!
+        } else "lines"
+        require(output in setOf("lines", "words", "spatial")) { "DetectTextOptions.output is invalid." }
+        fun number(name: String): Double? {
+            if (!options.hasKey(name) || options.isNull(name)) return null
+            require(options.getType(name) == ReadableType.Number) { "DetectTextOptions.$name must be a number." }
+            return options.getDouble(name)
+        }
+        fun boolean(name: String): Boolean? {
+            if (!options.hasKey(name) || options.isNull(name)) return null
+            require(options.getType(name) == ReadableType.Boolean) { "DetectTextOptions.$name must be a boolean." }
+            return options.getBoolean(name)
+        }
         val y = number("lineYThreshold")
         val x = number("wordXThreshold")
         val score = number("textScore")
@@ -97,12 +134,18 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
             lineYThreshold = y?.toFloat(),
             wordXThreshold = x?.toFloat(),
             textScore = score?.toFloat(),
-            classification = options?.takeIf { it.hasKey("classification") && !it.isNull("classification") }?.getBoolean("classification"),
-            orientation = options?.takeIf { it.hasKey("orientation") && !it.isNull("orientation") }?.getBoolean("orientation"),
+            classification = boolean("classification"),
+            orientation = boolean("orientation"),
         )
     }
 
-    private fun decodeBase64(value: String): ByteArray = Base64.decode(value.substringAfter("base64,", value), Base64.DEFAULT)
+    private fun decodeBase64(value: String): ByteArray = try {
+        Base64.decode(value.substringAfter("base64,", value), Base64.DEFAULT).also {
+            require(it.isNotEmpty()) { "Source base64 must decode to non-empty data." }
+        }
+    } catch (e: IllegalArgumentException) {
+        throw IllegalArgumentException("Source base64 is invalid.", e)
+    }
 
     private fun toWritableArray(results: List<TextResult>): WritableArray = Arguments.createArray().apply {
         results.forEach { result ->

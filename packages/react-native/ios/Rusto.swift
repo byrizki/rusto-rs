@@ -15,40 +15,37 @@ class RustoModule: NSObject {
     func initialize(_ configDict: [String: Any]?,
                    resolver resolve: @escaping RCTPromiseResolveBlock,
                    rejecter reject: @escaping RCTPromiseRejectBlock) {
-        
-        if let existing = rustoInstance {
-            rocr_free(existing)
-            rustoInstance = nil
-        }
-        
-        let config = configDict ?? [:]
-        let models = config["models"] as? [String: String] ?? [:]
-        func model(_ key: String, fallback: String? = nil) -> String? {
-            guard let value = models[key] ?? fallback else { return nil }
-            return getResourcePath(value) ?? value
-        }
-        var resolvedConfig: [String: Any] = [
-            "template": config["preset"] ?? "ppv6",
-            "detection": ["modelPath": model("detection", fallback: "det.mnn")!],
-            "recognition": [
-                "modelPath": model("recognition", fallback: "rec.mnn")!,
-                "dictPath": model("dictionary", fallback: "dict.txt")!,
-            ],
-        ]
-        if let path = model("classification") { resolvedConfig["classification"] = ["enabled": true, "modelPath": path] }
-        if let path = model("orientation") { resolvedConfig["orientation"] = ["enabled": true, "modelPath": path] }
-        
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: resolvedConfig),
-              let jsonStr = String(data: jsonData, encoding: .utf8) else {
-            reject("INIT_ERROR", "Failed to serialize configuration", nil)
-            return
-        }
-        
-        rustoInstance = rocr_initialize(jsonStr)
-        if rustoInstance == nil {
-            reject("INIT_ERROR", "Failed to initialize RustO with config", nil)
-        } else {
+        do {
+            let config = try validatedInitializeConfig(configDict)
+            let models = config["models"] as? [String: String] ?? [:]
+            func model(_ key: String, fallback: String? = nil) -> String? {
+                guard let value = models[key] ?? fallback else { return nil }
+                return getResourcePath(value) ?? value
+            }
+            var resolvedConfig: [String: Any] = [
+                "template": config["preset"] ?? "ppv6",
+                "detection": ["modelPath": model("detection", fallback: "det.mnn")!],
+                "recognition": [
+                    "modelPath": model("recognition", fallback: "rec.mnn")!,
+                    "dictPath": model("dictionary", fallback: "dict.txt")!,
+                ],
+            ]
+            if let path = model("classification") { resolvedConfig["classification"] = ["enabled": true, "modelPath": path] }
+            if let path = model("orientation") { resolvedConfig["orientation"] = ["enabled": true, "modelPath": path] }
+            guard let jsonData = try? JSONSerialization.data(withJSONObject: resolvedConfig),
+                  let jsonStr = String(data: jsonData, encoding: .utf8) else {
+                reject("INIT_ERROR", "Failed to serialize configuration", nil)
+                return
+            }
+            guard let replacement = rocr_initialize(jsonStr) else {
+                reject("INIT_ERROR", "Failed to initialize RustO with config", nil)
+                return
+            }
+            if let existing = rustoInstance { rocr_free(existing) }
+            rustoInstance = replacement
             resolve(nil)
+        } catch {
+            reject("INIT_ERROR", "Invalid initialization configuration: \(error.localizedDescription)", error)
         }
     }
     
@@ -76,25 +73,25 @@ class RustoModule: NSObject {
         guard source.count == 1,
               let key = source.keys.first,
               allowedKeys.contains(key),
-              let value = source[key] as? String,
-              !value.isEmpty else {
+              let rawValue = source[key] as? String else {
+            reject("INVALID_SOURCE", "Provide exactly one non-empty source key: uri or base64.", nil)
+            return
+        }
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else {
             reject("INVALID_SOURCE", "Provide exactly one non-empty source key: uri or base64.", nil)
             return
         }
         let entries = [(key, value)]
-        let output = options?["output"] as? String ?? "lines"
-        guard ["lines", "words", "spatial"].contains(output) else { reject("INVALID_OPTIONS", "Invalid output mode.", nil); return }
-        var runtimeOptions = options ?? [:]
-        runtimeOptions["output"] = output
-        for key in ["lineYThreshold", "wordXThreshold"] {
-            if let value = runtimeOptions[key] as? NSNumber, !value.doubleValue.isFinite || value.doubleValue < 0 { reject("INVALID_OPTIONS", "Invalid runtime options.", nil); return }
-        }
-        if let value = runtimeOptions["textScore"] as? NSNumber, !value.doubleValue.isFinite || value.doubleValue < 0 || value.doubleValue > 1 { reject("INVALID_OPTIONS", "Invalid runtime options.", nil); return }
+        let runtimeOptions: [String: Any]
+        do { runtimeOptions = try validatedRuntimeOptions(options) }
+        catch { reject("INVALID_OPTIONS", "Invalid runtime options: \(error.localizedDescription)", error); return }
+        let output = runtimeOptions["output"] as! String
         guard let jsonData = try? JSONSerialization.data(withJSONObject: runtimeOptions), let optionsJson = String(data: jsonData, encoding: .utf8) else { reject("INVALID_OPTIONS", "Invalid runtime options.", nil); return }
 
         if entries[0].0 == "base64" {
             let encoded = entries[0].1.components(separatedBy: "base64,").last ?? entries[0].1
-            guard let data = Data(base64Encoded: encoded) else { reject("INVALID_SOURCE", "Invalid base64 image.", nil); return }
+            guard let data = Data(base64Encoded: encoded), !data.isEmpty else { reject("INVALID_SOURCE", "Base64 image must decode to non-empty data.", nil); return }
             if output == "spatial" {
                 let text = data.withUnsafeBytes { rocr_detect_text_data_spatial(instance, $0.baseAddress, data.count, optionsJson) }
                 guard let text else { reject("OCR_ERROR", "OCR recognition failed", nil); return }; defer { rocr_free_string(text) }; resolve(String(cString: text)); return
@@ -120,6 +117,52 @@ class RustoModule: NSObject {
     }
     
     // MARK: - Helper Methods
+
+    private func validationError(_ message: String) -> NSError {
+        NSError(domain: "react-native-rusto", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+
+    private func validatedInitializeConfig(_ config: [String: Any]?) throws -> [String: Any] {
+        let config = config ?? [:]
+        let allowed = Set(["preset", "models"])
+        guard Set(config.keys).isSubset(of: allowed) else { throw validationError("unknown key") }
+        if let preset = config["preset"] {
+            guard let value = preset as? String, ["ppv6", "ppv5", "ppv4", "ppv3"].contains(value) else { throw validationError("preset is invalid") }
+        }
+        guard let rawModels = config["models"] else { return config }
+        guard let models = rawModels as? [String: Any] else { throw validationError("models must be an object") }
+        let allowedModels = Set(["detection", "recognition", "dictionary", "classification", "orientation"])
+        guard Set(models.keys).isSubset(of: allowedModels) else { throw validationError("models contains an unknown key") }
+        var strings: [String: String] = [:]
+        for (key, value) in models {
+            guard let path = value as? String, !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw validationError("models.\(key) must be a non-empty string") }
+            strings[key] = path
+        }
+        var validated = config
+        validated["models"] = strings
+        return validated
+    }
+
+    private func validatedRuntimeOptions(_ input: [String: Any]?) throws -> [String: Any] {
+        var options = input ?? [:]
+        let allowed = Set(["output", "lineYThreshold", "wordXThreshold", "textScore", "classification", "orientation"])
+        guard Set(options.keys).isSubset(of: allowed) else { throw validationError("unknown key") }
+        if let output = options["output"] {
+            guard let value = output as? String, ["lines", "words", "spatial"].contains(value) else { throw validationError("output is invalid") }
+        } else { options["output"] = "lines" }
+        for key in ["lineYThreshold", "wordXThreshold"] {
+            if let value = options[key] {
+                guard let number = value as? NSNumber, !(value is Bool), number.doubleValue.isFinite, number.doubleValue >= 0 else { throw validationError("\(key) is invalid") }
+            }
+        }
+        if let value = options["textScore"] {
+            guard let number = value as? NSNumber, !(value is Bool), number.doubleValue.isFinite, (0...1).contains(number.doubleValue) else { throw validationError("textScore is invalid") }
+        }
+        for key in ["classification", "orientation"] {
+            if let value = options[key], !(value is Bool) { throw validationError("\(key) must be a boolean") }
+        }
+        return options
+    }
     
     private func getResourcePath(_ filename: String) -> String? {
         if filename.hasPrefix("/") && FileManager.default.fileExists(atPath: filename) {
