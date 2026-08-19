@@ -5,6 +5,25 @@ All notable changes to RustO! will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-08-19
+
+### Changed
+- Refactor build ci
+- Use legacy yarn
+- Update download script
+- Refactor to use yarn
+
+### Fixed
+- Fix ocr source validation
+- Fix ios test build
+- Fix ios build
+- Fix subworkflow run
+- Fix build example gate
+- Fix build example gate, rn 0.75+
+- Fix rn deps install
+- Fix example build gate
+- Fix npm install examples gate
+
 ## [0.2.2] - 2026-08-14
 
 ### Changed
@@ -127,7 +146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Project Status
 
-**Version**: 0.2.2  
+**Version**: 0.2.3  
 **Status**: Production Ready  
 **Accuracy**: 99.3% OpenCV parity  
-**Last Updated**: August 14, 2026
+**Last Updated**: August 19, 2026
