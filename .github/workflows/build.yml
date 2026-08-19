@@ -94,16 +94,20 @@ jobs:
         run: |
           mkdir -p build/ios-device build/ios-simulator
 
-          cp artifacts/ios/rusto-ios-aarch64-apple-ios/librusto.a build/ios-device/
+          # `RustO` pod compiles Swift bridge into libRustO.a. APFS is normally
+          # case-insensitive, so core librusto.a collides with that output when
+          # CocoaPods passes -lrusto. Use distinct core name in XCFramework.
+          cp artifacts/ios/rusto-ios-aarch64-apple-ios/librusto.a \
+            build/ios-device/libRustoCore.a
 
           lipo -create \
             artifacts/ios/rusto-ios-aarch64-apple-ios-sim/librusto.a \
             artifacts/ios/rusto-ios-x86_64-apple-ios/librusto.a \
-            -output build/ios-simulator/librusto.a
+            -output build/ios-simulator/libRustoCore.a
 
           xcodebuild -create-xcframework \
-            -library build/ios-device/librusto.a \
-            -library build/ios-simulator/librusto.a \
+            -library build/ios-device/libRustoCore.a \
+            -library build/ios-simulator/libRustoCore.a \
             -output build/RustO.xcframework
 
           # Keep release framework artifact binary-only. Swift sources belong

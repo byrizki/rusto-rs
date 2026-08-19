@@ -21,8 +21,9 @@ Pod::Spec.new do |s|
   # Swift source files
   s.source_files = 'src/**/*.swift'
   
-  # Use prebuilt XCFramework (multi-arch support: arm64 device + arm64/x86_64 simulator)
-  s.vendored_frameworks = 'RustO.xcframework'
+  # Use prebuilt XCFramework (multi-arch support: arm64 device + arm64/x86_64 simulator).
+  # Core archive uses distinct name to avoid collision with pod target libRustO.a.
+  s.vendored_libraries = 'RustO.xcframework/**/libRustoCore.a'
   
   # Frameworks
   s.frameworks = 'Foundation'

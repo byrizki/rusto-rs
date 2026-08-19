@@ -49,7 +49,7 @@ case "$platform" in
     test -d "$core_pod/RustO.xcframework"
     # Fail before CocoaPods/Xcode if downloaded archive and checked-out Swift
     # bridge use different FFI generations. Inspect every static library slice.
-    for archive in "$core_pod"/RustO.xcframework/*/*.a; do
+    for archive in "$core_pod"/RustO.xcframework/*/libRustoCore.a; do
       test -f "$archive"
       # `nm` on Linux cannot parse Mach-O object members. `strings` is portable
       # and sufficient here: Rust's exported no_mangle FFI names are literal.
