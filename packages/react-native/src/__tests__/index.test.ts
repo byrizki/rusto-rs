@@ -22,16 +22,26 @@ describe('React Native API', () => {
     });
   });
 
-  it('forwards request-local preprocessing and dilation options', async () => {
+  it('forwards root runtime resize, detection, and postprocess options', async () => {
     (NativeModules.Rusto.detectText as jest.Mock).mockResolvedValue([]);
-    const options = { output: 'lines' as const, lineYThreshold: 0.5, preprocessing: { minHeight: 24, maxSideLen: 1600, minSideLen: 48, detection: { postprocess: { useDilation: false } } } };
+    const options = {
+      output: 'lines' as const,
+      lineYThreshold: 0.5,
+      minHeight: 24,
+      maxSideLen: 1600,
+      minSideLen: 48,
+      detection: { limitType: 'min' as const },
+      postprocess: { useDilation: false },
+    };
     await detectText({ uri: '/tmp/image.png' }, options);
     expect(NativeModules.Rusto.detectText).toHaveBeenCalledWith({ uri: '/tmp/image.png' }, options);
   });
 
   it('forwards spatial request', async () => {
     (NativeModules.Rusto.detectText as jest.Mock).mockResolvedValue('spatial text');
-    await expect(detectText({ base64: 'aGVsbG8=' }, { output: 'spatial' })).resolves.toBe('spatial text');
+    await expect(detectText({ base64: 'aGVsbG8=' }, { output: 'spatial' })).resolves.toBe(
+      'spatial text'
+    );
   });
 
   it('normalizes surrounding whitespace in string sources', async () => {
@@ -70,14 +80,17 @@ describe('React Native API', () => {
     { wordXThreshold: Number.NaN },
     { textScore: 2 },
     { classification: 'true' },
-    { preprocessing: { minHeight: 0 } },
-    { preprocessing: { detection: { limitType: 'other' } } },
-    { preprocessing: { detection: { mean: [0.5, 0.5] } } },
-    { preprocessing: { detection: { std: [0.5, 0, 0.5] } } },
-    { preprocessing: { detection: { postprocess: { useDilation: 'true' } } } },
+    { minHeight: 0 },
+    { detection: { limitType: 'other' } },
+    { detection: { mean: [0.5, 0.5] } },
+    { detection: { std: [0.5, 0, 0.5] } },
+    { postprocess: { useDilation: 'true' } },
+    { preprocessing: { minHeight: 24 } }, // obsolete nested key must reject
     { unknown: true },
   ])('rejects invalid runtime options %# before native invocation', (options) => {
-    expect(() => detectText({ uri: '/tmp/image.png' }, options as never)).toThrow(/DetectTextOptions/);
+    expect(() => detectText({ uri: '/tmp/image.png' }, options as never)).toThrow(
+      /DetectTextOptions/
+    );
     expect(NativeModules.Rusto.detectText).not.toHaveBeenCalled();
   });
 
@@ -90,7 +103,7 @@ describe('React Native API', () => {
     { models: 'invalid' },
     { models: { unknown: 'model.mnn' } },
     { models: { recognition: '' } },
-    { preprocessing: null },
+    { preprocessing: null }, // obsolete nested key must reject
     { unknown: true },
   ])('rejects invalid initialization config %# before native invocation', (config) => {
     expect(() => initialize(config as never)).toThrow(/InitializeConfig/);

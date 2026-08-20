@@ -201,16 +201,6 @@ namespace RustODotnet
         [JsonPropertyName("limitType")] public string LimitType { get; set; }
         [JsonPropertyName("mean")] public float[] Mean { get; set; }
         [JsonPropertyName("std")] public float[] Std { get; set; }
-        [JsonPropertyName("postprocess")] public PostprocessRunOptions Postprocess { get; set; }
-    }
-
-    public class PreprocessingRunOptions
-    {
-        [JsonPropertyName("minHeight")] public float? MinHeight { get; set; }
-        [JsonPropertyName("maxSideLen")] public float? MaxSideLen { get; set; }
-        [JsonPropertyName("minSideLen")] public float? MinSideLen { get; set; }
-        [JsonPropertyName("widthHeightRatio")] public float? WidthHeightRatio { get; set; }
-        [JsonPropertyName("detection")] public DetectionRunOptions Detection { get; set; }
     }
 
     /// <summary>Per-request OCR output and pipeline options.</summary>
@@ -232,8 +222,12 @@ namespace RustODotnet
         public bool? Classification { get; set; }
         [JsonPropertyName("orientation")]
         public bool? Orientation { get; set; }
-        [JsonPropertyName("preprocessing")]
-        public PreprocessingRunOptions Preprocessing { get; set; }
+        [JsonPropertyName("minHeight")] public float? MinHeight { get; set; }
+        [JsonPropertyName("maxSideLen")] public float? MaxSideLen { get; set; }
+        [JsonPropertyName("minSideLen")] public float? MinSideLen { get; set; }
+        [JsonPropertyName("widthHeightRatio")] public float? WidthHeightRatio { get; set; }
+        [JsonPropertyName("detection")] public DetectionRunOptions Detection { get; set; }
+        [JsonPropertyName("postprocess")] public PostprocessRunOptions Postprocess { get; set; }
     }
 
     public abstract class ImageSource { }
@@ -462,7 +456,12 @@ namespace RustODotnet
                 TextScore = options.TextScore,
                 Classification = options.Classification,
                 Orientation = options.Orientation,
-                Preprocessing = options.Preprocessing,
+                MinHeight = options.MinHeight,
+                MaxSideLen = options.MaxSideLen,
+                MinSideLen = options.MinSideLen,
+                WidthHeightRatio = options.WidthHeightRatio,
+                Detection = options.Detection,
+                Postprocess = options.Postprocess,
             };
             return JsonSerializer.Serialize(serialized, new JsonSerializerOptions
             {
@@ -488,24 +487,22 @@ namespace RustODotnet
             {
                 throw new RustOException("TextScore must be finite and between 0 and 1.");
             }
-            ValidatePreprocessing(options.Preprocessing);
-        }
-
-        private static void ValidatePreprocessing(PreprocessingRunOptions options)
-        {
-            if (options == null) return;
             ValidatePositive(options.MinHeight, nameof(options.MinHeight));
             ValidatePositive(options.MaxSideLen, nameof(options.MaxSideLen));
             ValidatePositive(options.MinSideLen, nameof(options.MinSideLen));
             if (options.WidthHeightRatio.HasValue && (!float.IsFinite(options.WidthHeightRatio.Value) || (options.WidthHeightRatio.Value <= 0 && options.WidthHeightRatio.Value != -1))) throw new RustOException("WidthHeightRatio must be positive or -1.");
             if (options.MinSideLen.HasValue && options.MaxSideLen.HasValue && options.MinSideLen.Value > options.MaxSideLen.Value) throw new RustOException("MinSideLen must not exceed MaxSideLen.");
             var detection = options.Detection;
-            if (detection == null) return;
+            if (detection == null) { ValidatePostprocess(options.Postprocess); return; }
             if (detection.LimitSideLen.HasValue && (detection.LimitSideLen.Value < 1 || detection.LimitSideLen.Value > 32767)) throw new RustOException("LimitSideLen must be between 1 and 32767.");
             if (detection.LimitType != null && detection.LimitType != "min" && detection.LimitType != "max") throw new RustOException("LimitType must be min or max.");
             ValidateVector(detection.Mean, false, "Mean");
             ValidateVector(detection.Std, true, "Std");
-            var postprocess = detection.Postprocess;
+            ValidatePostprocess(options.Postprocess);
+        }
+
+        private static void ValidatePostprocess(PostprocessRunOptions postprocess)
+        {
             if (postprocess == null) return;
             ValidateProbability(postprocess.Threshold, "Threshold");
             ValidateProbability(postprocess.BoxThreshold, "BoxThreshold");

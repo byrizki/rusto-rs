@@ -2,11 +2,21 @@
   "name": "react-native-rusto",
   "version": "0.2.4",
   "description": "React Native bindings for RustO! OCR library",
-  "main": "lib/commonjs/index",
-  "module": "lib/module/index",
-  "types": "lib/typescript/index.d.ts",
-  "typings": "lib/typescript/index.d.ts",
-  "react-native": "src/index",
+  "keywords": [
+    "android",
+    "ios",
+    "react-native"
+  ],
+  "homepage": "https://github.com/byrizki/rusto-rs#readme",
+  "bugs": {
+    "url": "https://github.com/byrizki/rusto-rs/issues"
+  },
+  "license": "MIT",
+  "author": "byrizki <contact@byrizki.com> (https://github.com/byrizki)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/byrizki/rusto-rs.git"
+  },
   "source": "src/index",
   "files": [
     "src",
@@ -20,47 +30,37 @@
     "react-native.config.js",
     "*.podspec"
   ],
+  "main": "lib/commonjs/index",
+  "module": "lib/module/index",
+  "types": "lib/typescript/index.d.ts",
+  "typings": "lib/typescript/index.d.ts",
+  "react-native": "src/index",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint \"**/*.{js,ts,tsx}\"",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "clean": "del-cli lib",
     "prepare": "bob build",
     "release": "release-it"
   },
-  "keywords": [
-    "react-native",
-    "ios",
-    "android"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/byrizki/rusto-rs.git"
-  },
-  "author": "byrizki <contact@byrizki.com> (https://github.com/byrizki)",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/byrizki/rusto-rs/issues"
-  },
-  "homepage": "https://github.com/byrizki/rusto-rs#readme",
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
-  },
   "devDependencies": {
     "@commitlint/config-conventional": "^17.0.2",
     "@evilmartians/lefthook": "^1.5.0",
-    "@react-native/eslint-config": "^0.72.2",
     "@release-it/conventional-changelog": "^5.0.0",
     "@types/jest": "^28.1.2",
     "@types/react": "~18.2.6",
     "@types/react-native": "0.70.19",
     "commitlint": "^17.0.2",
     "del-cli": "^5.0.0",
-    "eslint": "^8.4.1",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-plugin-prettier": "^4.0.0",
     "jest": "^28.1.1",
-    "prettier": "^2.0.5",
+    "oxfmt": "^0.64.0",
+    "oxlint": "^1.79.0",
     "react": "18.1.0",
     "react-native": "0.70.15",
     "react-native-builder-bob": "^0.20.0",
@@ -71,15 +71,29 @@
     "react": "*",
     "react-native": "*"
   },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
   "jest": {
     "modulePathIgnorePatterns": [
       "<rootDir>/example/node_modules",
       "<rootDir>/lib/"
     ]
   },
-  "commitlint": {
-    "extends": [
-      "@commitlint/config-conventional"
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      "commonjs",
+      "module",
+      [
+        "typescript",
+        {
+          "project": "tsconfig.build.json"
+        }
+      ]
     ]
   },
   "release-it": {
@@ -98,49 +112,5 @@
         "preset": "angular"
       }
     }
-  },
-  "eslintConfig": {
-    "root": true,
-    "extends": [
-      "@react-native",
-      "prettier"
-    ],
-    "rules": {
-      "prettier/prettier": [
-        "error",
-        {
-          "quoteProps": "consistent",
-          "singleQuote": true,
-          "tabWidth": 2,
-          "trailingComma": "es5",
-          "useTabs": false
-        }
-      ]
-    }
-  },
-  "eslintIgnore": [
-    "node_modules/",
-    "lib/"
-  ],
-  "prettier": {
-    "quoteProps": "consistent",
-    "singleQuote": true,
-    "tabWidth": 2,
-    "trailingComma": "es5",
-    "useTabs": false
-  },
-  "react-native-builder-bob": {
-    "source": "src",
-    "output": "lib",
-    "targets": [
-      "commonjs",
-      "module",
-      [
-        "typescript",
-        {
-          "project": "tsconfig.build.json"
-        }
-      ]
-    ]
   }
 }

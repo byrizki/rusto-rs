@@ -18,11 +18,5 @@
     "outDir": "lib/typescript"
   },
   "include": ["src"],
-  "exclude": [
-    "node_modules",
-    "lib",
-    "**/__tests__",
-    "**/*.spec.ts",
-    "**/*.spec.tsx"
-  ]
+  "exclude": ["node_modules", "lib", "**/__tests__", "**/*.spec.ts", "**/*.spec.tsx"]
 }

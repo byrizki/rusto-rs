@@ -5,7 +5,7 @@ use ndarray::{Array4, ArrayD};
 use crate::engine::{EngineError, MnnSession};
 use crate::postprocess::{DBPostProcess, TextDetOutput};
 use crate::preprocess::DetPreProcess;
-use crate::rusto_ocr::DetectionRunOptions;
+use crate::rusto_ocr::{DetectionRunOptions, PostprocessRunOptions};
 use crate::types::DetConfig;
 
 #[cfg(feature = "use-opencv")]
@@ -26,21 +26,25 @@ impl TextDetector {
     }
 
     pub fn run(&mut self, img: &Mat) -> Result<TextDetOutput, EngineError> {
-        self.run_with_options(img, None)
+        self.run_with_options(img, None, None)
     }
 
     pub fn run_with_options(
         &mut self,
         img: &Mat,
         options: Option<&DetectionRunOptions>,
+        postprocess: Option<&PostprocessRunOptions>,
     ) -> Result<TextDetOutput, EngineError> {
         let start = Instant::now();
+        // Per-call fields override only supplied values; omitted fields retain
+        // initialized detector defaults for this request.
         let options = options.cloned().unwrap_or_default();
         let limit_type = options.limit_type.unwrap_or_else(|| self.cfg.limit_type.clone());
         let configured_limit_side_len = options.limit_side_len.unwrap_or(self.cfg.limit_side_len);
         let mean = options.mean.unwrap_or(self.cfg.mean);
         let std = options.std.unwrap_or(self.cfg.std);
-        let postprocess_options = options.postprocess.unwrap_or_default();
+        // Same merge rule for postprocessing. Never mutate `self.cfg`.
+        let postprocess_options = postprocess.cloned().unwrap_or_default();
 
         let ori_h = img.rows();
         let ori_w = img.cols();

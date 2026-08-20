@@ -148,7 +148,7 @@ class RustoModule: NSObject {
     private func validatedRuntimeOptions(_ input: [String: Any]?) throws -> [String: Any] {
         var options = input ?? [:]
         guard !options.values.contains(where: { $0 is NSNull }) else { throw validationError("options values must not be null") }
-        let allowed = Set(["output", "lineYThreshold", "wordXThreshold", "textScore", "classification", "orientation", "preprocessing"])
+        let allowed = Set(["output", "lineYThreshold", "wordXThreshold", "textScore", "classification", "orientation", "minHeight", "maxSideLen", "minSideLen", "widthHeightRatio", "detection", "postprocess"])
         guard Set(options.keys).isSubset(of: allowed) else { throw validationError("unknown key") }
         if let output = options["output"] {
             guard let value = output as? String, ["lines", "words", "spatial"].contains(value) else { throw validationError("output is invalid") }
@@ -164,38 +164,30 @@ class RustoModule: NSObject {
         for key in ["classification", "orientation"] {
             if let value = options[key], !(value is Bool) { throw validationError("\(key) must be a boolean") }
         }
-        if let rawPreprocessing = options["preprocessing"] {
-            options["preprocessing"] = try validatedRuntimePreprocessing(rawPreprocessing)
+        func number(_ key: String, allowNegativeOne: Bool = false) throws -> NSNumber? {
+            guard let raw = options[key] else { return nil }
+            guard let value = raw as? NSNumber, !(raw is Bool), value.doubleValue.isFinite, value.doubleValue <= Double(Float.greatestFiniteMagnitude), value.doubleValue > 0 || (allowNegativeOne && value.doubleValue == -1) else { throw validationError("\(key) is invalid") }
+            return value
         }
+        let maxSideLen = try number("maxSideLen")
+        let minSideLen = try number("minSideLen")
+        _ = try number("minHeight")
+        _ = try number("widthHeightRatio", allowNegativeOne: true)
+        if let minSideLen, let maxSideLen, minSideLen.doubleValue > maxSideLen.doubleValue { throw validationError("minSideLen must be <= maxSideLen") }
+        if let rawDetection = options["detection"] { options["detection"] = try validatedRuntimeDetection(rawDetection) }
+        if let rawPostprocess = options["postprocess"] { options["postprocess"] = try validatedRuntimePostprocess(rawPostprocess) }
         return options
     }
 
-    private func validatedRuntimePreprocessing(_ raw: Any) throws -> [String: Any] {
-        guard let preprocessing = raw as? [String: Any] else { throw validationError("preprocessing must be an object") }
-        guard Set(preprocessing.keys).isSubset(of: Set(["minHeight", "maxSideLen", "minSideLen", "widthHeightRatio", "detection"])) else { throw validationError("preprocessing contains an unknown key") }
-        var result: [String: Any] = [:]
-        func number(_ key: String, allowNegativeOne: Bool = false) throws -> NSNumber? {
-            guard let raw = preprocessing[key] else { return nil }
-            guard let value = raw as? NSNumber, !(raw is Bool), value.doubleValue.isFinite, value.doubleValue <= Double(Float.greatestFiniteMagnitude), value.doubleValue > 0 || (allowNegativeOne && value.doubleValue == -1) else { throw validationError("preprocessing.\(key) is invalid") }
-            result[key] = value; return value
-        }
-        let minHeight = try number("minHeight"); let maxSideLen = try number("maxSideLen"); let minSideLen = try number("minSideLen"); _ = minHeight
-        _ = try number("widthHeightRatio", allowNegativeOne: true)
-        if let minSideLen, let maxSideLen, minSideLen.doubleValue > maxSideLen.doubleValue { throw validationError("preprocessing.minSideLen must be <= maxSideLen") }
-        if let rawDetection = preprocessing["detection"] { result["detection"] = try validatedRuntimeDetection(rawDetection) }
-        return result
-    }
-
     private func validatedRuntimeDetection(_ raw: Any) throws -> [String: Any] {
-        guard let detection = raw as? [String: Any] else { throw validationError("preprocessing.detection must be an object") }
-        guard Set(detection.keys).isSubset(of: Set(["limitSideLen", "limitType", "mean", "std", "postprocess"])) else { throw validationError("preprocessing.detection contains an unknown key") }
+        guard let detection = raw as? [String: Any] else { throw validationError("detection must be an object") }
+        guard Set(detection.keys).isSubset(of: Set(["limitSideLen", "limitType", "mean", "std"])) else { throw validationError("detection contains an unknown key") }
         var result: [String: Any] = [:]
         if let raw = detection["limitSideLen"] { guard let value = raw as? NSNumber, !(raw is Bool), value.doubleValue.isFinite, value.doubleValue > 0, value.doubleValue <= 32767, value.doubleValue.rounded() == value.doubleValue else { throw validationError("limitSideLen is invalid") }; result["limitSideLen"] = value }
         if let raw = detection["limitType"] { guard let value = raw as? String, value == "min" || value == "max" else { throw validationError("limitType is invalid") }; result["limitType"] = value }
         for key in ["mean", "std"] {
             if let raw = detection[key] { guard let values = raw as? [Any], values.count == 3 else { throw validationError("\(key) must contain three numbers") }; for value in values { guard let number = value as? NSNumber, !(value is Bool), number.doubleValue.isFinite, key != "std" || number.doubleValue != 0 else { throw validationError("\(key) contains an invalid value") } }; result[key] = values }
         }
-        if let rawPostprocess = detection["postprocess"] { result["postprocess"] = try validatedRuntimePostprocess(rawPostprocess) }
         return result
     }
 

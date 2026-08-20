@@ -1,134 +1,242 @@
 # React Native RustO
 
-React Native bindings for the RustO! OCR library.
+React Native OCR binding for RustO. Public API intentionally small:
 
-## Installation
-
-```bash
-npm install react-native-rusto
-# or
-yarn add react-native-rusto
-# or
-pnpm add react-native-rusto
+```ts
+await initialize();
+const result = await detectText(source, options);
 ```
 
-### 1. iOS Setup
+Initialize model resources once. Run `detectText` many times with request-local options.
 
-In your `ios/Podfile`, choose and add the model package you want to bundle (e.g. PP-OCRv6 Tiny, Small, Medium, PP-OCRv5, or PP-OCRv4):
+## Install
+
+```bash
+yarn add react-native-rusto
+# or npm install react-native-rusto
+```
+
+### iOS
+
+Add matching model pod beside React Native pods:
 
 ```ruby
 target 'YourApp' do
-  # ... other pods
-
-  # Add your preferred OCR models:
-  pod 'RustO-Models-PPOCRv6-Tiny'    # ~6 MB (recommended default)
-  # or pod 'RustO-Models-PPOCRv6-Small'   # ~30 MB
-  # or pod 'RustO-Models-PPOCRv6-Medium'  # ~134 MB
-  # or pod 'RustO-Models-PPOCRv5-Mobile'  # ~28 MB
-  # or pod 'RustO-Models-PPOCRv4-Mobile'  # ~23 MB
+  pod 'RustO-Models-PPOCRv6-Tiny' # recommended default
+  # pod 'RustO-Models-PPOCRv6-Small'
+  # pod 'RustO-Models-PPOCRv6-Medium'
+  # pod 'RustO-Models-PPOCRv5-Mobile'
+  # pod 'RustO-Models-PPOCRv4-Mobile'
 end
 ```
 
-Then install the CocoaPods:
 ```bash
 cd ios && pod install
 ```
 
-In your `android/build.gradle` (or `settings.gradle`), ensure `jitpack.io` repository is added:
+`react-native-rusto`, `RustO`, and selected `RustO-Models-*` pod must use matching versions.
+
+### Android
+
+Enable JitPack, then add one matching model AAR:
 
 ```groovy
+// android/settings.gradle or root build.gradle
 dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-        maven { url 'https://jitpack.io' }
-    }
+  repositories {
+    google()
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+  }
 }
-```
 
-In your `android/app/build.gradle`, add the corresponding model package dependency under `dependencies`:
-
-```groovy
+// android/app/build.gradle
 dependencies {
-    // Add your preferred OCR models:
-    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.4'     // ~6 MB (recommended default)
-    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-small:v0.2.4'    // ~30 MB
-    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-medium:v0.2.4'   // ~134 MB
-    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv5-mobile:v0.2.4'   // ~28 MB
-    // or implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv4-mobile:v0.2.4'   // ~23 MB
+  implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.4'
 }
 ```
 
-> **Note:** If you want to use custom models or load models dynamically from device storage, you don't need to install any model package. You can pass absolute filesystem paths directly to `initialize()`.
+Use a matching model version. Custom absolute model paths need no model package.
 
-## Usage
+## Complete example
 
-```typescript
-import { detectText, initialize } from 'react-native-rusto';
+```tsx
+import { detectText, initialize, type TextResult } from 'react-native-rusto';
 
-await initialize(); // PP-OCRv6 bundled defaults
+export async function readReceipt(uri: string): Promise<TextResult[]> {
+  await initialize({ preset: 'ppv6' });
 
-const lines = await detectText({ uri: '/absolute/path/receipt.jpg' });
-const words = await detectText(
-  { uri: 'file:///absolute/path/receipt.jpg' },
-  { output: 'words', lineYThreshold: 0.5, wordXThreshold: 0.4 },
-);
-const spatial = await detectText(
-  { base64: encodedImage },
-  { output: 'spatial', lineYThreshold: 0.5, wordXThreshold: 0.4 },
-);
-const fromBytes = await detectText({ bytes: new Uint8Array(imageBytes) });
+  return detectText(
+    { uri },
+    {
+      output: 'words',
+      textScore: 0.55,
+      maxSideLen: 1600,
+      detection: { limitSideLen: 960, limitType: 'max' },
+      postprocess: { useDilation: true },
+    }
+  );
+}
+
+const words = await readReceipt('file:///absolute/path/receipt.jpg');
+console.log(words);
 ```
 
-`detectText` accepts exactly one source: `{ uri }`, `{ base64 }`, or `{ bytes }` (`Uint8Array` / `ArrayBuffer`). `{ uri }` accepts an absolute filesystem path, `file:` URI, or Android `content://` URI.
+Example result:
 
-`output` defaults to `lines`, returning `TextResult[]`. `words` returns word boxes. `spatial` returns a formatted string. `lineYThreshold` groups vertically aligned regions; `wordXThreshold` controls word and spatial gaps.
+```json
+[
+  {
+    "text": "Total",
+    "score": 0.98,
+    "box_points": [
+      [40, 120],
+      [124, 120],
+      [124, 148],
+      [40, 148]
+    ],
+    "frame": { "width": 84, "height": 28, "top": 120, "left": 40 }
+  }
+]
+```
 
-Static model setup belongs in `initialize`:
+For approximate columns and rows:
 
-```typescript
+```ts
+const text = await detectText(
+  { uri: 'file:///absolute/path/receipt.jpg' },
+  { output: 'spatial', lineYThreshold: 0.5, wordXThreshold: 0.4 }
+);
+
+console.log(text);
+// Item                 Amount
+// Coffee                $3.50
+// Total                $12.50
+```
+
+## Public API
+
+### `initialize(config?: InitializeConfig): Promise<void>`
+
+Creates or replaces native OCR engine. Defaults to PP-OCRv6 bundled model filenames.
+
+```ts
 await initialize({
   preset: 'ppv6',
-  models: { detection: 'det.mnn', recognition: 'rec.mnn', dictionary: 'dict.txt' },
-});
-
-const words = await detectText({ uri: '/absolute/path/receipt.jpg' }, {
-  output: 'words',
-  preprocessing: {
-    maxSideLen: 1600,
-    detection: { postprocess: { useDilation: true } },
+  models: {
+    detection: 'det.mnn',
+    recognition: 'rec.mnn',
+    dictionary: 'dict.txt',
+    // classification: 'cls.mnn',
+    // orientation: 'orient.mnn',
   },
 });
 ```
 
-## Model Bundling
+| Config field            | Values                                 | Purpose                                                                 |
+| ----------------------- | -------------------------------------- | ----------------------------------------------------------------------- |
+| `preset`                | `'ppv6'`, `'ppv5'`, `'ppv4'`, `'ppv3'` | Model-family defaults. Default: `'ppv6'`.                               |
+| `models.detection`      | non-empty string                       | Detection-model path.                                                   |
+| `models.recognition`    | non-empty string                       | Recognition-model path.                                                 |
+| `models.dictionary`     | non-empty string                       | Recognition-dictionary path.                                            |
+| `models.classification` | non-empty string                       | Optional classifier resource. Pair with request `classification: true`. |
+| `models.orientation`    | non-empty string                       | Optional orientation resource. Pair with request `orientation: true`.   |
 
-Model files can be bundled with your app. See [BUNDLING.md](./BUNDLING.md) for detailed instructions on how to:
-- Bundle models with Android AAR
-- Bundle models with iOS XCFramework
-- Reduce app size with on-demand loading
-
-## API
-
-### `initialize(config?: InitializeConfig): Promise<void>`
-
-Loads static OCR model resources. `preset` defaults to `ppv6`. Optional `models` keys are `detection`, `recognition`, `dictionary`, `classification`, and `orientation`. Image preprocessing is configured per request via `detectText`.
-
-`preprocessing` belongs to `detectText` options, never `initialize`. It is request-local and does not mutate engine state. It contains resize/padding (`minHeight`, `maxSideLen`, `minSideLen`, `widthHeightRatio`), detector preprocessing (`limitSideLen`, `limitType`, `mean`, `std`), and detector postprocess (`threshold`, `boxThreshold`, `maxCandidates`, `unclipRatio`, `useDilation`).
+Initialization is model setup only. Resize, detection, and postprocess tuning belong to `detectText`.
 
 ### `detectText(source, options?)`
 
-Runs one request. Source contains exactly one of `uri`, `base64`, or `bytes`. `uri` accepts an absolute filesystem path, `file:` URI, or Android `content://` URI. Options include `output: 'lines' | 'words' | 'spatial'`, `lineYThreshold`, `wordXThreshold`, `textScore`, `classification`, and `orientation`.
+Runs one request. Native engine must already be initialized.
 
-`lines` and `words` return `TextResult[]`; `spatial` returns `string`.
+```ts
+const lines = await detectText({ uri: '/absolute/path/invoice.jpg' });
+const bytes = await detectText({ bytes: new Uint8Array(imageBytes) });
+const base64 = await detectText({ base64: encodedJpeg });
+```
 
-## Platform Support
+`source` must contain **exactly one** of:
 
-- ✅ iOS 13.0+
-- ✅ Android API 21+
-- Architectures:
-  - iOS: arm64, x86_64 (simulator)
-  - Android: armeabi-v7a, arm64-v8a, x86, x86_64
+| Source       | Value                                   | Notes                                                                        |
+| ------------ | --------------------------------------- | ---------------------------------------------------------------------------- |
+| `{ uri }`    | non-empty string                        | Absolute path, `file:` URI, or Android `content://` URI. Whitespace trimmed. |
+| `{ base64 }` | non-empty string                        | Encoded image payload. Whitespace trimmed.                                   |
+| `{ bytes }`  | non-empty `Uint8Array` or `ArrayBuffer` | Encoded image bytes; bridge converts to base64.                              |
+
+Unknown keys, multiple source keys, empty values, `null`, arrays, and primitive sources throw `TypeError` before native dispatch.
+
+### `DetectTextOptions`
+
+All fields optional. Omitted values merge with engine defaults and never alter later calls.
+
+```ts
+const options = {
+  output: 'words' as const,
+  lineYThreshold: 0.5,
+  wordXThreshold: 0.4,
+  textScore: 0.55,
+  classification: false,
+  orientation: false,
+  minHeight: 32,
+  maxSideLen: 1600,
+  minSideLen: 64,
+  widthHeightRatio: -1,
+  detection: {
+    limitSideLen: 960,
+    limitType: 'max' as const,
+    mean: [0.485, 0.456, 0.406] as [number, number, number],
+    std: [0.229, 0.224, 0.225] as [number, number, number],
+  },
+  postprocess: {
+    threshold: 0.3,
+    boxThreshold: 0.6,
+    maxCandidates: 1000,
+    unclipRatio: 2.0,
+    useDilation: true,
+  },
+};
+```
+
+| Field                                   | Valid value                       | Default / behavior                                                          |
+| --------------------------------------- | --------------------------------- | --------------------------------------------------------------------------- |
+| `output`                                | `'lines' \| 'words' \| 'spatial'` | `'lines'`; structured list for lines/words, string for spatial.             |
+| `lineYThreshold`, `wordXThreshold`      | finite `>= 0`                     | `0.5`, `0.4`; line/word grouping tolerance.                                 |
+| `textScore`                             | finite `[0, 1]`                   | Engine default confidence cutoff.                                           |
+| `classification`, `orientation`         | boolean                           | `false`; only useful with configured optional models.                       |
+| `minHeight`, `maxSideLen`, `minSideLen` | finite `> 0`                      | Request-local resize bounds; `minSideLen <= maxSideLen` when both supplied. |
+| `widthHeightRatio`                      | finite `> 0` or `-1`              | `-1` retains native aspect-ratio behavior.                                  |
+| `detection.limitSideLen`                | integer `1..32767`                | Detector resize bound.                                                      |
+| `detection.limitType`                   | `'min' \| 'max'`                  | Short-side minimum / long-side maximum mode.                                |
+| `detection.mean`, `detection.std`       | exactly three finite numbers      | Input normalization; `std` entries cannot be zero.                          |
+| `postprocess.threshold`, `boxThreshold` | finite `[0, 1]`                   | Detector pixel and polygon confidence thresholds.                           |
+| `postprocess.maxCandidates`             | integer `>= 1`                    | Candidate cap.                                                              |
+| `postprocess.unclipRatio`               | finite `> 0`                      | Polygon expansion ratio.                                                    |
+| `postprocess.useDilation`               | boolean                           | Enables dilation for faint/broken strokes.                                  |
+
+`preprocessing` is not a valid nested option. `detection` and `postprocess` are root-level siblings.
+
+## Result types
+
+```ts
+interface TextResult {
+  text: string;
+  score: number;
+  box_points: [[number, number], [number, number], [number, number], [number, number]];
+  frame: { width: number; height: number; top: number; left: number };
+}
+```
+
+`box_points` order is top-left, top-right, bottom-right, bottom-left. Values are image pixels with origin at top-left. `frame` is axis-aligned, including for rotated polygons.
+
+## Errors and platform support
+
+- Call `initialize` before `detectText`; native bridge reports not-initialized failure otherwise.
+- Invalid config/options/source fail before native OCR. Correct value and retry; initialized engine remains usable.
+- Native image/model errors depend on platform: missing file, missing model resources, decode failure, or OCR runtime failure.
+- Requires iOS 13+ or Android API 21+. Expo Go cannot load native Rust module; use development build.
+
+## Model bundling
+
+See [BUNDLING.md](./BUNDLING.md) for custom model packaging, on-demand resources, and app-size tradeoffs.
 
 ## License
 

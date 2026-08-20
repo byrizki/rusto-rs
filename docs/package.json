@@ -1,0 +1,41 @@
+{
+  "name": "rusto-docs",
+  "scripts": {
+    "dev": "nuxt dev --extends docus",
+    "build": "nuxt build --extends docus --preset github_pages",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "docus": "5.12.3",
+    "mermaid": "^11.17.0",
+    "nuxt": "^4.3.1"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.64.0",
+    "oxlint": "^1.79.0"
+  },
+  "resolutions": {
+    "@hono/node-server": "1.19.13",
+    "brace-expansion": "2.0.3",
+    "devalue": "5.8.1",
+    "esbuild": "0.28.1",
+    "express-rate-limit": "^7.4.1",
+    "h3": "^1.15.11",
+    "hono": "4.12.25",
+    "node-forge": "1.4.0",
+    "path-to-regexp": "^0.1.10",
+    "picomatch": "^4.0.1",
+    "serialize-javascript": "7.0.5",
+    "socket.io-parser": "^4.2.4",
+    "svgo": "^3.3.2",
+    "tar": "7.5.16",
+    "unimport": "5.6.0",
+    "ws": "8.21.0",
+    "yaml": "^2.4.5"
+  },
+  "packageManager": "yarn@4.12.0"
+}

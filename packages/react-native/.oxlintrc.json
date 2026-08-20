@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "jest", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {},
+  "env": {
+    "builtin": true
+  },
+  "ignorePatterns": ["lib/**", "node_modules/**", "android/**", "ios/**", "*.podspec"]
+}

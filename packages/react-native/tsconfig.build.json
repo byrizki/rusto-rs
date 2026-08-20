@@ -3,12 +3,5 @@
   "compilerOptions": {
     "noEmit": false
   },
-  "exclude": [
-    "node_modules",
-    "lib",
-    "example",
-    "**/__tests__",
-    "**/*.spec.ts",
-    "**/*.spec.tsx"
-  ]
+  "exclude": ["node_modules", "lib", "example", "**/__tests__", "**/*.spec.ts", "**/*.spec.tsx"]
 }

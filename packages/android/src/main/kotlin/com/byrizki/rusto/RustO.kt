@@ -169,15 +169,6 @@ data class DetectionRunOptions(
     val limitType: String? = null,
     val mean: FloatArray? = null,
     val std: FloatArray? = null,
-    val postprocess: PostprocessRunOptions? = null,
-)
-
-data class PreprocessingRunOptions(
-    val minHeight: Float? = null,
-    val maxSideLen: Float? = null,
-    val minSideLen: Float? = null,
-    val widthHeightRatio: Float? = null,
-    val detection: DetectionRunOptions? = null,
 )
 
 data class OcrRunOptions(
@@ -187,7 +178,12 @@ data class OcrRunOptions(
     val textScore: Float? = null,
     val classification: Boolean? = null,
     val orientation: Boolean? = null,
-    val preprocessing: PreprocessingRunOptions? = null,
+    val minHeight: Float? = null,
+    val maxSideLen: Float? = null,
+    val minSideLen: Float? = null,
+    val widthHeightRatio: Float? = null,
+    val detection: DetectionRunOptions? = null,
+    val postprocess: PostprocessRunOptions? = null,
 ) {
     internal fun toJson(): String {
         require(lineYThreshold == null || lineYThreshold.isFinite() && lineYThreshold >= 0f) {
@@ -199,7 +195,7 @@ data class OcrRunOptions(
         require(textScore == null || textScore.isFinite() && textScore in 0f..1f) {
             "textScore must be finite and between 0 and 1."
         }
-        preprocessing?.let { validatePreprocessing(it) }
+        validateRuntimeOverrides()
         return JSONObject().apply {
             put("output", output.wireValue)
             lineYThreshold?.let { put("lineYThreshold", it.toDouble()) }
@@ -207,51 +203,47 @@ data class OcrRunOptions(
             textScore?.let { put("textScore", it.toDouble()) }
             classification?.let { put("classification", it) }
             orientation?.let { put("orientation", it) }
-            preprocessing?.let { prep ->
-                put("preprocessing", JSONObject().apply {
-                    prep.minHeight?.let { put("minHeight", it.toDouble()) }
-                    prep.maxSideLen?.let { put("maxSideLen", it.toDouble()) }
-                    prep.minSideLen?.let { put("minSideLen", it.toDouble()) }
-                    prep.widthHeightRatio?.let { put("widthHeightRatio", it.toDouble()) }
-                    prep.detection?.let { detection ->
-                        put("detection", JSONObject().apply {
-                            detection.limitSideLen?.let { put("limitSideLen", it) }
-                            detection.limitType?.let { put("limitType", it) }
-                            detection.mean?.let { put("mean", it.toList()) }
-                            detection.std?.let { put("std", it.toList()) }
-                            detection.postprocess?.let { postprocess ->
-                                put("postprocess", JSONObject().apply {
-                                    postprocess.threshold?.let { put("threshold", it.toDouble()) }
-                                    postprocess.boxThreshold?.let { put("boxThreshold", it.toDouble()) }
-                                    postprocess.maxCandidates?.let { put("maxCandidates", it) }
-                                    postprocess.unclipRatio?.let { put("unclipRatio", it.toDouble()) }
-                                    postprocess.useDilation?.let { put("useDilation", it) }
-                                })
-                            }
-                        })
-                    }
+            minHeight?.let { put("minHeight", it.toDouble()) }
+            maxSideLen?.let { put("maxSideLen", it.toDouble()) }
+            minSideLen?.let { put("minSideLen", it.toDouble()) }
+            widthHeightRatio?.let { put("widthHeightRatio", it.toDouble()) }
+            detection?.let { detection ->
+                put("detection", JSONObject().apply {
+                    detection.limitSideLen?.let { put("limitSideLen", it) }
+                    detection.limitType?.let { put("limitType", it) }
+                    detection.mean?.let { put("mean", it.toList()) }
+                    detection.std?.let { put("std", it.toList()) }
+                })
+            }
+            postprocess?.let { postprocess ->
+                put("postprocess", JSONObject().apply {
+                    postprocess.threshold?.let { put("threshold", it.toDouble()) }
+                    postprocess.boxThreshold?.let { put("boxThreshold", it.toDouble()) }
+                    postprocess.maxCandidates?.let { put("maxCandidates", it) }
+                    postprocess.unclipRatio?.let { put("unclipRatio", it.toDouble()) }
+                    postprocess.useDilation?.let { put("useDilation", it) }
                 })
             }
         }.toString()
     }
 
-    private fun validatePreprocessing(value: PreprocessingRunOptions) {
+    private fun validateRuntimeOverrides() {
         fun positive(name: String, number: Float?) = require(number == null || number.isFinite() && number > 0f) { "$name must be finite and greater than zero." }
-        positive("minHeight", value.minHeight); positive("maxSideLen", value.maxSideLen); positive("minSideLen", value.minSideLen)
-        require(value.widthHeightRatio == null || value.widthHeightRatio.isFinite() && (value.widthHeightRatio > 0f || value.widthHeightRatio == -1f)) { "widthHeightRatio must be positive or -1." }
-        require(value.minSideLen == null || value.maxSideLen == null || value.minSideLen <= value.maxSideLen) { "minSideLen must not exceed maxSideLen." }
-        value.detection?.let { detection ->
+        positive("minHeight", minHeight); positive("maxSideLen", maxSideLen); positive("minSideLen", minSideLen)
+        require(widthHeightRatio == null || widthHeightRatio.isFinite() && (widthHeightRatio > 0f || widthHeightRatio == -1f)) { "widthHeightRatio must be positive or -1." }
+        require(minSideLen == null || maxSideLen == null || minSideLen <= maxSideLen) { "minSideLen must not exceed maxSideLen." }
+        detection?.let { detection ->
             require(detection.limitSideLen == null || detection.limitSideLen in 1..32767) { "limitSideLen must be between 1 and 32767." }
             require(detection.limitType == null || detection.limitType == "min" || detection.limitType == "max") { "limitType must be min or max." }
             for ((name, values, rejectZero) in listOf(Triple("mean", detection.mean, false), Triple("std", detection.std, true))) {
                 require(values == null || values.size == 3 && values.all { it.isFinite() && (!rejectZero || it != 0f) }) { "$name must contain three valid numbers." }
             }
-            detection.postprocess?.let { postprocess ->
-                require(postprocess.threshold == null || postprocess.threshold.isFinite() && postprocess.threshold in 0f..1f) { "threshold must be between zero and one." }
-                require(postprocess.boxThreshold == null || postprocess.boxThreshold.isFinite() && postprocess.boxThreshold in 0f..1f) { "boxThreshold must be between zero and one." }
-                require(postprocess.maxCandidates == null || postprocess.maxCandidates >= 1) { "maxCandidates must be at least one." }
-                require(postprocess.unclipRatio == null || postprocess.unclipRatio.isFinite() && postprocess.unclipRatio > 0f) { "unclipRatio must be finite and greater than zero." }
-            }
+        }
+        postprocess?.let { postprocess ->
+            require(postprocess.threshold == null || postprocess.threshold.isFinite() && postprocess.threshold in 0f..1f) { "threshold must be between zero and one." }
+            require(postprocess.boxThreshold == null || postprocess.boxThreshold.isFinite() && postprocess.boxThreshold in 0f..1f) { "boxThreshold must be between zero and one." }
+            require(postprocess.maxCandidates == null || postprocess.maxCandidates >= 1) { "maxCandidates must be at least one." }
+            require(postprocess.unclipRatio == null || postprocess.unclipRatio.isFinite() && postprocess.unclipRatio > 0f) { "unclipRatio must be finite and greater than zero." }
         }
     }
 }
@@ -347,7 +339,7 @@ class RustO private constructor(
         var path = value.trim()
         if (path.startsWith("file://")) path = Uri.parse(path).path ?: path.removePrefix("file://")
         else if (path.startsWith("file:")) path = path.removePrefix("file:")
-        path = try { URLDecoder.decode(path, "UTF-8") } catch (_: Exception) { path }
+        path = try { URLDecoder.decode(path, "UTF-8") } catch (e: Exception) { path }
         require(File(path).isFile) { "Image file not found: $value" }
         return action(path, null)
     }

@@ -9,8 +9,9 @@ The React Native RustO package supports bundling model files directly into your 
 ## Default Model Files
 
 The package expects these default model files:
+
 - `det.mnn` - Detection model
-- `rec.mnn` - Recognition model  
+- `rec.mnn` - Recognition model
 - `dict.txt` - Character dictionary
 
 These files should be placed in the appropriate directories for each platform.
@@ -166,7 +167,7 @@ To copy the default PPOCR_v5 models from the source repository:
 ```bash
 # From the repository root
 cp models/PPOCR_v5/det.mnn packages/android/src/main/assets/
-cp models/PPOCR_v5/rec.mnn packages/android/src/main/assets/  
+cp models/PPOCR_v5/rec.mnn packages/android/src/main/assets/
 cp models/PPOCR_v5/dict.txt packages/android/src/main/assets/
 ```
 
@@ -197,6 +198,7 @@ unzip -l build/outputs/aar/android-release.aar | grep assets
 ```
 
 You should see:
+
 ```
 assets/det.mnn
 assets/rec.mnn
@@ -234,6 +236,7 @@ The models will be bundled in `RustoModels.bundle` within your app's frameworks.
 ### Large App Size
 
 If bundled models make your app too large, consider:
+
 1. Using smaller model variants
 2. Downloading models on first launch
 3. Using on-demand resources (iOS) or app bundles (Android)

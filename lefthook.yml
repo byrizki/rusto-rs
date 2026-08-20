@@ -20,8 +20,10 @@
 # pre-commit:
 #   parallel: true
 #   jobs:
-#     - run: yarn eslint {staged_files}
+#     - run: yarn oxlint {staged_files}
 #       glob: "*.{js,ts,jsx,tsx}"
+#     - run: yarn oxfmt {staged_files}
+#       glob: "*.{js,ts,jsx,tsx,json,md,vue}"
 #
 #     - name: rubocop
 #       glob: "*.rb"

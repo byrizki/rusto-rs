@@ -1,0 +1,10 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "tabWidth": 2,
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "quoteProps": "consistent",
+  "useTabs": false,
+  "printWidth": 100,
+  "ignorePatterns": ["lib/**", "node_modules/**", "android/**", "ios/**"]
+}

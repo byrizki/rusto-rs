@@ -48,7 +48,7 @@
 ### 1. Rust
 
 ```rust
-use rusto::{DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, PreprocessingRunOptions, RustO};
+use rusto::{DetectTextResult, DetectionRunOptions, ImageSource, InitializeConfig, OcrRunOptions, PostprocessRunOptions, RustO};
 
 let mut ocr = RustO::initialize(InitializeConfig::ppv6("det.mnn", "rec.mnn", "dict.txt"))?;
 match ocr.detect_text(&ImageSource::Path("document.jpg".into()), &OcrRunOptions::default())? {
@@ -63,8 +63,18 @@ match ocr.detect_text(&ImageSource::Path("document.jpg".into()), &OcrRunOptions:
 ### 2. .NET / C#
 
 ```csharp
-using var ocr = RustO.Initialize();
-var result = ocr.DetectText(new UriImageSource("invoice.jpg"));
+using RustODotnet;
+
+using var ocr = RustO.Initialize(InitializeConfig.Ppv6());
+var result = ocr.DetectText(
+    new UriImageSource("invoice.jpg"),
+    new OcrRunOptions { Output = OutputGranularity.Words });
+
+if (result is StructuredDetectTextResult structured)
+    foreach (var item in structured.Items)
+        Console.WriteLine($"{item.Text} ({item.Score:F2})");
+// Total (0.98)
+// $12.50 (0.96)
 ```
 
 ---
@@ -129,8 +139,12 @@ console.log(spatialText);
 ### 4. iOS (Swift)
 
 ```swift
-let ocr = try RustO.initialize()
-let result = try ocr.detectText(.uri("receipt.jpg"))
+let ocr = try RustO.initialize(config: .ppv6())
+let result = try ocr.detectText(.uri("receipt.jpg"), options: .init(output: .words))
+
+if case .structured(let items) = result {
+    items.forEach { print("\($0.text) (\($0.score))") }
+}
 ```
 
 ---
@@ -139,8 +153,15 @@ let result = try ocr.detectText(.uri("receipt.jpg"))
 ### 5. Android (Kotlin)
 
 ```kotlin
-val ocr = RustO.initialize(context)
-val result = ocr.detectText(ImageSource.Uri("/path/to/image.jpg"))
+RustO.initialize(context).use { ocr ->
+    when (val result = ocr.detectText(
+        ImageSource.Uri("/path/to/image.jpg"),
+        OcrRunOptions(output = OutputGranularity.WORDS),
+    )) {
+        is DetectTextResult.Structured -> result.items.forEach { println("${it.text} (${it.score})") }
+        is DetectTextResult.Spatial -> println(result.text)
+    }
+}
 ```
 
 ---
@@ -224,64 +245,76 @@ bash scripts/download_models.sh --model ppocrv5 --lang arabic --output-dir model
 
 ---
 
-## ⚙️ Configuration Reference (`InitializeConfig`)
+## ⚙️ Public configuration and request options
 
-`InitializeConfig` provides granular control over the OCR pipeline:
+RustO API has two separate layers:
+
+1. **`InitializeConfig`** creates model sessions. Use it for model family, model files, dictionary, and optional classifier/orientation resources.
+2. **`OcrRunOptions`** controls one image. Use it for output shape, grouping, confidence cutoff, resize, detector input, and postprocess tuning.
+
+Do not put per-image preprocessing under initialization or a nested `preprocessing` object. Every request starts from engine defaults; supplied fields override only that request.
+
+### Initialize model resources
 
 ```rust
-use rusto::InitializeConfig;
+use rusto::{InitializeConfig, RustO};
 
-let config = InitializeConfig::ppv6("models/det.mnn", "models/rec.mnn", "models/dict.txt")
-    // Detection parameters
-    .with_det_thresh(0.3)          // Pixel binarization threshold
-    .with_det_box_thresh(0.6)      // Box confidence threshold
-    .with_limit_side_len(736)      // Max input side length for detection
-    .with_limit_type("min")        // Resize strategy ("min" or "max")
-    .with_unclip_ratio(2.0)        // Expansion ratio for detected text polygons
-    .with_use_dilation(true)       // Morphological dilation for segmented lines
-    
-    // Recognition & Spatial tuning
-    .with_text_score(0.5)          // Minimum character confidence score
-    .with_xy_threshold(0.5, 1.0)   // (y_multiplier, x_multiplier) for spatial layout
-    .with_rec_batch_num(6)         // Batch size for text recognition
-
-    // Optional modules
-    .with_cls("models/cls.mnn", 0.9)            // Direction / orientation classifier
-    .with_orientation("models/orient.mnn", 0.9) // Document angle rotator
-    .with_unwarp("models/unwarp.mnn");          // Document shadow/curve unwarper
+let config = InitializeConfig::ppv6(
+    "models/det.mnn",
+    "models/rec.mnn",
+    "models/dict.txt",
+);
+let mut ocr = RustO::initialize(config)?;
 ```
 
-### Per-request preprocessing and detection
+| Preset | Detector resize default | Resize mode | Unclip default |
+|---|---:|---|---:|
+| `InitializeConfig::ppv6(...)` | 736 | `min` | 2.0 |
+| `InitializeConfig::ppv5(...)` | 736 | `min` | 2.0 |
+| `InitializeConfig::ppv4(...)` | 960 | `max` | 1.5 |
+| `InitializeConfig::ppv3(...)` | 960 | `max` | 1.5 |
 
-Image processing belongs in `OcrRunOptions` / `detectText` options, not initialization. Overrides are request-local and never mutate model sessions. Use nested `preprocessing` for `minHeight`, `maxSideLen`, `minSideLen`, `widthHeightRatio`, detector resize/normalization, and detector postprocessing including dilation:
+Paths must identify compatible detection model, recognition model, and dictionary. Recreate engine to change them.
+
+### Tune one request
 
 ```rust
+use rusto::{
+    DetectionRunOptions, DetectTextResult, ImageSource, OcrRunOptions,
+    OutputGranularity, PostprocessRunOptions,
+};
+
 let result = ocr.detect_text(
     &ImageSource::Path("document.jpg".into()),
     &OcrRunOptions {
-        preprocessing: Some(PreprocessingRunOptions {
-            max_side_len: Some(1600.0),
-            detection: Some(DetectionRunOptions {
-                postprocess: Some(PostprocessRunOptions {
-                    use_dilation: Some(true),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
+        output: OutputGranularity::Words,
+        text_score: Some(0.55),
+        max_side_len: Some(1600.0),
+        detection: Some(DetectionRunOptions {
+            limit_side_len: Some(960),
+            limit_type: Some("max".into()),
+            ..Default::default()
+        }),
+        postprocess: Some(PostprocessRunOptions {
+            use_dilation: Some(true),
             ..Default::default()
         }),
         ..Default::default()
     },
 )?;
+
+if let DetectTextResult::Structured(items) = result {
+    for item in items {
+        println!("{} ({:.2})", item.text, item.score);
+    }
+}
+// Total (0.98)
+// $12.50 (0.96)
 ```
 
-All bindings share camel-case JSON keys. Model paths, dictionaries, model architecture, and session settings remain initialization-only.
-### Template Presets
+Root options: `minHeight`, `maxSideLen`, `minSideLen`, `widthHeightRatio`, `detection`, and `postprocess`. Wire JSON uses camelCase; Rust field names use snake_case. `detection` and `postprocess` are sibling root fields.
 
-- `InitializeConfig::ppv6(...)` — Pre-configured for PP-OCRv6 (`limit_side_len=736`, `limit_type="min"`, `unclip_ratio=2.0`)
-- `InitializeConfig::ppv5(...)` — Pre-configured for PP-OCRv5 (`limit_side_len=736`, `limit_type="min"`, `unclip_ratio=2.0`)
-- `InitializeConfig::ppv4(...)` — Pre-configured for PP-OCRv4 (`limit_side_len=960`, `limit_type="max"`, `unclip_ratio=1.5`)
-- `InitializeConfig::ppv3(...)` — Pre-configured for PP-OCRv3 (`limit_side_len=960`, `limit_type="max"`, `unclip_ratio=1.5`)
+Full public reference, validation ranges, source contracts, result shapes, and binding-specific examples: [documentation site](./docs/content/en/04.api-reference/).
 
 ---
 
