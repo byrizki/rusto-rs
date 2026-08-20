@@ -52,7 +52,7 @@ dependencyResolutionManagement {
 
 // android/app/build.gradle
 dependencies {
-  implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.4'
+  implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.5'
 }
 ```
 

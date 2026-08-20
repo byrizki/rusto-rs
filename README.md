@@ -106,7 +106,7 @@ cd ios && pod install
 ```groovy
 dependencies {
     // Add your preferred OCR model package:
-    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.4'
+    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.5'
 }
 ```
 

@@ -14,7 +14,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <!-- CI patches RustOArtifactVersion from downloaded local package artifact. -->
-    <PackageReference Include="RustODotnet" Version="0.2.4" />
+    <PackageReference Include="RustODotnet" Version="0.2.5" />
     <PackageReference Include="RustODotnet.Models.PPOCRv6.Tiny" Version="$(RustOArtifactVersion)" />
   </ItemGroup>
 </Project>

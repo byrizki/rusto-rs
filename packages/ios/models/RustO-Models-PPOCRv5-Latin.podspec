@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'RustO-Models-PPOCRv5-Latin'
-  s.version          = '0.2.4'
+  s.version          = '0.2.5'
   s.summary          = 'PP-OCRv5 Latin script recognition model for RustO! iOS'
   s.description      = 'Pre-trained PP-OCRv5 Latin script MNN recognition model bundled as a resource bundle for RustO on iOS.'
   s.homepage         = 'https://github.com/byrizki/rusto-rs'

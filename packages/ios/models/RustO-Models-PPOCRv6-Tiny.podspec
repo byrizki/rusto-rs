@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'RustO-Models-PPOCRv6-Tiny'
-  s.version          = '0.2.4'
+  s.version          = '0.2.5'
   s.summary          = 'PP-OCRv6 Tiny pre-trained models for RustO! iOS'
   s.description      = 'Pre-trained PP-OCRv6 Tiny MNN models (~6 MB) bundled as a resource bundle for RustO on iOS.'
   s.homepage         = 'https://github.com/byrizki/rusto-rs'
