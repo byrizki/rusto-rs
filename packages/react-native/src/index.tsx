@@ -122,12 +122,15 @@ function normalizeOptions(options: DetectTextOptions | undefined): DetectTextOpt
     }
     const ratio = preprocessing.widthHeightRatio;
     if (ratio !== undefined && (typeof ratio !== 'number' || !Number.isFinite(ratio) || (ratio <= 0 && ratio !== -1))) throw new TypeError('DetectTextOptions.preprocessing.widthHeightRatio must be > 0 or -1.');
-    if (preprocessing.minSideLen !== undefined && preprocessing.maxSideLen !== undefined && preprocessing.minSideLen > preprocessing.maxSideLen) throw new TypeError('DetectTextOptions.preprocessing.minSideLen must be <= maxSideLen.');
+    const minSideLen = preprocessing.minSideLen;
+    const maxSideLen = preprocessing.maxSideLen;
+    if (typeof minSideLen === 'number' && typeof maxSideLen === 'number' && minSideLen > maxSideLen) throw new TypeError('DetectTextOptions.preprocessing.minSideLen must be <= maxSideLen.');
     const detection = preprocessing.detection;
     if (detection !== undefined) {
       if (!isObject(detection)) throw new TypeError('DetectTextOptions.preprocessing.detection must be an object.');
       requireOnlyKeys(detection, DETECTION_PREPROCESSING_KEYS, 'DetectTextOptions.preprocessing.detection contains an unknown key.');
-      if (detection.limitSideLen !== undefined && (!Number.isInteger(detection.limitSideLen) || detection.limitSideLen < 1 || detection.limitSideLen > 32767)) throw new TypeError('DetectTextOptions.preprocessing.detection.limitSideLen must be an integer between 1 and 32767.');
+      const limitSideLen = detection.limitSideLen;
+      if (limitSideLen !== undefined && (typeof limitSideLen !== 'number' || !Number.isInteger(limitSideLen) || limitSideLen < 1 || limitSideLen > 32767)) throw new TypeError('DetectTextOptions.preprocessing.detection.limitSideLen must be an integer between 1 and 32767.');
       if (detection.limitType !== undefined && detection.limitType !== 'min' && detection.limitType !== 'max') throw new TypeError('DetectTextOptions.preprocessing.detection.limitType is invalid.');
       for (const key of ['mean', 'std'] as const) {
         const values = detection[key];
@@ -138,7 +141,8 @@ function normalizeOptions(options: DetectTextOptions | undefined): DetectTextOpt
         if (!isObject(postprocess)) throw new TypeError('DetectTextOptions.preprocessing.detection.postprocess must be an object.');
         requireOnlyKeys(postprocess, POSTPROCESS_KEYS, 'DetectTextOptions.preprocessing.detection.postprocess contains an unknown key.');
         for (const key of ['threshold', 'boxThreshold'] as const) { const value = postprocess[key]; if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1)) throw new TypeError(`DetectTextOptions.preprocessing.detection.postprocess.${key} must be in [0, 1].`); }
-        if (postprocess.maxCandidates !== undefined && (!Number.isInteger(postprocess.maxCandidates) || postprocess.maxCandidates < 1)) throw new TypeError('DetectTextOptions.preprocessing.detection.postprocess.maxCandidates must be an integer >= 1.');
+        const maxCandidates = postprocess.maxCandidates;
+        if (maxCandidates !== undefined && (typeof maxCandidates !== 'number' || !Number.isInteger(maxCandidates) || maxCandidates < 1)) throw new TypeError('DetectTextOptions.preprocessing.detection.postprocess.maxCandidates must be an integer >= 1.');
         if (postprocess.unclipRatio !== undefined && (typeof postprocess.unclipRatio !== 'number' || !Number.isFinite(postprocess.unclipRatio) || postprocess.unclipRatio <= 0)) throw new TypeError('DetectTextOptions.preprocessing.detection.postprocess.unclipRatio must be > 0.');
         if (postprocess.useDilation !== undefined && typeof postprocess.useDilation !== 'boolean') throw new TypeError('DetectTextOptions.preprocessing.detection.postprocess.useDilation must be a boolean.');
       }
