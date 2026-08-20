@@ -29,7 +29,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '24'
   JAVA_VERSION: '17'
 
 jobs:
@@ -86,9 +86,9 @@ jobs:
       matrix:
         include:
           - app: legacy
-            node-version: '18'
+            node-version: '24'
           - app: new-arch
-            node-version: '20'
+            node-version: '24'
     # This job tests package source, not consumer app. Do not set a consumer
     # working directory: a reusable workflow may be invoked from a release SHA
     # created before example directories existed.
@@ -123,9 +123,9 @@ jobs:
       matrix:
         include:
           - app: legacy
-            node-version: '18'
+            node-version: '24'
           - app: new-arch
-            node-version: '20'
+            node-version: '24'
     defaults:
       run:
         working-directory: examples/react-native-${{ matrix.app }}
@@ -251,9 +251,9 @@ jobs:
       matrix:
         include:
           - app: legacy
-            node-version: '18'
+            node-version: '24'
           - app: new-arch
-            node-version: '20'
+            node-version: '24'
     steps:
       # Keep currently selected workflow revision: it owns iOS consumer app.
       # Downloaded artifacts alone come from prior Build & Release run.
