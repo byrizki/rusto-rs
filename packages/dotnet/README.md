@@ -10,6 +10,12 @@ var result = ocr.DetectText(
         Output = OutputGranularity.Words,
         LineYThreshold = 0.5f,
         WordXThreshold = 0.4f,
+        Preprocessing = new PreprocessingRunOptions {
+            MaxSideLen = 1600f,
+            Detection = new DetectionRunOptions {
+                Postprocess = new PostprocessRunOptions { UseDilation = true },
+            },
+        },
     }
 );
 
@@ -26,3 +32,8 @@ if (spatial is SpatialDetectTextResult formatted) Console.WriteLine(formatted.Te
 Public API: `RustO.Initialize`, `DetectText`, `ImageSource`, `OcrRunOptions`,
 `DetectTextResult`, and `IDisposable.Dispose`. `lines` and `words` yield
 `StructuredDetectTextResult`; `spatial` yields `SpatialDetectTextResult`.
+
+`OcrRunOptions.Preprocessing` contains request-local image and detector controls:
+`MinHeight`, `MaxSideLen`, `MinSideLen`, `WidthHeightRatio`, nested detection
+resize/normalization, and nested postprocess values including `UseDilation`.
+They apply only to that call and never mutate initialized model sessions.

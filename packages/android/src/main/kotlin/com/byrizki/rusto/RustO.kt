@@ -69,13 +69,6 @@ data class UnwarpConfig(
     val modelPath: String? = null
 )
 
-data class PreprocessingConfig(
-    val minHeight: Float? = null,
-    val maxSideLen: Float? = null,
-    val minSideLen: Float? = null,
-    val debugImages: Boolean? = null
-)
-
 data class LayoutConfig(
     val yThresholdMultiplier: Float? = null,
     val xThresholdMultiplier: Float? = null
@@ -88,7 +81,6 @@ data class InitializeConfig(
     val classification: ClassificationConfig? = null,
     val orientation: OrientationConfig? = null,
     val unwarp: UnwarpConfig? = null,
-    val preprocessing: PreprocessingConfig? = null,
     val layout: LayoutConfig? = null
 ) {
     fun toJson(context: Context): String {
@@ -141,15 +133,6 @@ data class InitializeConfig(
             if (unwObj.length() > 0) json.put("unwarp", unwObj)
         }
 
-        preprocessing?.let { prep ->
-            val prepObj = JSONObject()
-            prep.minHeight?.let { prepObj.put("minHeight", it.toDouble()) }
-            prep.maxSideLen?.let { prepObj.put("maxSideLen", it.toDouble()) }
-            prep.minSideLen?.let { prepObj.put("minSideLen", it.toDouble()) }
-            prep.debugImages?.let { prepObj.put("debugImages", it) }
-            if (prepObj.length() > 0) json.put("preprocessing", prepObj)
-        }
-
         layout?.let { lay ->
             val layObj = JSONObject()
             lay.yThresholdMultiplier?.let { layObj.put("yThresholdMultiplier", it.toDouble()) }
@@ -173,6 +156,30 @@ enum class OutputGranularity(val wireValue: String) {
     LINES("lines"), WORDS("words"), SPATIAL("spatial");
 }
 
+data class PostprocessRunOptions(
+    val threshold: Float? = null,
+    val boxThreshold: Float? = null,
+    val maxCandidates: Int? = null,
+    val unclipRatio: Float? = null,
+    val useDilation: Boolean? = null,
+)
+
+data class DetectionRunOptions(
+    val limitSideLen: Int? = null,
+    val limitType: String? = null,
+    val mean: FloatArray? = null,
+    val std: FloatArray? = null,
+    val postprocess: PostprocessRunOptions? = null,
+)
+
+data class PreprocessingRunOptions(
+    val minHeight: Float? = null,
+    val maxSideLen: Float? = null,
+    val minSideLen: Float? = null,
+    val widthHeightRatio: Float? = null,
+    val detection: DetectionRunOptions? = null,
+)
+
 data class OcrRunOptions(
     val output: OutputGranularity = OutputGranularity.LINES,
     val lineYThreshold: Float? = null,
@@ -180,6 +187,7 @@ data class OcrRunOptions(
     val textScore: Float? = null,
     val classification: Boolean? = null,
     val orientation: Boolean? = null,
+    val preprocessing: PreprocessingRunOptions? = null,
 ) {
     internal fun toJson(): String {
         require(lineYThreshold == null || lineYThreshold.isFinite() && lineYThreshold >= 0f) {
@@ -191,6 +199,7 @@ data class OcrRunOptions(
         require(textScore == null || textScore.isFinite() && textScore in 0f..1f) {
             "textScore must be finite and between 0 and 1."
         }
+        preprocessing?.let { validatePreprocessing(it) }
         return JSONObject().apply {
             put("output", output.wireValue)
             lineYThreshold?.let { put("lineYThreshold", it.toDouble()) }
@@ -198,7 +207,52 @@ data class OcrRunOptions(
             textScore?.let { put("textScore", it.toDouble()) }
             classification?.let { put("classification", it) }
             orientation?.let { put("orientation", it) }
+            preprocessing?.let { prep ->
+                put("preprocessing", JSONObject().apply {
+                    prep.minHeight?.let { put("minHeight", it.toDouble()) }
+                    prep.maxSideLen?.let { put("maxSideLen", it.toDouble()) }
+                    prep.minSideLen?.let { put("minSideLen", it.toDouble()) }
+                    prep.widthHeightRatio?.let { put("widthHeightRatio", it.toDouble()) }
+                    prep.detection?.let { detection ->
+                        put("detection", JSONObject().apply {
+                            detection.limitSideLen?.let { put("limitSideLen", it) }
+                            detection.limitType?.let { put("limitType", it) }
+                            detection.mean?.let { put("mean", it.toList()) }
+                            detection.std?.let { put("std", it.toList()) }
+                            detection.postprocess?.let { postprocess ->
+                                put("postprocess", JSONObject().apply {
+                                    postprocess.threshold?.let { put("threshold", it.toDouble()) }
+                                    postprocess.boxThreshold?.let { put("boxThreshold", it.toDouble()) }
+                                    postprocess.maxCandidates?.let { put("maxCandidates", it) }
+                                    postprocess.unclipRatio?.let { put("unclipRatio", it.toDouble()) }
+                                    postprocess.useDilation?.let { put("useDilation", it) }
+                                })
+                            }
+                        })
+                    }
+                })
+            }
         }.toString()
+    }
+
+    private fun validatePreprocessing(value: PreprocessingRunOptions) {
+        fun positive(name: String, number: Float?) = require(number == null || number.isFinite() && number > 0f) { "$name must be finite and greater than zero." }
+        positive("minHeight", value.minHeight); positive("maxSideLen", value.maxSideLen); positive("minSideLen", value.minSideLen)
+        require(value.widthHeightRatio == null || value.widthHeightRatio.isFinite() && (value.widthHeightRatio > 0f || value.widthHeightRatio == -1f)) { "widthHeightRatio must be positive or -1." }
+        require(value.minSideLen == null || value.maxSideLen == null || value.minSideLen <= value.maxSideLen) { "minSideLen must not exceed maxSideLen." }
+        value.detection?.let { detection ->
+            require(detection.limitSideLen == null || detection.limitSideLen in 1..32767) { "limitSideLen must be between 1 and 32767." }
+            require(detection.limitType == null || detection.limitType == "min" || detection.limitType == "max") { "limitType must be min or max." }
+            for ((name, values, rejectZero) in listOf(Triple("mean", detection.mean, false), Triple("std", detection.std, true))) {
+                require(values == null || values.size == 3 && values.all { it.isFinite() && (!rejectZero || it != 0f) }) { "$name must contain three valid numbers." }
+            }
+            detection.postprocess?.let { postprocess ->
+                require(postprocess.threshold == null || postprocess.threshold.isFinite() && postprocess.threshold in 0f..1f) { "threshold must be between zero and one." }
+                require(postprocess.boxThreshold == null || postprocess.boxThreshold.isFinite() && postprocess.boxThreshold in 0f..1f) { "boxThreshold must be between zero and one." }
+                require(postprocess.maxCandidates == null || postprocess.maxCandidates >= 1) { "maxCandidates must be at least one." }
+                require(postprocess.unclipRatio == null || postprocess.unclipRatio.isFinite() && postprocess.unclipRatio > 0f) { "unclipRatio must be finite and greater than zero." }
+            }
+        }
     }
 }
 

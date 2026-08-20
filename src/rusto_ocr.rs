@@ -32,7 +32,37 @@ pub enum OutputGranularity {
     Spatial,
 }
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PostprocessRunOptions {
+    pub threshold: Option<f32>,
+    pub box_threshold: Option<f32>,
+    pub max_candidates: Option<i32>,
+    pub unclip_ratio: Option<f32>,
+    pub use_dilation: Option<bool>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DetectionRunOptions {
+    pub limit_side_len: Option<i32>,
+    pub limit_type: Option<String>,
+    pub mean: Option<[f32; 3]>,
+    pub std: Option<[f32; 3]>,
+    pub postprocess: Option<PostprocessRunOptions>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PreprocessingRunOptions {
+    pub min_height: Option<f32>,
+    pub max_side_len: Option<f32>,
+    pub min_side_len: Option<f32>,
+    pub width_height_ratio: Option<f32>,
+    pub detection: Option<DetectionRunOptions>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct OcrRunOptions {
     #[serde(default)]
     pub output: OutputGranularity,
@@ -41,6 +71,47 @@ pub struct OcrRunOptions {
     pub text_score: Option<f32>,
     pub classification: Option<bool>,
     pub orientation: Option<bool>,
+    pub preprocessing: Option<PreprocessingRunOptions>,
+}
+
+impl OcrRunOptions {
+    /// Validate per-request options before native execution.
+    pub fn validate(&self) -> Result<(), EngineError> {
+        let finite = |name: &str, value: Option<f32>, range: fn(f32) -> bool| {
+            match value {
+                Some(value) if !value.is_finite() || !range(value) => Err(EngineError::Preprocess(format!("{name} is invalid"))),
+                _ => Ok(()),
+            }
+        };
+        finite("lineYThreshold", self.line_y_threshold, |value| value >= 0.0)?;
+        finite("wordXThreshold", self.word_x_threshold, |value| value >= 0.0)?;
+        finite("textScore", self.text_score, |value| (0.0..=1.0).contains(&value))?;
+        let Some(preprocessing) = &self.preprocessing else { return Ok(()); };
+        finite("preprocessing.minHeight", preprocessing.min_height, |value| value > 0.0)?;
+        finite("preprocessing.maxSideLen", preprocessing.max_side_len, |value| value > 0.0)?;
+        finite("preprocessing.minSideLen", preprocessing.min_side_len, |value| value > 0.0)?;
+        finite("preprocessing.widthHeightRatio", preprocessing.width_height_ratio, |value| value > 0.0 || value == -1.0)?;
+        if let (Some(min), Some(max)) = (preprocessing.min_side_len, preprocessing.max_side_len) {
+            if min > max { return Err(EngineError::Preprocess("preprocessing.minSideLen must be <= maxSideLen".into())); }
+        }
+        let Some(detection) = &preprocessing.detection else { return Ok(()); };
+        if detection.limit_side_len.is_some_and(|value| value <= 0) { return Err(EngineError::Preprocess("preprocessing.detection.limitSideLen must be > 0".into())); }
+        if detection.limit_type.as_deref().is_some_and(|value| value != "min" && value != "max") { return Err(EngineError::Preprocess("preprocessing.detection.limitType must be min or max".into())); }
+        for (name, values, allow_zero) in [("mean", detection.mean, true), ("std", detection.std, false)] {
+            if let Some(values) = values {
+                if values.iter().any(|value| !value.is_finite() || (!allow_zero && *value == 0.0)) {
+                    return Err(EngineError::Preprocess(format!("preprocessing.detection.{name} is invalid")));
+                }
+            }
+        }
+        if let Some(postprocess) = &detection.postprocess {
+            finite("preprocessing.detection.postprocess.threshold", postprocess.threshold, |value| (0.0..=1.0).contains(&value))?;
+            finite("preprocessing.detection.postprocess.boxThreshold", postprocess.box_threshold, |value| (0.0..=1.0).contains(&value))?;
+            finite("preprocessing.detection.postprocess.unclipRatio", postprocess.unclip_ratio, |value| value > 0.0)?;
+            if postprocess.max_candidates.is_some_and(|value| value < 1) { return Err(EngineError::Preprocess("preprocessing.detection.postprocess.maxCandidates must be >= 1".into())); }
+        }
+        Ok(())
+    }
 }
 
 /// Image input accepted by the canonical `RustO::detect_text` API.
@@ -84,9 +155,26 @@ pub struct RustO {
     pub cls: Option<OrientClassifier>,
 }
 
+fn validate_preprocessing(global: &GlobalConfig) -> Result<(), EngineError> {
+    for (name, value) in [
+        ("minHeight", global.min_height),
+        ("maxSideLen", global.max_side_len),
+        ("minSideLen", global.min_side_len),
+    ] {
+        if !value.is_finite() || value <= 0.0 {
+            return Err(EngineError::Preprocess(format!("{name} must be finite and greater than zero")));
+        }
+    }
+    if global.min_side_len > global.max_side_len {
+        return Err(EngineError::Preprocess("minSideLen must be less than or equal to maxSideLen".into()));
+    }
+    Ok(())
+}
+
 impl RustO {
     /// Initialize an OCR engine with static model/session configuration.
     pub fn initialize(config: InitializeConfig) -> Result<Self, EngineError> {
+        validate_preprocessing(&config.global)?;
         let det = TextDetector::new(config.det.clone())?;
         let rec = TextRecognizer::new(config.rec.clone())?;
         let cal_rec_boxes = CalRecBoxes::new();
@@ -138,6 +226,7 @@ impl RustO {
         source: &ImageSource,
         options: &OcrRunOptions,
     ) -> Result<DetectTextResult, EngineError> {
+        options.validate()?;
         let output = match source {
             ImageSource::Path(path) => self.run_with_options(path, options)?,
             ImageSource::Bytes(bytes) => {
@@ -188,14 +277,20 @@ impl RustO {
         if let Some(value) = options.text_score {
             effective.text_score = value;
         }
-        self.run_on_mat_with_global(img, &effective)
+        if let Some(preprocessing) = &options.preprocessing {
+            if let Some(value) = preprocessing.min_height { effective.min_height = value; }
+            if let Some(value) = preprocessing.max_side_len { effective.max_side_len = value; }
+            if let Some(value) = preprocessing.min_side_len { effective.min_side_len = value; }
+            if let Some(value) = preprocessing.width_height_ratio { effective.width_height_ratio = value; }
+        }
+        self.run_on_mat_with_global(img, &effective, options.preprocessing.as_ref().and_then(|value| value.detection.as_ref()))
     }
-
 
     fn run_on_mat_with_global(
         &mut self,
         img: &Mat,
         global: &GlobalConfig,
+        detection: Option<&DetectionRunOptions>,
     ) -> Result<RustOOutput, EngineError> {
         let size = img.size()?;
         let ori_h = size.height;
@@ -251,7 +346,7 @@ impl RustO {
 
         // Detection (boxes are in padded-image coordinates here)
         // IMPORTANT: Pass padded image dimensions, not original!
-        let det_res = self.det.run(&padded)?;
+        let det_res = self.det.run_with_options(&padded, detection)?;
         let padded_boxes = match det_res.boxes {
             Some(b) if !b.is_empty() => b,
             _ => {

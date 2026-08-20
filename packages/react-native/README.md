@@ -91,6 +91,14 @@ await initialize({
   preset: 'ppv6',
   models: { detection: 'det.mnn', recognition: 'rec.mnn', dictionary: 'dict.txt' },
 });
+
+const words = await detectText({ uri: '/absolute/path/receipt.jpg' }, {
+  output: 'words',
+  preprocessing: {
+    maxSideLen: 1600,
+    detection: { postprocess: { useDilation: true } },
+  },
+});
 ```
 
 ## Model Bundling
@@ -104,7 +112,9 @@ Model files can be bundled with your app. See [BUNDLING.md](./BUNDLING.md) for d
 
 ### `initialize(config?: InitializeConfig): Promise<void>`
 
-Loads static OCR model resources. `preset` defaults to `ppv6`. Optional `models` keys are `detection`, `recognition`, `dictionary`, `classification`, and `orientation`.
+Loads static OCR model resources. `preset` defaults to `ppv6`. Optional `models` keys are `detection`, `recognition`, `dictionary`, `classification`, and `orientation`. Image preprocessing is configured per request via `detectText`.
+
+`preprocessing` belongs to `detectText` options, never `initialize`. It is request-local and does not mutate engine state. It contains resize/padding (`minHeight`, `maxSideLen`, `minSideLen`, `widthHeightRatio`), detector preprocessing (`limitSideLen`, `limitType`, `mean`, `std`), and detector postprocess (`threshold`, `boxThreshold`, `maxCandidates`, `unclipRatio`, `useDilation`).
 
 ### `detectText(source, options?)`
 

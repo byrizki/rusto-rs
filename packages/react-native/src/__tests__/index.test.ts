@@ -12,14 +12,21 @@ describe('React Native API', () => {
 
   it('forwards shallow initialization config', async () => {
     (NativeModules.Rusto.initialize as jest.Mock).mockResolvedValue(undefined);
-    await initialize({ preset: 'ppv6', models: { recognition: 'rec.mnn' } });
-    expect(NativeModules.Rusto.initialize).toHaveBeenCalledWith({ preset: 'ppv6', models: { recognition: 'rec.mnn' } });
+    await initialize({
+      preset: 'ppv6',
+      models: { recognition: 'rec.mnn' },
+    });
+    expect(NativeModules.Rusto.initialize).toHaveBeenCalledWith({
+      preset: 'ppv6',
+      models: { recognition: 'rec.mnn' },
+    });
   });
 
-  it('forwards line source and options', async () => {
+  it('forwards request-local preprocessing and dilation options', async () => {
     (NativeModules.Rusto.detectText as jest.Mock).mockResolvedValue([]);
-    await detectText({ uri: '/tmp/image.png' }, { output: 'lines', lineYThreshold: 0.5 });
-    expect(NativeModules.Rusto.detectText).toHaveBeenCalledWith({ uri: '/tmp/image.png' }, { output: 'lines', lineYThreshold: 0.5 });
+    const options = { output: 'lines' as const, lineYThreshold: 0.5, preprocessing: { minHeight: 24, maxSideLen: 1600, minSideLen: 48, detection: { postprocess: { useDilation: false } } } };
+    await detectText({ uri: '/tmp/image.png' }, options);
+    expect(NativeModules.Rusto.detectText).toHaveBeenCalledWith({ uri: '/tmp/image.png' }, options);
   });
 
   it('forwards spatial request', async () => {
@@ -63,6 +70,11 @@ describe('React Native API', () => {
     { wordXThreshold: Number.NaN },
     { textScore: 2 },
     { classification: 'true' },
+    { preprocessing: { minHeight: 0 } },
+    { preprocessing: { detection: { limitType: 'other' } } },
+    { preprocessing: { detection: { mean: [0.5, 0.5] } } },
+    { preprocessing: { detection: { std: [0.5, 0, 0.5] } } },
+    { preprocessing: { detection: { postprocess: { useDilation: 'true' } } } },
     { unknown: true },
   ])('rejects invalid runtime options %# before native invocation', (options) => {
     expect(() => detectText({ uri: '/tmp/image.png' }, options as never)).toThrow(/DetectTextOptions/);
@@ -78,6 +90,7 @@ describe('React Native API', () => {
     { models: 'invalid' },
     { models: { unknown: 'model.mnn' } },
     { models: { recognition: '' } },
+    { preprocessing: null },
     { unknown: true },
   ])('rejects invalid initialization config %# before native invocation', (config) => {
     expect(() => initialize(config as never)).toThrow(/InitializeConfig/);

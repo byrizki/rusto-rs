@@ -13,6 +13,30 @@ public sealed class PublicContractTests
     }
 
     [Fact]
+    public void RuntimePreprocessingUsesSharedCamelCaseWireContract()
+    {
+        var json = JsonSerializer.Serialize(new OcrRunOptions
+        {
+            Preprocessing = new PreprocessingRunOptions
+            {
+                MinHeight = 24f,
+                MaxSideLen = 1600f,
+                MinSideLen = 48f,
+                Detection = new DetectionRunOptions
+                {
+                    Postprocess = new PostprocessRunOptions { UseDilation = true },
+                },
+            },
+        });
+
+        Assert.Contains("\"preprocessing\":{", json);
+        Assert.Contains("\"minHeight\":24", json);
+        Assert.Contains("\"maxSideLen\":1600", json);
+        Assert.Contains("\"minSideLen\":48", json);
+        Assert.Contains("\"useDilation\":true", json);
+    }
+
+    [Fact]
     public void SourcesRetainCallerValues()
     {
         var uri = new UriImageSource("/tmp/invoice.png");

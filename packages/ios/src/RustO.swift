@@ -121,20 +121,6 @@ public struct UnwarpConfig: Codable {
     }
 }
 
-public struct PreprocessingConfig: Codable {
-    public var minHeight: Float? = nil
-    public var maxSideLen: Float? = nil
-    public var minSideLen: Float? = nil
-    public var debugImages: Bool? = nil
-
-    public init(minHeight: Float? = nil, maxSideLen: Float? = nil, minSideLen: Float? = nil, debugImages: Bool? = nil) {
-        self.minHeight = minHeight
-        self.maxSideLen = maxSideLen
-        self.minSideLen = minSideLen
-        self.debugImages = debugImages
-    }
-}
-
 public struct LayoutConfig: Codable {
     public var yThresholdMultiplier: Float? = nil
     public var xThresholdMultiplier: Float? = nil
@@ -152,7 +138,6 @@ public struct InitializeConfig: Codable {
     public var classification: ClassificationConfig? = nil
     public var orientation: OrientationConfig? = nil
     public var unwarp: UnwarpConfig? = nil
-    public var preprocessing: PreprocessingConfig? = nil
     public var layout: LayoutConfig? = nil
 
     public init(
@@ -162,7 +147,6 @@ public struct InitializeConfig: Codable {
         classification: ClassificationConfig? = nil,
         orientation: OrientationConfig? = nil,
         unwarp: UnwarpConfig? = nil,
-        preprocessing: PreprocessingConfig? = nil,
         layout: LayoutConfig? = nil
     ) {
         self.template = template
@@ -171,7 +155,6 @@ public struct InitializeConfig: Codable {
         self.classification = classification
         self.orientation = orientation
         self.unwarp = unwarp
-        self.preprocessing = preprocessing
         self.layout = layout
     }
 
@@ -204,6 +187,33 @@ public enum OutputGranularity: String, Codable {
     case lines, words, spatial
 }
 
+public struct PostprocessRunOptions: Codable {
+    public var threshold: Float?
+    public var boxThreshold: Float?
+    public var maxCandidates: Int?
+    public var unclipRatio: Float?
+    public var useDilation: Bool?
+    public init(threshold: Float? = nil, boxThreshold: Float? = nil, maxCandidates: Int? = nil, unclipRatio: Float? = nil, useDilation: Bool? = nil) { self.threshold = threshold; self.boxThreshold = boxThreshold; self.maxCandidates = maxCandidates; self.unclipRatio = unclipRatio; self.useDilation = useDilation }
+}
+
+public struct DetectionRunOptions: Codable {
+    public var limitSideLen: Int?
+    public var limitType: String?
+    public var mean: [Float]?
+    public var std: [Float]?
+    public var postprocess: PostprocessRunOptions?
+    public init(limitSideLen: Int? = nil, limitType: String? = nil, mean: [Float]? = nil, std: [Float]? = nil, postprocess: PostprocessRunOptions? = nil) { self.limitSideLen = limitSideLen; self.limitType = limitType; self.mean = mean; self.std = std; self.postprocess = postprocess }
+}
+
+public struct PreprocessingRunOptions: Codable {
+    public var minHeight: Float?
+    public var maxSideLen: Float?
+    public var minSideLen: Float?
+    public var widthHeightRatio: Float?
+    public var detection: DetectionRunOptions?
+    public init(minHeight: Float? = nil, maxSideLen: Float? = nil, minSideLen: Float? = nil, widthHeightRatio: Float? = nil, detection: DetectionRunOptions? = nil) { self.minHeight = minHeight; self.maxSideLen = maxSideLen; self.minSideLen = minSideLen; self.widthHeightRatio = widthHeightRatio; self.detection = detection }
+}
+
 public struct OcrRunOptions: Codable {
     public var output: OutputGranularity
     public var lineYThreshold: Float?
@@ -211,21 +221,10 @@ public struct OcrRunOptions: Codable {
     public var textScore: Float?
     public var classification: Bool?
     public var orientation: Bool?
+    public var preprocessing: PreprocessingRunOptions?
 
-    public init(
-        output: OutputGranularity = .lines,
-        lineYThreshold: Float? = nil,
-        wordXThreshold: Float? = nil,
-        textScore: Float? = nil,
-        classification: Bool? = nil,
-        orientation: Bool? = nil
-    ) {
-        self.output = output
-        self.lineYThreshold = lineYThreshold
-        self.wordXThreshold = wordXThreshold
-        self.textScore = textScore
-        self.classification = classification
-        self.orientation = orientation
+    public init(output: OutputGranularity = .lines, lineYThreshold: Float? = nil, wordXThreshold: Float? = nil, textScore: Float? = nil, classification: Bool? = nil, orientation: Bool? = nil, preprocessing: PreprocessingRunOptions? = nil) {
+        self.output = output; self.lineYThreshold = lineYThreshold; self.wordXThreshold = wordXThreshold; self.textScore = textScore; self.classification = classification; self.orientation = orientation; self.preprocessing = preprocessing
     }
 }
 
@@ -361,6 +360,21 @@ public class RustO {
               options.textScore == nil || (options.textScore!.isFinite && (0...1).contains(options.textScore!)) else {
             throw RustOError.serializationFailed
         }
+        guard let preprocessing = options.preprocessing else { return }
+        func positive(_ value: Float?) -> Bool { value == nil || (value!.isFinite && value! > 0) }
+        guard positive(preprocessing.minHeight), positive(preprocessing.maxSideLen), positive(preprocessing.minSideLen),
+              preprocessing.widthHeightRatio == nil || (preprocessing.widthHeightRatio!.isFinite && (preprocessing.widthHeightRatio! > 0 || preprocessing.widthHeightRatio! == -1)),
+              preprocessing.minSideLen == nil || preprocessing.maxSideLen == nil || preprocessing.minSideLen! <= preprocessing.maxSideLen! else { throw RustOError.serializationFailed }
+        guard let detection = preprocessing.detection else { return }
+        guard detection.limitSideLen == nil || (detection.limitSideLen! > 0 && detection.limitSideLen! <= 32767),
+              detection.limitType == nil || ["min", "max"].contains(detection.limitType!),
+              detection.mean == nil || (detection.mean!.count == 3 && detection.mean!.allSatisfy { $0.isFinite }),
+              detection.std == nil || (detection.std!.count == 3 && detection.std!.allSatisfy { $0.isFinite && $0 != 0 }) else { throw RustOError.serializationFailed }
+        guard let postprocess = detection.postprocess else { return }
+        guard postprocess.threshold == nil || (postprocess.threshold!.isFinite && (0...1).contains(postprocess.threshold!)),
+              postprocess.boxThreshold == nil || (postprocess.boxThreshold!.isFinite && (0...1).contains(postprocess.boxThreshold!)),
+              postprocess.maxCandidates == nil || postprocess.maxCandidates! >= 1,
+              positive(postprocess.unclipRatio) else { throw RustOError.serializationFailed }
     }
 
     private static func resolveModelPath(_ filename: String) -> String? {

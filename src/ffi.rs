@@ -15,18 +15,7 @@ unsafe fn parse_run_options(options_json: *const c_char) -> Result<OcrRunOptions
         .ok()
         .and_then(|json| serde_json::from_str::<OcrRunOptions>(json).ok())
         .ok_or(ROCR_INVALID_OPTIONS)?;
-    if options
-        .line_y_threshold
-        .is_some_and(|value| !value.is_finite() || value < 0.0)
-        || options
-            .word_x_threshold
-            .is_some_and(|value| !value.is_finite() || value < 0.0)
-        || options
-            .text_score
-            .is_some_and(|value| !value.is_finite() || !(0.0..=1.0).contains(&value))
-    {
-        return Err(ROCR_INVALID_OPTIONS);
-    }
+    options.validate().map_err(|_| ROCR_INVALID_OPTIONS)?;
     Ok(options)
 }
 

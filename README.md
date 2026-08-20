@@ -48,7 +48,7 @@
 ### 1. Rust
 
 ```rust
-use rusto::{DetectTextResult, ImageSource, OcrRunOptions, RustO, InitializeConfig};
+use rusto::{DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, PreprocessingRunOptions, RustO};
 
 let mut ocr = RustO::initialize(InitializeConfig::ppv6("det.mnn", "rec.mnn", "dict.txt"))?;
 match ocr.detect_text(&ImageSource::Path("document.jpg".into()), &OcrRunOptions::default())? {
@@ -195,18 +195,15 @@ RustO! supports all PaddleOCR model series in lightweight MNN format:
 | **Telugu** | `te` | ~7.5 MB | `rusto-models-ppocrv5-te` | `RustO-Models-PPOCRv5-Telugu` | `RustODotnet.Models.PPOCRv5.Telugu` |
 | **Thai** | `th` | ~7.5 MB | `rusto-models-ppocrv5-th` | `RustO-Models-PPOCRv5-Thai` | `RustODotnet.Models.PPOCRv5.Thai` |
 
-#### Additional PP-OCRv4 Language Models (Available via Downloader)
+#### PP-OCRv4 Language Packages
 
-PP-OCRv4 includes additional specialized language models on ModelScope (e.g. Japanese, Traditional Chinese, Kannada):
+PP-OCRv4 specialized recognition packages pair a language-specific `rec.mnn` + `dict.txt` with language-agnostic PP-OCRv4 detection. Install matching package for target platform:
 
-| Language / Script | Key | Rec Size | ModelScope Name |
-|---|---|---|---|
-| **Japanese** | `japan` | ~9.3 MB | `japan_PP-OCRv4_rec_mobile.mnn` |
-| **Traditional Chinese** | `chinese_cht` | ~10.6 MB | `chinese_cht_PP-OCRv3_rec_mobile.mnn` |
-| **Kannada** | `ka` | ~7.3 MB | `ka_PP-OCRv4_rec_mobile.mnn` |
-| **Korean (v4)** | `korean` | ~22.5 MB | `korean_PP-OCRv4_rec_mobile.mnn` |
-| **Tamil (v4)** | `ta` | ~20.9 MB | `ta_PP-OCRv4_rec_mobile.mnn` |
-| **Telugu (v4)** | `te` | ~20.9 MB | `te_PP-OCRv4_rec_mobile.mnn` |
+| Language / Script | Key | Rec Size | Android Package | iOS Podspec | .NET NuGet Package |
+|---|---|---:|---|---|---|
+| **Japanese** | `japan` | ~9.3 MB | `rusto-models-ppocrv4-japan` | `RustO-Models-PPOCRv4-Japanese` | `RustODotnet.Models.PPOCRv4.Japanese` |
+| **Traditional Chinese** | `chinese_cht` | ~10.6 MB | `rusto-models-ppocrv4-chinese-cht` | `RustO-Models-PPOCRv4-TraditionalChinese` | `RustODotnet.Models.PPOCRv4.TraditionalChinese` |
+| **Kannada** | `ka` | ~7.3 MB | `rusto-models-ppocrv4-kannada` | `RustO-Models-PPOCRv4-Kannada` | `RustODotnet.Models.PPOCRv4.Kannada` |
 
 ### Downloading Models on the Fly
 
@@ -247,13 +244,38 @@ let config = InitializeConfig::ppv6("models/det.mnn", "models/rec.mnn", "models/
     .with_text_score(0.5)          // Minimum character confidence score
     .with_xy_threshold(0.5, 1.0)   // (y_multiplier, x_multiplier) for spatial layout
     .with_rec_batch_num(6)         // Batch size for text recognition
-    
+
     // Optional modules
     .with_cls("models/cls.mnn", 0.9)            // Direction / orientation classifier
     .with_orientation("models/orient.mnn", 0.9) // Document angle rotator
     .with_unwarp("models/unwarp.mnn");          // Document shadow/curve unwarper
 ```
 
+### Per-request preprocessing and detection
+
+Image processing belongs in `OcrRunOptions` / `detectText` options, not initialization. Overrides are request-local and never mutate model sessions. Use nested `preprocessing` for `minHeight`, `maxSideLen`, `minSideLen`, `widthHeightRatio`, detector resize/normalization, and detector postprocessing including dilation:
+
+```rust
+let result = ocr.detect_text(
+    &ImageSource::Path("document.jpg".into()),
+    &OcrRunOptions {
+        preprocessing: Some(PreprocessingRunOptions {
+            max_side_len: Some(1600.0),
+            detection: Some(DetectionRunOptions {
+                postprocess: Some(PostprocessRunOptions {
+                    use_dilation: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+        ..Default::default()
+    },
+)?;
+```
+
+All bindings share camel-case JSON keys. Model paths, dictionaries, model architecture, and session settings remain initialization-only.
 ### Template Presets
 
 - `InitializeConfig::ppv6(...)` — Pre-configured for PP-OCRv6 (`limit_side_len=736`, `limit_type="min"`, `unclip_ratio=2.0`)

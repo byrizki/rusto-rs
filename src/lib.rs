@@ -58,6 +58,7 @@ pub mod ffi;
 
 // Public API exports
 pub use config::{ModelPreset, InitializeConfig, PPV3_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG};
+pub use rusto_ocr::{DetectionRunOptions, PostprocessRunOptions, PreprocessingRunOptions};
 pub use det::TextDetector;
 pub use doc_pipeline::{DocBlock, DocPipeline, DocPipelineConfig, DocResult};
 pub use layout::{LayoutDetector, LayoutOutput, LayoutRegion, LayoutType};

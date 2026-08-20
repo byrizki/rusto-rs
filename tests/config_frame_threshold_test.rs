@@ -1,4 +1,4 @@
-use rusto::{DetectTextResult, Frame, ImageSource, OcrRunOptions, OutputGranularity, InitializeConfig, TextResult};
+use rusto::{DetectTextResult, DetectionRunOptions, Frame, ImageSource, InitializeConfig, OcrRunOptions, OutputGranularity, PostprocessRunOptions, PreprocessingRunOptions, TextResult};
 
 #[test]
 fn test_frame_from_points_upright() {
@@ -65,6 +65,38 @@ fn test_rusto_config_builders() {
 }
 
 #[test]
+fn test_rusto_preprocessing_run_options_are_public_and_serialize() {
+    let options = OcrRunOptions {
+        preprocessing: Some(PreprocessingRunOptions {
+            min_height: Some(24.0),
+            max_side_len: Some(1600.0),
+            min_side_len: Some(48.0),
+            width_height_ratio: Some(8.0),
+            detection: Some(DetectionRunOptions {
+                limit_side_len: Some(960),
+                limit_type: Some("min".into()),
+                postprocess: Some(PostprocessRunOptions { use_dilation: Some(false), ..Default::default() }),
+                ..Default::default()
+            }),
+        }),
+        ..Default::default()
+    };
+    options.validate().expect("valid runtime preprocessing");
+    let json = serde_json::to_string(&options).expect("Serialize options");
+    assert!(json.contains("\"preprocessing\""));
+    assert!(json.contains("\"useDilation\":false"));
+}
+
+#[test]
+fn test_rusto_preprocessing_run_options_reject_invalid_bounds() {
+    let options = OcrRunOptions {
+        preprocessing: Some(PreprocessingRunOptions { min_side_len: Some(100.0), max_side_len: Some(50.0), ..Default::default() }),
+        ..Default::default()
+    };
+    assert!(options.validate().is_err());
+}
+
+#[test]
 fn test_rusto_config_grouped_json() {
     let json_str = r#"{
         "template": "ppv5",
@@ -90,11 +122,6 @@ fn test_rusto_config_grouped_json() {
         "layout": {
             "yThresholdMultiplier": 0.62,
             "xThresholdMultiplier": 1.25
-        },
-        "preprocessing": {
-            "minHeight": 28.0,
-            "maxSideLen": 1800.0,
-            "debugImages": true
         }
     }"#;
 
@@ -125,9 +152,6 @@ fn test_rusto_config_grouped_json() {
     assert_eq!(config.cls.as_ref().unwrap().cls_thresh, 0.88);
     assert_eq!(config.global.y_threshold_multiplier, Some(0.62));
     assert_eq!(config.global.x_threshold_multiplier, Some(1.25));
-    assert_eq!(config.global.min_height, 28.0);
-    assert_eq!(config.global.max_side_len, 1800.0);
-    assert!(config.global.debug_images);
 }
 
 #[test]

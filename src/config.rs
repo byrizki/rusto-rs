@@ -79,7 +79,7 @@ pub struct InitializeConfig {
     
     /// Global OCR settings
     pub global: GlobalConfig,
-    
+
     /// Optional: Orientation classification configuration
     pub orient: Option<OrientConfig>,
     
@@ -160,17 +160,6 @@ struct UnwarpConfigJson {
     model_path: Option<PathBuf>,
 }
 
-#[derive(Deserialize, Default, Clone, Debug)]
-struct PreprocessingConfigJson {
-    #[serde(alias = "minHeight", alias = "min_height")]
-    min_height: Option<f32>,
-    #[serde(alias = "maxSideLen", alias = "max_side_len")]
-    max_side_len: Option<f32>,
-    #[serde(alias = "minSideLen", alias = "min_side_len")]
-    min_side_len: Option<f32>,
-    #[serde(alias = "debugImages", alias = "debug_images")]
-    debug_images: Option<bool>,
-}
 
 #[derive(Deserialize, Default, Clone, Debug)]
 struct LayoutConfigJson {
@@ -190,7 +179,6 @@ struct FlatConfig {
     classification: Option<ClassificationConfigJson>,
     orientation: Option<OrientationConfigJson>,
     unwarp: Option<UnwarpConfigJson>,
-    preprocessing: Option<PreprocessingConfigJson>,
     layout: Option<LayoutConfigJson>,
 }
 
@@ -362,18 +350,6 @@ impl InitializeConfig {
         }
         if let Some(use_unwarp) = flat.unwarp.as_ref().and_then(|u| u.enabled) {
             config.global.use_unwarp = use_unwarp;
-        }
-        if let Some(debug) = flat.preprocessing.as_ref().and_then(|p| p.debug_images) {
-            config.global.debug_images = debug;
-        }
-        if let Some(min_h) = flat.preprocessing.as_ref().and_then(|p| p.min_height) {
-            config.global.min_height = min_h;
-        }
-        if let Some(max_s) = flat.preprocessing.as_ref().and_then(|p| p.max_side_len) {
-            config.global.max_side_len = max_s;
-        }
-        if let Some(min_s) = flat.preprocessing.as_ref().and_then(|p| p.min_side_len) {
-            config.global.min_side_len = min_s;
         }
         if let Some(word_box) = flat.recognition.as_ref().and_then(|r| r.return_word_box) {
             config.global.return_word_box = word_box;

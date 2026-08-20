@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -134,18 +135,6 @@ namespace RustODotnet
         public string ModelPath { get; set; }
     }
 
-    public class PreprocessingConfig
-    {
-        [JsonPropertyName("minHeight")]
-        public float? MinHeight { get; set; }
-        [JsonPropertyName("maxSideLen")]
-        public float? MaxSideLen { get; set; }
-        [JsonPropertyName("minSideLen")]
-        public float? MinSideLen { get; set; }
-        [JsonPropertyName("debugImages")]
-        public bool? DebugImages { get; set; }
-    }
-
     public class LayoutConfig
     {
         [JsonPropertyName("yThresholdMultiplier")]
@@ -168,8 +157,6 @@ namespace RustODotnet
         public OrientationConfig Orientation { get; set; }
         [JsonPropertyName("unwarp")]
         public UnwarpConfig Unwarp { get; set; }
-        [JsonPropertyName("preprocessing")]
-        public PreprocessingConfig Preprocessing { get; set; }
         [JsonPropertyName("layout")]
         public LayoutConfig Layout { get; set; }
 
@@ -199,6 +186,33 @@ namespace RustODotnet
         Spatial,
     }
 
+    public class PostprocessRunOptions
+    {
+        [JsonPropertyName("threshold")] public float? Threshold { get; set; }
+        [JsonPropertyName("boxThreshold")] public float? BoxThreshold { get; set; }
+        [JsonPropertyName("maxCandidates")] public int? MaxCandidates { get; set; }
+        [JsonPropertyName("unclipRatio")] public float? UnclipRatio { get; set; }
+        [JsonPropertyName("useDilation")] public bool? UseDilation { get; set; }
+    }
+
+    public class DetectionRunOptions
+    {
+        [JsonPropertyName("limitSideLen")] public int? LimitSideLen { get; set; }
+        [JsonPropertyName("limitType")] public string LimitType { get; set; }
+        [JsonPropertyName("mean")] public float[] Mean { get; set; }
+        [JsonPropertyName("std")] public float[] Std { get; set; }
+        [JsonPropertyName("postprocess")] public PostprocessRunOptions Postprocess { get; set; }
+    }
+
+    public class PreprocessingRunOptions
+    {
+        [JsonPropertyName("minHeight")] public float? MinHeight { get; set; }
+        [JsonPropertyName("maxSideLen")] public float? MaxSideLen { get; set; }
+        [JsonPropertyName("minSideLen")] public float? MinSideLen { get; set; }
+        [JsonPropertyName("widthHeightRatio")] public float? WidthHeightRatio { get; set; }
+        [JsonPropertyName("detection")] public DetectionRunOptions Detection { get; set; }
+    }
+
     /// <summary>Per-request OCR output and pipeline options.</summary>
     public class OcrRunOptions
     {
@@ -218,6 +232,8 @@ namespace RustODotnet
         public bool? Classification { get; set; }
         [JsonPropertyName("orientation")]
         public bool? Orientation { get; set; }
+        [JsonPropertyName("preprocessing")]
+        public PreprocessingRunOptions Preprocessing { get; set; }
     }
 
     public abstract class ImageSource { }
@@ -446,6 +462,7 @@ namespace RustODotnet
                 TextScore = options.TextScore,
                 Classification = options.Classification,
                 Orientation = options.Orientation,
+                Preprocessing = options.Preprocessing,
             };
             return JsonSerializer.Serialize(serialized, new JsonSerializerOptions
             {
@@ -471,6 +488,45 @@ namespace RustODotnet
             {
                 throw new RustOException("TextScore must be finite and between 0 and 1.");
             }
+            ValidatePreprocessing(options.Preprocessing);
+        }
+
+        private static void ValidatePreprocessing(PreprocessingRunOptions options)
+        {
+            if (options == null) return;
+            ValidatePositive(options.MinHeight, nameof(options.MinHeight));
+            ValidatePositive(options.MaxSideLen, nameof(options.MaxSideLen));
+            ValidatePositive(options.MinSideLen, nameof(options.MinSideLen));
+            if (options.WidthHeightRatio.HasValue && (!float.IsFinite(options.WidthHeightRatio.Value) || (options.WidthHeightRatio.Value <= 0 && options.WidthHeightRatio.Value != -1))) throw new RustOException("WidthHeightRatio must be positive or -1.");
+            if (options.MinSideLen.HasValue && options.MaxSideLen.HasValue && options.MinSideLen.Value > options.MaxSideLen.Value) throw new RustOException("MinSideLen must not exceed MaxSideLen.");
+            var detection = options.Detection;
+            if (detection == null) return;
+            if (detection.LimitSideLen.HasValue && (detection.LimitSideLen.Value < 1 || detection.LimitSideLen.Value > 32767)) throw new RustOException("LimitSideLen must be between 1 and 32767.");
+            if (detection.LimitType != null && detection.LimitType != "min" && detection.LimitType != "max") throw new RustOException("LimitType must be min or max.");
+            ValidateVector(detection.Mean, false, "Mean");
+            ValidateVector(detection.Std, true, "Std");
+            var postprocess = detection.Postprocess;
+            if (postprocess == null) return;
+            ValidateProbability(postprocess.Threshold, "Threshold");
+            ValidateProbability(postprocess.BoxThreshold, "BoxThreshold");
+            if (postprocess.MaxCandidates.HasValue && postprocess.MaxCandidates.Value < 1) throw new RustOException("MaxCandidates must be at least one.");
+            ValidatePositive(postprocess.UnclipRatio, "UnclipRatio");
+        }
+
+        private static void ValidateVector(float[] values, bool nonZero, string name)
+        {
+            if (values == null) return;
+            if (values.Length != 3 || values.Any(value => !float.IsFinite(value) || (nonZero && value == 0))) throw new RustOException($"{name} must contain three valid values.");
+        }
+
+        private static void ValidateProbability(float? value, string name)
+        {
+            if (value.HasValue && (!float.IsFinite(value.Value) || value.Value < 0 || value.Value > 1)) throw new RustOException($"{name} must be finite and between 0 and 1.");
+        }
+
+        private static void ValidatePositive(float? value, string name)
+        {
+            if (value.HasValue && (!float.IsFinite(value.Value) || value.Value <= 0)) throw new RustOException($"{name} must be finite and greater than zero.");
         }
 
         private static void ValidateNonNegative(float? value, string name)

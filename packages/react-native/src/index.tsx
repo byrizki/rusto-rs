@@ -15,6 +15,27 @@ export type ImageSource = { uri: string } | { base64: string } | { bytes: Binary
 export type OutputGranularity = 'lines' | 'words' | 'spatial';
 export type ModelPreset = 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3';
 
+export interface PostprocessOptions {
+  threshold?: number;
+  boxThreshold?: number;
+  maxCandidates?: number;
+  unclipRatio?: number;
+  useDilation?: boolean;
+}
+export interface DetectionPreprocessingOptions {
+  limitSideLen?: number;
+  limitType?: 'min' | 'max';
+  mean?: [number, number, number];
+  std?: [number, number, number];
+  postprocess?: PostprocessOptions;
+}
+export interface PreprocessingOptions {
+  minHeight?: number;
+  maxSideLen?: number;
+  minSideLen?: number;
+  widthHeightRatio?: number;
+  detection?: DetectionPreprocessingOptions;
+}
 export interface InitializeConfig {
   preset?: ModelPreset;
   models?: { detection?: string; recognition?: string; dictionary?: string; classification?: string; orientation?: string };
@@ -26,13 +47,18 @@ export interface DetectTextOptions {
   textScore?: number;
   classification?: boolean;
   orientation?: boolean;
+  /** Request-local preprocessing and detector postprocess overrides. */
+  preprocessing?: PreprocessingOptions;
 }
 export interface Frame { width: number; height: number; top: number; left: number; }
 export interface TextResult { text: string; score: number; box_points: [[number, number], [number, number], [number, number], [number, number]]; frame: Frame; }
 
 const SOURCE_KEYS = ['uri', 'base64', 'bytes'] as const;
-const OPTION_KEYS = ['output', 'lineYThreshold', 'wordXThreshold', 'textScore', 'classification', 'orientation'] as const;
+const OPTION_KEYS = ['output', 'lineYThreshold', 'wordXThreshold', 'textScore', 'classification', 'orientation', 'preprocessing'] as const;
 const MODEL_KEYS = ['detection', 'recognition', 'dictionary', 'classification', 'orientation'] as const;
+const PREPROCESSING_KEYS = ['minHeight', 'maxSideLen', 'minSideLen', 'widthHeightRatio', 'detection'] as const;
+const DETECTION_PREPROCESSING_KEYS = ['limitSideLen', 'limitType', 'mean', 'std', 'postprocess'] as const;
+const POSTPROCESS_KEYS = ['threshold', 'boxThreshold', 'maxCandidates', 'unclipRatio', 'useDilation'] as const;
 const PRESETS = ['ppv6', 'ppv5', 'ppv4', 'ppv3'] as const;
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -56,7 +82,7 @@ function bytesToBase64(bytes: unknown): string {
 function normalizeSource(source: ImageSource): { uri?: string; base64?: string } {
   if (!isObject(source)) throw new TypeError('ImageSource must be an object with exactly one of uri, base64, or bytes.');
   // Runtime validation deliberately handles values cast past ImageSource's union type.
-  const rawSource: Record<string, unknown> = source;
+  const rawSource = source as unknown as Record<string, unknown>;
   requireOnlyKeys(rawSource, SOURCE_KEYS, 'ImageSource must contain exactly one of uri, base64, or bytes.');
   const keys = Object.keys(rawSource);
   if (keys.length !== 1 || !SOURCE_KEYS.includes(keys[0] as typeof SOURCE_KEYS[number])) {
@@ -85,6 +111,38 @@ function normalizeOptions(options: DetectTextOptions | undefined): DetectTextOpt
   for (const key of ['classification', 'orientation'] as const) {
     const value = options[key];
     if (value !== undefined && typeof value !== 'boolean') throw new TypeError(`DetectTextOptions.${key} must be a boolean.`);
+  }
+  const preprocessing = options.preprocessing;
+  if (preprocessing !== undefined) {
+    if (!isObject(preprocessing)) throw new TypeError('DetectTextOptions.preprocessing must be an object.');
+    requireOnlyKeys(preprocessing, PREPROCESSING_KEYS, 'DetectTextOptions.preprocessing contains an unknown key.');
+    for (const key of ['minHeight', 'maxSideLen', 'minSideLen'] as const) {
+      const value = preprocessing[key];
+      if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)) throw new TypeError(`DetectTextOptions.preprocessing.${key} must be a finite number > 0.`);
+    }
+    const ratio = preprocessing.widthHeightRatio;
+    if (ratio !== undefined && (typeof ratio !== 'number' || !Number.isFinite(ratio) || (ratio <= 0 && ratio !== -1))) throw new TypeError('DetectTextOptions.preprocessing.widthHeightRatio must be > 0 or -1.');
+    if (preprocessing.minSideLen !== undefined && preprocessing.maxSideLen !== undefined && preprocessing.minSideLen > preprocessing.maxSideLen) throw new TypeError('DetectTextOptions.preprocessing.minSideLen must be <= maxSideLen.');
+    const detection = preprocessing.detection;
+    if (detection !== undefined) {
+      if (!isObject(detection)) throw new TypeError('DetectTextOptions.preprocessing.detection must be an object.');
+      requireOnlyKeys(detection, DETECTION_PREPROCESSING_KEYS, 'DetectTextOptions.preprocessing.detection contains an unknown key.');
+      if (detection.limitSideLen !== undefined && (!Number.isInteger(detection.limitSideLen) || detection.limitSideLen < 1 || detection.limitSideLen > 32767)) throw new TypeError('DetectTextOptions.preprocessing.detection.limitSideLen must be an integer between 1 and 32767.');
+      if (detection.limitType !== undefined && detection.limitType !== 'min' && detection.limitType !== 'max') throw new TypeError('DetectTextOptions.preprocessing.detection.limitType is invalid.');
+      for (const key of ['mean', 'std'] as const) {
+        const values = detection[key];
+        if (values !== undefined && (!Array.isArray(values) || values.length !== 3 || values.some((value) => typeof value !== 'number' || !Number.isFinite(value) || (key === 'std' && value === 0)))) throw new TypeError(`DetectTextOptions.preprocessing.detection.${key} must contain three valid numbers.`);
+      }
+      const postprocess = detection.postprocess;
+      if (postprocess !== undefined) {
+        if (!isObject(postprocess)) throw new TypeError('DetectTextOptions.preprocessing.detection.postprocess must be an object.');
+        requireOnlyKeys(postprocess, POSTPROCESS_KEYS, 'DetectTextOptions.preprocessing.detection.postprocess contains an unknown key.');
+        for (const key of ['threshold', 'boxThreshold'] as const) { const value = postprocess[key]; if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1)) throw new TypeError(`DetectTextOptions.preprocessing.detection.postprocess.${key} must be in [0, 1].`); }
+        if (postprocess.maxCandidates !== undefined && (!Number.isInteger(postprocess.maxCandidates) || postprocess.maxCandidates < 1)) throw new TypeError('DetectTextOptions.preprocessing.detection.postprocess.maxCandidates must be an integer >= 1.');
+        if (postprocess.unclipRatio !== undefined && (typeof postprocess.unclipRatio !== 'number' || !Number.isFinite(postprocess.unclipRatio) || postprocess.unclipRatio <= 0)) throw new TypeError('DetectTextOptions.preprocessing.detection.postprocess.unclipRatio must be > 0.');
+        if (postprocess.useDilation !== undefined && typeof postprocess.useDilation !== 'boolean') throw new TypeError('DetectTextOptions.preprocessing.detection.postprocess.useDilation must be a boolean.');
+      }
+    }
   }
   return options;
 }
