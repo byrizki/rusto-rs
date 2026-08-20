@@ -11,7 +11,7 @@ android {
         minSdk 21
         targetSdk 34
         versionCode 1
-        versionName "0.2.3"
+        versionName "0.2.4"
     }
 
     sourceSets {
@@ -23,7 +23,7 @@ android {
 
 mavenPublishing {
 
-    coordinates('com.github.byrizki.rusto-rs', 'rusto-models-ppocrv4-chinese-cht', '0.2.3')
+    coordinates('com.github.byrizki.rusto-rs', 'rusto-models-ppocrv4-chinese-cht', '0.2.4')
 
     pom {
         name = 'RustO! Models PP-OCRv4 TraditionalChinese'

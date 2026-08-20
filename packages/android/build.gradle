@@ -12,7 +12,7 @@ android {
         minSdk 21
         targetSdk 34
         versionCode 1
-        versionName "0.2.3"
+        versionName "0.2.4"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
@@ -61,7 +61,7 @@ dependencies {
 
 mavenPublishing {
 
-    coordinates('com.github.byrizki.rusto-rs', 'rusto-android', '0.2.3')
+    coordinates('com.github.byrizki.rusto-rs', 'rusto-android', '0.2.4')
 
     pom {
         name = 'RustO! Android'

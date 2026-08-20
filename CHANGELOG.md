@@ -5,6 +5,14 @@ All notable changes to RustO! will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] - 2026-08-20
+
+### Added
+- Add several text detection configuration
+
+### Fixed
+- Fix ts lint
+
 ## [0.2.3] - 2026-08-19
 
 ### Changed
@@ -146,7 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Project Status
 
-**Version**: 0.2.3  
+**Version**: 0.2.4  
 **Status**: Production Ready  
 **Accuracy**: 99.3% OpenCV parity  
-**Last Updated**: August 19, 2026
+**Last Updated**: August 20, 2026
