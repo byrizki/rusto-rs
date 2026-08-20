@@ -11,7 +11,7 @@ describe('React Native API', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('forwards shallow initialization config', async () => {
-    (NativeModules.Rusto.initialize as jest.Mock).mockResolvedValue(undefined);
+    (NativeModules.Rusto.initialize as jest.Mock).mockResolvedValue();
     await initialize({
       preset: 'ppv6',
       models: { recognition: 'rec.mnn' },
@@ -60,14 +60,14 @@ describe('React Native API', () => {
     { uri: '/tmp/image.png', extra: true },
     { uri: '' },
   ])('rejects invalid image source %# before native invocation', (source) => {
-    expect(() => detectText(source as never)).toThrow(/ImageSource/);
+    expect(() => detectText(source as never)).toThrow(/ImageSource/u);
     expect(NativeModules.Rusto.detectText).not.toHaveBeenCalled();
   });
 
   it.each([{ bytes: null }, { bytes: {} }, { bytes: 'not-bytes' }, { bytes: new Uint8Array() }])(
     'rejects invalid byte source %# before native invocation',
     (source) => {
-      expect(() => detectText(source as never)).toThrow(/ImageSource\.bytes/);
+      expect(() => detectText(source as never)).toThrow(/ImageSource\.bytes/u);
       expect(NativeModules.Rusto.detectText).not.toHaveBeenCalled();
     }
   );
@@ -85,11 +85,12 @@ describe('React Native API', () => {
     { detection: { mean: [0.5, 0.5] } },
     { detection: { std: [0.5, 0, 0.5] } },
     { postprocess: { useDilation: 'true' } },
-    { preprocessing: { minHeight: 24 } }, // obsolete nested key must reject
+    // obsolete nested key must reject
+    { preprocessing: { minHeight: 24 } },
     { unknown: true },
   ])('rejects invalid runtime options %# before native invocation', (options) => {
     expect(() => detectText({ uri: '/tmp/image.png' }, options as never)).toThrow(
-      /DetectTextOptions/
+      /DetectTextOptions/u
     );
     expect(NativeModules.Rusto.detectText).not.toHaveBeenCalled();
   });
@@ -103,10 +104,11 @@ describe('React Native API', () => {
     { models: 'invalid' },
     { models: { unknown: 'model.mnn' } },
     { models: { recognition: '' } },
-    { preprocessing: null }, // obsolete nested key must reject
+    // obsolete nested key must reject
+    { preprocessing: null },
     { unknown: true },
   ])('rejects invalid initialization config %# before native invocation', (config) => {
-    expect(() => initialize(config as never)).toThrow(/InitializeConfig/);
+    expect(() => initialize(config as never)).toThrow(/InitializeConfig/u);
     expect(NativeModules.Rusto.initialize).not.toHaveBeenCalled();
   });
 });

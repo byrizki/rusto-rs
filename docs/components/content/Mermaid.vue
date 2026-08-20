@@ -26,7 +26,47 @@ const props = defineProps<{
 
 const svgContent = ref<string>('');
 const error = ref<string>('');
-const uniqueId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
+
+const decodeHtmlEntities = (raw: string): string => {
+  return raw
+    .trim()
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#39;', "'")
+    .replaceAll('&le;', '<=')
+    .replaceAll('&ge;', '>=')
+    .replaceAll('&rarr;', '->')
+    .replaceAll('&times;', 'x');
+};
+
+const getThemeVariables = (isDark: boolean) => {
+  if (isDark) {
+    return {
+      primaryColor: '#3b82f6',
+      primaryTextColor: '#f8fafc',
+      primaryBorderColor: '#60a5fa',
+      lineColor: '#94a3b8',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#0f172a',
+      background: '#0f172a',
+      mainBkg: '#1e293b',
+      nodeBorder: '#3b82f6',
+    };
+  }
+  return {
+    primaryColor: '#e0e7ff',
+    primaryTextColor: '#1e293b',
+    primaryBorderColor: '#6366f1',
+    lineColor: '#64748b',
+    secondaryColor: '#f1f5f9',
+    tertiaryColor: '#ffffff',
+    background: '#ffffff',
+    mainBkg: '#f8fafc',
+    nodeBorder: '#6366f1',
+  };
+};
 
 const renderDiagram = async () => {
   if (typeof window === 'undefined') return;
@@ -34,7 +74,6 @@ const renderDiagram = async () => {
     error.value = '';
     const mermaidModule = await import('mermaid');
     const mermaid = mermaidModule.default || mermaidModule;
-
     const isDark = document.documentElement.classList.contains('dark');
 
     mermaid.initialize({
@@ -42,57 +81,22 @@ const renderDiagram = async () => {
       theme: isDark ? 'dark' : 'default',
       securityLevel: 'loose',
       fontFamily: 'Inter, system-ui, sans-serif',
-      themeVariables: isDark
-        ? {
-            primaryColor: '#3b82f6',
-            primaryTextColor: '#f8fafc',
-            primaryBorderColor: '#60a5fa',
-            lineColor: '#94a3b8',
-            secondaryColor: '#1e293b',
-            tertiaryColor: '#0f172a',
-            background: '#0f172a',
-            mainBkg: '#1e293b',
-            nodeBorder: '#3b82f6',
-          }
-        : {
-            primaryColor: '#e0e7ff',
-            primaryTextColor: '#1e293b',
-            primaryBorderColor: '#6366f1',
-            lineColor: '#64748b',
-            secondaryColor: '#f1f5f9',
-            tertiaryColor: '#ffffff',
-            background: '#ffffff',
-            mainBkg: '#f8fafc',
-            nodeBorder: '#6366f1',
-          },
+      themeVariables: getThemeVariables(isDark),
     });
 
-    // Clean up code content: decode html entities if any
-    let cleanCode = props.code.trim();
-    cleanCode = cleanCode
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&amp;/g, '&')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&le;/g, '<=')
-      .replace(/&ge;/g, '>=')
-      .replace(/&rarr;/g, '->')
-      .replace(/&times;/g, 'x');
-
-    const renderId = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
+    const cleanCode = decodeHtmlEntities(props.code);
+    const renderId = `mermaid-${Math.random().toString(36).slice(2, 9)}`;
     const { svg } = await mermaid.render(renderId, cleanCode);
     svgContent.value = svg;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Mermaid render error:', err);
-    error.value = err?.message || 'Unknown error';
+    error.value = err instanceof Error ? err.message : String(err);
   }
 };
 
 onMounted(() => {
   renderDiagram();
 
-  // Watch for theme changes (dark / light mode toggle)
   const observer = new MutationObserver(() => {
     renderDiagram();
   });

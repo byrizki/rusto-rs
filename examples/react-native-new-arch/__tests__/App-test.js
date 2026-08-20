@@ -11,11 +11,11 @@ jest.mock('react-native-rusto', () => ({
 
 it('calls canonical RustO initialize and detectText overloads', async () => {
   let tree;
-  await act(async () => {
+  await act(() => {
     tree = renderer.create(<App />);
   });
   await act(async () => {
-    tree.root.findByProps({title: 'Verify RustO API'}).props.onPress();
+    await tree.root.findByProps({title: 'Verify RustO API'}).props.onPress();
   });
   expect(tree.root.findByProps({testID: 'status'}).props.children).toBe(
     'API verified: 0 items, 13 chars',

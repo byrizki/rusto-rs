@@ -3,11 +3,18 @@
   "plugins": ["typescript", "vue", "unicorn", "oxc"],
   "categories": {
     "correctness": "error",
-    "suspicious": "warn"
+    "suspicious": "warn",
+    "pedantic": "warn",
+    "perf": "warn"
   },
-  "rules": {},
+  "rules": {
+    "typescript/no-explicit-any": "warn",
+    "unicorn/no-empty-file": "error"
+  },
   "env": {
-    "builtin": true
+    "builtin": true,
+    "browser": true,
+    "node": true
   },
-  "ignorePatterns": [".nuxt/**", ".output/**", "node_modules/**"]
+  "ignorePatterns": [".nuxt/**", ".output/**", "node_modules/**", "dist/**"]
 }

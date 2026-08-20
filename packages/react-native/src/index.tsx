@@ -108,7 +108,7 @@ const POSTPROCESS_KEYS = [
 const PRESETS = ['ppv6', 'ppv5', 'ppv4', 'ppv3'] as const;
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
+  return value !== null && value !== undefined && typeof value === 'object' && !Array.isArray(value);
 }
 function requireOnlyKeys(
   value: Record<string, unknown>,
@@ -125,7 +125,7 @@ function bytesToBase64(bytes: unknown): string {
   if (data.byteLength === 0) throw new TypeError('ImageSource.bytes must not be empty.');
   let binary = '';
   for (let i = 0; i < data.length; i += 0x8000)
-    binary += String.fromCharCode(...data.subarray(i, i + 0x8000));
+    binary += String.fromCodePoint(...data.subarray(i, i + 0x8000));
   const encoder = global.btoa;
   if (typeof encoder !== 'function')
     throw new Error('Base64 encoding is unavailable in this React Native runtime.');
@@ -152,6 +152,78 @@ function normalizeSource(source: ImageSource): { uri?: string; base64?: string }
     throw new TypeError(`ImageSource.${key} must be a non-empty string.`);
   }
   return { [key]: value.trim() };
+}
+function normalizeDetectionOptions(detection: unknown): void {
+  if (detection === undefined) return;
+  if (!isObject(detection)) throw new TypeError('DetectTextOptions.detection must be an object.');
+  requireOnlyKeys(
+    detection,
+    DETECTION_KEYS,
+    'DetectTextOptions.detection contains an unknown key.'
+  );
+  const limitSideLen = detection.limitSideLen;
+  if (
+    limitSideLen !== undefined &&
+    (typeof limitSideLen !== 'number' ||
+      !Number.isInteger(limitSideLen) ||
+      limitSideLen < 1 ||
+      limitSideLen > 32767)
+  )
+    throw new TypeError(
+      'DetectTextOptions.detection.limitSideLen must be an integer between 1 and 32767.'
+    );
+  if (
+    detection.limitType !== undefined &&
+    detection.limitType !== 'min' &&
+    detection.limitType !== 'max'
+  )
+    throw new TypeError('DetectTextOptions.detection.limitType is invalid.');
+  for (const key of ['mean', 'std'] as const) {
+    const values = detection[key];
+    if (
+      values !== undefined &&
+      (!Array.isArray(values) ||
+        values.length !== 3 ||
+        values.some(
+          (value) =>
+            typeof value !== 'number' || !Number.isFinite(value) || (key === 'std' && value === 0)
+        ))
+    )
+      throw new TypeError(`DetectTextOptions.detection.${key} must contain three valid numbers.`);
+  }
+}
+function normalizePostprocessOptions(postprocess: unknown): void {
+  if (postprocess === undefined) return;
+  if (!isObject(postprocess))
+    throw new TypeError('DetectTextOptions.postprocess must be an object.');
+  requireOnlyKeys(
+    postprocess,
+    POSTPROCESS_KEYS,
+    'DetectTextOptions.postprocess contains an unknown key.'
+  );
+  for (const key of ['threshold', 'boxThreshold'] as const) {
+    const value = postprocess[key];
+    if (
+      value !== undefined &&
+      (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1)
+    )
+      throw new TypeError(`DetectTextOptions.postprocess.${key} must be in [0, 1].`);
+  }
+  const maxCandidates = postprocess.maxCandidates;
+  if (
+    maxCandidates !== undefined &&
+    (typeof maxCandidates !== 'number' || !Number.isInteger(maxCandidates) || maxCandidates < 1)
+  )
+    throw new TypeError('DetectTextOptions.postprocess.maxCandidates must be an integer >= 1.');
+  if (
+    postprocess.unclipRatio !== undefined &&
+    (typeof postprocess.unclipRatio !== 'number' ||
+      !Number.isFinite(postprocess.unclipRatio) ||
+      postprocess.unclipRatio <= 0)
+  )
+    throw new TypeError('DetectTextOptions.postprocess.unclipRatio must be > 0.');
+  if (postprocess.useDilation !== undefined && typeof postprocess.useDilation !== 'boolean')
+    throw new TypeError('DetectTextOptions.postprocess.useDilation must be a boolean.');
 }
 function normalizeOptions(options: DetectTextOptions | undefined): DetectTextOptions {
   if (options === undefined) return {};
@@ -191,78 +263,8 @@ function normalizeOptions(options: DetectTextOptions | undefined): DetectTextOpt
   const maxSideLen = options.maxSideLen;
   if (typeof minSideLen === 'number' && typeof maxSideLen === 'number' && minSideLen > maxSideLen)
     throw new TypeError('DetectTextOptions.minSideLen must be <= maxSideLen.');
-  const detection = options.detection;
-  if (detection !== undefined) {
-    if (!isObject(detection)) throw new TypeError('DetectTextOptions.detection must be an object.');
-    requireOnlyKeys(
-      detection,
-      DETECTION_KEYS,
-      'DetectTextOptions.detection contains an unknown key.'
-    );
-    const limitSideLen = detection.limitSideLen;
-    if (
-      limitSideLen !== undefined &&
-      (typeof limitSideLen !== 'number' ||
-        !Number.isInteger(limitSideLen) ||
-        limitSideLen < 1 ||
-        limitSideLen > 32767)
-    )
-      throw new TypeError(
-        'DetectTextOptions.detection.limitSideLen must be an integer between 1 and 32767.'
-      );
-    if (
-      detection.limitType !== undefined &&
-      detection.limitType !== 'min' &&
-      detection.limitType !== 'max'
-    )
-      throw new TypeError('DetectTextOptions.detection.limitType is invalid.');
-    for (const key of ['mean', 'std'] as const) {
-      const values = detection[key];
-      if (
-        values !== undefined &&
-        (!Array.isArray(values) ||
-          values.length !== 3 ||
-          values.some(
-            (value) =>
-              typeof value !== 'number' || !Number.isFinite(value) || (key === 'std' && value === 0)
-          ))
-      )
-        throw new TypeError(`DetectTextOptions.detection.${key} must contain three valid numbers.`);
-    }
-  }
-  const postprocess = options.postprocess;
-  if (postprocess !== undefined) {
-    if (!isObject(postprocess))
-      throw new TypeError('DetectTextOptions.postprocess must be an object.');
-    requireOnlyKeys(
-      postprocess,
-      POSTPROCESS_KEYS,
-      'DetectTextOptions.postprocess contains an unknown key.'
-    );
-    for (const key of ['threshold', 'boxThreshold'] as const) {
-      const value = postprocess[key];
-      if (
-        value !== undefined &&
-        (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1)
-      )
-        throw new TypeError(`DetectTextOptions.postprocess.${key} must be in [0, 1].`);
-    }
-    const maxCandidates = postprocess.maxCandidates;
-    if (
-      maxCandidates !== undefined &&
-      (typeof maxCandidates !== 'number' || !Number.isInteger(maxCandidates) || maxCandidates < 1)
-    )
-      throw new TypeError('DetectTextOptions.postprocess.maxCandidates must be an integer >= 1.');
-    if (
-      postprocess.unclipRatio !== undefined &&
-      (typeof postprocess.unclipRatio !== 'number' ||
-        !Number.isFinite(postprocess.unclipRatio) ||
-        postprocess.unclipRatio <= 0)
-    )
-      throw new TypeError('DetectTextOptions.postprocess.unclipRatio must be > 0.');
-    if (postprocess.useDilation !== undefined && typeof postprocess.useDilation !== 'boolean')
-      throw new TypeError('DetectTextOptions.postprocess.useDilation must be a boolean.');
-  }
+  normalizeDetectionOptions(options.detection);
+  normalizePostprocessOptions(options.postprocess);
   return options;
 }
 function normalizeInitializeConfig(config: InitializeConfig | undefined): InitializeConfig {

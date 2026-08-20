@@ -3,11 +3,20 @@
   "plugins": ["typescript", "react", "jest", "unicorn", "oxc"],
   "categories": {
     "correctness": "error",
-    "suspicious": "warn"
+    "suspicious": "warn",
+    "pedantic": "warn",
+    "perf": "warn"
   },
-  "rules": {},
+  "rules": {
+    "typescript/no-explicit-any": "warn",
+    "unicorn/no-empty-file": "error",
+    "eslint/max-lines": ["warn", { "max": 500, "skipComments": true }],
+    "eslint/max-lines-per-function": ["warn", { "max": 200, "skipComments": true }]
+  },
   "env": {
-    "builtin": true
+    "builtin": true,
+    "browser": true,
+    "node": true
   },
   "ignorePatterns": ["android/**", "ios/**", "node_modules/**"]
 }
