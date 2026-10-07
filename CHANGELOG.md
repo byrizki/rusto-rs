@@ -5,6 +5,25 @@ All notable changes to RustO! will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-07
+
+### Added
+- **packages**: Add rusto-web, react-rusto, and model packages
+- **wasm**: Add rten-wasm crate for high-performance browser OCR inference
+- **core**: Add configurable image calibration, descreening, and optimization pipeline
+
+### Changed
+- Standardize session usage from RtenSession/MnnSession to EngineSession
+- Update npm model generator and PowerShell scripts for ONNX/RTen
+- Complete MNN to RTen migration across bindings, examples, and podspecs
+- Update workflows and model scripts for RTen engine migration
+- Update gitignore for debugging dumps and add architecture benchmark plans
+- Update documentation, guides, and interactive live demo with RTen WASM
+- **bindings**: Align Android, iOS, .NET, and React Native bindings with RTen and calibration options
+- **engine**: Replace MNN with pure-Rust RTen backend and remove legacy MNN crates
+- Fix formats
+- Update node to 24
+
 ## [0.2.5] - 2026-08-20
 
 ### Added
@@ -162,7 +181,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Project Status
 
-**Version**: 0.2.5  
+**Version**: 0.3.0  
 **Status**: Production Ready  
 **Accuracy**: 99.3% OpenCV parity  
-**Last Updated**: August 20, 2026
+**Last Updated**: October 07, 2026

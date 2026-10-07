@@ -1,6 +1,6 @@
 {
   "name": "rusto-web",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "High-performance Web and Browser OCR engine for RustO! powered by PaddleOCR models",
   "keywords": [
     "ocr",

@@ -35,11 +35,39 @@
 | Platform | Package / Registry | Description |
 |---|---|---|
 | **Rust** | `cargo add rusto-rs` ([crates.io](https://crates.io/crates/rusto-rs)) | Pure Rust library + CLI tool |
+| **Web (WASM)** | `npm install @rusto/web` ([npm](https://www.npmjs.com/package/@rusto/web)) | Browser-native pure Rust RTen WASM OCR engine |
+| **React** | `npm install @rusto/react` ([npm](https://www.npmjs.com/package/@rusto/react)) | React hooks & components for browser OCR |
 | **.NET / C#** | `dotnet add package RustODotnet` ([NuGet](https://www.nuget.org/packages/RustODotnet)) | Managed .NET library + Windows/Linux/macOS native runtimes |
 | **React Native** | `npm install react-native-rusto` ([npm](https://www.npmjs.com/package/react-native-rusto)) | Cross-platform React Native TypeScript bridge |
 | **iOS** | `pod 'RustO'` ([CocoaPods](https://cocoapods.org/pods/RustO)) | Swift library + Universal XCFramework (Device & Simulator) |
 | **Android** | `com.github.byrizki.rusto-rs:rusto-android` ([JitPack](https://jitpack.io/#byrizki/rusto-rs)) | Kotlin library + AAR with ARM64, ARMv7, x86, x86_64 |
 | **C / Native** | `librusto.so` / `librusto.dylib` / `rusto.dll` | C FFI shared libraries for custom integrations |
+
+---
+
+## ⚠️ Notable Breaking Changes in v0.3.0
+
+Upgrading from **v0.2.x** to **v0.3.0** introduces significant architectural upgrades:
+
+### 1. Pure-Rust RTen Engine (MNN Removed)
+- **Zero C++ / CMake toolchain**: In v0.2, RustO relied on Alibaba MNN which required CMake, C++ compilers, and platform-specific native runtime bindings. In v0.3, the core inference engine is 100% pure-Rust powered by [RTen](https://github.com/robertknight/rten).
+- **New model formats (`.rten` & `.onnx`)**: Proprietary `.mnn` models are deprecated and replaced with high-performance `.rten` (FlatBuffers) or standard `.onnx` models.
+- **Model filenames**: Update model references from `det.mnn` / `rec.mnn` to `det.rten` / `rec.rten` (or `det.onnx` / `rec.onnx`).
+
+### 2. Session Abstraction (`EngineSession` replaces `MnnSession`)
+- **`MnnSession` is deprecated**: Use the generic `EngineSession` wrapper.
+- **Pluggable custom inference backends**: `EngineSession` implements `InferenceSession` and can wrap either built-in RTen or custom runtime engines (e.g. ONNX Runtime `ort`, Tract, Candle) via `EngineSession::from_custom` or `RustO::with_custom_engines(config, det_session, rec_session)`.
+- **Constructors**: Use `EngineSession::from_det_config(&config.det)` and `EngineSession::from_rec_config(&config.rec)`.
+
+### 3. Decoupled Initialization vs Per-Request Runtime Options
+- **`InitializeConfig`**: Used solely for static model loading, dictionaries, and hardware thread configuration.
+- **`OcrRunOptions`**: Configures per-image inference (score thresholds, dimension limits, output shape).
+- **Flat options hierarchy**: `detection` and `postprocess` are now direct sibling fields on `OcrRunOptions` (the legacy nested `preprocessing` block has been removed).
+- **Calibration & Optimization**: ID card and document preprocessing options (`CalibrationOptions`, `OptimizationOptions`) are passed per request via `OcrRunOptions.calibration` and `OcrRunOptions.optimization`.
+
+### 4. Ecosystem & Model Package Updates
+- Prepackaged model distributions for Android (AAR), iOS (CocoaPods), .NET (NuGet), and React Native (npm) have been upgraded to v0.3.0 with `.rten` / `.onnx` models.
+- Introduced `@rusto/web` and `@rusto/react` packages for pure client-side in-browser OCR via WebAssembly.
 
 ---
 
@@ -106,7 +134,7 @@ cd ios && pod install
 ```groovy
 dependencies {
     // Add your preferred OCR model package:
-    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.2.5'
+    implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.3.0'
 }
 ```
 

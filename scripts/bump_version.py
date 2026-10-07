@@ -82,6 +82,9 @@ def update_json_file(file_path: Path, new_ver: str, dry_run: bool = False, stage
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
     
+    if "version" not in data:
+        return False
+
     data["version"] = new_ver
     
     # Handle package-lock.json v2/v3 structure
@@ -450,6 +453,8 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
     
     # 12. packages/dotnet/**/*.nuspec
     for nuspec_file in dotnet_dir.rglob("*.nuspec"):
+        if "bin" in nuspec_file.parts or "obj" in nuspec_file.parts:
+            continue
         replace_in_file(
             nuspec_file,
             r'(<version>)[^<]+(</version>)',
@@ -505,7 +510,27 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
 
-    # 16. CHANGELOG.md (auto-generated from git commits)
+    # 16. scripts/generate_npm_models.py fallback
+    if (REPO_ROOT / "scripts" / "generate_npm_models.py").exists():
+        replace_in_file(
+            REPO_ROOT / "scripts" / "generate_npm_models.py",
+            r'(return\s+")[0-9A-Za-z.-]+(")',
+            rf'\g<1>{new_ver}\g<2>',
+            dry_run,
+            staged_files
+        )
+
+    # 17. docs installation guides
+    for doc_file in (REPO_ROOT / "docs").rglob("2.installation.md"):
+        replace_in_file(
+            doc_file,
+            r'(rusto-rs\s*=\s*")[^"]+(")',
+            rf'\g<1>{new_ver}\g<2>',
+            dry_run,
+            staged_files
+        )
+
+    # 18. CHANGELOG.md (auto-generated from git commits)
     if (REPO_ROOT / "CHANGELOG.md").exists():
         update_changelog_file(
             REPO_ROOT / "CHANGELOG.md",

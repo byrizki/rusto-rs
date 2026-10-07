@@ -1,6 +1,6 @@
 {
   "name": "rusto-models-ppocrv6-medium",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "Pre-trained PP-OCRv6 Medium models (~24 MB) for RustO OCR",
   "keywords": [
     "ocr",
