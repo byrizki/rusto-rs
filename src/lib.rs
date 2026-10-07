@@ -1,14 +1,14 @@
 //! # RustO! - Pure Rust OCR Library
 //!
 //! RustO! is a high-performance OCR library written in pure Rust,
-//! powered by PaddleOCR models with MNN inference engine.
+//! powered by PaddleOCR models with RTen inference engine.
 //!
 //! ## Features
 //!
-//! - **Pure Rust**: Zero OpenCV dependency (optional OpenCV backend available)
+//! - **Pure Rust**: Zero OpenCV or C++ dependencies (optional OpenCV backend available)
 //! - **High Accuracy**: 99.3% parity with OpenCV-based implementations
 //! - **Fast Performance**: Optimized with LTO and aggressive compilation settings
-//! - **Cross-Platform**: Linux, macOS, Windows, Android, iOS support
+//! - **Cross-Platform**: Linux, macOS, Windows, Android, iOS, WASM support
 //! - **Memory Safe**: Leverages Rust's safety guarantees
 //!
 //! ## Quick Start
@@ -17,7 +17,7 @@
 //! use rusto::{DetectTextResult, ImageSource, OcrRunOptions, RustO, InitializeConfig};
 //!
 //! let mut ocr = RustO::initialize(InitializeConfig::ppv5(
-//!     "models/det.mnn", "models/rec.mnn", "models/dict.txt",
+//!     "models/det.rten", "models/rec.rten", "models/dict.txt",
 //! ))?;
 //! let result = ocr.detect_text(
 //!     &ImageSource::Path("image.jpg".into()),
@@ -34,20 +34,21 @@
 
 // Core modules
 mod cal_rec_boxes;
+pub mod calibration;
 pub mod config;
-mod det;
+pub mod det;
 pub mod doc_pipeline;
-mod engine;
-mod geometry;
+pub mod engine;
+pub mod geometry;
 pub mod image_impl;
 pub mod layout;
-mod orient;
-mod postprocess;
-mod preprocess;
-mod rec;
+pub mod orient;
+pub mod postprocess;
+pub mod preprocess;
+pub mod rec;
 pub mod rusto_ocr;
 pub mod table;
-mod types;
+pub mod types;
 
 #[cfg(not(feature = "use-opencv"))]
 mod contours;
@@ -57,6 +58,7 @@ mod contours;
 pub mod ffi;
 
 // Public API exports
+pub use calibration::{CalibrationOptions, OptimizationOptions};
 pub use config::{ModelPreset, InitializeConfig, PPV3_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG};
 pub use rusto_ocr::{DetectionRunOptions, PostprocessRunOptions};
 pub use det::TextDetector;
@@ -69,7 +71,7 @@ pub use table::{TableDetector, TableDetectorConfig, TableModelType, TableStructu
 pub use types::{ClsConfig, DetConfig, Frame, GlobalConfig, LayoutConfig, OrientConfig, RecConfig};
 
 // Re-export for easier access
-pub use crate::engine::EngineError;
+pub use crate::engine::{EngineError, EngineSession, InferenceSession, RtenSession};
 
 /// OCR text result with bounding box and frame
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

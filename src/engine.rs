@@ -1,14 +1,23 @@
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
-use mnn::{BackendConfig, ForwardType, Interpreter, PowerMode, PrecisionMode, ScheduleConfig};
 use ndarray::{Array, ArrayD};
+use rten::Model;
+use rten_tensor::prelude::*;
+use rten_tensor::Tensor as RtenTensor;
 
 use crate::types::{DetConfig, EngineConfig, RecConfig};
 
 #[derive(thiserror::Error, Debug)]
 pub enum EngineError {
-    #[error("MNN error: {0}")]
-    Mnn(#[from] mnn::MNNError),
+    #[error("RTen load error: {0}")]
+    Load(#[from] rten::LoadError),
+
+    #[error("RTen run error: {0}")]
+    Run(#[from] rten::RunError),
+
+    #[error("Engine error: {0}")]
+    Engine(String),
 
     #[cfg(feature = "use-opencv")]
     #[error("OpenCV error: {0}")]
@@ -36,26 +45,241 @@ impl From<Box<dyn std::error::Error>> for EngineError {
     }
 }
 
-pub struct MnnSession {
-    interpreter: Interpreter,
-    session: Option<mnn::Session>,
-    input_tensor_name: Option<String>,
-    output_tensor_name: Option<String>,
-    last_input_shape: Option<[i32; 4]>,
+/// Abstract inference session interface allowing alternative backends
+/// (e.g. RTen, ONNX Runtime, Tract, Candle, or custom hardware accelerators).
+pub trait InferenceSession: Send {
+    /// Execute inference with a single input tensor returning primary output tensor.
+    fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError>;
+
+    /// Execute inference with a single input tensor returning all named output tensors.
+    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, EngineError>;
+
+    /// Execute inference with named input tensors returning all named output tensors.
+    fn run_with_inputs(
+        &mut self,
+        inputs: HashMap<String, ArrayD<f32>>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError>;
+
+    /// Optional metadata lookup for embedded character list.
+    fn get_character_list(&self, _key: &str) -> Option<Vec<String>> {
+        None
+    }
+
+    /// Check if metadata key exists.
+    fn have_key(&self, _key: &str) -> bool {
+        false
+    }
 }
 
-impl Drop for MnnSession {
-    fn drop(&mut self) {
-        // Explicitly release the session before the interpreter is dropped
-        // This prevents segfault by ensuring proper cleanup order
-        if let Some(session) = self.session.take() {
-            // Release session before interpreter drops
-            drop(session);
+impl InferenceSession for Box<dyn InferenceSession> {
+    fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
+        (**self).run(input)
+    }
+
+    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        (**self).run_all(input)
+    }
+
+    fn run_with_inputs(
+        &mut self,
+        inputs: HashMap<String, ArrayD<f32>>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        (**self).run_with_inputs(inputs)
+    }
+
+    fn get_character_list(&self, key: &str) -> Option<Vec<String>> {
+        (**self).get_character_list(key)
+    }
+
+    fn have_key(&self, key: &str) -> bool {
+        (**self).have_key(key)
+    }
+}
+
+/// Generic engine session enum supporting both default pure-Rust RTen
+/// and any custom backend implementing `InferenceSession`.
+pub enum EngineSession {
+    Rten(RtenSession),
+    Custom(Box<dyn InferenceSession>),
+}
+
+impl EngineSession {
+    pub fn from_path(model_path: &Path, engine_cfg: &EngineConfig) -> Result<Self, EngineError> {
+        let session = RtenSession::from_path(model_path, engine_cfg)?;
+        Ok(Self::Rten(session))
+    }
+
+    pub fn from_det_config(cfg: &DetConfig) -> Result<Self, EngineError> {
+        Self::from_path(&cfg.model_path, &cfg.engine_cfg)
+    }
+
+    pub fn from_rec_config(cfg: &RecConfig) -> Result<Self, EngineError> {
+        Self::from_path(&cfg.model_path, &cfg.engine_cfg)
+    }
+
+    pub fn from_custom(session: impl InferenceSession + 'static) -> Self {
+        Self::Custom(Box::new(session))
+    }
+
+    pub fn from_boxed(session: Box<dyn InferenceSession>) -> Self {
+        Self::Custom(session)
+    }
+
+    pub fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
+        match self {
+            Self::Rten(s) => s.run(input),
+            Self::Custom(s) => s.run(input),
+        }
+    }
+
+    pub fn run_all(
+        &mut self,
+        input: ArrayD<f32>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        match self {
+            Self::Rten(s) => s.run_all(input),
+            Self::Custom(s) => s.run_all(input),
+        }
+    }
+
+    pub fn run_with_inputs(
+        &mut self,
+        inputs: HashMap<String, ArrayD<f32>>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        match self {
+            Self::Rten(s) => s.run_with_inputs(inputs),
+            Self::Custom(s) => s.run_with_inputs(inputs),
+        }
+    }
+
+    pub fn get_character_list(&self, key: &str) -> Option<Vec<String>> {
+        match self {
+            Self::Rten(s) => s.get_character_list(key),
+            Self::Custom(s) => s.get_character_list(key),
+        }
+    }
+
+    pub fn have_key(&self, key: &str) -> bool {
+        match self {
+            Self::Rten(s) => s.have_key(key),
+            Self::Custom(s) => s.have_key(key),
         }
     }
 }
 
-impl MnnSession {
+impl InferenceSession for EngineSession {
+    fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
+        self.run(input)
+    }
+
+    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        self.run_all(input)
+    }
+
+    fn run_with_inputs(
+        &mut self,
+        inputs: HashMap<String, ArrayD<f32>>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        self.run_with_inputs(inputs)
+    }
+
+    fn get_character_list(&self, key: &str) -> Option<Vec<String>> {
+        self.get_character_list(key)
+    }
+
+    fn have_key(&self, key: &str) -> bool {
+        self.have_key(key)
+    }
+}
+
+pub struct RtenSession {
+    model: Model,
+}
+
+fn resolve_model_path(path: &Path) -> PathBuf {
+    if path.exists() {
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            if ext.eq_ignore_ascii_case("rten") || ext.eq_ignore_ascii_case("onnx") {
+                return path.to_path_buf();
+            }
+        }
+    }
+
+    let rten_cand = path.with_extension("rten");
+    if rten_cand.exists() {
+        return rten_cand;
+    }
+
+    let onnx_cand = path.with_extension("onnx");
+    if onnx_cand.exists() {
+        return onnx_cand;
+    }
+
+    if path.exists() {
+        return path.to_path_buf();
+    }
+
+    if let Some(file_name) = path.file_name().and_then(|s| s.to_str()) {
+        let is_det = file_name.starts_with("det");
+        let is_rec = file_name.starts_with("rec");
+        let base = if is_det {
+            "det"
+        } else if is_rec {
+            "rec"
+        } else {
+            ""
+        };
+
+        if !base.is_empty() {
+            for dir in &["models/PPOCR_v6_tiny", "models/PPOCR_v6", "models"] {
+                let p_rten = PathBuf::from(format!("{}/{}.rten", dir, base));
+                if p_rten.exists() {
+                    return p_rten;
+                }
+                let p_onnx = PathBuf::from(format!("{}/{}.onnx", dir, base));
+                if p_onnx.exists() {
+                    return p_onnx;
+                }
+            }
+        }
+    }
+
+    path.to_path_buf()
+}
+
+fn convert_output_to_array(value: &rten::Value) -> Result<ArrayD<f32>, EngineError> {
+    match value {
+        rten::Value::FloatTensor(t) => {
+            let shape = t.shape().to_vec();
+            let data: Vec<f32> = t.iter().copied().collect();
+            let array = Array::from_shape_vec(shape, data)?;
+            Ok(array.into_dyn())
+        }
+        rten::Value::Int32Tensor(t) => {
+            let shape = t.shape().to_vec();
+            let data: Vec<f32> = t.iter().map(|&x| x as f32).collect();
+            let array = Array::from_shape_vec(shape, data)?;
+            Ok(array.into_dyn())
+        }
+        rten::Value::Int8Tensor(t) => {
+            let shape = t.shape().to_vec();
+            let data: Vec<f32> = t.iter().map(|&x| x as f32).collect();
+            let array = Array::from_shape_vec(shape, data)?;
+            Ok(array.into_dyn())
+        }
+        rten::Value::UInt8Tensor(t) => {
+            let shape = t.shape().to_vec();
+            let data: Vec<f32> = t.iter().map(|&x| x as f32).collect();
+            let array = Array::from_shape_vec(shape, data)?;
+            Ok(array.into_dyn())
+        }
+        _ => Err(EngineError::OutputError(
+            "Unsupported output tensor type".into(),
+        )),
+    }
+}
+
+impl RtenSession {
     pub fn from_det_config(cfg: &DetConfig) -> Result<Self, EngineError> {
         Self::from_path(&cfg.model_path, &cfg.engine_cfg)
     }
@@ -65,196 +289,86 @@ impl MnnSession {
     }
 
     pub fn from_path(model_path: &Path, _engine_cfg: &EngineConfig) -> Result<Self, EngineError> {
-        let interpreter = Interpreter::from_file(model_path)?;
-
-        Ok(Self {
-            interpreter,
-            session: None,
-            input_tensor_name: None,
-            output_tensor_name: None,
-            last_input_shape: None,
-        })
-    }
-
-    fn ensure_session(&mut self) -> Result<(), EngineError> {
-        if self.session.is_none() {
-            let mut config = ScheduleConfig::new();
-            config.set_type(ForwardType::Auto);
-
-            let mut backend_config = BackendConfig::new();
-            backend_config.set_precision_mode(PrecisionMode::High);
-            backend_config.set_power_mode(PowerMode::High);
-
-            config.set_backend_config(backend_config);
-
-            let session = self.interpreter.create_session(config)?;
-            self.session = Some(session);
-        }
-        Ok(())
+        let resolved = resolve_model_path(model_path);
+        let model = Model::load_file(&resolved)?;
+        Ok(Self { model })
     }
 
     pub fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
-        self.ensure_session()?;
-
-        // Get tensor names if not cached
-        if self.input_tensor_name.is_none() || self.output_tensor_name.is_none() {
-            let session = self.session.as_ref().unwrap();
-            let inputs = self.interpreter.inputs(session);
-            let outputs = self.interpreter.outputs(session);
-
-            let input_info = inputs.iter().next().unwrap();
-            let output_info = outputs.iter().next().unwrap();
-
-            self.input_tensor_name = Some(input_info.name().to_string());
-            self.output_tensor_name = Some(output_info.name().to_string());
-        }
-
-        let input_tensor_name = self.input_tensor_name.as_ref().unwrap();
-        let output_tensor_name = self.output_tensor_name.as_ref().unwrap();
-
-        let input_shape = input.shape();
-        let new_shape: [i32; 4] = [
-            input_shape[0] as i32,
-            input_shape[1] as i32,
-            input_shape[2] as i32,
-            input_shape[3] as i32,
-        ];
-
-        // Resize if shape changed
-        let need_resize = self
-            .last_input_shape
-            .map(|last_shape| last_shape != new_shape)
-            .unwrap_or(true);
-
-        if need_resize {
-            let session = self.session.as_mut().unwrap();
-            let mut input_tensor = unsafe {
-                self.interpreter
-                    .input_unresized::<f32>(session, input_tensor_name)?
-            };
-
-            self.interpreter.resize_tensor(&mut input_tensor, &new_shape);
-            drop(input_tensor);
-            self.interpreter.resize_session(session);
-
-            self.last_input_shape = Some(new_shape);
-        }
-
-        // Run inference
-        let (output_data, output_shape) = {
-            let session = self.session.as_mut().unwrap();
-            let mut input_tensor = self.interpreter.input::<f32>(session, input_tensor_name)?;
-
-            // Copy input data
-            if let Some(flat_data) = input.as_slice() {
-                // Use explicit NCHW host tensor to ensure correct layout
-                let shape = input_tensor.shape();
-                let mut host_tensor = mnn::Tensor::new_host(&shape);
-                let host_data_mut = host_tensor.host_mut();
-                host_data_mut.copy_from_slice(flat_data);
-                input_tensor.copy_from_host_tensor(&host_tensor)?;
-            } else {
-                let shape = input_tensor.shape();
-                let mut host_tensor = mnn::Tensor::new_host(&shape);
-                let host_data_mut = host_tensor.host_mut();
-                for (i, val) in input.iter().enumerate() {
-                    host_data_mut[i] = *val;
-                }
-                input_tensor.copy_from_host_tensor(&host_tensor)?;
-            }
-
-            self.interpreter.run_session(session)?;
-
-            let output = self
-                .interpreter
-                .output::<f32>(session, output_tensor_name)?;
-            output.wait(mnn::ffi::MapType::MAP_TENSOR_READ, true);
-
-            let shape = output.shape();
-            // Use explicit NCHW host tensor for output as well
-            let mut output_host_tensor = mnn::Tensor::new_host(&shape);
-            output.copy_to_host_tensor(&mut output_host_tensor)?;
-
-            (output_host_tensor.host().to_vec(), shape)
+        let shape: Vec<usize> = input.shape().to_vec();
+        let data: Vec<f32> = if let Some(slice) = input.as_slice() {
+            slice.to_vec()
+        } else {
+            input.iter().copied().collect()
         };
 
-        // Convert to ndarray
-        let output_shape_usize: Vec<usize> = output_shape.iter().map(|&x| x as usize).collect();
-        let output_array = Array::from_shape_vec(output_shape_usize, output_data)?;
+        let tensor = RtenTensor::<f32>::from_data(&shape, data);
+        let in_ids = self.model.input_ids();
+        if in_ids.is_empty() {
+            return Err(EngineError::OutputError("Model has no inputs".into()));
+        }
+        let in_id = in_ids[0];
 
-        Ok(output_array.into_dyn())
+        let out_ids = self.model.output_ids();
+        let outputs = self.model.run(
+            vec![(in_id, tensor.view().into())],
+            out_ids,
+            None,
+        )?;
+
+        if outputs.is_empty() {
+            return Err(EngineError::OutputError("Model produced no outputs".into()));
+        }
+
+        convert_output_to_array(&outputs[0])
     }
 
     pub fn run_with_inputs(
         &mut self,
-        inputs_map: std::collections::HashMap<String, ArrayD<f32>>,
-    ) -> Result<std::collections::HashMap<String, ArrayD<f32>>, EngineError> {
-        self.ensure_session()?;
-        let session = self.session.as_mut().unwrap();
+        inputs_map: HashMap<String, ArrayD<f32>>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        let mut rten_tensors = Vec::new();
 
-        // Resize all inputs first if needed
-        let mut resized_any = false;
         for (name, input) in &inputs_map {
-            let input_shape = input.shape();
-            let shape_vec: Vec<i32> = input_shape.iter().map(|&x| x as i32).collect();
-            
-            let mut input_tensor = unsafe {
-                self.interpreter.input_unresized::<f32>(session, name)?
-            };
-            
-            let current_shape = input_tensor.shape();
-            if current_shape != shape_vec {
-                self.interpreter.resize_tensor(&mut input_tensor, &shape_vec);
-                resized_any = true;
-            }
-            drop(input_tensor);
-        }
-        
-        if resized_any {
-            self.interpreter.resize_session(session);
-        }
-
-        // Copy input data to tensors
-        for (name, input) in &inputs_map {
-            let mut input_tensor = self.interpreter.input::<f32>(session, name)?;
-            let shape = input_tensor.shape();
-            
-            // Create NCHW host tensor
-            let mut host_tensor = mnn::Tensor::new_host(&shape);
-            let host_data_mut = host_tensor.host_mut::<f32>();
-            
-            // Copy input data
-            if let Some(flat_data) = input.as_slice() {
-                host_data_mut.copy_from_slice(flat_data);
+            let node_id = if let Some(id) = self.model.find_node(name) {
+                id
+            } else if inputs_map.len() == 1 && !self.model.input_ids().is_empty() {
+                self.model.input_ids()[0]
             } else {
-                for (i, val) in input.iter().enumerate() {
-                    host_data_mut[i] = *val;
-                }
-            }
-            
-            input_tensor.copy_from_host_tensor(&host_tensor)?;
+                return Err(EngineError::OutputError(format!(
+                    "Input node '{}' not found in model",
+                    name
+                )));
+            };
+
+            let shape: Vec<usize> = input.shape().to_vec();
+            let data: Vec<f32> = if let Some(slice) = input.as_slice() {
+                slice.to_vec()
+            } else {
+                input.iter().copied().collect()
+            };
+            rten_tensors.push((node_id, RtenTensor::<f32>::from_data(&shape, data)));
         }
 
-        self.interpreter.run_session(session)?;
+        let input_pairs: Vec<(rten::NodeId, rten::ValueOrView)> = rten_tensors
+            .iter()
+            .map(|(node_id, tensor)| (*node_id, tensor.view().into()))
+            .collect();
 
-        // Retrieve all outputs
-        let outputs = self.interpreter.outputs(session);
-        let mut results = std::collections::HashMap::new();
+        let out_ids = self.model.output_ids();
+        let outputs = self.model.run(input_pairs, out_ids, None)?;
 
-        for info in &outputs {
-            let name = info.name();
-            let output = self.interpreter.output::<f32>(session, name)?;
-            output.wait(mnn::ffi::MapType::MAP_TENSOR_READ, true);
-
-            let shape = output.shape();
-            let mut output_host_tensor = mnn::Tensor::new_host(&shape);
-            output.copy_to_host_tensor(&mut output_host_tensor)?;
-
-            let output_data = output_host_tensor.host().to_vec();
-            let output_shape_usize: Vec<usize> = shape.iter().map(|&x| x as usize).collect();
-            let output_array = Array::from_shape_vec(output_shape_usize, output_data)?;
-
-            results.insert(name.to_string(), output_array.into_dyn());
+        let mut results = HashMap::new();
+        for (i, out_id) in out_ids.iter().enumerate() {
+            let name = self
+                .model
+                .node_info(*out_id)
+                .and_then(|info| info.name().map(|s| s.to_string()))
+                .unwrap_or_else(|| format!("output_{}", i));
+            if let Some(out_val) = outputs.get(i) {
+                let array = convert_output_to_array(out_val)?;
+                results.insert(name, array);
+            }
         }
 
         Ok(results)
@@ -263,100 +377,74 @@ impl MnnSession {
     pub fn run_all(
         &mut self,
         input: ArrayD<f32>,
-    ) -> Result<std::collections::HashMap<String, ArrayD<f32>>, EngineError> {
-        self.ensure_session()?;
-
-        // Get input tensor name if not cached
-        if self.input_tensor_name.is_none() {
-            let session = self.session.as_ref().unwrap();
-            let inputs = self.interpreter.inputs(session);
-            let input_info = inputs.iter().next().unwrap();
-            let name = input_info.name();
-            self.input_tensor_name = Some(name.to_string());
-        }
-
-        let input_tensor_name = self.input_tensor_name.as_ref().unwrap();
-
-        let input_shape = input.shape();
-        let new_shape: [i32; 4] = [
-            input_shape[0] as i32,
-            input_shape[1] as i32,
-            input_shape[2] as i32,
-            input_shape[3] as i32,
-        ];
-
-        // Resize if shape changed
-        let need_resize = self
-            .last_input_shape
-            .map(|last_shape| last_shape != new_shape)
-            .unwrap_or(true);
-
-        if need_resize {
-            let session = self.session.as_mut().unwrap();
-            let mut input_tensor = unsafe {
-                self.interpreter
-                    .input_unresized::<f32>(session, input_tensor_name)?
-            };
-
-            self.interpreter.resize_tensor(&mut input_tensor, &new_shape);
-            drop(input_tensor);
-            self.interpreter.resize_session(session);
-
-            self.last_input_shape = Some(new_shape);
-        }
-
-        // Run inference
-        let session = self.session.as_mut().unwrap();
-        let mut input_tensor = self.interpreter.input::<f32>(session, input_tensor_name)?;
-
-        // Copy input data
-        if let Some(flat_data) = input.as_slice() {
-            let shape = input_tensor.shape();
-            let mut host_tensor = mnn::Tensor::new_host(&shape);
-            let host_data_mut = host_tensor.host_mut();
-            host_data_mut.copy_from_slice(flat_data);
-            input_tensor.copy_from_host_tensor(&host_tensor)?;
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        let shape: Vec<usize> = input.shape().to_vec();
+        let data: Vec<f32> = if let Some(slice) = input.as_slice() {
+            slice.to_vec()
         } else {
-            let shape = input_tensor.shape();
-            let mut host_tensor = mnn::Tensor::new_host(&shape);
-            let host_data_mut = host_tensor.host_mut();
-            for (i, val) in input.iter().enumerate() {
-                host_data_mut[i] = *val;
-            }
-            input_tensor.copy_from_host_tensor(&host_tensor)?;
+            input.iter().copied().collect()
+        };
+
+        let tensor = RtenTensor::<f32>::from_data(&shape, data);
+        let in_ids = self.model.input_ids();
+        if in_ids.is_empty() {
+            return Err(EngineError::OutputError("Model has no inputs".into()));
         }
+        let in_id = in_ids[0];
 
-        self.interpreter.run_session(session)?;
+        let out_ids = self.model.output_ids();
+        let outputs = self.model.run(
+            vec![(in_id, tensor.view().into())],
+            out_ids,
+            None,
+        )?;
 
-        // Retrieve all outputs
-        let outputs = self.interpreter.outputs(session);
-        let mut results = std::collections::HashMap::new();
-
-        for info in &outputs {
-            let name = info.name();
-            let output = self.interpreter.output::<f32>(session, name)?;
-            output.wait(mnn::ffi::MapType::MAP_TENSOR_READ, true);
-
-            let shape = output.shape();
-            let mut output_host_tensor = mnn::Tensor::new_host(&shape);
-            output.copy_to_host_tensor(&mut output_host_tensor)?;
-
-            let output_data = output_host_tensor.host().to_vec();
-            let output_shape_usize: Vec<usize> = shape.iter().map(|&x| x as usize).collect();
-            let output_array = Array::from_shape_vec(output_shape_usize, output_data)?;
-
-            results.insert(name.to_string(), output_array.into_dyn());
+        let mut results = HashMap::new();
+        for (i, out_id) in out_ids.iter().enumerate() {
+            let name = self
+                .model
+                .node_info(*out_id)
+                .and_then(|info| info.name().map(|s| s.to_string()))
+                .unwrap_or_else(|| format!("output_{}", i));
+            if let Some(out_val) = outputs.get(i) {
+                let array = convert_output_to_array(out_val)?;
+                results.insert(name, array);
+            }
         }
 
         Ok(results)
     }
 
     pub fn get_character_list(&self, _key: &str) -> Option<Vec<String>> {
-        // MNN models don't typically embed character lists in metadata
         None
     }
 
     pub fn have_key(&self, _key: &str) -> bool {
         false
+    }
+}
+
+impl InferenceSession for RtenSession {
+    fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
+        self.run(input)
+    }
+
+    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        self.run_all(input)
+    }
+
+    fn run_with_inputs(
+        &mut self,
+        inputs: HashMap<String, ArrayD<f32>>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        self.run_with_inputs(inputs)
+    }
+
+    fn get_character_list(&self, key: &str) -> Option<Vec<String>> {
+        self.get_character_list(key)
+    }
+
+    fn have_key(&self, key: &str) -> bool {
+        self.have_key(key)
     }
 }

@@ -15,14 +15,14 @@
 
 </div>
 
-**RustO!** is a high-performance Optical Character Recognition (OCR) engine and cross-platform toolkit written in pure Rust. Based on [RapidOCR](https://github.com/RapidAI/RapidOCR) and powered by [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) models with Alibaba's [MNN](https://github.com/alibaba/MNN) lightweight inference backend, RustO! delivers sub-second inference speeds, ultra-low memory overhead, and 99.3%+ parity with OpenCV-based solutions.
+**RustO!** is a high-performance Optical Character Recognition (OCR) engine and cross-platform toolkit written in pure Rust. Based on [RapidOCR](https://github.com/RapidAI/RapidOCR) and powered by [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) models with the pure-Rust [RTen](https://github.com/robertknight/rten) inference engine (supporting both `.rten` FlatBuffers and standard `.onnx`), RustO! delivers sub-second inference speeds, ultra-low memory overhead, zero C++ / CMake build dependencies, and 99.3%+ parity with OpenCV-based solutions.
 
 ---
 
 ## 🎯 Key Features
 
-- **🚀 Pure Rust Core** — Zero OpenCV dependency. Includes pure Rust image processing, DBNet polygon contour detection, and unclip algorithms.
-- **⚡ Blazing Fast & Lightweight** — Powered by the lightweight MNN inference engine, optimized with link-time optimization (LTO) and single codegen unit compilation.
+- **🚀 100% Pure Rust Core** — Zero OpenCV and zero C++ dependencies. Powered by pure-Rust RTen inference, image processing, DBNet polygon contour detection, and unclip algorithms.
+- **⚡ Blazing Fast & Lightweight** — Pure-Rust vector-accelerated inference with SIMD optimizations (AVX, NEON), link-time optimization (LTO), and single codegen unit compilation.
 - **📄 Spatial Layout Text Reconstruction** — Reconstructs human-readable document layouts (multi-column tables, invoices, forms) with configurable visual XY spatial spacing.
 - **🧠 Full Model Series Support** — Seamless support for **PP-OCRv6** (Tiny, Small, Medium), **PP-OCRv5** (Mobile, Server), and **PP-OCRv4** (Mobile, Server) with orientation classification.
 - **📦 Modular Distribution** — Core runtimes are stripped of forced model bloat. Users can choose pre-packaged model tiers or bring their own custom models.
@@ -50,7 +50,7 @@
 ```rust
 use rusto::{DetectTextResult, DetectionRunOptions, ImageSource, InitializeConfig, OcrRunOptions, PostprocessRunOptions, RustO};
 
-let mut ocr = RustO::initialize(InitializeConfig::ppv6("det.mnn", "rec.mnn", "dict.txt"))?;
+let mut ocr = RustO::initialize(InitializeConfig::ppv6("det.rten", "rec.rten", "dict.txt"))?;
 match ocr.detect_text(&ImageSource::Path("document.jpg".into()), &OcrRunOptions::default())? {
     DetectTextResult::Structured(results) => println!("{:?}", results),
     DetectTextResult::Spatial(text) => println!("{text}"),
@@ -171,20 +171,20 @@ RustO.initialize(context).use { ocr ->
 
 ```bash
 # JSON output (default)
-cargo run --release -- --det-model det.mnn --rec-model rec.mnn --dict dict.txt image.jpg
+cargo run --release -- --det-model det.rten --rec-model rec.rten --dict dict.txt image.jpg
 
 # Ordered text output
-cargo run --release -- --det-model det.mnn --rec-model rec.mnn --dict dict.txt --format text-ordered image.jpg
+cargo run --release -- --det-model det.rten --rec-model rec.rten --dict dict.txt --format text-ordered image.jpg
 
 # TSV / Plain text output
-cargo run --release -- --det-model det.mnn --rec-model rec.mnn --dict dict.txt --format tsv image.jpg
+cargo run --release -- --det-model det.rten --rec-model rec.rten --dict dict.txt --format tsv image.jpg
 ```
 
 ---
 
 ## 🧠 Supported OCR Models & Tiers
 
-RustO! supports all PaddleOCR model series in lightweight MNN format:
+RustO! supports all PaddleOCR model series in lightweight RTen format:
 
 | Series | Tier / Variant | Total Size | Description |
 |---|---|---|---|
@@ -199,7 +199,7 @@ RustO! supports all PaddleOCR model series in lightweight MNN format:
 ### 🌐 Multi-Language Support Across Model Versions
 
 - **PP-OCRv6 (Recommended Default)**: Uses a **unified 50-language dictionary** (`ppocrv6_dict.txt`) and multilingual model architecture. All language scripts (Latin, Cyrillic, CJK, Devanagari, Arabic, etc.) are supported out-of-the-box in the base `PPOCRv6` packages without needing separate language model downloads.
-- **PP-OCRv5 & PP-OCRv4**: Use dedicated language recognition models (`rec.mnn` + `dict.txt`) for specific non-Chinese scripts. Text detection (`det.mnn`) remains language-agnostic.
+- **PP-OCRv5 & PP-OCRv4**: Use dedicated language recognition models (`rec.rten` + `dict.txt`) for specific non-Chinese scripts. Text detection (`det.rten`) remains language-agnostic.
 
 #### PP-OCRv5 Language Packages
 
@@ -218,7 +218,7 @@ RustO! supports all PaddleOCR model series in lightweight MNN format:
 
 #### PP-OCRv4 Language Packages
 
-PP-OCRv4 specialized recognition packages pair a language-specific `rec.mnn` + `dict.txt` with language-agnostic PP-OCRv4 detection. Install matching package for target platform:
+PP-OCRv4 specialized recognition packages pair a language-specific `rec.rten` + `dict.txt` with language-agnostic PP-OCRv4 detection. Install matching package for target platform:
 
 | Language / Script | Key | Rec Size | Android Package | iOS Podspec | .NET NuGet Package |
 |---|---|---:|---|---|---|
@@ -260,8 +260,8 @@ Do not put per-image preprocessing under initialization or a nested `preprocessi
 use rusto::{InitializeConfig, RustO};
 
 let config = InitializeConfig::ppv6(
-    "models/det.mnn",
-    "models/rec.mnn",
+    "models/det.rten",
+    "models/rec.rten",
     "models/dict.txt",
 );
 let mut ocr = RustO::initialize(config)?;
@@ -322,7 +322,7 @@ Full public reference, validation ranges, source contracts, result shapes, and b
 
 Tested on standard document images across platforms:
 
-| Aspect | RustO! (MNN Backend) | OpenCV / C++ Implementations |
+| Aspect | RustO! (RTen Pure Rust Backend) | OpenCV / C++ Implementations |
 |---|---|---|
 | **Speed** | ⚡ **~80ms** det / **~120ms** rec | ~85ms det / ~125ms rec (±5%) |
 | **Accuracy Parity** | 🎯 **99.3%+** | Baseline (100%) |
@@ -392,7 +392,7 @@ This project is licensed under the [MIT License](LICENSE).
 RustO! is inspired by and builds upon the incredible work of:
 - **[RapidOCR](https://github.com/RapidAI/RapidOCR)** — Architecture and OCR pipeline reference
 - **[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)** — State-of-the-art OCR models (PP-OCRv6, PP-OCRv5, PP-OCRv4)
-- **[Alibaba MNN](https://github.com/alibaba/MNN)** — Ultra-fast, lightweight deep learning inference engine
+- **[RTen](https://github.com/robertknight/rten)** — Pure Rust deep learning inference engine
 - **Rust Community** — `image`, `imageproc`, `nalgebra`, and `rayon` crates
 
 ---
@@ -407,6 +407,6 @@ If you use RustO! in your research or commercial application, please consider ci
   author = {Rizki & Contributors},
   year = {2024},
   url = {https://github.com/byrizki/rusto-rs},
-  note = {Based on RapidOCR and powered by PaddleOCR models with MNN inference}
+  note = {Based on RapidOCR and powered by PaddleOCR models with pure Rust RTen inference}
 }
 ```

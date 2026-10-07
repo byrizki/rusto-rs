@@ -29,7 +29,7 @@ struct Cli {
     #[arg(long)]
     enable_orient: bool,
 
-    /// Path to orientation classification model (lcnet.mnn)
+    /// Path to orientation classification model (lcnet.rten)
     #[arg(long)]
     orient_model: Option<PathBuf>,
 
@@ -37,7 +37,7 @@ struct Cli {
     #[arg(long)]
     enable_unwarp: bool,
 
-    /// Path to text unwarping model (uvdoc.mnn)
+    /// Path to text unwarping model (uvdoc.rten)
     #[arg(long)]
     unwarp_model: Option<PathBuf>,
     // Layout detection removed

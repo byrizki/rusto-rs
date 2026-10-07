@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/mnn-sys", "crates/mnn"]
+members = [".", "crates/rten-wasm"]
 
 [package]
 name = "rusto-rs"
@@ -8,7 +8,7 @@ edition = "2021"
 description = "RustO! - Pure Rust OCR library based on RapidOCR with PaddleOCR engine"
 license = "MIT"
 repository = "https://github.com/byrizki/rusto-rs"
-keywords = ["ocr", "paddle", "mnn", "computer-vision", "text-recognition"]
+keywords = ["ocr", "paddle", "rten", "computer-vision", "text-recognition"]
 categories = ["computer-vision", "text-processing"]
 include = [
     "/src/**",
@@ -40,8 +40,9 @@ nalgebra = "0.33"
 # Optional OpenCV backend
 opencv = { version = "0.97.2", optional = true }
 
-# Local MNN bindings
-mnn = { package = "rusto-mnn", path = "crates/mnn", version = "0.2.5" }
+# Pure Rust inference engine
+rten = { version = "0.27.0", features = ["onnx_format", "rten_format"] }
+rten-tensor = "0.27.0"
 
 # JNI bindings for Android
 jni = { version = "0.21", optional = true }
@@ -54,20 +55,16 @@ default = []
 use-opencv = ["opencv"]
 ffi = ["dep:jni"]  # Enable C FFI and JNI bindings
 
-# Features
-build-from-source = ["mnn/build-from-source"]
-
-# MNN GPU/Accelerator backends
-metal = ["mnn/metal"]
-coreml = ["mnn/coreml"]
-opencl = ["mnn/opencl"]
-vulkan = ["mnn/vulkan"]
-cuda = ["mnn/cuda"]
-
-# MNN Mobile NPU backends
-nnapi = ["mnn/nnapi"]
-hiai = ["mnn/hiai"]
-qnn = ["mnn/qnn"]
+# Feature stubs for backwards compatibility
+build-from-source = []
+metal = []
+coreml = []
+opencl = []
+vulkan = []
+cuda = []
+nnapi = []
+hiai = []
+qnn = []
  
 [profile.dev]
 # Faster dev builds

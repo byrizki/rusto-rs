@@ -1,6 +1,3 @@
-[submodule "vendor/mnn"]
-	path = vendor/mnn
-	url = https://github.com/alibaba/MNN.git
 [submodule "vendor/paddlex"]
 	path = vendor/paddlex
 	url = https://github.com/PaddlePaddle/PaddleX.git
