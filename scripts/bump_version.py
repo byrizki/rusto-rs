@@ -357,51 +357,19 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
     print(f"\nUpdating version to '{new_ver}' across repository files...")
     staged_files: Set[Path] = set()
     
-    # 1. Cargo.toml (root package and mnn dependency)
+    # 1. Cargo.toml (root package)
     replace_in_file(
         REPO_ROOT / "Cargo.toml",
-        r'(?ms)(\[package\](?:(?!\[).)*?\bversion\s*=\s*")[^"]+(")',
-        rf'\g<1>{new_ver}\g<2>',
-        dry_run,
-        staged_files
-    )
-    replace_in_file(
-        REPO_ROOT / "Cargo.toml",
-        r'(mnn\s*=\s*\{[^}]*version\s*=\s*")[^"]+(")',
-        rf'\g<1>{new_ver}\g<2>',
-        dry_run,
-        staged_files
-    )
-    
-    # 2. crates/mnn/Cargo.toml (package and mnn-sys dependency)
-    replace_in_file(
-        REPO_ROOT / "crates" / "mnn" / "Cargo.toml",
-        r'(?ms)(\[package\](?:(?!\[).)*?\bversion\s*=\s*")[^"]+(")',
-        rf'\g<1>{new_ver}\g<2>',
-        dry_run,
-        staged_files
-    )
-    replace_in_file(
-        REPO_ROOT / "crates" / "mnn" / "Cargo.toml",
-        r'(mnn-sys\s*=\s*\{[^}]*version\s*=\s*")[^"]+(")',
-        rf'\g<1>{new_ver}\g<2>',
-        dry_run,
-        staged_files
-    )
-    
-    # 3. crates/mnn-sys/Cargo.toml
-    replace_in_file(
-        REPO_ROOT / "crates" / "mnn-sys" / "Cargo.toml",
         r'(?ms)(\[package\](?:(?!\[).)*?\bversion\s*=\s*")[^"]+(")',
         rf'\g<1>{new_ver}\g<2>',
         dry_run,
         staged_files
     )
 
-    # 4. crates/mnn-sys/build.rs (default fallback version)
+    # 2. crates/rten-wasm/Cargo.toml
     replace_in_file(
-        REPO_ROOT / "crates" / "mnn-sys" / "build.rs",
-        r'(CARGO_PKG_VERSION"\)\.unwrap_or_else\(\|\_\s*\|\s*")[^"]+("\.to_string\(\)\))',
+        REPO_ROOT / "crates" / "rten-wasm" / "Cargo.toml",
+        r'(?ms)(\[package\](?:(?!\[).)*?\bversion\s*=\s*")[^"]+(")',
         rf'\g<1>{new_ver}\g<2>',
         dry_run,
         staged_files

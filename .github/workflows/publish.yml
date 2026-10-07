@@ -75,12 +75,9 @@ jobs:
             done
           }
           
-          publish_crate rusto-mnn-sys
-          sleep 20
-          publish_crate rusto-mnn
-          sleep 20
           publish_crate rusto-rs
-
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   # Publish to NuGet
   publish-nuget:
@@ -130,19 +127,25 @@ jobs:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
           
-      - name: Download NPM package from release
+      - name: Download NPM packages from release
         run: |
           VERSION="${{ github.event.inputs.version || github.ref_name }}"
           VERSION="${VERSION#v}"
           
-          # Download tgz from GitHub release
-          gh release download "v${VERSION}" -p "*.tgz" -D packages/react-native/ || true
+          mkdir -p npm-packages
+          # Download all tgz from GitHub release
+          gh release download "v${VERSION}" -p "*.tgz" -D npm-packages/ || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
       - name: Publish to NPM
-        working-directory: packages/react-native
-        run: npm publish *.tgz
+        run: |
+          for pkg in npm-packages/*.tgz; do
+            if [ -f "$pkg" ]; then
+              echo "Publishing $pkg..."
+              npm publish "$pkg" --access public || true
+            fi
+          done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         continue-on-error: true

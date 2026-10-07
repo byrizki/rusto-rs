@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'docs/**'
+      - 'packages/web/**'
       - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
 
@@ -26,10 +27,10 @@ jobs:
         working-directory: docs
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: '24.x'
 
@@ -43,7 +44,7 @@ jobs:
         run: NUXT_APP_BASE_URL=/rusto-rs/ yarn build
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./docs/.output/public
 
@@ -57,4 +58,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v4

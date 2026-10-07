@@ -40,31 +40,11 @@ jobs:
 
       - name: Setup environment
         run: |
-          echo "Building MNN from source"
           echo "IPHONEOS_DEPLOYMENT_TARGET=12.0" >> $GITHUB_ENV
           echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
 
       - name: Build for iOS target
         run: cargo build --release --target ${{ matrix.target }} --features ffi
-
-      - name: Package MNN static prebuilt
-        shell: bash
-        run: |
-          mkdir -p mnn-prebuilt-pkg
-          LIB_MNN=$(find target/${{ matrix.target }}/release/build -type f -name "libMNN.a" | head -n 1)
-          if [ -n "$LIB_MNN" ]; then
-            cp "$LIB_MNN" mnn-prebuilt-pkg/
-            tar -czf "mnn-static-${{ matrix.target }}.tar.gz" -C mnn-prebuilt-pkg $(basename "$LIB_MNN")
-          else
-            echo "::warning::libMNN static library not found for ${{ matrix.target }}"
-          fi
-
-      - name: Upload MNN prebuilt artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: mnn-static-${{ matrix.target }}
-          path: mnn-static-${{ matrix.target }}.tar.gz
-          if-no-files-found: ignore
 
       - name: Upload iOS target library
         uses: actions/upload-artifact@v4
@@ -248,25 +228,6 @@ jobs:
           AR_x86_64_linux_android: llvm-ar
         run: cargo build --release --target ${{ matrix.target }} --features ffi
 
-      - name: Package MNN static prebuilt
-        shell: bash
-        run: |
-          mkdir -p mnn-prebuilt-pkg
-          LIB_MNN=$(find target/${{ matrix.target }}/release/build -type f -name "libMNN.a" | head -n 1)
-          if [ -n "$LIB_MNN" ]; then
-            cp "$LIB_MNN" mnn-prebuilt-pkg/
-            tar -czf "mnn-static-${{ matrix.target }}.tar.gz" -C mnn-prebuilt-pkg $(basename "$LIB_MNN")
-          else
-            echo "::warning::libMNN static library not found for ${{ matrix.target }}"
-          fi
-
-      - name: Upload MNN prebuilt artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: mnn-static-${{ matrix.target }}
-          path: mnn-static-${{ matrix.target }}.tar.gz
-          if-no-files-found: ignore
-
       - name: Upload Android target library
         uses: actions/upload-artifact@v4
         with:
@@ -416,25 +377,6 @@ jobs:
           cp target/${{ matrix.rust_target }}/release/${{ matrix.lib }} \
              packages/dotnet/runtimes/${{ matrix.target }}/native/
 
-      - name: Package MNN static prebuilt
-        shell: bash
-        run: |
-          mkdir -p mnn-prebuilt-pkg
-          LIB_MNN=$(find target/${{ matrix.rust_target }}/release/build -type f \( -name "libMNN.a" -o -name "MNN.lib" \) | head -n 1)
-          if [ -n "$LIB_MNN" ]; then
-            cp "$LIB_MNN" mnn-prebuilt-pkg/
-            tar -czf "mnn-static-${{ matrix.rust_target }}.tar.gz" -C mnn-prebuilt-pkg $(basename "$LIB_MNN")
-          else
-            echo "::warning::libMNN static library not found for ${{ matrix.rust_target }}"
-          fi
-
-      - name: Upload MNN prebuilt artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: mnn-static-${{ matrix.rust_target }}
-          path: mnn-static-${{ matrix.rust_target }}.tar.gz
-          if-no-files-found: ignore
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -552,9 +494,9 @@ jobs:
           name: rusto-dotnet-model-nupkgs
           path: artifacts/dotnet-models/
 
-  # package React Native
+  # package NPM packages (React Native, Web, React)
   package-react-native:
-    name: Package React Native
+    name: Package NPM Packages
     runs-on: ubuntu-22.04
 
     steps:
@@ -569,11 +511,25 @@ jobs:
       - name: Verify Yarn Classic
         run: yarn --version
 
+      - name: Build and pack rusto-web
+        working-directory: packages/web
+        run: |
+          npm install
+          npm run build
+          npm pack --pack-destination ..
+
+      - name: Build and pack react-rusto
+        working-directory: packages/react
+        run: |
+          npm install
+          npm run build
+          npm pack --pack-destination ..
+
       - name: Install React Native package build dependencies
         working-directory: packages/react-native
         run: yarn install --ignore-scripts --non-interactive
 
-      - name: Build and pack NPM package
+      - name: Build and pack React Native package
         working-directory: packages/react-native
         run: |
           yarn prepare
@@ -583,7 +539,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rusto-react-native-package
-          path: packages/react-native-rusto.tgz
+          path: |
+            packages/react-native-rusto.tgz
+            packages/rusto-web-*.tgz
+            packages/react-rusto-*.tgz
 
   # Create GitHub Release
   binding-examples:
@@ -649,12 +608,6 @@ jobs:
              cp rusto-react-native-package/*.tgz ../releases/ || true
           fi
 
-          for f in mnn-static-*/*.tar.gz; do
-            if [ -f "$f" ]; then
-              cp "$f" ../releases/ || true
-            fi
-          done
-
       - name: Generate checksums
         working-directory: releases
         run: |
@@ -687,8 +640,8 @@ jobs:
 
             ### Highlights
             - Pure Rust OCR library powered by PaddleOCR models
-            - Uses MNN inference engine for optimal performance
-            - Cross-platform support (Linux, macOS, Windows, iOS, Android, .NET)
+            - Uses RTen pure-Rust neural network engine for optimal inference performance
+            - Cross-platform support (Linux, macOS, Windows, iOS, Android, .NET, Web/WASM, React)
             - Includes bundled model files and dictionary files
 
             ### Platform Support
@@ -698,15 +651,16 @@ jobs:
             - **iOS**: Universal XCFramework (device + simulator)
             - **Android**: AAR with all architectures (arm64-v8a, armeabi-v7a, x86, x86_64)
             - **.NET**: NuGet package with native libraries for all desktop platforms
-            - **React Native**: NPM package with bundled binaries
+            - **NPM / React Native**: React Native bindings (`react-native-rusto`)
+            - **NPM / Web**: WebAssembly engine (`rusto-web`) and React UI hooks (`react-rusto`)
 
             ### Installation
             Download the appropriate package for your platform and extract it.
             See SHA256SUMS for file verification.
 
             ### Inference Engine
-            - Uses MNN (Mobile Neural Network) for efficient inference
-            - Includes pre-converted PaddleOCR models in MNN format
+            - Uses RTen pure-Rust inference engine
+            - Supports PaddleOCR models in ONNX and RTen formats
             - Supports multiple languages via included dictionary files
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
