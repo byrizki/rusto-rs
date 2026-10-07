@@ -45,7 +45,7 @@ fn test_text_result_serde() {
 
 #[test]
 fn test_rusto_config_builders() {
-    let config = InitializeConfig::new("det.mnn", "rec.mnn", "dict.txt")
+    let config = InitializeConfig::new("det.rten", "rec.rten", "dict.txt")
         .with_det_thresh(0.25)
         .with_det_box_thresh(0.6)
         .with_text_score(0.7)
@@ -102,21 +102,21 @@ fn test_rusto_config_grouped_json() {
     let json_str = r#"{
         "template": "ppv5",
         "detection": {
-            "modelPath": "models/custom_det.mnn",
+            "modelPath": "models/custom_det.rten",
             "thresh": 0.38,
             "boxThresh": 0.58,
             "unclipRatio": 1.8,
             "enabled": true
         },
         "recognition": {
-            "modelPath": "models/custom_rec.mnn",
+            "modelPath": "models/custom_rec.rten",
             "dictPath": "models/custom_dict.txt",
             "scoreThresh": 0.72,
             "returnWordBox": true,
             "enabled": true
         },
         "classification": {
-            "modelPath": "models/v5_cls.mnn",
+            "modelPath": "models/v5_cls.rten",
             "threshold": 0.88,
             "enabled": true
         },
@@ -129,11 +129,11 @@ fn test_rusto_config_grouped_json() {
     let config = InitializeConfig::from_json(json_str).expect("Parse grouped JSON");
     assert_eq!(
         config.det.model_path.to_str().unwrap(),
-        "models/custom_det.mnn"
+        "models/custom_det.rten"
     );
     assert_eq!(
         config.rec.model_path.to_str().unwrap(),
-        "models/custom_rec.mnn"
+        "models/custom_rec.rten"
     );
     assert_eq!(
         config.rec.rec_keys_path.unwrap().to_str().unwrap(),
@@ -148,7 +148,7 @@ fn test_rusto_config_grouped_json() {
     assert!(config.cls.is_some());
     assert_eq!(
         config.cls.as_ref().unwrap().model_path.to_str().unwrap(),
-        "models/v5_cls.mnn"
+        "models/v5_cls.rten"
     );
     assert_eq!(config.cls.as_ref().unwrap().cls_thresh, 0.88);
     assert_eq!(config.global.y_threshold_multiplier, Some(0.62));
@@ -166,7 +166,7 @@ fn test_rusto_config_templates_and_presets() {
     );
     assert_eq!(default_config.det.box_thresh, 0.6);
 
-    let v6_config = InitializeConfig::ppv6("det6.mnn", "rec6.mnn", "dict.txt");
+    let v6_config = InitializeConfig::ppv6("det6.rten", "rec6.rten", "dict.txt");
     assert_eq!(
         v6_config.det.limit_side_len,
         PPV6_MODEL_CONFIG.det_limit_side_len
@@ -175,7 +175,7 @@ fn test_rusto_config_templates_and_presets() {
     assert_eq!(v6_config.det.box_thresh, 0.6);
     assert_eq!(v6_config.det.unclip_ratio, 2.0);
 
-    let v5_config = InitializeConfig::ppv5("det5.mnn", "rec5.mnn", "dict.txt");
+    let v5_config = InitializeConfig::ppv5("det5.rten", "rec5.rten", "dict.txt");
     assert_eq!(
         v5_config.det.limit_side_len,
         PPV5_MODEL_CONFIG.det_limit_side_len
@@ -183,7 +183,7 @@ fn test_rusto_config_templates_and_presets() {
     assert_eq!(v5_config.det.limit_type, "min");
     assert_eq!(v5_config.det.unclip_ratio, 2.0);
 
-    let v4_config = InitializeConfig::ppv4("det4.mnn", "rec4.mnn", "dict.txt");
+    let v4_config = InitializeConfig::ppv4("det4.rten", "rec4.rten", "dict.txt");
     assert_eq!(
         v4_config.det.limit_side_len,
         PPV4_MODEL_CONFIG.det_limit_side_len
@@ -191,7 +191,7 @@ fn test_rusto_config_templates_and_presets() {
     assert_eq!(v4_config.det.limit_type, "max");
     assert_eq!(v4_config.det.unclip_ratio, 1.5);
 
-    let v3_config = InitializeConfig::ppv3("det3.mnn", "rec3.mnn", "dict.txt");
+    let v3_config = InitializeConfig::ppv3("det3.rten", "rec3.rten", "dict.txt");
     assert_eq!(
         v3_config.det.limit_side_len,
         PPV3_MODEL_CONFIG.det_limit_side_len
@@ -201,8 +201,8 @@ fn test_rusto_config_templates_and_presets() {
     // Test JSON with template selection
     let json_str_v6 = r#"{
         "template": "ppv6",
-        "detModelPath": "det6.mnn",
-        "recModelPath": "rec6.mnn",
+        "detModelPath": "det6.rten",
+        "recModelPath": "rec6.rten",
         "dictPath": "dict.txt"
     }"#;
     let json_config_v6 = InitializeConfig::from_json(json_str_v6).expect("Parse v6 template JSON");
@@ -210,8 +210,8 @@ fn test_rusto_config_templates_and_presets() {
 
     let json_str = r#"{
         "template": "ppv4",
-        "detModelPath": "det.mnn",
-        "recModelPath": "rec.mnn",
+        "detModelPath": "det.rten",
+        "recModelPath": "rec.rten",
         "dictPath": "dict.txt",
         "maxCandidates": 2000,
         "scoreMode": "slow"

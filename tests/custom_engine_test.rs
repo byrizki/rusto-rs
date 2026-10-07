@@ -3,18 +3,18 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use ndarray::ArrayD;
 use rusto::{
-    DetectTextResult, EngineError, ImageSource, InferenceSession,
-    InitializeConfig, OcrRunOptions, RustO, RtenSession, TextDetector, TextRecognizer,
+    DetectTextResult, EngineError, EngineSession, ImageSource, InferenceSession,
+    InitializeConfig, OcrRunOptions, RustO, TextDetector, TextRecognizer,
 };
 
 /// A custom inference session wrapper that counts how many inferences were executed.
 struct CountingSession {
-    inner: RtenSession,
+    inner: EngineSession,
     inference_count: Arc<AtomicUsize>,
 }
 
 impl CountingSession {
-    fn new(inner: RtenSession, counter: Arc<AtomicUsize>) -> Self {
+    fn new(inner: EngineSession, counter: Arc<AtomicUsize>) -> Self {
         Self {
             inner,
             inference_count: counter,
@@ -62,8 +62,8 @@ fn test_custom_inference_session_pluggability() {
 
     let config = InitializeConfig::ppv6(det_path, rec_path, dict_path);
 
-    let raw_det_session = RtenSession::from_det_config(&config.det).expect("Load det");
-    let raw_rec_session = RtenSession::from_rec_config(&config.rec).expect("Load rec");
+    let raw_det_session = EngineSession::from_det_config(&config.det).expect("Load det");
+    let raw_rec_session = EngineSession::from_rec_config(&config.rec).expect("Load rec");
 
     let det_counter = Arc::new(AtomicUsize::new(0));
     let rec_counter = Arc::new(AtomicUsize::new(0));

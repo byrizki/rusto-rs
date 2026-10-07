@@ -48,14 +48,14 @@ trait OcrEngineBackend {
 }
 
 // ----------------------------------------------------------------------------
-// 1. MNN Backend
+// 1. EngineSession Backend (Native RustO RTen Engine)
 // ----------------------------------------------------------------------------
-struct MnnBackend {
+struct EngineSessionBackend {
     det: EngineSession,
     rec: EngineSession,
 }
 
-impl MnnBackend {
+impl EngineSessionBackend {
     fn new(det_path: &Path, rec_path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
         let engine_cfg = EngineConfig::default();
         let det = EngineSession::from_path(det_path, &engine_cfg)?;
@@ -64,9 +64,9 @@ impl MnnBackend {
     }
 }
 
-impl OcrEngineBackend for MnnBackend {
+impl OcrEngineBackend for EngineSessionBackend {
     fn name(&self) -> &'static str {
-        "MNN (Native rusto)"
+        "EngineSession (Native rusto)"
     }
 
     fn infer_det(&mut self, input: &Array4<f32>) -> Result<Array4<f32>, Box<dyn std::error::Error>> {
@@ -473,12 +473,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 0. Verify Native RustO::detect_text baseline
     // ------------------------------------------------------------
     println!("--- [0] Native RustO::initialize / detect_text Baseline ---");
-    let mnn_config = InitializeConfig::ppv6(
-        models_dir.join("det.mnn"),
-        models_dir.join("rec.mnn"),
+    let ocr_config = InitializeConfig::ppv6(
+        models_dir.join("det.onnx"),
+        models_dir.join("rec.onnx"),
         dict_path.clone(),
     );
-    let mut native_ocr = RustO::initialize(mnn_config)?;
+    let mut native_ocr = RustO::initialize(ocr_config)?;
     let t_native0 = Instant::now();
     let native_res = native_ocr.detect_text(
         &ImageSource::Path(ktp_path.clone()),
@@ -496,8 +496,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize All 4 Engines
     // ------------------------------------------------------------
     println!("--- Initializing Inference Engines ---");
-    let mnn_backend = MnnBackend::new(&models_dir.join("det.mnn"), &models_dir.join("rec.mnn"))?;
-    println!("  [✓] MNN backend initialized");
+    let engine_backend = EngineSessionBackend::new(&models_dir.join("det.onnx"), &models_dir.join("rec.onnx"))?;
+    println!("  [✓] EngineSession backend initialized");
 
     let ort_backend = OrtBackend::new(&models_dir.join("det.onnx"), &models_dir.join("rec.onnx"))?;
     println!("  [✓] Rust ort backend initialized");
@@ -520,12 +520,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Execute Benchmarks
     // ------------------------------------------------------------
     println!("--- Running Identical Base Pipeline Across All Engines ---");
-    let stats_mnn = benchmark_engine(mnn_backend, &raw_img, &decoder, warmup, runs)?;
+    let stats_engine = benchmark_engine(engine_backend, &raw_img, &decoder, warmup, runs)?;
     let stats_ort = benchmark_engine(ort_backend, &raw_img, &decoder, warmup, runs)?;
     let stats_rten_onnx = benchmark_engine(rten_onnx_backend, &raw_img, &decoder, warmup, runs)?;
     let stats_rten_rten = benchmark_engine(rten_rten_backend, &raw_img, &decoder, warmup, runs)?;
 
-    let all_stats = vec![&stats_mnn, &stats_ort, &stats_rten_onnx, &stats_rten_rten];
+    let all_stats = vec![&stats_engine, &stats_ort, &stats_rten_onnx, &stats_rten_rten];
 
     // ------------------------------------------------------------
     // Print Summary Console Table
@@ -585,44 +585,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writeln!(f, "")?;
     writeln!(f, "Every millisecond from raw image preprocessing til final transcription decoded:")?;
     writeln!(f, "")?;
-    writeln!(f, "| Pipeline Stage | Description | MNN (Native) | Rust ort | RTen (.onnx) | RTen (.rten) |")?;
+    writeln!(f, "| Pipeline Stage | Description | EngineSession (Native) | Rust ort | RTen (.onnx) | RTen (.rten) |")?;
     writeln!(f, "|---|---|---|---|---|---|")?;
     writeln!(f, "| **1. Det Preprocess** | Bounds resize, vertical pad, 736 min-side resize, ImageNet BGR norm | {:.2} ms | {:.2} ms | {:.2} ms | {:.2} ms |",
-        stats_mnn.avg.det_pre_ms, stats_ort.avg.det_pre_ms, stats_rten_onnx.avg.det_pre_ms, stats_rten_rten.avg.det_pre_ms)?;
+        stats_engine.avg.det_pre_ms, stats_ort.avg.det_pre_ms, stats_rten_onnx.avg.det_pre_ms, stats_rten_rten.avg.det_pre_ms)?;
     writeln!(f, "| **2. Det Inference** | Neural detection model inference on `[1, 3, 736, 1184]` | {:.2} ms | {:.2} ms | {:.2} ms | {:.2} ms |",
-        stats_mnn.avg.det_infer_ms, stats_ort.avg.det_infer_ms, stats_rten_onnx.avg.det_infer_ms, stats_rten_rten.avg.det_infer_ms)?;
+        stats_engine.avg.det_infer_ms, stats_ort.avg.det_infer_ms, stats_rten_onnx.avg.det_infer_ms, stats_rten_rten.avg.det_infer_ms)?;
     writeln!(f, "| **3. Det Postprocess** | DBNet binary thresholding (0.3), contour extraction, unclip (2.0), box sorting | {:.2} ms | {:.2} ms | {:.2} ms | {:.2} ms |",
-        stats_mnn.avg.det_post_ms, stats_ort.avg.det_post_ms, stats_rten_onnx.avg.det_post_ms, stats_rten_rten.avg.det_post_ms)?;
+        stats_engine.avg.det_post_ms, stats_ort.avg.det_post_ms, stats_rten_onnx.avg.det_post_ms, stats_rten_rten.avg.det_post_ms)?;
     writeln!(f, "| **4. Crop & Unwarp** | 4-point perspective warp & 90° orientation rotation for all 16 boxes | {:.2} ms | {:.2} ms | {:.2} ms | {:.2} ms |",
-        stats_mnn.avg.crop_unwarp_ms, stats_ort.avg.crop_unwarp_ms, stats_rten_onnx.avg.crop_unwarp_ms, stats_rten_rten.avg.crop_unwarp_ms)?;
+        stats_engine.avg.crop_unwarp_ms, stats_ort.avg.crop_unwarp_ms, stats_rten_onnx.avg.crop_unwarp_ms, stats_rten_rten.avg.crop_unwarp_ms)?;
     writeln!(f, "| **5. Rec Preprocess** | Aspect ratio sorting, height-48 scaling, zero padding, batch construction | {:.2} ms | {:.2} ms | {:.2} ms | {:.2} ms |",
-        stats_mnn.avg.rec_pre_ms, stats_ort.avg.rec_pre_ms, stats_rten_onnx.avg.rec_pre_ms, stats_rten_rten.avg.rec_pre_ms)?;
+        stats_engine.avg.rec_pre_ms, stats_ort.avg.rec_pre_ms, stats_rten_onnx.avg.rec_pre_ms, stats_rten_rten.avg.rec_pre_ms)?;
     writeln!(f, "| **6. Rec Inference** | Neural text recognition across all 16 crops (batches of 6) | {:.2} ms | {:.2} ms | {:.2} ms | {:.2} ms |",
-        stats_mnn.avg.rec_infer_ms, stats_ort.avg.rec_infer_ms, stats_rten_onnx.avg.rec_infer_ms, stats_rten_rten.avg.rec_infer_ms)?;
+        stats_engine.avg.rec_infer_ms, stats_ort.avg.rec_infer_ms, stats_rten_onnx.avg.rec_infer_ms, stats_rten_rten.avg.rec_infer_ms)?;
     writeln!(f, "| **7. CTC Decode** | Greedy token decoding & vocabulary mapping to UTF-8 characters | {:.2} ms | {:.2} ms | {:.2} ms | {:.2} ms |",
-        stats_mnn.avg.rec_decode_ms, stats_ort.avg.rec_decode_ms, stats_rten_onnx.avg.rec_decode_ms, stats_rten_rten.avg.rec_decode_ms)?;
+        stats_engine.avg.rec_decode_ms, stats_ort.avg.rec_decode_ms, stats_rten_onnx.avg.rec_decode_ms, stats_rten_rten.avg.rec_decode_ms)?;
     writeln!(f, "| **TOTAL PIPELINE** | **Preprocessing Til Finished** | **{:.2} ms** | **{:.2} ms** | **{:.2} ms** | **{:.2} ms** |",
-        stats_mnn.avg.total_pipeline_ms, stats_ort.avg.total_pipeline_ms, stats_rten_onnx.avg.total_pipeline_ms, stats_rten_rten.avg.total_pipeline_ms)?;
+        stats_engine.avg.total_pipeline_ms, stats_ort.avg.total_pipeline_ms, stats_rten_onnx.avg.total_pipeline_ms, stats_rten_rten.avg.total_pipeline_ms)?;
 
     writeln!(f, "")?;
     writeln!(f, "---")?;
     writeln!(f, "")?;
     writeln!(f, "## 3. Transcription Parity Verification on ktp.jpeg")?;
     writeln!(f, "")?;
-    writeln!(f, "| Line # | MNN (Native rusto) | Rust ort | RTen (.onnx) | RTen (.rten) |")?;
+    writeln!(f, "| Line # | EngineSession (Native rusto) | Rust ort | RTen (.onnx) | RTen (.rten) |")?;
     writeln!(f, "|---|---|---|---|---|")?;
 
-    let max_lines = stats_mnn.sample_lines.len()
+    let max_lines = stats_engine.sample_lines.len()
         .max(stats_ort.sample_lines.len())
         .max(stats_rten_onnx.sample_lines.len())
         .max(stats_rten_rten.sample_lines.len());
 
     for i in 0..max_lines {
-        let l_mnn = stats_mnn.sample_lines.get(i).map(|(t, s)| format!("{} ({:.2})", t, s)).unwrap_or_else(|| "-".into());
+        let l_engine = stats_engine.sample_lines.get(i).map(|(t, s)| format!("{} ({:.2})", t, s)).unwrap_or_else(|| "-".into());
         let l_ort = stats_ort.sample_lines.get(i).map(|(t, s)| format!("{} ({:.2})", t, s)).unwrap_or_else(|| "-".into());
         let l_ro = stats_rten_onnx.sample_lines.get(i).map(|(t, s)| format!("{} ({:.2})", t, s)).unwrap_or_else(|| "-".into());
         let l_rr = stats_rten_rten.sample_lines.get(i).map(|(t, s)| format!("{} ({:.2})", t, s)).unwrap_or_else(|| "-".into());
-        writeln!(f, "| Line {:02} | {} | {} | {} | {} |", i + 1, l_mnn, l_ort, l_ro, l_rr)?;
+        writeln!(f, "| Line {:02} | {} | {} | {} | {} |", i + 1, l_engine, l_ort, l_ro, l_rr)?;
     }
 
     writeln!(f, "")?;

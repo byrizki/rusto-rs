@@ -103,7 +103,7 @@ pub enum EngineSession {
     Custom(Box<dyn InferenceSession>),
 }
 
-#[deprecated(note = "MnnSession is deprecated, please use EngineSession or RtenSession")]
+#[deprecated(note = "MnnSession is deprecated, please use EngineSession")]
 pub type MnnSession = EngineSession;
 
 impl EngineSession {
@@ -117,6 +117,14 @@ impl EngineSession {
     }
 
     pub fn from_rec_config(cfg: &RecConfig) -> Result<Self, EngineError> {
+        Self::from_path(&cfg.model_path, &cfg.engine_cfg)
+    }
+
+    pub fn from_cls_config(cfg: &crate::types::ClsConfig) -> Result<Self, EngineError> {
+        Self::from_path(&cfg.model_path, &cfg.engine_cfg)
+    }
+
+    pub fn from_orient_config(cfg: &crate::types::OrientConfig) -> Result<Self, EngineError> {
         Self::from_path(&cfg.model_path, &cfg.engine_cfg)
     }
 
