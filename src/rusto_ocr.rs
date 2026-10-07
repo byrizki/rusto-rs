@@ -12,9 +12,10 @@ use opencv::{
 use crate::image_impl::{Mat, Point2f};
 
 use crate::cal_rec_boxes::CalRecBoxes;
+use crate::calibration::{CalibrationOptions, OptimizationOptions};
 use crate::config::InitializeConfig;
 use crate::det::TextDetector;
-use crate::engine::EngineError;
+use crate::engine::{EngineError, InferenceSession};
 use crate::geometry::{
     apply_vertical_padding, get_rotate_crop_image, map_boxes_to_original,
     resize_image_within_bounds, OpRecord,
@@ -67,6 +68,8 @@ pub struct OcrRunOptions {
     pub width_height_ratio: Option<f32>,
     pub detection: Option<DetectionRunOptions>,
     pub postprocess: Option<PostprocessRunOptions>,
+    pub calibration: Option<CalibrationOptions>,
+    pub optimization: Option<OptimizationOptions>,
 }
 
 impl OcrRunOptions {
@@ -104,6 +107,13 @@ impl OcrRunOptions {
             finite("postprocess.boxThreshold", postprocess.box_threshold, |value| (0.0..=1.0).contains(&value))?;
             finite("postprocess.unclipRatio", postprocess.unclip_ratio, |value| value > 0.0)?;
             if postprocess.max_candidates.is_some_and(|value| value < 1) { return Err(EngineError::Preprocess("postprocess.maxCandidates must be >= 1".into())); }
+        }
+        if let Some(calib) = &self.calibration {
+            finite("calibration.descreenStrength", calib.descreen_strength, |value| value >= 0.0)?;
+        }
+        if let Some(opt) = &self.optimization {
+            finite("optimization.cropPaddingX", opt.crop_padding_x, |value| (0.0..=1.0).contains(&value))?;
+            finite("optimization.cropPaddingY", opt.crop_padding_y, |value| (0.0..=1.0).contains(&value))?;
         }
         Ok(())
     }
@@ -212,6 +222,82 @@ impl RustO {
         })
     }
 
+    /// Initialize an OCR engine using pre-configured TextDetector and TextRecognizer components.
+    pub fn with_components(
+        global: GlobalConfig,
+        det: TextDetector,
+        rec: TextRecognizer,
+    ) -> Result<Self, EngineError> {
+        validate_preprocessing(&global)?;
+        let cal_rec_boxes = CalRecBoxes::new();
+        Ok(Self {
+            det,
+            rec,
+            global,
+            cal_rec_boxes,
+            orient: None,
+            cls: None,
+        })
+    }
+
+    /// Initialize an OCR engine with custom inference sessions for detection and recognition.
+    pub fn with_custom_engines(
+        mut config: InitializeConfig,
+        det_session: impl InferenceSession + 'static,
+        rec_session: impl InferenceSession + 'static,
+    ) -> Result<Self, EngineError> {
+        validate_preprocessing(&config.global)?;
+        let det = TextDetector::with_custom_session(config.det.clone(), det_session);
+        let rec = TextRecognizer::with_custom_session(config.rec.clone(), rec_session)?;
+        let cal_rec_boxes = CalRecBoxes::new();
+
+        let orient = if let Some(orient_cfg) = config.orient.take() {
+            Some(OrientClassifier::new(orient_cfg)?)
+        } else {
+            None
+        };
+
+        let cls = if let Some(cls_cfg) = config.cls.take() {
+            let orient_cfg = crate::types::OrientConfig {
+                engine_type: cls_cfg.engine_type,
+                model_type: cls_cfg.model_type,
+                task_type: cls_cfg.task_type,
+                model_path: cls_cfg.model_path,
+                orient_image_shape: cls_cfg.cls_image_shape,
+                mean: [0.5, 0.5, 0.5],
+                std: [0.5, 0.5, 0.5],
+                confidence_threshold: cls_cfg.cls_thresh,
+                orient_batch_num: cls_cfg.cls_batch_num,
+                orient_thresh: cls_cfg.cls_thresh,
+                engine_cfg: cls_cfg.engine_cfg,
+            };
+            Some(OrientClassifier::new(orient_cfg)?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            det,
+            rec,
+            global: config.global,
+            cal_rec_boxes,
+            orient,
+            cls,
+        })
+    }
+
+    /// Set an orientation classifier.
+    pub fn with_orient(mut self, orient: OrientClassifier) -> Self {
+        self.orient = Some(orient);
+        self
+    }
+
+    /// Set a line orientation classifier.
+    pub fn with_cls(mut self, cls: OrientClassifier) -> Self {
+        self.cls = Some(cls);
+        self
+    }
+
     /// Detect text from a file path or in-memory image bytes.
     ///
     /// `lines` and `words` produce structured results; `spatial` produces
@@ -276,6 +362,8 @@ impl RustO {
         if let Some(value) = options.max_side_len { effective.max_side_len = value; }
         if let Some(value) = options.min_side_len { effective.min_side_len = value; }
         if let Some(value) = options.width_height_ratio { effective.width_height_ratio = value; }
+        if let Some(calib) = &options.calibration { effective.calibration = Some(calib.clone()); }
+        if let Some(opt) = &options.optimization { effective.optimization = Some(opt.clone()); }
         self.run_on_mat_with_global(img, &effective, options.detection.as_ref(), options.postprocess.as_ref())
     }
 
@@ -294,9 +382,20 @@ impl RustO {
         let mut orientation = None;
         let mut debug_oriented_image = None;
 
+        // Step 0: Image Calibration (if enabled)
+        let calibrated_img = if let Some(calib) = &global.calibration {
+            if calib.enabled.unwrap_or(true) {
+                crate::calibration::apply_calibration(img, calib)?
+            } else {
+                img.clone()
+            }
+        } else {
+            img.clone()
+        };
+
         // Step 1: Orientation classification and correction (if enabled)
         // Apply to ENTIRE image before detection
-        let mut working_img = img.clone();
+        let mut working_img = calibrated_img;
         if global.use_orient && self.orient.is_some() {
             if let Some(orient_classifier) = &mut self.orient {
                 let orient_result = orient_classifier.classify(img)?;
@@ -323,8 +422,22 @@ impl RustO {
         let mut op_record: OpRecord = OpRecord::new();
 
         // Step 2: Global resize within bounds (use corrected image)
+        let effective_max_side = if let Some(opt) = &global.optimization {
+            if opt.enabled.unwrap_or(true) {
+                if let Some(target) = opt.target_max_side {
+                    (target as f32).min(global.max_side_len)
+                } else {
+                    global.max_side_len
+                }
+            } else {
+                global.max_side_len
+            }
+        } else {
+            global.max_side_len
+        };
+
         let (resized, ratio_h, ratio_w) =
-            resize_image_within_bounds(&working_img, global.min_side_len, global.max_side_len)?;
+            resize_image_within_bounds(&working_img, global.min_side_len, effective_max_side)?;
         let mut m = std::collections::BTreeMap::new();
         m.insert("ratio_h".to_string(), ratio_h);
         m.insert("ratio_w".to_string(), ratio_w);
@@ -361,9 +474,30 @@ impl RustO {
         };
 
         // Step 4: Crop text regions from padded image
+        let (pad_x, pad_y) = if let Some(opt) = &global.optimization {
+            if opt.enabled.unwrap_or(true) {
+                (opt.crop_padding_x.unwrap_or(0.0), opt.crop_padding_y.unwrap_or(0.0))
+            } else {
+                (0.0, 0.0)
+            }
+        } else {
+            (0.0, 0.0)
+        };
+
         let mut crop_imgs: Vec<Mat> = Vec::with_capacity(padded_boxes.len());
         for b in &padded_boxes {
-            let crop = get_rotate_crop_image(&padded, b)?;
+            let crop_box = if pad_x > 0.0 || pad_y > 0.0 {
+                crate::calibration::expand_box_padding(
+                    b,
+                    pad_x,
+                    pad_y,
+                    padded.cols() as f32,
+                    padded.rows() as f32,
+                )
+            } else {
+                *b
+            };
+            let crop = get_rotate_crop_image(&padded, &crop_box)?;
             crop_imgs.push(crop);
         }
 

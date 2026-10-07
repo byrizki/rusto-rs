@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use crate::calibration::{CalibrationOptions, OptimizationOptions};
 use crate::types::{ClsConfig, DetConfig, RecConfig, OrientConfig, UnwarpConfig, GlobalConfig};
 
 /// Preset configuration for OCR model architectures
@@ -92,7 +93,7 @@ pub struct InitializeConfig {
 
 impl Default for InitializeConfig {
     fn default() -> Self {
-        Self::from_preset(PPV6_MODEL_CONFIG, "det.mnn", "rec.mnn", "dict.txt")
+        Self::from_preset(PPV6_MODEL_CONFIG, "det.rten", "rec.rten", "dict.txt")
     }
 }
 
@@ -275,9 +276,9 @@ impl InitializeConfig {
         // Fall back to grouped format
         let flat: FlatConfig = serde_json::from_str(json_str)?;
         let det_path = flat.detection.as_ref().and_then(|d| d.model_path.clone())
-            .unwrap_or_else(|| PathBuf::from("det.mnn"));
+            .unwrap_or_else(|| PathBuf::from("det.rten"));
         let rec_path = flat.recognition.as_ref().and_then(|r| r.model_path.clone())
-            .unwrap_or_else(|| PathBuf::from("rec.mnn"));
+            .unwrap_or_else(|| PathBuf::from("rec.rten"));
         let dict_path = flat.recognition.as_ref().and_then(|r| r.dict_path.clone())
             .unwrap_or_else(|| PathBuf::from("dict.txt"));
 
@@ -578,6 +579,18 @@ impl InitializeConfig {
     /// Set aspect ratio threshold for long text boxes
     pub fn with_width_height_ratio(mut self, ratio: f32) -> Self {
         self.global.width_height_ratio = ratio;
+        self
+    }
+
+    /// Set pre-OCR image calibration options
+    pub fn with_calibration(mut self, calibration: CalibrationOptions) -> Self {
+        self.global.calibration = Some(calibration);
+        self
+    }
+
+    /// Set runtime image optimization options
+    pub fn with_optimization(mut self, optimization: OptimizationOptions) -> Self {
+        self.global.optimization = Some(optimization);
         self
     }
 }

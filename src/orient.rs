@@ -7,7 +7,7 @@ use opencv::prelude::*;
 #[cfg(not(feature = "use-opencv"))]
 use crate::image_impl::Mat;
 
-use crate::engine::{EngineError, MnnSession};
+use crate::engine::{EngineError, EngineSession, InferenceSession};
 use crate::types::OrientConfig;
 
 /// Orientation classification result
@@ -105,14 +105,22 @@ pub struct OrientOutput {
 }
 
 pub struct OrientClassifier {
-    session: MnnSession,
+    session: EngineSession,
     pub config: OrientConfig,  // Public to allow access to confidence_threshold
 }
 
 impl OrientClassifier {
     pub fn new(config: OrientConfig) -> Result<Self, EngineError> {
-        let session = MnnSession::from_path(&config.model_path, &config.engine_cfg)?;
+        let session = EngineSession::from_path(&config.model_path, &config.engine_cfg)?;
         Ok(Self { session, config })
+    }
+
+    /// Construct orientation classifier with a custom inference session
+    pub fn with_custom_session(config: OrientConfig, session: impl InferenceSession + 'static) -> Self {
+        Self {
+            session: EngineSession::from_custom(session),
+            config,
+        }
     }
 
     pub fn classify(&mut self, image: &Mat) -> Result<OrientOutput, EngineError> {

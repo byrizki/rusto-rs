@@ -1,4 +1,4 @@
-use crate::engine::{EngineError, MnnSession};
+use crate::engine::{EngineError, EngineSession, InferenceSession};
 use crate::types::EngineConfig;
 use ndarray::{Array3, ArrayD};
 use std::collections::HashMap;
@@ -133,7 +133,7 @@ pub enum TableModelType {
 impl Default for TableDetectorConfig {
     fn default() -> Self {
         Self {
-            model_path: std::path::PathBuf::from("models/DocOCR/rtdetr-wireless.mnn"),
+            model_path: std::path::PathBuf::from("models/DocOCR/rtdetr-wireless.rten"),
             conf_threshold: 0.5,
             iou_threshold: 0.5,
             model_type: TableModelType::Wireless,
@@ -143,16 +143,23 @@ impl Default for TableDetectorConfig {
 
 /// RT-DETR table detector
 pub struct TableDetector {
-    _session: MnnSession,
+    _session: EngineSession,
     _config: TableDetectorConfig,
 }
 
 impl TableDetector {
     pub fn new(config: TableDetectorConfig) -> Result<Self, EngineError> {
         let engine_config = EngineConfig::default();
-        let session = MnnSession::from_path(&config.model_path, &engine_config)?;
+        let session = EngineSession::from_path(&config.model_path, &engine_config)?;
         
         Ok(Self { _session: session, _config: config })
+    }
+
+    pub fn with_custom_session(config: TableDetectorConfig, session: impl InferenceSession + 'static) -> Self {
+        Self {
+            _session: EngineSession::from_custom(session),
+            _config: config,
+        }
     }
 
     /// Detect table cells in an image
@@ -280,7 +287,7 @@ pub struct TableStructureConfig {
 impl Default for TableStructureConfig {
     fn default() -> Self {
         Self {
-            model_path: std::path::PathBuf::from("models/DocOCR/slanext-wireless.mnn"),
+            model_path: std::path::PathBuf::from("models/DocOCR/slanext-wireless.rten"),
             model_type: TableModelType::Wireless,
         }
     }
@@ -288,16 +295,23 @@ impl Default for TableStructureConfig {
 
 /// SLANet table structure recognizer
 pub struct TableStructureRecognizer {
-    _session: MnnSession,
+    _session: EngineSession,
     _config: TableStructureConfig,
 }
 
 impl TableStructureRecognizer {
     pub fn new(config: TableStructureConfig) -> Result<Self, EngineError> {
         let engine_config = EngineConfig::default();
-        let session = MnnSession::from_path(&config.model_path, &engine_config)?;
+        let session = EngineSession::from_path(&config.model_path, &engine_config)?;
         
         Ok(Self { _session: session, _config: config })
+    }
+
+    pub fn with_custom_session(config: TableStructureConfig, session: impl InferenceSession + 'static) -> Self {
+        Self {
+            _session: EngineSession::from_custom(session),
+            _config: config,
+        }
     }
 
     /// Recognize table structure from image

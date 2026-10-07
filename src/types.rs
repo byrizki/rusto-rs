@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use crate::calibration::{CalibrationOptions, OptimizationOptions};
 
 /// Axis-aligned bounding box frame
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -403,6 +404,10 @@ pub struct GlobalConfig {
     pub y_threshold_multiplier: Option<f32>,
     /// Configurable X threshold multiplier for word/column gap separation in spatial text
     pub x_threshold_multiplier: Option<f32>,
+    /// Optional pre-OCR image calibration options
+    pub calibration: Option<CalibrationOptions>,
+    /// Optional runtime image optimization options
+    pub optimization: Option<OptimizationOptions>,
 }
 
 impl Default for GlobalConfig {
@@ -425,6 +430,8 @@ impl Default for GlobalConfig {
             return_single_char_box: false,
             y_threshold_multiplier: None,
             x_threshold_multiplier: None,
+            calibration: None,
+            optimization: None,
         }
     }
 }

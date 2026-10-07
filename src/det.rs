@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use ndarray::{Array4, ArrayD};
 
-use crate::engine::{EngineError, MnnSession};
+use crate::engine::{EngineError, EngineSession, InferenceSession};
 use crate::postprocess::{DBPostProcess, TextDetOutput};
 use crate::preprocess::DetPreProcess;
 use crate::rusto_ocr::{DetectionRunOptions, PostprocessRunOptions};
@@ -16,13 +16,21 @@ use crate::image_impl::Mat;
 
 pub struct TextDetector {
     pub cfg: DetConfig,
-    pub session: MnnSession,
+    pub session: EngineSession,
 }
 
 impl TextDetector {
     pub fn new(cfg: DetConfig) -> Result<Self, EngineError> {
-        let session = MnnSession::from_det_config(&cfg)?;
+        let session = EngineSession::from_det_config(&cfg)?;
         Ok(Self { cfg, session })
+    }
+
+    /// Construct detector with a custom inference session implementation
+    pub fn with_custom_session(cfg: DetConfig, session: impl InferenceSession + 'static) -> Self {
+        Self {
+            cfg,
+            session: EngineSession::from_custom(session),
+        }
     }
 
     pub fn run(&mut self, img: &Mat) -> Result<TextDetOutput, EngineError> {
@@ -93,7 +101,7 @@ impl TextDetector {
     }
 
     #[cfg(feature = "use-opencv")]
-    fn sorted_boxes(&self, dt_boxes: &mut Vec<[opencv::core::Point2f; 4]>) {
+    pub fn sorted_boxes(&self, dt_boxes: &mut Vec<[opencv::core::Point2f; 4]>) {
         dt_boxes.sort_by(|a, b| {
             let ay = a[0].y as i32;
             let by = b[0].y as i32;
@@ -108,18 +116,22 @@ impl TextDetector {
     }
 
     #[cfg(not(feature = "use-opencv"))]
-    fn sorted_boxes(&self, dt_boxes: &mut Vec<[crate::image_impl::Point2f; 4]>) {
-        dt_boxes.sort_by(|a, b| {
-            let ay = a[0].y as i32;
-            let by = b[0].y as i32;
-            if ay != by {
-                ay.cmp(&by)
-            } else {
-                let ax = a[0].x as i32;
-                let bx = b[0].x as i32;
-                ax.cmp(&bx)
-            }
-        });
-
+    pub fn sorted_boxes(&self, dt_boxes: &mut Vec<[crate::image_impl::Point2f; 4]>) {
+        sort_det_boxes(dt_boxes);
     }
+}
+
+#[cfg(not(feature = "use-opencv"))]
+pub fn sort_det_boxes(dt_boxes: &mut [[crate::image_impl::Point2f; 4]]) {
+    dt_boxes.sort_by(|a, b| {
+        let ay = a[0].y as i32;
+        let by = b[0].y as i32;
+        if ay != by {
+            ay.cmp(&by)
+        } else {
+            let ax = a[0].x as i32;
+            let bx = b[0].x as i32;
+            ax.cmp(&bx)
+        }
+    });
 }

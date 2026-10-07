@@ -13,7 +13,7 @@ use opencv::core::Mat;
 #[cfg(not(feature = "use-opencv"))]
 use crate::image_impl::{Mat, Size, INTER_LINEAR};
 
-use crate::engine::{EngineError, MnnSession};
+use crate::engine::{EngineError, EngineSession, InferenceSession};
 use crate::types::RecConfig;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,48 +39,45 @@ pub struct TextRecOutput {
     pub elapse: f64,
 }
 
-struct CtcDecoder {
-    chars: Vec<String>,
+pub struct CtcDecoder {
+    pub chars: Vec<String>,
 }
 
 impl CtcDecoder {
-    fn from_cfg(cfg: &RecConfig, session: &MnnSession) -> Result<Self, EngineError> {
-        let mut chars: Option<Vec<String>> = None;
-
-        if session.have_key("character") {
-            if let Some(list) = session.get_character_list("character") {
-                chars = Some(list);
-            }
-        }
-
-        if chars.is_none() {
-            if let Some(path) = &cfg.rec_keys_path {
-                let file = File::open(path).map_err(|e| {
-                    EngineError::Preprocess(format!("failed to open rec_keys_path: {e}"))
-                })?;
-                let reader = BufReader::new(file);
-                let mut list = Vec::new();
-                for line in reader.lines() {
-                    let l = line.map_err(|e| {
-                        EngineError::Preprocess(format!("failed to read rec_keys_path: {e}"))
-                    })?;
-                    list.push(l);
-                }
-                chars = Some(list);
-            }
-        }
-
-        let mut character_list = chars.ok_or_else(|| {
-            EngineError::Preprocess("no character list found for recognizer".to_string())
+    pub fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, EngineError> {
+        let file = File::open(path).map_err(|e| {
+            EngineError::Preprocess(format!("failed to open rec_keys_path: {e}"))
         })?;
-
-        character_list.push(" ".to_string());
-        character_list.insert(0, "blank".to_string());
-
-        Ok(Self { chars: character_list })
+        let reader = BufReader::new(file);
+        let mut list = Vec::new();
+        for line in reader.lines() {
+            let l = line.map_err(|e| {
+                EngineError::Preprocess(format!("failed to read rec_keys_path: {e}"))
+            })?;
+            list.push(l);
+        }
+        list.push(" ".to_string());
+        list.insert(0, "blank".to_string());
+        Ok(Self { chars: list })
     }
 
-    fn decode(
+    fn from_cfg(cfg: &RecConfig, session: &impl InferenceSession) -> Result<Self, EngineError> {
+        if session.have_key("character") {
+            if let Some(mut list) = session.get_character_list("character") {
+                list.push(" ".to_string());
+                list.insert(0, "blank".to_string());
+                return Ok(Self { chars: list });
+            }
+        }
+
+        if let Some(path) = &cfg.rec_keys_path {
+            return Self::from_file(path);
+        }
+
+        Err(EngineError::Preprocess("no character list found for recognizer".to_string()))
+    }
+
+    pub fn decode(
         &self,
         preds: Array3<f32>,
         return_word_box: bool,
@@ -280,13 +277,23 @@ impl CtcDecoder {
 
 pub struct TextRecognizer {
     pub cfg: RecConfig,
-    pub session: MnnSession,
+    pub session: EngineSession,
     decoder: CtcDecoder,
 }
 
 impl TextRecognizer {
     pub fn new(cfg: RecConfig) -> Result<Self, EngineError> {
-        let session = MnnSession::from_rec_config(&cfg)?;
+        let session = EngineSession::from_rec_config(&cfg)?;
+        let decoder = CtcDecoder::from_cfg(&cfg, &session)?;
+        Ok(Self { cfg, session, decoder })
+    }
+
+    /// Construct recognizer with a custom inference session implementation
+    pub fn with_custom_session(
+        cfg: RecConfig,
+        session: impl InferenceSession + 'static,
+    ) -> Result<Self, EngineError> {
+        let session = EngineSession::from_custom(session);
         let decoder = CtcDecoder::from_cfg(&cfg, &session)?;
         Ok(Self { cfg, session, decoder })
     }
@@ -467,52 +474,62 @@ impl TextRecognizer {
         _img_w: usize,
         max_wh_ratio: f32,
     ) -> Result<Array3<f32>, EngineError> {
-        let img_width = (img_h as f32 * max_wh_ratio).round() as i32;
-
-        let h = img.rows();
-        let w = img.cols();
-        if h <= 0 || w <= 0 {
-            return Err(EngineError::Preprocess("invalid image size".to_string()));
-        }
-
-        let ratio = w as f32 / h as f32;
-        let resized_w = if ((img_h as f32) * ratio).ceil() as i32 > img_width {
-            img_width
-        } else {
-            ((img_h as f32) * ratio).ceil() as i32
-        };
-
-        let mut resized = Mat::default();
-        crate::image_impl::resize(
-            img,
-            &mut resized,
-            Size::new(resized_w, img_h as i32),
-            INTER_LINEAR,
-        )?;
-
-        let size = resized.size()?;
-        let h2 = size.height as usize;
-        let w2 = size.width as usize;
-
-        let mut out = Array3::<f32>::zeros((img_c, img_h, img_width as usize));
-
-        for y in 0..h2 {
-            for x in 0..w2.min(img_width as usize) {
-                let pix = resized.get_pixel(x as u32, y as u32);
-                // image crate uses RGB format, but model expects BGR
-                let r = pix[0] as f32 / 255.0;  // Red channel
-                let g = pix[1] as f32 / 255.0;  // Green channel
-                let b = pix[2] as f32 / 255.0;  // Blue channel
-
-                // Store in BGR order (model expects BGR as per inference.yml)
-                out[[0, y, x]] = (b - 0.5) / 0.5;  // Blue
-                out[[1, y, x]] = (g - 0.5) / 0.5;  // Green
-                out[[2, y, x]] = (r - 0.5) / 0.5;  // Red
-            }
-        }
-
-        Ok(out)
+        resize_norm_rec_img(img, img_c, img_h, max_wh_ratio)
     }
+}
+
+#[cfg(not(feature = "use-opencv"))]
+pub fn resize_norm_rec_img(
+    img: &Mat,
+    img_c: usize,
+    img_h: usize,
+    max_wh_ratio: f32,
+) -> Result<Array3<f32>, EngineError> {
+    let img_width = (img_h as f32 * max_wh_ratio).round() as i32;
+
+    let h = img.rows();
+    let w = img.cols();
+    if h <= 0 || w <= 0 {
+        return Err(EngineError::Preprocess("invalid image size".to_string()));
+    }
+
+    let ratio = w as f32 / h as f32;
+    let resized_w = if ((img_h as f32) * ratio).ceil() as i32 > img_width {
+        img_width
+    } else {
+        ((img_h as f32) * ratio).ceil() as i32
+    };
+
+    let mut resized = Mat::default();
+    crate::image_impl::resize(
+        img,
+        &mut resized,
+        Size::new(resized_w, img_h as i32),
+        INTER_LINEAR,
+    )?;
+
+    let size = resized.size()?;
+    let h2 = size.height as usize;
+    let w2 = size.width as usize;
+
+    let mut out = Array3::<f32>::zeros((img_c, img_h, img_width as usize));
+
+    for y in 0..h2 {
+        for x in 0..w2.min(img_width as usize) {
+            let pix = resized.get_pixel(x as u32, y as u32);
+            // image crate uses RGB format, but model expects BGR
+            let r = pix[0] as f32 / 255.0;  // Red channel
+            let g = pix[1] as f32 / 255.0;  // Green channel
+            let b = pix[2] as f32 / 255.0;  // Blue channel
+
+            // Store in BGR order (model expects BGR as per inference.yml)
+            out[[0, y, x]] = (b - 0.5) / 0.5;  // Blue
+            out[[1, y, x]] = (g - 0.5) / 0.5;  // Green
+            out[[2, y, x]] = (r - 0.5) / 0.5;  // Red
+        }
+    }
+
+    Ok(out)
 }
 
 fn has_chinese_char(text: &str) -> bool {

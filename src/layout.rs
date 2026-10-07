@@ -7,7 +7,7 @@ use opencv::prelude::*;
 #[cfg(not(feature = "use-opencv"))]
 use crate::image_impl::Mat;
 
-use crate::engine::{EngineError, MnnSession};
+use crate::engine::{EngineError, EngineSession, InferenceSession};
 use crate::types::LayoutConfig;
 
 #[derive(Debug, Clone)]
@@ -79,14 +79,22 @@ pub struct LayoutOutput {
 }
 
 pub struct LayoutDetector {
-    session: MnnSession,
+    session: EngineSession,
     config: LayoutConfig,
 }
 
 impl LayoutDetector {
     pub fn new(config: LayoutConfig) -> Result<Self, EngineError> {
-        let session = MnnSession::from_path(&config.model_path, &config.engine_cfg)?;
+        let session = EngineSession::from_path(&config.model_path, &config.engine_cfg)?;
         Ok(Self { session, config })
+    }
+
+    /// Construct layout detector with a custom inference session
+    pub fn with_custom_session(config: LayoutConfig, session: impl InferenceSession + 'static) -> Self {
+        Self {
+            session: EngineSession::from_custom(session),
+            config,
+        }
     }
 
     pub fn detect(&mut self, image: &Mat) -> Result<LayoutOutput, EngineError> {

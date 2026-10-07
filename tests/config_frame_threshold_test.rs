@@ -227,8 +227,8 @@ fn test_ppv6_inference_tiny() {
     use rusto::RustO;
     use std::path::Path;
 
-    let det_path = "models/PPOCR_v6/det.mnn";
-    let rec_path = "models/PPOCR_v6/rec.mnn";
+    let det_path = "models/PPOCR_v6/det.rten";
+    let rec_path = "models/PPOCR_v6/rec.rten";
     let dict_path = "models/PPOCR_v6/dict.txt";
     let img_path = "models/test_images/example1.png";
 
@@ -273,8 +273,8 @@ fn test_default_ocr_v6_spatial_text() {
     use rusto::RustO;
     use std::path::Path;
 
-    let det_path = "models/PPOCR_v6/det.mnn";
-    let rec_path = "models/PPOCR_v6/rec.mnn";
+    let det_path = "models/PPOCR_v6/det.rten";
+    let rec_path = "models/PPOCR_v6/rec.rten";
     let dict_path = "models/PPOCR_v6/dict.txt";
     let img_path = "models/test_images/example1.png";
 
@@ -306,8 +306,8 @@ fn test_ppv6_invoice_ocr() {
     use rusto::RustO;
     use std::path::Path;
 
-    let det_path = "models/PPOCR_v6/det.mnn";
-    let rec_path = "models/PPOCR_v6/rec.mnn";
+    let det_path = "models/PPOCR_v6/det.rten";
+    let rec_path = "models/PPOCR_v6/rec.rten";
     let dict_path = "models/PPOCR_v6/dict.txt";
     let img_path = "models/test_images/invoice1.jpg";
 
