@@ -511,6 +511,20 @@ jobs:
       - name: Verify Yarn Classic
         run: yarn --version
 
+      - name: Install Rust toolchain for WebAssembly
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build rten-wasm
+        run: |
+          wasm-pack build crates/rten-wasm --target web --out-dir ../../packages/web/src/wasm
+          mkdir -p artifacts/wasm
+          tar czf artifacts/wasm/rusto-wasm.tar.gz -C packages/web/src/wasm .
+
       - name: Build and pack rusto-web
         working-directory: packages/web
         run: |
@@ -543,6 +557,7 @@ jobs:
             packages/react-native-rusto.tgz
             packages/rusto-web-*.tgz
             packages/react-rusto-*.tgz
+            artifacts/wasm/rusto-wasm.tar.gz
 
   # Create GitHub Release
   binding-examples:
@@ -606,6 +621,7 @@ jobs:
 
           if [ -d "rusto-react-native-package" ]; then
              cp rusto-react-native-package/*.tgz ../releases/ || true
+             cp rusto-react-native-package/*.tar.gz ../releases/ || true
           fi
 
       - name: Generate checksums
