@@ -1,6 +1,6 @@
 # RustO! Documentation Site
 
-> Documentation site for [RustO!](https://github.com/byrizki/rusto-rs) — High-Performance, Pure Rust OCR Engine & Multi-Platform Toolkit based on RapidOCR with PaddleOCR engine and MNN inference.
+> Documentation site for [RustO!](https://github.com/byrizki/rusto-rs) — High-Performance, Pure Rust OCR Engine & Multi-Platform Toolkit based on RapidOCR with PaddleOCR models and pure-Rust RTen inference.
 
 Built with [Nuxt](https://nuxt.com), [Docus](https://docus.dev), and [Nuxt Content](https://content.nuxt.com/), deployed to [GitHub Pages](https://byrizki.github.io/rusto-rs/).
 

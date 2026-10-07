@@ -7,7 +7,7 @@ export default defineAppConfig({
   docus: {
     title: 'RustO!',
     description:
-      'High-Performance, Pure Rust OCR Engine & Multi-Platform Toolkit powered by RapidOCR, PaddleOCR models, and MNN inference.',
+      'High-Performance, Pure Rust OCR Engine & Multi-Platform Toolkit powered by RapidOCR, PaddleOCR models, and pure-Rust RTen inference.',
     socials: {
       github: 'byrizki/rusto-rs',
     },

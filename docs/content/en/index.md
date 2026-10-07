@@ -1,7 +1,7 @@
 ---
 seo:
   title: RustO! - High-Performance Pure Rust OCR Library & Toolkit
-  description: RustO! is a blazing-fast OCR engine and cross-platform toolkit written in pure Rust, powered by PaddleOCR models and MNN lightweight inference.
+  description: RustO! is a blazing-fast OCR engine and cross-platform toolkit written in pure Rust, powered by PaddleOCR models and pure-Rust RTen inference.
 ---
 
 ::u-page-hero
@@ -9,15 +9,27 @@ seo:
 High-Performance, Pure Rust OCR Engine
 
 #description
-RustO! is an Optical Character Recognition engine and multi-platform toolkit written in pure Rust. Powered by RapidOCR, PaddleOCR models, and Alibaba's MNN inference engine, delivering sub-second inference with zero OpenCV dependency.
+RustO! is an Optical Character Recognition engine and multi-platform toolkit written in pure Rust. Powered by RapidOCR, PaddleOCR models, and pure-Rust RTen inference engine, delivering sub-second inference with zero OpenCV dependency.
 
 #links
 :::u-button
 ---
 
+color: primary
+size: xl
+to: /en/demo
+trailing-icon: i-lucide-play
+---
+
+Live Demo
+:::
+
+:::u-button
+---
+
 color: neutral
 size: xl
-to: /getting-started/introduction
+to: /en/getting-started/introduction
 trailing-icon: i-lucide-arrow-right
 ---
 
