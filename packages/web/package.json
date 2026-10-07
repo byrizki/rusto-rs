@@ -46,7 +46,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node -e \"const fs=require('fs'); if (fs.existsSync('src/wasm')) { fs.mkdirSync('dist/wasm', {recursive:true}); fs.cpSync('src/wasm', 'dist/wasm', {recursive:true, filter: (src) => !src.endsWith('.gitignore')}); }\"",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
