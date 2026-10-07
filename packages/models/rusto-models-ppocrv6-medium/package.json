@@ -1,0 +1,56 @@
+{
+  "name": "rusto-models-ppocrv6-medium",
+  "version": "0.2.5",
+  "description": "Pre-trained PP-OCRv6 Medium MNN models (~24 MB) for RustO OCR",
+  "keywords": [
+    "ocr",
+    "rusto",
+    "models",
+    "paddleocr",
+    "mnn",
+    "ppv6",
+    "medium",
+    "multilingual"
+  ],
+  "homepage": "https://github.com/byrizki/rusto-rs#readme",
+  "bugs": {
+    "url": "https://github.com/byrizki/rusto-rs/issues"
+  },
+  "license": "MIT",
+  "author": "byrizki <contact@byrizki.com> (https://github.com/byrizki)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/byrizki/rusto-rs.git",
+    "directory": "packages/models/rusto-models-ppocrv6-medium"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./models/*": "./models/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "models",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.2"
+  }
+}

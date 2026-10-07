@@ -1,0 +1,56 @@
+{
+  "name": "rusto-web",
+  "version": "0.2.5",
+  "description": "High-performance Web and Browser OCR engine for RustO! powered by PaddleOCR models",
+  "keywords": [
+    "ocr",
+    "rusto",
+    "web",
+    "browser",
+    "paddleocr",
+    "rten",
+    "text-recognition",
+    "webassembly",
+    "typescript"
+  ],
+  "homepage": "https://github.com/byrizki/rusto-rs#readme",
+  "bugs": {
+    "url": "https://github.com/byrizki/rusto-rs/issues"
+  },
+  "license": "MIT",
+  "author": "byrizki <contact@byrizki.com> (https://github.com/byrizki)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/byrizki/rusto-rs.git",
+    "directory": "packages/web"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.2"
+  }
+}
