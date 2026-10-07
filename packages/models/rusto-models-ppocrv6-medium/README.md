@@ -1,6 +1,6 @@
 # rusto-models-ppocrv6-medium
 
-> Pre-trained PP-OCRv6 Medium MNN model package for [RustO!](https://github.com/byrizki/rusto-rs)
+> Pre-trained PP-OCRv6 Medium model package for [RustO!](https://github.com/byrizki/rusto-rs)
 
 ## Metadata
 

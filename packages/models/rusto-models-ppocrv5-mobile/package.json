@@ -1,13 +1,14 @@
 {
   "name": "rusto-models-ppocrv5-mobile",
   "version": "0.2.5",
-  "description": "Pre-trained PP-OCRv5 Mobile MNN models (~8 MB) for RustO OCR",
+  "description": "Pre-trained PP-OCRv5 Mobile models (~8 MB) for RustO OCR",
   "keywords": [
     "ocr",
     "rusto",
     "models",
     "paddleocr",
-    "mnn",
+    "onnx",
+    "rten",
     "ppv5",
     "mobile",
     "multilingual"

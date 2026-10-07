@@ -1,13 +1,14 @@
 {
   "name": "rusto-models-ppocrv6-medium",
   "version": "0.2.5",
-  "description": "Pre-trained PP-OCRv6 Medium MNN models (~24 MB) for RustO OCR",
+  "description": "Pre-trained PP-OCRv6 Medium models (~24 MB) for RustO OCR",
   "keywords": [
     "ocr",
     "rusto",
     "models",
     "paddleocr",
-    "mnn",
+    "onnx",
+    "rten",
     "ppv6",
     "medium",
     "multilingual"

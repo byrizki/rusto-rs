@@ -1,6 +1,6 @@
 # rusto-models-ppocrv6-small
 
-> Pre-trained PP-OCRv6 Small MNN model package for [RustO!](https://github.com/byrizki/rusto-rs)
+> Pre-trained PP-OCRv6 Small model package for [RustO!](https://github.com/byrizki/rusto-rs)
 
 ## Metadata
 

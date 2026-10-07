@@ -1,6 +1,6 @@
 # rusto-models-ppocrv5-mobile
 
-> Pre-trained PP-OCRv5 Mobile MNN model package for [RustO!](https://github.com/byrizki/rusto-rs)
+> Pre-trained PP-OCRv5 Mobile model package for [RustO!](https://github.com/byrizki/rusto-rs)
 
 ## Metadata
 

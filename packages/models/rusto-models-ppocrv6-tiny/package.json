@@ -1,13 +1,14 @@
 {
   "name": "rusto-models-ppocrv6-tiny",
   "version": "0.2.5",
-  "description": "Pre-trained PP-OCRv6 Tiny MNN models (~6 MB) for RustO OCR",
+  "description": "Pre-trained PP-OCRv6 Tiny models (~6 MB) for RustO OCR",
   "keywords": [
     "ocr",
     "rusto",
     "models",
     "paddleocr",
-    "mnn",
+    "onnx",
+    "rten",
     "ppv6",
     "tiny",
     "multilingual"

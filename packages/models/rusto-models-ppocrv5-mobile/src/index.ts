@@ -31,10 +31,10 @@ export const modelMetadata: ModelPackageMetadata = {
   tier: 'mobile',
   language: 'multilingual',
   files: {
-    "detection": "models/det.rten",
-    "recognition": "models/rec.rten",
+    "detection": "models/det.onnx",
+    "recognition": "models/rec.onnx",
     "dictionary": "models/dict.txt",
-    "recognitionEnglish": "models/rec_en.rten",
+    "recognitionEnglish": "models/rec_en.onnx",
     "dictionaryEnglish": "models/dict_en.txt"
 },
 };

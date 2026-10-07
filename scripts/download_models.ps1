@@ -74,8 +74,8 @@ function Download-File {
     }
 }
 
-Download-File -Filename "det.mnn" -GhName "ppocrv6_det_${Tier}.mnn" -MsPath "mnn%2FPP-OCRv6%2Fdet%2FPP-OCRv6_det_${Tier}.mnn"
-Download-File -Filename "rec.mnn" -GhName "ppocrv6_rec_${Tier}.mnn" -MsPath "mnn%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_${Tier}.mnn"
+Download-File -Filename "det.onnx" -GhName "ppocrv6_det_${Tier}.onnx" -MsPath "onnx%2FPP-OCRv6%2Fdet%2FPP-OCRv6_det_${Tier}.onnx"
+Download-File -Filename "rec.onnx" -GhName "ppocrv6_rec_${Tier}.onnx" -MsPath "onnx%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_${Tier}.onnx"
 
 if ($Tier -eq "tiny") {
     Download-File -Filename "dict.txt" -GhName "ppocrv6_tiny_dict.txt" -MsPath "paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_tiny%2Fppocrv6_tiny_dict.txt"

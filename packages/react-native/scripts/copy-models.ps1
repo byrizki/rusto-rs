@@ -21,10 +21,30 @@ Write-Host "Repository root: $RepoRoot"
 Write-Host "Model source: $ModelsSource"
 Write-Host ""
 
+# Detect available model file format
+$detFile = ""
+$recFile = ""
+foreach ($ext in @("onnx", "rten", "mnn")) {
+    if ((Test-Path "$ModelsSource\det.$ext") -and [string]::IsNullOrEmpty($detFile)) {
+        $detFile = "det.$ext"
+    }
+    if ((Test-Path "$ModelsSource\rec.$ext") -and [string]::IsNullOrEmpty($recFile)) {
+        $recFile = "rec.$ext"
+    }
+}
+
 # Check if source models exist; if not, download on the fly
-if (-not (Test-Path "$ModelsSource\det.mnn") -or -not (Test-Path "$ModelsSource\rec.mnn") -or -not (Test-Path "$ModelsSource\dict.txt")) {
+if ([string]::IsNullOrEmpty($detFile) -or [string]::IsNullOrEmpty($recFile) -or -not (Test-Path "$ModelsSource\dict.txt")) {
     Write-Host "Models not found in $ModelsSource. Downloading default PP-OCRv6 tiny models..." -ForegroundColor Yellow
     & "$RepoRoot\scripts\download_models.ps1" -OutputDir "$ModelsSource"
+    foreach ($ext in @("onnx", "rten", "mnn")) {
+        if ((Test-Path "$ModelsSource\det.$ext") -and [string]::IsNullOrEmpty($detFile)) {
+            $detFile = "det.$ext"
+        }
+        if ((Test-Path "$ModelsSource\rec.$ext") -and [string]::IsNullOrEmpty($recFile)) {
+            $recFile = "rec.$ext"
+        }
+    }
 }
 
 # Android: Copy to main android package assets
@@ -32,17 +52,17 @@ Write-Host "📦 Android Setup..." -ForegroundColor Yellow
 $AndroidAssets = Join-Path $AndroidPackage "src\main\assets"
 New-Item -ItemType Directory -Path $AndroidAssets -Force | Out-Null
 
-Copy-Item -Path "$ModelsSource\det.mnn" -Destination $AndroidAssets -Force
-Copy-Item -Path "$ModelsSource\rec.mnn" -Destination $AndroidAssets -Force
+Copy-Item -Path "$ModelsSource\$detFile" -Destination $AndroidAssets -Force
+Copy-Item -Path "$ModelsSource\$recFile" -Destination $AndroidAssets -Force
 Copy-Item -Path "$ModelsSource\dict.txt" -Destination $AndroidAssets -Force
 
-$detSize = (Get-Item "$AndroidAssets\det.mnn").Length / 1MB
-$recSize = (Get-Item "$AndroidAssets\rec.mnn").Length / 1MB
+$detSize = (Get-Item "$AndroidAssets\$detFile").Length / 1MB
+$recSize = (Get-Item "$AndroidAssets\$recFile").Length / 1MB
 $dictSize = (Get-Item "$AndroidAssets\dict.txt").Length / 1KB
 
 Write-Host "✓ Copied models to $AndroidAssets" -ForegroundColor Green
-Write-Host "  - det.mnn ($([math]::Round($detSize, 2)) MB)"
-Write-Host "  - rec.mnn ($([math]::Round($recSize, 2)) MB)"
+Write-Host "  - $detFile ($([math]::Round($detSize, 2)) MB)"
+Write-Host "  - $recFile ($([math]::Round($recSize, 2)) MB)"
 Write-Host "  - dict.txt ($([math]::Round($dictSize, 2)) KB)"
 Write-Host ""
 
@@ -51,17 +71,17 @@ Write-Host "🍎 iOS Setup..." -ForegroundColor Yellow
 $IOSModels = Join-Path $RNPackage "ios\models"
 New-Item -ItemType Directory -Path $IOSModels -Force | Out-Null
 
-Copy-Item -Path "$ModelsSource\det.mnn" -Destination $IOSModels -Force
-Copy-Item -Path "$ModelsSource\rec.mnn" -Destination $IOSModels -Force
+Copy-Item -Path "$ModelsSource\$detFile" -Destination $IOSModels -Force
+Copy-Item -Path "$ModelsSource\$recFile" -Destination $IOSModels -Force
 Copy-Item -Path "$ModelsSource\dict.txt" -Destination $IOSModels -Force
 
-$iosDetSize = (Get-Item "$IOSModels\det.mnn").Length / 1MB
-$iosRecSize = (Get-Item "$IOSModels\rec.mnn").Length / 1MB
+$iosDetSize = (Get-Item "$IOSModels\$detFile").Length / 1MB
+$iosRecSize = (Get-Item "$IOSModels\$recFile").Length / 1MB
 $iosDictSize = (Get-Item "$IOSModels\dict.txt").Length / 1KB
 
 Write-Host "✓ Copied models to $IOSModels" -ForegroundColor Green
-Write-Host "  - det.mnn ($([math]::Round($iosDetSize, 2)) MB)"
-Write-Host "  - rec.mnn ($([math]::Round($iosRecSize, 2)) MB)"
+Write-Host "  - $detFile ($([math]::Round($iosDetSize, 2)) MB)"
+Write-Host "  - $recFile ($([math]::Round($iosRecSize, 2)) MB)"
 Write-Host "  - dict.txt ($([math]::Round($iosDictSize, 2)) KB)"
 Write-Host ""
 

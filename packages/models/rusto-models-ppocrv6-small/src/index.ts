@@ -31,8 +31,8 @@ export const modelMetadata: ModelPackageMetadata = {
   tier: 'small',
   language: 'multilingual',
   files: {
-    "detection": "models/det.rten",
-    "recognition": "models/rec.rten",
+    "detection": "models/det.onnx",
+    "recognition": "models/rec.onnx",
     "dictionary": "models/dict.txt"
 },
 };
