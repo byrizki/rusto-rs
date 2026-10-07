@@ -1,0 +1,17 @@
+[package]
+name = "rusto-rten-wasm"
+version = "0.2.5"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+rten = { version = "0.27.0", default-features = false, features = ["onnx_format", "rten_format"] }
+rten-tensor = "0.27.0"
+wasm-bindgen = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
