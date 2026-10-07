@@ -21,20 +21,44 @@ onnxruntime.lib
 # Model binaries (downloaded on the fly via scripts/download_models.sh)
 models/**/*.mnn
 models/**/*.onnx
+models/**/*.rten
+docs/public/models/**/*.rten
+docs/public/models/**/*.onnx
+
+# Debugging binary dumps, benchmark artifacts, and agent workspaces
+*.bin
+ktp.jpeg
+.pi-subagents/
+.codesight/
+benchmarks/engine_comparison/dump/
+benchmarks/engine_comparison/calibrated_samples/
 
 # Bundled model assets (generated at build time via packages/react-native/scripts/copy-models.sh)
 packages/android/src/main/assets/*.mnn
 packages/android/src/main/assets/*.onnx
+packages/android/src/main/assets/*.rten
 packages/android/src/main/assets/*.txt
 packages/react-native/android/src/main/assets/*.mnn
 packages/react-native/android/src/main/assets/*.onnx
+packages/react-native/android/src/main/assets/*.rten
 packages/react-native/android/src/main/assets/*.txt
 packages/react-native/ios/models/*.mnn
 packages/react-native/ios/models/*.onnx
+packages/react-native/ios/models/*.rten
 packages/react-native/ios/models/*.txt
 packages/dotnet/models/*.mnn
 packages/dotnet/models/*.onnx
+packages/dotnet/models/*.rten
 packages/dotnet/models/*.txt
+packages/models/**/*.mnn
+packages/models/**/*.onnx
+packages/models/**/*.rten
+packages/models/**/dist
+packages/web/dist
+packages/react/dist
+packages/react-native/directory/
+docs/public/models/**/*.mnn
+packages/ios/Resources/*.rten
 packages/ios/Resources/det.mnn
 packages/ios/Resources/rec.mnn
 packages/ios/Resources/lcnet.mnn
@@ -58,3 +82,6 @@ examples/react-native-*/android/.gradle/
 examples/react-native-*/android/app/build/
 examples/dotnet/**/bin/
 examples/dotnet/**/obj/
+
+.codesight
+.pi-subagents
