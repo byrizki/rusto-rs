@@ -279,8 +279,8 @@ namespace RustODotnet
             config.Detection ??= new DetectionConfig();
             config.Recognition ??= new RecognitionConfig();
 
-            var detName = config.Detection.ModelPath ?? "det.mnn";
-            var recName = config.Recognition.ModelPath ?? "rec.mnn";
+            var detName = config.Detection.ModelPath ?? "det.rten";
+            var recName = config.Recognition.ModelPath ?? "rec.rten";
             var dictName = config.Recognition.DictPath ?? "dict.txt";
 
             config.Detection.ModelPath = ResolveModelPath(detName);
@@ -368,21 +368,25 @@ namespace RustODotnet
             }
 
             var appDir = AppContext.BaseDirectory;
-            var modelsPath = Path.Combine(appDir, "models", path);
-            if (File.Exists(modelsPath))
+            var candidates = new List<string> { path };
+            var ext = Path.GetExtension(path);
+            if (!string.IsNullOrEmpty(ext))
             {
-                return modelsPath;
+                var withoutExt = path.Substring(0, path.Length - ext.Length);
+                candidates.Add(withoutExt + ".rten");
+                candidates.Add(withoutExt + ".onnx");
+                candidates.Add(withoutExt + ".mnn");
             }
 
-            var directPath = Path.Combine(appDir, path);
-            if (File.Exists(directPath))
+            foreach (var cand in candidates)
             {
-                return directPath;
-            }
+                var modelsPath = Path.Combine(appDir, "models", cand);
+                if (File.Exists(modelsPath)) return modelsPath;
 
-            if (File.Exists(path))
-            {
-                return Path.GetFullPath(path);
+                var directPath = Path.Combine(appDir, cand);
+                if (File.Exists(directPath)) return directPath;
+
+                if (File.Exists(cand)) return Path.GetFullPath(cand);
             }
 
             return path;

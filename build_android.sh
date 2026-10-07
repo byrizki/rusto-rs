@@ -41,12 +41,12 @@ cp target/x86_64-linux-android/release/librusto.so packages/android/src/main/jni
 echo "=== Copying assets ==="
 mkdir -p packages/android/src/main/assets
 mkdir -p packages/react-native/android/src/main/assets
-cp models/PPOCR_v5/det.mnn packages/android/src/main/assets/
-cp models/PPOCR_v5/rec.mnn packages/android/src/main/assets/
-cp models/PPOCR_v5/dict.txt packages/android/src/main/assets/
-cp models/PPOCR_v5/det.mnn packages/react-native/android/src/main/assets/
-cp models/PPOCR_v5/rec.mnn packages/react-native/android/src/main/assets/
-cp models/PPOCR_v5/dict.txt packages/react-native/android/src/main/assets/
+cp models/PPOCR_v6_tiny/det.rten packages/android/src/main/assets/
+cp models/PPOCR_v6_tiny/rec.rten packages/android/src/main/assets/
+cp models/PPOCR_v6_tiny/dict.txt packages/android/src/main/assets/
+cp models/PPOCR_v6_tiny/det.rten packages/react-native/android/src/main/assets/
+cp models/PPOCR_v6_tiny/rec.rten packages/react-native/android/src/main/assets/
+cp models/PPOCR_v6_tiny/dict.txt packages/react-native/android/src/main/assets/
 
 echo "=== Building Android AAR ==="
 cd packages/android

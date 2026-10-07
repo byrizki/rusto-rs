@@ -248,12 +248,12 @@ public class RustO {
     public static func initialize(config: InitializeConfig = InitializeConfig()) throws -> RustO {
         var resolvedConfig = config
         var det = config.detection ?? DetectionConfig()
-        let detName = det.modelPath ?? "det.mnn"
+        let detName = det.modelPath ?? "det.rten"
         det.modelPath = resolveModelPath(detName) ?? detName
         resolvedConfig.detection = det
 
         var rec = config.recognition ?? RecognitionConfig()
-        let recName = rec.modelPath ?? "rec.mnn"
+        let recName = rec.modelPath ?? "rec.rten"
         let dictName = rec.dictPath ?? "dict.txt"
         rec.modelPath = resolveModelPath(recName) ?? recName
         rec.dictPath = resolveModelPath(dictName) ?? dictName
@@ -375,12 +375,17 @@ public class RustO {
 
     private static func resolveModelPath(_ filename: String) -> String? {
         if filename.hasPrefix("/") && FileManager.default.fileExists(atPath: filename) { return filename }
-        let name = filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
+        let name = filename.replacingOccurrences(of: ".rten", with: "").replacingOccurrences(of: ".onnx", with: "").replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
         let ext = String(filename.split(separator: ".").last ?? "")
+        let candidateExts = [ext, "rten", "onnx", "mnn", "txt"].filter { !$0.isEmpty }
         let bundleNames = ["RustOModels", "RustoModels", "RustOModels_PPOCRv6_Tiny", "RustOModels_PPOCRv6_Small", "RustOModels_PPOCRv6_Medium", "RustOModels_PPOCRv5_Mobile", "RustOModels_PPOCRv5_Server", "RustOModels_PPOCRv4_Mobile", "RustOModels_PPOCRv4_Server"]
         for bundleName in bundleNames {
             if let path = Bundle.main.path(forResource: bundleName, ofType: "bundle"),
-               let bundle = Bundle(path: path), let file = bundle.path(forResource: name, ofType: ext) { return file }
+               let bundle = Bundle(path: path) {
+                for candidateExt in candidateExts {
+                    if let file = bundle.path(forResource: name, ofType: candidateExt) { return file }
+                }
+            }
         }
         if let file = Bundle.main.path(forResource: filename, ofType: nil) { return file }
         let documents = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)[0]

@@ -24,9 +24,9 @@ class RustoModule: NSObject {
             }
             var resolvedConfig: [String: Any] = [
                 "template": config["preset"] ?? "ppv6",
-                "detection": ["modelPath": model("detection", fallback: "det.mnn")!],
+                "detection": ["modelPath": model("detection", fallback: "det.rten")!],
                 "recognition": [
-                    "modelPath": model("recognition", fallback: "rec.mnn")!,
+                    "modelPath": model("recognition", fallback: "rec.rten")!,
                     "dictPath": model("dictionary", fallback: "dict.txt")!,
                 ],
             ]
@@ -208,8 +208,9 @@ class RustoModule: NSObject {
         }
         
         var sourcePath: String?
-        let name = filename.replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
+        let name = filename.replacingOccurrences(of: ".rten", with: "").replacingOccurrences(of: ".onnx", with: "").replacingOccurrences(of: ".mnn", with: "").replacingOccurrences(of: ".txt", with: "")
         let ext = String(filename.split(separator: ".").last ?? "")
+        let candidateExts = [ext, "rten", "onnx", "mnn", "txt"].filter { !$0.isEmpty }
         
         let bundleNames = [
             "RustOModels", "RustoModels",
@@ -220,9 +221,15 @@ class RustoModule: NSObject {
         
         for bName in bundleNames {
             if let bundlePath = Bundle(for: type(of: self)).path(forResource: bName, ofType: "bundle") ?? Bundle.main.path(forResource: bName, ofType: "bundle"),
-               let bundle = Bundle(path: bundlePath),
-               let filePath = bundle.path(forResource: name, ofType: ext) {
-                sourcePath = filePath
+               let bundle = Bundle(path: bundlePath) {
+                for candidateExt in candidateExts {
+                    if let filePath = bundle.path(forResource: name, ofType: candidateExt) {
+                        sourcePath = filePath
+                        break
+                    }
+                }
+                if sourcePath != nil { break }
+            }
                 break
             }
         }

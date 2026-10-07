@@ -59,8 +59,8 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
         }
         return InitializeConfig(
             template = template,
-            detection = DetectionConfig(modelPath = model("detection") ?: "det.mnn"),
-            recognition = RecognitionConfig(modelPath = model("recognition") ?: "rec.mnn", dictPath = model("dictionary") ?: "dict.txt"),
+            detection = DetectionConfig(modelPath = model("detection") ?: "det.rten"),
+            recognition = RecognitionConfig(modelPath = model("recognition") ?: "rec.rten", dictPath = model("dictionary") ?: "dict.txt"),
             classification = model("classification")?.let { ClassificationConfig(enabled = true, modelPath = it) },
             orientation = model("orientation")?.let { OrientationConfig(enabled = true, modelPath = it) },
         )

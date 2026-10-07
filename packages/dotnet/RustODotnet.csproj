@@ -13,7 +13,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/byrizki/rusto-rs</RepositoryUrl>
     <PackageProjectUrl>https://github.com/byrizki/rusto-rs</PackageProjectUrl>
-    <PackageTags>OCR;TextRecognition;ComputerVision;Rust;PaddleOCR;MNN</PackageTags>
+    <PackageTags>OCR;TextRecognition;ComputerVision;Rust;PaddleOCR;RTen</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>

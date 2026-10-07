@@ -88,7 +88,7 @@ data class InitializeConfig(
         template?.let { json.put("template", it) }
 
         val detObj = JSONObject()
-        val detPath = detection?.modelPath ?: "det.mnn"
+        val detPath = detection?.modelPath ?: "det.rten"
         detObj.put("modelPath", resolveModel(context, detPath))
         detection?.enabled?.let { detObj.put("enabled", it) }
         detection?.thresh?.let { detObj.put("thresh", it.toDouble()) }
@@ -100,7 +100,7 @@ data class InitializeConfig(
         json.put("detection", detObj)
 
         val recObj = JSONObject()
-        val recPath = recognition?.modelPath ?: "rec.mnn"
+        val recPath = recognition?.modelPath ?: "rec.rten"
         val dictPath = recognition?.dictPath ?: "dict.txt"
         recObj.put("modelPath", resolveModel(context, recPath))
         recObj.put("dictPath", resolveModel(context, dictPath))
