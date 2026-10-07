@@ -2,7 +2,7 @@ Pod::Spec.new do |s|
   s.name             = 'RustO-Models-PPOCRv5-Tamil'
   s.version          = '0.2.5'
   s.summary          = 'PP-OCRv5 Tamil recognition model for RustO! iOS'
-  s.description      = 'Pre-trained PP-OCRv5 Tamil MNN recognition model bundled as a resource bundle for RustO on iOS.'
+  s.description      = 'Pre-trained PP-OCRv5 Tamil recognition model bundled as a resource bundle for RustO on iOS.'
   s.homepage         = 'https://github.com/byrizki/rusto-rs'
   s.license          = { :type => 'MIT', :text => 'MIT License' }
   s.author           = { 'RustO Contributors' => 'support@rusto.dev' }
@@ -11,6 +11,6 @@ Pod::Spec.new do |s|
   }
   s.ios.deployment_target = '12.0'
   s.resource_bundles = {
-    'RustOModels_PPOCRv5_Tamil' => ['**/*.{mnn,txt}']
+    'RustOModels_PPOCRv5_Tamil' => ['**/*.{onnx,rten,mnn,txt}']
   }
 end

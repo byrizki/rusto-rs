@@ -1,13 +1,13 @@
 # RustODotnet.Models.PPOCRv4.Kannada
 
-Pre-converted PP-OCRv4 Kannada script MNN recognition model for [RustODotnet](https://www.nuget.org/packages/RustODotnet).
+Pre-converted PP-OCRv4 Kannada script recognition model for [RustODotnet](https://www.nuget.org/packages/RustODotnet).
 
 ## Included Models
 
-- `rec.mnn` (PP-OCRv4 Kannada Recognition)
+- `rec.onnx` (PP-OCRv4 Kannada Recognition)
 - `dict.txt` (Kannada script dictionary)
 
-> **Note**: Detection model (`det.mnn`) is language-agnostic.
+> **Note**: Detection model (`det.onnx`) is language-agnostic.
 > Add a base model package (e.g. `RustODotnet.Models.PPOCRv4.Mobile`) for the detection model,
 > then configure `recognition.modelPath` and `recognition.dictPath` to point to this package's files.
 

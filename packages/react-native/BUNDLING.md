@@ -10,8 +10,8 @@ The React Native RustO package supports bundling model files directly into your 
 
 The package expects these default model files:
 
-- `det.mnn` - Detection model
-- `rec.mnn` - Recognition model
+- `det.onnx` - Detection model
+- `rec.onnx` - Recognition model
 - `dict.txt` - Character dictionary
 
 These files should be placed in the appropriate directories for each platform.
@@ -26,8 +26,8 @@ Place model files in `packages/android/src/main/assets/`:
 
 ```
 packages/android/src/main/assets/
-├── det.mnn
-├── rec.mnn
+├── det.onnx
+├── rec.onnx
 └── dict.txt
 ```
 
@@ -39,8 +39,8 @@ Place model files in `packages/react-native/android/src/main/assets/`:
 
 ```
 packages/react-native/android/src/main/assets/
-├── det.mnn
-├── rec.mnn
+├── det.onnx
+├── rec.onnx
 └── dict.txt
 ```
 
@@ -79,8 +79,8 @@ Place your model files in this directory:
 
 ```
 packages/react-native/ios/models/
-├── det.mnn
-├── rec.mnn
+├── det.onnx
+├── rec.onnx
 └── dict.txt
 ```
 
@@ -91,7 +91,7 @@ The `.podspec` file is already configured to bundle these models as resources:
 ```ruby
 s.resource_bundles = {
   'RustoModels' => [
-    'ios/models/*.mnn',
+    'ios/models/*.onnx',
     'ios/models/*.txt'
   ]
 }
@@ -127,8 +127,8 @@ You can specify custom model paths in config:
 // Initialize with custom models.
 await initialize({
   models: {
-    detection: '/custom/path/det_model.mnn',
-    recognition: '/custom/path/rec_model.mnn',
+    detection: '/custom/path/det_model.onnx',
+    recognition: '/custom/path/rec_model.onnx',
     dictionary: '/custom/path/dictionary.txt',
   },
 });
@@ -143,7 +143,7 @@ You can override only specific models:
 await initialize({ models: { dictionary: '/custom/path/my_dict.txt' } });
 
 // Or use custom detector with bundled recognizer and dictionary.
-await initialize({ models: { detection: '/custom/det.mnn' } });
+await initialize({ models: { detection: '/custom/det.onnx' } });
 ```
 
 ---
@@ -166,8 +166,8 @@ To copy the default PPOCR_v5 models from the source repository:
 
 ```bash
 # From the repository root
-cp models/PPOCR_v5/det.mnn packages/android/src/main/assets/
-cp models/PPOCR_v5/rec.mnn packages/android/src/main/assets/
+cp models/PPOCR_v5/det.onnx packages/android/src/main/assets/
+cp models/PPOCR_v5/rec.onnx packages/android/src/main/assets/
 cp models/PPOCR_v5/dict.txt packages/android/src/main/assets/
 ```
 
@@ -176,8 +176,8 @@ cp models/PPOCR_v5/dict.txt packages/android/src/main/assets/
 ```bash
 # From the repository root
 mkdir -p packages/react-native/ios/models
-cp models/PPOCR_v5/det.mnn packages/react-native/ios/models/
-cp models/PPOCR_v5/rec.mnn packages/react-native/ios/models/
+cp models/PPOCR_v5/det.onnx packages/react-native/ios/models/
+cp models/PPOCR_v5/rec.onnx packages/react-native/ios/models/
 cp models/PPOCR_v5/dict.txt packages/react-native/ios/models/
 ```
 
@@ -200,8 +200,8 @@ unzip -l build/outputs/aar/android-release.aar | grep assets
 You should see:
 
 ```
-assets/det.mnn
-assets/rec.mnn
+assets/det.onnx
+assets/rec.onnx
 assets/dict.txt
 ```
 

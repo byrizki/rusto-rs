@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(long, default_value = "models/DocOCR/layout.mnn")]
+    #[arg(long, default_value = "models/DocOCR/layout.onnx")]
     model: PathBuf,
     
     #[arg(long, default_value = "models/test_images/page3.png")]

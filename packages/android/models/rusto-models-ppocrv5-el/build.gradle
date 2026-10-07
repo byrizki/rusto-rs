@@ -27,7 +27,7 @@ mavenPublishing {
 
     pom {
         name = 'RustO! Models PP-OCRv5 Greek'
-        description = 'PP-OCRv5 Greek pre-trained MNN recognition model for RustO! Android'
+        description = 'PP-OCRv5 Greek pre-trained recognition model for RustO! Android'
         url = 'https://github.com/byrizki/rusto-rs'
 
         licenses {

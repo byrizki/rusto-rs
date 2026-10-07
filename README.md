@@ -228,7 +228,7 @@ PP-OCRv4 specialized recognition packages pair a language-specific `rec.rten` + 
 
 ### Downloading Models on the Fly
 
-You can use the built-in downloader to fetch pre-converted MNN models directly from [ModelScope RapidOCR](https://www.modelscope.cn/models/RapidAI/RapidOCR):
+You can use the built-in downloader to fetch pre-converted ONNX models directly from [ModelScope RapidOCR](https://www.modelscope.cn/models/RapidAI/RapidOCR):
 
 ```bash
 # Download all models for all tiers and languages

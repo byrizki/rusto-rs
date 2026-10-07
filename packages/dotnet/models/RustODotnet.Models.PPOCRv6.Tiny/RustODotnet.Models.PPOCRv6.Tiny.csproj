@@ -5,11 +5,11 @@
     <PackageId>RustODotnet.Models.PPOCRv6.Tiny</PackageId>
     <Version>0.2.5</Version>
     <Authors>RustO Contributors</Authors>
-    <Description>PP-OCRv6 Tiny pre-trained MNN models for RustODotnet (~6 MB default/recommended)</Description>
+    <Description>PP-OCRv6 Tiny pre-trained models for RustODotnet (~6 MB default/recommended)</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/byrizki/rusto-rs</RepositoryUrl>
     <PackageProjectUrl>https://github.com/byrizki/rusto-rs</PackageProjectUrl>
-    <PackageTags>OCR;PaddleOCR;MNN;PP-OCRv6;Models;Tiny</PackageTags>
+    <PackageTags>OCR;PaddleOCR;ONNX;RTen;PP-OCRv6;Models;Tiny</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>

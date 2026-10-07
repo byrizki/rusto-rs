@@ -19,19 +19,19 @@ Demonstrates the full document processing pipeline with layout analysis and OCR.
 ```bash
 cargo run --example doc_pipeline_demo -- \
   --image path/to/document.jpg \
-  --layout-model models/DocOCR/layout.mnn \
-  --det-model models/ch_PP-OCRv4_det_infer.mnn \
-  --rec-model models/ch_PP-OCRv4_rec_infer.mnn \
-  --keys-path models/ppocr_keys_v1.txt
+  --layout-model models/DocOCR/layout.onnx \
+  --det-model models/PPOCR_v5/det.onnx \
+  --rec-model models/PPOCR_v5/rec.onnx \
+  --keys-path models/PPOCR_v5/dict.txt
 ```
 
 ### Arguments
 
 - `--image`: Path to the input document image
-- `--layout-model`: Path to the layout detection model (default: `models/DocOCR/layout.mnn`)
-- `--det-model`: Path to the text detection model (default: `models/ch_PP-OCRv4_det_infer.mnn`)
-- `--rec-model`: Path to the text recognition model (default: `models/ch_PP-OCRv4_rec_infer.mnn`)
-- `--keys-path`: Path to the character dictionary (default: `models/ppocr_keys_v1.txt`)
+- `--layout-model`: Path to the layout detection model (default: `models/DocOCR/layout.onnx`)
+- `--det-model`: Path to the text detection model (default: `models/PPOCR_v5/det.onnx`)
+- `--rec-model`: Path to the text recognition model (default: `models/PPOCR_v5/rec.onnx`)
+- `--keys-path`: Path to the character dictionary (default: `models/PPOCR_v5/dict.txt`)
 
 ### Output
 
@@ -44,19 +44,18 @@ The example generates markdown-formatted output with:
 
 ### Required Models
 
-You need to download or convert the following models:
+You need to download the following models:
 
-1. **Layout Model** (`layout.mnn`):
-   - Download from RapidDoc models or convert from PaddleOCR layout models
+1. **Layout Model** (`layout.onnx`):
    - Place in `models/DocOCR/`
 
-2. **Detection Model** (`det.mnn`):
-   - Convert from PaddleOCR detection models using `convert_paddle_to_mnn.py`
+2. **Detection Model** (`det.onnx` or `det.rten`):
+   - Download using `bash scripts/download_models.sh`
 
-3. **Recognition Model** (`rec.mnn`):
-   - Convert from PaddleOCR recognition models using `convert_paddle_to_mnn.py`
+3. **Recognition Model** (`rec.onnx` or `rec.rten`):
+   - Download using `bash scripts/download_models.sh`
 
 4. **Dictionary** (`dict.txt`):
-   - Download from PaddleOCR or RapidOCR repositories
+   - Included with model downloads
 
 See the main [README.md](../README.md) for model conversion instructions.

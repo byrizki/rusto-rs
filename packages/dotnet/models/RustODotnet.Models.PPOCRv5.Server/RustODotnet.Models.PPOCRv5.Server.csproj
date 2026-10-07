@@ -9,7 +9,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/byrizki/rusto-rs</RepositoryUrl>
     <PackageProjectUrl>https://github.com/byrizki/rusto-rs</PackageProjectUrl>
-    <PackageTags>OCR;PaddleOCR;MNN;PP-OCRv5;Models;Server</PackageTags>
+    <PackageTags>OCR;PaddleOCR;ONNX;RTen;PP-OCRv5;Models;Server</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>

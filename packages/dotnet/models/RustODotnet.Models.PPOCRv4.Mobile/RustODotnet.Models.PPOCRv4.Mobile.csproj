@@ -5,11 +5,11 @@
     <PackageId>RustODotnet.Models.PPOCRv4.Mobile</PackageId>
     <Version>0.2.5</Version>
     <Authors>RustO Contributors</Authors>
-    <Description>PP-OCRv4 mobile pre-trained MNN models with orientation classifier for RustODotnet (~23 MB)</Description>
+    <Description>PP-OCRv4 mobile pre-trained models with orientation classifier for RustODotnet (~23 MB)</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/byrizki/rusto-rs</RepositoryUrl>
     <PackageProjectUrl>https://github.com/byrizki/rusto-rs</PackageProjectUrl>
-    <PackageTags>OCR;PaddleOCR;MNN;PP-OCRv4;Models;Mobile</PackageTags>
+    <PackageTags>OCR;PaddleOCR;ONNX;RTen;PP-OCRv4;Models;Mobile</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>

@@ -12,13 +12,13 @@ struct Args {
     #[arg(short, long)]
     image: PathBuf,
 
-    #[arg(long, default_value = "models/DocOCR/layout.mnn")]
+    #[arg(long, default_value = "models/DocOCR/layout.onnx")]
     layout_model: PathBuf,
 
-    #[arg(long, default_value = "models/PPOCR_v5/det.mnn")]
+    #[arg(long, default_value = "models/PPOCR_v5/det.onnx")]
     det_model: PathBuf,
 
-    #[arg(long, default_value = "models/PPOCR_v5/rec.mnn")]
+    #[arg(long, default_value = "models/PPOCR_v5/rec.onnx")]
     rec_model: PathBuf,
 
     #[arg(long, default_value = "models/PPOCR_v5/dict.txt")]
@@ -47,13 +47,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         (
             Some(TableDetectorConfig {
-                model_path: model_dir.join("rtdetr-wired.mnn"),
+                model_path: model_dir.join("rtdetr-wired.onnx"),
                 conf_threshold: 0.5,
                 iou_threshold: 0.5,
                 model_type: TableModelType::Wired,
             }),
             Some(TableStructureConfig {
-                model_path: model_dir.join("slanext-wired.mnn"),
+                model_path: model_dir.join("slanext-wired.onnx"),
                 model_type: TableModelType::Wired,
             }),
         )

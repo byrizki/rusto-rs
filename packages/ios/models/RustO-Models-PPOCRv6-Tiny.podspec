@@ -2,7 +2,7 @@ Pod::Spec.new do |s|
   s.name             = 'RustO-Models-PPOCRv6-Tiny'
   s.version          = '0.2.5'
   s.summary          = 'PP-OCRv6 Tiny pre-trained models for RustO! iOS'
-  s.description      = 'Pre-trained PP-OCRv6 Tiny MNN models (~6 MB) bundled as a resource bundle for RustO on iOS.'
+  s.description      = 'Pre-trained PP-OCRv6 Tiny models (~6 MB) bundled as a resource bundle for RustO on iOS.'
   s.homepage         = 'https://github.com/byrizki/rusto-rs'
   s.license          = { :type => 'MIT', :text => 'MIT License' }
   s.author           = { 'RustO Contributors' => 'support@rusto.dev' }
@@ -11,6 +11,6 @@ Pod::Spec.new do |s|
   }
   s.ios.deployment_target = '12.0'
   s.resource_bundles = {
-    'RustOModels_PPOCRv6_Tiny' => ['**/*.{mnn,txt}']
+    'RustOModels_PPOCRv6_Tiny' => ['**/*.{onnx,rten,mnn,txt}']
   }
 end

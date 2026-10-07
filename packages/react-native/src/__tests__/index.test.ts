@@ -14,11 +14,11 @@ describe('React Native API', () => {
     (NativeModules.Rusto.initialize as jest.Mock).mockResolvedValue();
     await initialize({
       preset: 'ppv6',
-      models: { recognition: 'rec.mnn' },
+      models: { recognition: 'rec.onnx' },
     });
     expect(NativeModules.Rusto.initialize).toHaveBeenCalledWith({
       preset: 'ppv6',
-      models: { recognition: 'rec.mnn' },
+      models: { recognition: 'rec.onnx' },
     });
   });
 

@@ -5,8 +5,8 @@ fn main() {
     println!("=== RustO Performance Test ===\n");
     
     let config = InitializeConfig::ppv5(
-        "models/PPOCR_v5/det.mnn",
-        "models/PPOCR_v5/rec.mnn",
+        "models/PPOCR_v5/det.onnx",
+        "models/PPOCR_v5/rec.onnx",
         "models/PPOCR_v5/dict.txt"
     );
     

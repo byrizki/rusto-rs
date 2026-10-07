@@ -23,10 +23,30 @@ echo "Repository root: $REPO_ROOT"
 echo "Model source: $MODELS_SOURCE"
 echo ""
 
+# Detect available model file format
+DET_FILE=""
+REC_FILE=""
+for ext in onnx rten mnn; do
+    if [ -f "$MODELS_SOURCE/det.$ext" ] && [ -z "$DET_FILE" ]; then
+        DET_FILE="det.$ext"
+    fi
+    if [ -f "$MODELS_SOURCE/rec.$ext" ] && [ -z "$REC_FILE" ]; then
+        REC_FILE="rec.$ext"
+    fi
+done
+
 # Check if source models exist; if not, download on the fly
-if [ ! -f "$MODELS_SOURCE/det.mnn" ] || [ ! -f "$MODELS_SOURCE/rec.mnn" ] || [ ! -f "$MODELS_SOURCE/dict.txt" ]; then
+if [ -z "$DET_FILE" ] || [ -z "$REC_FILE" ] || [ ! -f "$MODELS_SOURCE/dict.txt" ]; then
     echo "Models not found in $MODELS_SOURCE. Downloading default PP-OCRv6 tiny models..."
     bash "$REPO_ROOT/scripts/download_models.sh" --output-dir "$MODELS_SOURCE"
+    for ext in onnx rten mnn; do
+        if [ -f "$MODELS_SOURCE/det.$ext" ] && [ -z "$DET_FILE" ]; then
+            DET_FILE="det.$ext"
+        fi
+        if [ -f "$MODELS_SOURCE/rec.$ext" ] && [ -z "$REC_FILE" ]; then
+            REC_FILE="rec.$ext"
+        fi
+    done
 fi
 
 # Android: Copy to main android package assets and react-native android assets
@@ -36,17 +56,17 @@ RN_ANDROID_ASSETS="$RN_PACKAGE/android/src/main/assets"
 mkdir -p "$ANDROID_ASSETS"
 mkdir -p "$RN_ANDROID_ASSETS"
 
-cp "$MODELS_SOURCE/det.mnn" "$ANDROID_ASSETS/"
-cp "$MODELS_SOURCE/rec.mnn" "$ANDROID_ASSETS/"
+cp "$MODELS_SOURCE/$DET_FILE" "$ANDROID_ASSETS/"
+cp "$MODELS_SOURCE/$REC_FILE" "$ANDROID_ASSETS/"
 cp "$MODELS_SOURCE/dict.txt" "$ANDROID_ASSETS/"
 
-cp "$MODELS_SOURCE/det.mnn" "$RN_ANDROID_ASSETS/"
-cp "$MODELS_SOURCE/rec.mnn" "$RN_ANDROID_ASSETS/"
+cp "$MODELS_SOURCE/$DET_FILE" "$RN_ANDROID_ASSETS/"
+cp "$MODELS_SOURCE/$REC_FILE" "$RN_ANDROID_ASSETS/"
 cp "$MODELS_SOURCE/dict.txt" "$RN_ANDROID_ASSETS/"
 
 echo "✓ Copied models to $ANDROID_ASSETS and $RN_ANDROID_ASSETS"
-echo "  - det.mnn ($(du -h "$ANDROID_ASSETS/det.mnn" | cut -f1))"
-echo "  - rec.mnn ($(du -h "$ANDROID_ASSETS/rec.mnn" | cut -f1))"
+echo "  - $DET_FILE ($(du -h "$ANDROID_ASSETS/$DET_FILE" | cut -f1))"
+echo "  - $REC_FILE ($(du -h "$ANDROID_ASSETS/$REC_FILE" | cut -f1))"
 echo "  - dict.txt ($(du -h "$ANDROID_ASSETS/dict.txt" | cut -f1))"
 echo ""
 
@@ -55,13 +75,13 @@ echo "🍎 iOS Setup..."
 IOS_MODELS="$RN_PACKAGE/ios/models"
 mkdir -p "$IOS_MODELS"
 
-cp "$MODELS_SOURCE/det.mnn" "$IOS_MODELS/"
-cp "$MODELS_SOURCE/rec.mnn" "$IOS_MODELS/"
+cp "$MODELS_SOURCE/$DET_FILE" "$IOS_MODELS/"
+cp "$MODELS_SOURCE/$REC_FILE" "$IOS_MODELS/"
 cp "$MODELS_SOURCE/dict.txt" "$IOS_MODELS/"
 
 echo "✓ Copied models to $IOS_MODELS"
-echo "  - det.mnn ($(du -h "$IOS_MODELS/det.mnn" | cut -f1))"
-echo "  - rec.mnn ($(du -h "$IOS_MODELS/rec.mnn" | cut -f1))"
+echo "  - $DET_FILE ($(du -h "$IOS_MODELS/$DET_FILE" | cut -f1))"
+echo "  - $REC_FILE ($(du -h "$IOS_MODELS/$REC_FILE" | cut -f1))"
 echo "  - dict.txt ($(du -h "$IOS_MODELS/dict.txt" | cut -f1))"
 echo ""
 

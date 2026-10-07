@@ -27,7 +27,7 @@ mavenPublishing {
 
     pom {
         name = 'RustO! Models PP-OCRv4 Japanese'
-        description = 'PP-OCRv4 Japanese script pre-trained MNN recognition model for RustO! Android'
+        description = 'PP-OCRv4 Japanese script pre-trained recognition model for RustO! Android'
         url = 'https://github.com/byrizki/rusto-rs'
 
         licenses {

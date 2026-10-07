@@ -1,13 +1,13 @@
 # RustODotnet.Models.PPOCRv5.Telugu
 
-Pre-converted PP-OCRv5 Telugu MNN recognition model for [RustODotnet](https://www.nuget.org/packages/RustODotnet).
+Pre-converted PP-OCRv5 Telugu recognition model for [RustODotnet](https://www.nuget.org/packages/RustODotnet).
 
 ## Included Models
 
-- `rec.mnn` (PP-OCRv5 Telugu Recognition)
+- `rec.onnx` (PP-OCRv5 Telugu Recognition)
 - `dict.txt` (Telugu dictionary)
 
-> **Note**: Detection model (`det.mnn`) is language-agnostic.
+> **Note**: Detection model (`det.onnx`) is language-agnostic.
 > Add a base model package (e.g. `RustODotnet.Models.PPOCRv5.Mobile`) for the detection model,
 > then configure `recognition.modelPath` and `recognition.dictPath` to point to this package's files.
 

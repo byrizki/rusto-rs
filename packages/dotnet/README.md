@@ -73,10 +73,10 @@ Initialization selects model preset/resources. It does not control per-image pre
 
 ```csharp
 using var ocr = RustO.Initialize(InitializeConfig.Ppv6(
-    detection: new DetectionConfig { ModelPath = "models/det.mnn" },
+    detection: new DetectionConfig { ModelPath = "models/det.onnx" },
     recognition: new RecognitionConfig
     {
-        ModelPath = "models/rec.mnn",
+        ModelPath = "models/rec.onnx",
         DictPath = "models/dict.txt",
     }));
 ```
@@ -84,8 +84,8 @@ using var ocr = RustO.Initialize(InitializeConfig.Ppv6(
 | Field | Type | Meaning |
 |---|---|---|
 | `Template` | `"ppv6"`, `"ppv5"`, `"ppv4"`, `"ppv3"` | Preset defaults. Use `InitializeConfig.Ppv6()` etc. when possible. |
-| `Detection.ModelPath` | `string` | Detection model; default logical name `det.mnn`. |
-| `Recognition.ModelPath` | `string` | Recognition model; default logical name `rec.mnn`. |
+| `Detection.ModelPath` | `string` | Detection model; default logical name `det.onnx` (or `det.rten`). |
+| `Recognition.ModelPath` | `string` | Recognition model; default logical name `rec.onnx` (or `rec.rten`). |
 | `Recognition.DictPath` | `string` | Dictionary; default logical name `dict.txt`. |
 | `Classification` / `Orientation` | optional config | Optional auxiliary model paths. Enable respective request option to use. |
 

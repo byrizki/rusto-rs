@@ -103,6 +103,9 @@ pub enum EngineSession {
     Custom(Box<dyn InferenceSession>),
 }
 
+#[deprecated(note = "MnnSession is deprecated, please use EngineSession or RtenSession")]
+pub type MnnSession = EngineSession;
+
 impl EngineSession {
     pub fn from_path(model_path: &Path, engine_cfg: &EngineConfig) -> Result<Self, EngineError> {
         let session = RtenSession::from_path(model_path, engine_cfg)?;

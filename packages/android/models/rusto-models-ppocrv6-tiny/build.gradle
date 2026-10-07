@@ -27,7 +27,7 @@ mavenPublishing {
 
     pom {
         name = 'RustO! Models PP-OCRv6 Tiny'
-        description = 'PP-OCRv6 Tiny pre-trained MNN models for RustO! Android'
+        description = 'PP-OCRv6 Tiny pre-trained models for RustO! Android'
         url = 'https://github.com/byrizki/rusto-rs'
         
         licenses {

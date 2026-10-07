@@ -124,11 +124,11 @@ Creates or replaces native OCR engine. Defaults to PP-OCRv6 bundled model filena
 await initialize({
   preset: 'ppv6',
   models: {
-    detection: 'det.mnn',
-    recognition: 'rec.mnn',
+    detection: 'det.onnx',
+    recognition: 'rec.onnx',
     dictionary: 'dict.txt',
-    // classification: 'cls.mnn',
-    // orientation: 'orient.mnn',
+    // classification: 'cls.onnx',
+    // orientation: 'orient.onnx',
   },
 });
 ```

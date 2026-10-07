@@ -27,7 +27,7 @@ mavenPublishing {
 
     pom {
         name = 'RustO! Models PP-OCRv4 Server'
-        description = 'PP-OCRv4 server pre-trained high-accuracy MNN models with orientation classifier for RustO! Android'
+        description = 'PP-OCRv4 server pre-trained high-accuracy models with orientation classifier for RustO! Android'
         url = 'https://github.com/byrizki/rusto-rs'
         
         licenses {

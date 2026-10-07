@@ -2,7 +2,7 @@ Pod::Spec.new do |s|
   s.name             = 'RustO-Models-PPOCRv4-Mobile'
   s.version          = '0.2.5'
   s.summary          = 'PP-OCRv4 Mobile pre-trained models for RustO! iOS'
-  s.description      = 'Pre-trained PP-OCRv4 Mobile MNN models with orientation classifier (~23 MB) bundled as a resource bundle for RustO on iOS.'
+  s.description      = 'Pre-trained PP-OCRv4 Mobile models with orientation classifier (~23 MB) bundled as a resource bundle for RustO on iOS.'
   s.homepage         = 'https://github.com/byrizki/rusto-rs'
   s.license          = { :type => 'MIT', :text => 'MIT License' }
   s.author           = { 'RustO Contributors' => 'support@rusto.dev' }
@@ -11,6 +11,6 @@ Pod::Spec.new do |s|
   }
   s.ios.deployment_target = '12.0'
   s.resource_bundles = {
-    'RustOModels_PPOCRv4_Mobile' => ['**/*.{mnn,txt}']
+    'RustOModels_PPOCRv4_Mobile' => ['**/*.{onnx,rten,mnn,txt}']
   }
 end
