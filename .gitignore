@@ -24,6 +24,12 @@ models/**/*.onnx
 models/**/*.rten
 docs/public/models/**/*.rten
 docs/public/models/**/*.onnx
+docs/public/models/ppocrv5-mobile/
+docs/public/models/ppocrv5-server/
+docs/public/models/ppocrv4-mobile/
+docs/public/models/ppocrv4-server/
+docs/public/models/ppocrv6-small/
+docs/public/models/ppocrv6-medium/
 
 # Debugging binary dumps, benchmark artifacts, and agent workspaces
 *.bin

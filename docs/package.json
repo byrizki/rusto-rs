@@ -3,6 +3,7 @@
   "scripts": {
     "dev": "nuxt dev --extends docus",
     "build": "nuxt build --extends docus --preset github_pages",
+    "download-models": "bash scripts/download-models.sh",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",

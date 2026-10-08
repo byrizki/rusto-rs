@@ -12,11 +12,13 @@ TIER="tiny"
 LANG=""
 OUTPUT_DIR=""
 DOWNLOAD_ALL=false
+CONVERT_RTEN=false
 
 # Parse optional arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --all) DOWNLOAD_ALL=true ;;
+        --convert-rten) CONVERT_RTEN=true ;;
         --model) MODEL_TYPE="$2"; shift ;;
         --tier) TIER="$2"; shift ;;
         --lang) LANG="$2"; shift ;;
@@ -316,3 +318,32 @@ fi
 
 echo ""
 echo "✅ Download complete"
+
+if [ "$CONVERT_RTEN" = true ]; then
+    echo "=== Converting downloaded models to true .rten format and removing .onnx ==="
+    RTEN_CONVERT=""
+    if command -v rten-convert &>/dev/null; then
+        RTEN_CONVERT="rten-convert"
+    elif [ -f "/tmp/rten-env/bin/rten-convert" ]; then
+        RTEN_CONVERT="/tmp/rten-env/bin/rten-convert"
+    elif [ -f "$HOME/.local/bin/rten-convert" ]; then
+        RTEN_CONVERT="$HOME/.local/bin/rten-convert"
+    else
+        python3 -m pip install --upgrade rten-convert --break-system-packages 2>/dev/null || python3 -m pip install rten-convert 2>/dev/null || true
+        RTEN_CONVERT="$(command -v rten-convert || true)"
+    fi
+
+    if [ -n "$RTEN_CONVERT" ]; then
+        target_root="${OUTPUT_DIR:-$REPO_ROOT/models}"
+        find "$target_root" -name "*.onnx" | while read -r onnx_path; do
+            rten_path="${onnx_path%.onnx}.rten"
+            echo "Converting $onnx_path -> $rten_path..."
+            "$RTEN_CONVERT" "$onnx_path" "$rten_path"
+            rm -f "$onnx_path"
+        done
+        echo "✓ All ONNX models converted to .rten"
+    else
+        echo "⚠️ rten-convert could not be found or installed, skipping conversion" >&2
+    fi
+fi
+

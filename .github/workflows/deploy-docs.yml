@@ -95,18 +95,27 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Fetch prebuilt WASM from GitHub Release
+      - name: Fetch prebuilt WASM and Models from GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.check-prerequisites.outputs.release_tag }}
         run: |
           mkdir -p /tmp/wasm-assets
+          mkdir -p /tmp/model-assets
           mkdir -p ../packages/web/src/wasm
           mkdir -p public/wasm
+          mkdir -p public/models/ppocrv6-tiny
+          mkdir -p public/models/ppocrv6-small
+          mkdir -p public/models/ppocrv6-medium
+          mkdir -p public/models/ppocrv5-mobile
+          mkdir -p public/models/ppocrv5-server
+          mkdir -p public/models/ppocrv4-mobile
+          mkdir -p public/models/ppocrv4-server
 
           if [ "$RELEASE_TAG" != "local" ] && [ -n "$RELEASE_TAG" ]; then
-            echo "Downloading prebuilt WASM from release ${RELEASE_TAG}..."
+            echo "Downloading prebuilt WASM and Models from release ${RELEASE_TAG}..."
             gh release download "$RELEASE_TAG" --pattern 'rusto-wasm.*' --pattern 'rusto-web-*.tgz' --dir /tmp/wasm-assets || true
+            gh release download "$RELEASE_TAG" --pattern 'RustO-Models-*.zip' --dir /tmp/model-assets || true
 
             if [ -f /tmp/wasm-assets/rusto-wasm.tar.gz ]; then
               echo "Extracting rusto-wasm.tar.gz..."
@@ -121,7 +130,64 @@ jobs:
                 cp -r /tmp/wasm-assets/package/src/wasm/* ../packages/web/src/wasm/
               fi
             fi
+
+            for zip_file in /tmp/model-assets/RustO-Models-*.zip; do
+              [ -f "$zip_file" ] || continue
+              name=$(basename "$zip_file" .zip)
+              case "$name" in
+                RustO-Models-PPOCRv6-Tiny) target="ppocrv6-tiny" ;;
+                RustO-Models-PPOCRv6-Small) target="ppocrv6-small" ;;
+                RustO-Models-PPOCRv6-Medium) target="ppocrv6-medium" ;;
+                RustO-Models-PPOCRv5-Mobile) target="ppocrv5-mobile" ;;
+                RustO-Models-PPOCRv5-Server) target="ppocrv5-server" ;;
+                RustO-Models-PPOCRv4-Mobile) target="ppocrv4-mobile" ;;
+                RustO-Models-PPOCRv4-Server) target="ppocrv4-server" ;;
+                *) continue ;;
+              esac
+              echo "Extracting $zip_file to public/models/$target/..."
+              unzip -o "$zip_file" -d "public/models/$target/"
+            done
           fi
+
+          # Fallback for models if not populated from release
+          populate_model() {
+            local target_id="$1"
+            local local_dir="$2"
+            local model_type="$3"
+            local tier="$4"
+
+            if [ ! -f "public/models/$target_id/det.onnx" ] && [ ! -f "public/models/$target_id/det.rten" ]; then
+              if [ -d "$local_dir" ] && ([ -f "$local_dir/det.onnx" ] || [ -f "$local_dir/det.rten" ]); then
+                echo "Copying local models from $local_dir to public/models/$target_id/..."
+                cp -r "$local_dir"/* "public/models/$target_id/"
+              else
+                echo "Downloading $target_id via download_models.sh..."
+                (cd .. && bash scripts/download_models.sh --model "$model_type" --tier "$tier" --output-dir "docs/public/models/$target_id") || true
+              fi
+            fi
+          }
+
+          populate_model "ppocrv6-tiny" "../models/PPOCR_v6_tiny" "ppocrv6" "tiny"
+          populate_model "ppocrv6-small" "../models/PPOCR_v6_small" "ppocrv6" "small"
+          populate_model "ppocrv6-medium" "../models/PPOCR_v6_medium" "ppocrv6" "medium"
+          populate_model "ppocrv5-mobile" "../models/PPOCR_v5_mobile" "ppocrv5" "mobile"
+          populate_model "ppocrv5-server" "../models/PPOCR_v5_server" "ppocrv5" "server"
+          populate_model "ppocrv4-mobile" "../models/PPOCR_v4_mobile" "ppocrv4" "mobile"
+          populate_model "ppocrv4-server" "../models/PPOCR_v4_server" "ppocrv4" "server"
+
+          # Convert ONNX models to true .rten FlatBuffers format and clean up
+          python3 -m pip install --break-system-packages rten-convert || pip install rten-convert || true
+
+          for mdir in public/models/*; do
+            [ -d "$mdir" ] || continue
+            if [ -f "$mdir/det.onnx" ]; then
+              rten-convert "$mdir/det.onnx" "$mdir/det.rten" || mv "$mdir/det.onnx" "$mdir/det.rten"
+            fi
+            if [ -f "$mdir/rec.onnx" ]; then
+              rten-convert "$mdir/rec.onnx" "$mdir/rec.rten" || mv "$mdir/rec.onnx" "$mdir/rec.rten"
+            fi
+            rm -f "$mdir"/*.onnx
+          done
 
           # Copy wasm runtime binary to public/wasm for live demo client asset serving
           if [ -f ../packages/web/src/wasm/rusto_rten_wasm_bg.wasm ]; then
@@ -135,6 +201,9 @@ jobs:
 
           echo "WebAssembly bindings configured:"
           ls -la ../packages/web/src/wasm/
+
+          echo "Configured public models for live demo:"
+          ls -la public/models/
 
       - name: Build with Nuxt
         run: NUXT_APP_BASE_URL=/rusto-rs/ yarn build

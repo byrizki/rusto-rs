@@ -98,7 +98,8 @@ jobs:
       - name: Package iOS Model Bundles
         run: |
           chmod +x scripts/download_models.sh
-          bash scripts/download_models.sh --all
+          python3 -m pip install --upgrade rten-convert --break-system-packages || python3 -m pip install rten-convert || true
+          bash scripts/download_models.sh --all --convert-rten
 
           package_model_zip() {
             local model_src="$1"
@@ -106,6 +107,7 @@ jobs:
             local tmp_dir="build/tmp_$zip_name"
             mkdir -p "$tmp_dir"
             cp -r "$model_src"/* "$tmp_dir/"
+            rm -f "$tmp_dir"/*.onnx
             (cd "$tmp_dir" && zip -r "../../build/$zip_name.zip" .)
             rm -rf "$tmp_dir"
           }
@@ -248,7 +250,8 @@ jobs:
       - name: Download all OCR models
         run: |
           chmod +x scripts/download_models.sh
-          bash scripts/download_models.sh --all
+          python3 -m pip install --upgrade rten-convert --break-system-packages || python3 -m pip install rten-convert || true
+          bash scripts/download_models.sh --all --convert-rten
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -279,6 +282,7 @@ jobs:
               if [ -d "$pkg_dir" ]; then
                 mkdir -p "$pkg_dir/src/main/assets"
                 cp -r "$model_dir"/* "$pkg_dir/src/main/assets/"
+                rm -f "$pkg_dir/src/main/assets/"*.onnx
                 echo "Copied $model_dir -> $pkg_dir/src/main/assets/"
               else
                 echo "Warning: No Android package found for $model_dir (tried $pkg_dir)"
@@ -424,7 +428,8 @@ jobs:
       - name: Download all OCR models
         run: |
           chmod +x scripts/download_models.sh
-          bash scripts/download_models.sh --all
+          python3 -m pip install --upgrade rten-convert --break-system-packages || python3 -m pip install rten-convert || true
+          bash scripts/download_models.sh --all --convert-rten
 
       - name: Prepare model packages
         run: |
@@ -444,6 +449,7 @@ jobs:
               if [ -d "models/$model_name" ]; then
                 mkdir -p "$proj_dir/models"
                 cp -r "models/$model_name"/* "$proj_dir/models/"
+                rm -f "$proj_dir/models/"*.onnx
                 echo "Copied models/$model_name -> $proj_dir/models/"
               else
                 echo "Warning: models/$model_name not found for $proj_name"
