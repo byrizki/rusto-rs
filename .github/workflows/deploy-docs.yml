@@ -106,11 +106,14 @@ jobs:
 
           if [ "$RELEASE_TAG" != "local" ] && [ -n "$RELEASE_TAG" ]; then
             echo "Downloading prebuilt WASM from release ${RELEASE_TAG}..."
-            gh release download "$RELEASE_TAG" --pattern 'rusto-wasm.tar.gz' --pattern 'rusto-web-*.tgz' --dir /tmp/wasm-assets || true
+            gh release download "$RELEASE_TAG" --pattern 'rusto-wasm.*' --pattern 'rusto-web-*.tgz' --dir /tmp/wasm-assets || true
 
             if [ -f /tmp/wasm-assets/rusto-wasm.tar.gz ]; then
               echo "Extracting rusto-wasm.tar.gz..."
               tar -xzf /tmp/wasm-assets/rusto-wasm.tar.gz -C ../packages/web/src/wasm
+            elif [ -f /tmp/wasm-assets/rusto-wasm.tgz ]; then
+              echo "Extracting rusto-wasm.tgz..."
+              tar -xzf /tmp/wasm-assets/rusto-wasm.tgz -C ../packages/web/src/wasm
             elif ls /tmp/wasm-assets/rusto-web-*.tgz 1>/dev/null 2>&1; then
               echo "Extracting from rusto-web npm package tarball..."
               tar -xzf /tmp/wasm-assets/rusto-web-*.tgz -C /tmp/wasm-assets

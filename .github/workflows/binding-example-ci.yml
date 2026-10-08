@@ -182,7 +182,7 @@ jobs:
           set -euo pipefail
           artifact_dir=artifacts/rusto-react-native-package
           target="$artifact_dir/react-native-rusto.tgz"
-          tarball="$(find "$artifact_dir" -type f -name '*.tgz' -print -quit)"
+          tarball="$(find "$artifact_dir" -type f -name 'react-native-rusto*.tgz' -print -quit)"
           test -n "$tarball"
           mkdir -p "$artifact_dir"
           # macOS BSD realpath has no GNU --canonicalize-missing (-m).
@@ -303,7 +303,7 @@ jobs:
           set -euo pipefail
           artifact_dir=artifacts/rusto-react-native-package
           target="$artifact_dir/react-native-rusto.tgz"
-          tarball="$(find "$artifact_dir" -type f -name '*.tgz' -print -quit)"
+          tarball="$(find "$artifact_dir" -type f -name 'react-native-rusto*.tgz' -print -quit)"
           test -n "$tarball"
           mkdir -p "$artifact_dir"
           # macOS BSD realpath has no GNU --canonicalize-missing (-m).

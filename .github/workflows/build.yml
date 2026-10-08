@@ -524,6 +524,7 @@ jobs:
           wasm-pack build crates/rten-wasm --target web --out-dir ../../packages/web/src/wasm
           mkdir -p artifacts/wasm
           tar czf artifacts/wasm/rusto-wasm.tar.gz -C packages/web/src/wasm .
+          cp artifacts/wasm/rusto-wasm.tar.gz artifacts/wasm/rusto-wasm.tgz
 
       - name: Build and pack rusto-web
         working-directory: packages/web
@@ -549,15 +550,31 @@ jobs:
           yarn prepare
           yarn pack --filename ../react-native-rusto.tgz
 
-      - name: Upload NPM package
+      - name: Upload React Native package
         uses: actions/upload-artifact@v4
         with:
           name: rusto-react-native-package
+          path: packages/react-native-rusto.tgz
+
+      - name: Upload rusto-web package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-web-package
+          path: packages/rusto-web-*.tgz
+
+      - name: Upload react-rusto package
+        uses: actions/upload-artifact@v4
+        with:
+          name: react-rusto-package
+          path: packages/react-rusto-*.tgz
+
+      - name: Upload rusto-wasm package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-wasm-package
           path: |
-            packages/react-native-rusto.tgz
-            packages/rusto-web-*.tgz
-            packages/react-rusto-*.tgz
             artifacts/wasm/rusto-wasm.tar.gz
+            artifacts/wasm/rusto-wasm.tgz
 
   # Create GitHub Release
   binding-examples:
@@ -619,10 +636,11 @@ jobs:
             find rusto-dotnet-model-nupkgs -name 'RustODotnet.Models.*.nupkg' -exec cp {} ../releases/ \;
           fi
 
-          if [ -d "rusto-react-native-package" ]; then
-             cp rusto-react-native-package/*.tgz ../releases/ || true
-             cp rusto-react-native-package/*.tar.gz ../releases/ || true
-          fi
+          for pkg_dir in rusto-react-native-package rusto-web-package react-rusto-package rusto-wasm-package rusto-web-packages; do
+            if [ -d "$pkg_dir" ]; then
+              find "$pkg_dir" -type f \( -name '*.tgz' -o -name '*.tar.gz' \) -exec cp {} ../releases/ \;
+            fi
+          done
 
       - name: Generate checksums
         working-directory: releases
