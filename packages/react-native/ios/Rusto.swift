@@ -230,8 +230,6 @@ class RustoModule: NSObject {
                 }
                 if sourcePath != nil { break }
             }
-                break
-            }
         }
         
         if sourcePath == nil {
