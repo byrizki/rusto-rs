@@ -95,7 +95,7 @@ jobs:
         run: |
           chmod +x scripts/download_models.sh
           python3 -m pip install --upgrade rten-convert onnx onnxruntime --break-system-packages || python3 -m pip install rten-convert onnx onnxruntime || true
-          bash scripts/download_models.sh --all --convert-rten
+          bash scripts/download_models.sh --all --convert-rten --keep-onnx
           chmod +x scripts/quantize_ppocrv6_int8.py
           python3 scripts/quantize_ppocrv6_int8.py --all
 

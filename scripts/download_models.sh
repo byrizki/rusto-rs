@@ -13,12 +13,14 @@ LANG=""
 OUTPUT_DIR=""
 DOWNLOAD_ALL=false
 CONVERT_RTEN=false
+KEEP_ONNX=false
 
 # Parse optional arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --all) DOWNLOAD_ALL=true ;;
         --convert-rten) CONVERT_RTEN=true ;;
+        --keep-onnx) KEEP_ONNX=true ;;
         --model) MODEL_TYPE="$2"; shift ;;
         --tier) TIER="$2"; shift ;;
         --lang) LANG="$2"; shift ;;
@@ -339,7 +341,9 @@ if [ "$CONVERT_RTEN" = true ]; then
             rten_path="${onnx_path%.onnx}.rten"
             echo "Converting $onnx_path -> $rten_path..."
             "$RTEN_CONVERT" "$onnx_path" "$rten_path"
-            rm -f "$onnx_path"
+            if [ "$KEEP_ONNX" = false ]; then
+                rm -f "$onnx_path"
+            fi
         done
         echo "✓ All ONNX models converted to .rten"
     else

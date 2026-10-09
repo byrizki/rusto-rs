@@ -94,6 +94,13 @@ def quantize_tier(tier: str, input_dir: Path, output_dir: Path, convert_rten: bo
     dict_in = input_dir / "dict.txt"
 
     if not det_in.exists() or not rec_in.exists():
+        repo_root = Path(__file__).resolve().parent.parent
+        dl_script = repo_root / "scripts" / "download_models.sh"
+        if dl_script.exists():
+            print(f"  det.onnx or rec.onnx missing in {input_dir}, downloading via download_models.sh...")
+            subprocess.run(["bash", str(dl_script), "--model", "ppocrv6", "--tier", tier, "--output-dir", str(input_dir)], check=False)
+
+    if not det_in.exists() or not rec_in.exists():
         print(f"Error: Missing det.onnx or rec.onnx in {input_dir}", file=sys.stderr)
         return False
 
