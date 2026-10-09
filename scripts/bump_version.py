@@ -24,7 +24,7 @@ from typing import List, Set
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-def get_current_version() -> str:
+def get_current_lib_version() -> str:
     cargo_toml = REPO_ROOT / "Cargo.toml"
     with open(cargo_toml, "r", encoding="utf-8") as f:
         content = f.read()
@@ -32,6 +32,19 @@ def get_current_version() -> str:
     if not match:
         raise ValueError(f"Could not determine current version from {cargo_toml}")
     return match.group(1)
+
+def get_current_models_version() -> str:
+    models_file = REPO_ROOT / "MODELS_VERSION"
+    if models_file.exists():
+        val = models_file.read_text(encoding="utf-8").strip()
+        if val:
+            return val
+    return get_current_lib_version()
+
+def get_current_version(target: str = "lib") -> str:
+    if target == "models":
+        return get_current_models_version()
+    return get_current_lib_version()
 
 def parse_new_version(current_ver: str, bump_arg: str) -> str:
     semver_match = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$", current_ver)
@@ -356,8 +369,8 @@ def update_changelog_file(file_path: Path, new_ver: str, current_ver: str = "", 
     print(f"  [OK] Updated {file_path.relative_to(REPO_ROOT)} with new section for [{new_ver}]")
     return True
 
-def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False) -> Set[Path]:
-    print(f"\nUpdating version to '{new_ver}' across repository files...")
+def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False) -> Set[Path]:
+    print(f"\nUpdating library version to '{new_ver}' across repository files...")
     staged_files: Set[Path] = set()
     
     # 1. Cargo.toml (root package)
@@ -378,53 +391,48 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         staged_files
     )
     
-    # 5. packages/android/gradle.properties
+    # 3. packages/android/gradle.properties (VERSION_NAME only, not MODELS_VERSION_NAME)
     replace_in_file(
         REPO_ROOT / "packages" / "android" / "gradle.properties",
-        r'(VERSION_NAME\s*=\s*).*',
+        r'(?m)^(VERSION_NAME\s*=\s*).*',
         rf'\g<1>{new_ver}',
         dry_run,
         staged_files
     )
     
-    # 6. packages/android/**/build.gradle (root and all 20 model submodules)
-    for bg_file in (REPO_ROOT / "packages" / "android").rglob("build.gradle"):
-        replace_in_file(
-            bg_file,
-            r'(versionName\s+")[^"]+(")',
-            rf'\g<1>{new_ver}\g<2>',
-            dry_run,
-            staged_files
-        )
-        replace_in_file(
-            bg_file,
-            r"(coordinates\('[^']+',\s*'[^']+',\s*')[^']+(\'\))",
-            rf"\g<1>{new_ver}\g<2>",
-            dry_run,
-            staged_files
-        )
+    # 4. packages/android/build.gradle (root core library only)
+    root_bg = REPO_ROOT / "packages" / "android" / "build.gradle"
+    replace_in_file(
+        root_bg,
+        r'(versionName\s+")[^"]+(")',
+        rf'\g<1>{new_ver}\g<2>',
+        dry_run,
+        staged_files
+    )
+    replace_in_file(
+        root_bg,
+        r"(coordinates\('com\.github\.byrizki\.rusto-rs',\s*'rusto-android',\s*')[^']+(\'\))",
+        rf"\g<1>{new_ver}\g<2>",
+        dry_run,
+        staged_files
+    )
     
-    # 7. packages/ios/**/*.podspec (binding package and every model subpackage)
-    ios_dir = REPO_ROOT / "packages" / "ios"
-    for podspec_file in ios_dir.rglob("*.podspec"):
-        replace_in_file(
-            podspec_file,
-            r'(s\.version\s*=\s*\')[^\']+(\')',
-            rf'\g<1>{new_ver}\g<2>',
-            dry_run,
-            staged_files
-        )
+    # 5. packages/ios/RustO.podspec (core binding podspec only)
+    replace_in_file(
+        REPO_ROOT / "packages" / "ios" / "RustO.podspec",
+        r'(s\.version\s*=\s*\')[^\']+(\')',
+        rf'\g<1>{new_ver}\g<2>',
+        dry_run,
+        staged_files
+    )
     
-    # 8. First-party npm package manifests only. React Native examples consume the
-    # current workflow tarball via file: paths, so their manifests and Yarn locks
-    # intentionally do not carry a release version.
-    packages_dir = REPO_ROOT / "packages"
-    for package_json_file in packages_dir.rglob("package.json"):
-        if "node_modules" in package_json_file.parts:
-            continue
-        update_json_file(package_json_file, new_ver, dry_run, staged_files)
+    # 6. First-party npm library manifests only
+    for pkg_dir in [REPO_ROOT / "packages" / "web", REPO_ROOT / "packages" / "react", REPO_ROOT / "packages" / "react-native"]:
+        pkg_json = pkg_dir / "package.json"
+        if pkg_json.exists():
+            update_json_file(pkg_json, new_ver, dry_run, staged_files)
 
-    # 10. packages/react-native/android/build.gradle
+    # 7. packages/react-native/android/build.gradle
     replace_in_file(
         REPO_ROOT / "packages" / "react-native" / "android" / "build.gradle",
         r'(versionName\s+")[^"]+(")',
@@ -440,21 +448,17 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         staged_files
     )
     
-    # 11. packages/dotnet/**/*.csproj (binding package and every model subpackage)
-    dotnet_dir = REPO_ROOT / "packages" / "dotnet"
-    for csproj_file in dotnet_dir.rglob("*.csproj"):
-        replace_in_file(
-            csproj_file,
-            r'(<Version>)[^<]+(</Version>)',
-            rf'\g<1>{new_ver}\g<2>',
-            dry_run,
-            staged_files
-        )
+    # 8. packages/dotnet/RustODotnet.csproj (core package only)
+    replace_in_file(
+        REPO_ROOT / "packages" / "dotnet" / "RustODotnet.csproj",
+        r'(<Version>)[^<]+(</Version>)',
+        rf'\g<1>{new_ver}\g<2>',
+        dry_run,
+        staged_files
+    )
     
-    # 12. packages/dotnet/**/*.nuspec
-    for nuspec_file in dotnet_dir.rglob("*.nuspec"):
-        if "bin" in nuspec_file.parts or "obj" in nuspec_file.parts:
-            continue
+    # 9. packages/dotnet/*.nuspec (core only)
+    for nuspec_file in (REPO_ROOT / "packages" / "dotnet").glob("*.nuspec"):
         replace_in_file(
             nuspec_file,
             r'(<version>)[^<]+(</version>)',
@@ -463,8 +467,7 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
 
-    # 13. Consumer examples restore RustODotnet from the release nupkg.
-    # Update only binding reference, never unrelated xUnit/Test SDK dependencies.
+    # 10. Consumer examples reference RustODotnet
     examples_dotnet_dir = REPO_ROOT / "examples" / "dotnet"
     if examples_dotnet_dir.exists():
         for csproj_file in examples_dotnet_dir.rglob("*.csproj"):
@@ -476,7 +479,7 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
                 staged_files
             )
     
-    # 14. README.md & packages/react-native/README.md
+    # 11. README.md & packages/react-native/README.md
     replace_in_file(
         REPO_ROOT / "README.md",
         r'(\*\*Version\*\*:\s*)[^\s]+',
@@ -500,7 +503,7 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
 
-    # 15. .github/workflows/publish.yml (default workflow_dispatch version)
+    # 12. .github/workflows/publish.yml default version
     if (REPO_ROOT / ".github" / "workflows" / "publish.yml").exists():
         replace_in_file(
             REPO_ROOT / ".github" / "workflows" / "publish.yml",
@@ -510,17 +513,7 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
 
-    # 16. scripts/generate_npm_models.py fallback
-    if (REPO_ROOT / "scripts" / "generate_npm_models.py").exists():
-        replace_in_file(
-            REPO_ROOT / "scripts" / "generate_npm_models.py",
-            r'(return\s+")[0-9A-Za-z.-]+(")',
-            rf'\g<1>{new_ver}\g<2>',
-            dry_run,
-            staged_files
-        )
-
-    # 17. docs installation guides
+    # 13. docs installation guides
     for doc_file in (REPO_ROOT / "docs").rglob("2.installation.md"):
         replace_in_file(
             doc_file,
@@ -530,7 +523,7 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
 
-    # 18. CHANGELOG.md (auto-generated from git commits)
+    # 14. CHANGELOG.md (auto-generated from git commits)
     if (REPO_ROOT / "CHANGELOG.md").exists():
         update_changelog_file(
             REPO_ROOT / "CHANGELOG.md",
@@ -541,6 +534,116 @@ def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         )
 
     return staged_files
+
+def update_models_files(new_ver: str, current_ver: str = "", dry_run: bool = False) -> Set[Path]:
+    print(f"\nUpdating OCR models version to '{new_ver}' across repository files...")
+    staged_files: Set[Path] = set()
+
+    # 1. MODELS_VERSION file
+    models_ver_file = REPO_ROOT / "MODELS_VERSION"
+    if not dry_run:
+        models_ver_file.write_text(f"{new_ver}\n", encoding="utf-8")
+    if staged_files is not None:
+        staged_files.add(models_ver_file)
+    print(f"  [OK] Updated MODELS_VERSION to {new_ver}")
+
+    # 2. packages/android/gradle.properties (MODELS_VERSION_NAME)
+    replace_in_file(
+        REPO_ROOT / "packages" / "android" / "gradle.properties",
+        r'(?m)^(MODELS_VERSION_NAME\s*=\s*).*',
+        rf'\g<1>{new_ver}',
+        dry_run,
+        staged_files
+    )
+
+    # 3. packages/android/models/**/build.gradle (all 20 model submodules)
+    android_models_dir = REPO_ROOT / "packages" / "android" / "models"
+    if android_models_dir.exists():
+        for bg_file in android_models_dir.rglob("build.gradle"):
+            replace_in_file(
+                bg_file,
+                r'(versionName\s+")[^"]+(")',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files
+            )
+            replace_in_file(
+                bg_file,
+                r"(coordinates\('[^']+',\s*'[^']+',\s*')[^']+(\'\))",
+                rf"\g<1>{new_ver}\g<2>",
+                dry_run,
+                staged_files
+            )
+
+    # 4. packages/ios/models/*.podspec (all 20 model podspecs)
+    ios_models_dir = REPO_ROOT / "packages" / "ios" / "models"
+    if ios_models_dir.exists():
+        for podspec_file in ios_models_dir.glob("*.podspec"):
+            replace_in_file(
+                podspec_file,
+                r'(s\.version\s*=\s*\')[^\']+(\')',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files
+            )
+
+    # 5. packages/dotnet/models/**/*.csproj (all 20 model projects)
+    dotnet_models_dir = REPO_ROOT / "packages" / "dotnet" / "models"
+    if dotnet_models_dir.exists():
+        for csproj_file in dotnet_models_dir.rglob("*.csproj"):
+            replace_in_file(
+                csproj_file,
+                r'(<Version>)[^<]+(</Version>)',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files
+            )
+
+    # 6. packages/models/**/package.json & README.md (all npm model packages)
+    packages_models_dir = REPO_ROOT / "packages" / "models"
+    if packages_models_dir.exists():
+        for package_json_file in packages_models_dir.rglob("package.json"):
+            if "node_modules" in package_json_file.parts:
+                continue
+            update_json_file(package_json_file, new_ver, dry_run, staged_files)
+        for model_readme in packages_models_dir.rglob("README.md"):
+            if "node_modules" in model_readme.parts:
+                continue
+            replace_in_file(
+                model_readme,
+                r'(- \*\*Version:\*\*\s*`)[^`]+(`)',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files
+            )
+
+    # 7. scripts/generate_npm_models.py (fallback return)
+    if (REPO_ROOT / "scripts" / "generate_npm_models.py").exists():
+        replace_in_file(
+            REPO_ROOT / "scripts" / "generate_npm_models.py",
+            r'(return\s+")[0-9A-Za-z.-]+(")',
+            rf'\g<1>{new_ver}\g<2>',
+            dry_run,
+            staged_files
+        )
+
+    # 8. .github/workflows/publish-models.yml (default workflow_dispatch version)
+    if (REPO_ROOT / ".github" / "workflows" / "publish-models.yml").exists():
+        replace_in_file(
+            REPO_ROOT / ".github" / "workflows" / "publish-models.yml",
+            r'(version:\s*\n\s*description:[^\n]*\n\s*required:[^\n]*\n\s*default:\s*\')[^\']+(\')',
+            rf'\g<1>{new_ver}\g<2>',
+            dry_run,
+            staged_files
+        )
+
+    return staged_files
+
+def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False) -> Set[Path]:
+    staged = set()
+    staged.update(update_lib_files(new_ver, current_ver=current_ver, dry_run=dry_run))
+    staged.update(update_models_files(new_ver, current_ver=current_ver, dry_run=dry_run))
+    return staged
 
 def stage_git_files(files: Set[Path]):
     if not files:
@@ -557,24 +660,46 @@ def stage_git_files(files: Set[Path]):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Bump version across all packages in the RustO! monorepo and auto-stage files.",
+        description="Bump version across packages in the RustO! monorepo and auto-stage files.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  ./bump_version.sh patch          # 0.1.3 -> 0.1.4 (updates & stages files)
-  ./bump_version.sh minor          # 0.1.3 -> 0.2.0 (updates & stages files)
-  ./bump_version.sh major          # 0.1.3 -> 1.0.0 (updates & stages files)
-  ./bump_version.sh 0.1.4          # Explicit version
-  ./bump_version.sh --git patch    # Bump, stage, commit, and create git tag
+  ./bump_version.sh patch                 # 0.3.0 -> 0.3.1 (updates lib packages only)
+  ./bump_version.sh minor                 # 0.3.0 -> 0.4.0 (updates lib packages only)
+  ./bump_version.sh --models patch        # 0.3.0 -> 0.3.1 (updates OCR model packages only)
+  ./bump_version.sh --all patch           # 0.3.0 -> 0.3.1 (updates both lib and model packages)
+  ./bump_version.sh --git patch           # Bump lib, stage, commit, and tag 'v0.3.1'
+  ./bump_version.sh --models --git patch  # Bump models, stage, commit, and tag 'models-rten-v0.3.1'
   ./bump_version.sh --dry-run patch
-  ./bump_version.sh --no-stage     # Update version without running git add
+  ./bump_version.sh --no-stage
         """
     )
     parser.add_argument(
         "version",
         nargs="?",
         default="patch",
-        help="Bump type ('patch', 'minor', 'major') or explicit version (e.g. '0.1.4'). Default: 'patch'"
+        help="Bump type ('patch', 'minor', 'major') or explicit version (e.g. '0.3.1'). Default: 'patch'"
+    )
+    parser.add_argument(
+        "--target",
+        choices=["lib", "models", "all"],
+        default="lib",
+        help="Target component to bump: 'lib' (default), 'models', or 'all'"
+    )
+    parser.add_argument(
+        "--lib",
+        action="store_true",
+        help="Bump library packages only (default)"
+    )
+    parser.add_argument(
+        "--models",
+        action="store_true",
+        help="Bump OCR model packages only"
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Bump both library and OCR model packages"
     )
     parser.add_argument(
         "--dry-run",
@@ -594,22 +719,54 @@ Examples:
 
     args = parser.parse_args()
 
+    target = args.target
+    if args.models:
+        target = "models"
+    elif args.all:
+        target = "all"
+    elif args.lib:
+        target = "lib"
+
     try:
-        current_ver = get_current_version()
-        new_ver = parse_new_version(current_ver, args.version)
+        if target == "models":
+            current_ver = get_current_models_version()
+            new_ver = parse_new_version(current_ver, args.version)
+            print(f"Target          : OCR Models")
+            print(f"Current version : {current_ver}")
+            print(f"New version     : {new_ver}")
+        elif target == "all":
+            current_lib = get_current_lib_version()
+            new_lib = parse_new_version(current_lib, args.version)
+            current_models = get_current_models_version()
+            new_models = parse_new_version(current_models, args.version)
+            print(f"Target          : Libraries & OCR Models")
+            print(f"Current lib ver : {current_lib} -> {new_lib}")
+            print(f"Current mod ver : {current_models} -> {new_models}")
+            new_ver = new_lib
+        else:
+            current_ver = get_current_lib_version()
+            new_ver = parse_new_version(current_ver, args.version)
+            print(f"Target          : Libraries (core engine & bindings)")
+            print(f"Current version : {current_ver}")
+            print(f"New version     : {new_ver}")
     except ValueError as err:
         print(f"Error: {err}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Current version : {current_ver}")
-    print(f"New version     : {new_ver}")
     if args.dry_run:
         print("Mode            : [DRY-RUN - No files will be modified]")
 
-    modified_files = update_all_files(new_ver, current_ver=current_ver, dry_run=args.dry_run)
+    if target == "models":
+        modified_files = update_models_files(new_ver, current_ver=current_ver, dry_run=args.dry_run)
+    elif target == "all":
+        modified_files = set()
+        modified_files.update(update_lib_files(new_lib, current_ver=current_lib, dry_run=args.dry_run))
+        modified_files.update(update_models_files(new_models, current_ver=current_models, dry_run=args.dry_run))
+    else:
+        modified_files = update_lib_files(new_ver, current_ver=current_ver, dry_run=args.dry_run)
 
-    # Sync Cargo.lock if cargo is installed
-    if not args.dry_run:
+    # Sync Cargo.lock if cargo is installed and library was bumped
+    if not args.dry_run and target in ("lib", "all"):
         print("\nUpdating Cargo.lock...")
         try:
             subprocess.run(
@@ -626,28 +783,59 @@ Examples:
         except Exception:
             pass
 
-        # Auto stage modified versioned files
-        if not args.no_stage:
-            stage_git_files(modified_files)
+    if not args.dry_run and not args.no_stage:
+        stage_git_files(modified_files)
 
-    print(f"\n✨ Version bump to v{new_ver} complete!")
+    if target == "models":
+        print(f"\n✨ OCR models version bump to models-rten-v{new_ver} complete!")
+    elif target == "all":
+        print(f"\n✨ Full version bump complete (lib: v{new_lib}, models: models-rten-v{new_models})!")
+    else:
+        print(f"\n✨ Library version bump to v{new_ver} complete!")
 
     if args.git and not args.dry_run:
-        print("\nCreating Git commit and tag...")
-        commit_msg = f"chore: release v{new_ver}"
-        subprocess.run(["git", "commit", "-m", commit_msg], cwd=REPO_ROOT, check=True)
-        tag_name = f"v{new_ver}"
-        subprocess.run(["git", "tag", "-a", tag_name, "-m", f"Release {tag_name}"], cwd=REPO_ROOT, check=True)
-        print(f"  [OK] Created commit: '{commit_msg}'")
-        print(f"  [OK] Created git tag: '{tag_name}'")
+        print("\nCreating Git commit and tag(s)...")
+        if target == "models":
+            commit_msg = f"chore: release models-rten-v{new_ver}"
+            tag_name = f"models-rten-v{new_ver}"
+            subprocess.run(["git", "commit", "-m", commit_msg], cwd=REPO_ROOT, check=True)
+            subprocess.run(["git", "tag", "-a", tag_name, "-m", f"Release {tag_name}"], cwd=REPO_ROOT, check=True)
+            print(f"  [OK] Created commit: '{commit_msg}'")
+            print(f"  [OK] Created git tag: '{tag_name}'")
+        elif target == "all":
+            commit_msg = f"chore: release v{new_lib} & models-rten-v{new_models}"
+            subprocess.run(["git", "commit", "-m", commit_msg], cwd=REPO_ROOT, check=True)
+            tag_lib = f"v{new_lib}"
+            tag_models = f"models-rten-v{new_models}"
+            subprocess.run(["git", "tag", "-a", tag_lib, "-m", f"Release {tag_lib}"], cwd=REPO_ROOT, check=True)
+            subprocess.run(["git", "tag", "-a", tag_models, "-m", f"Release {tag_models}"], cwd=REPO_ROOT, check=True)
+            print(f"  [OK] Created commit: '{commit_msg}'")
+            print(f"  [OK] Created git tag: '{tag_lib}'")
+            print(f"  [OK] Created git tag: '{tag_models}'")
+        else:
+            commit_msg = f"chore: release v{new_ver}"
+            tag_name = f"v{new_ver}"
+            subprocess.run(["git", "commit", "-m", commit_msg], cwd=REPO_ROOT, check=True)
+            subprocess.run(["git", "tag", "-a", tag_name, "-m", f"Release {tag_name}"], cwd=REPO_ROOT, check=True)
+            print(f"  [OK] Created commit: '{commit_msg}'")
+            print(f"  [OK] Created git tag: '{tag_name}'")
         print("\nTo push changes and trigger CI/CD release:")
         print(f"  git push origin main --tags")
     elif not args.dry_run:
         print("\nSuggested next steps:")
-        print(f"  git commit -m \"chore: release v{new_ver}\"")
-        print(f"  git tag -a v{new_ver} -m \"Release v{new_ver}\"")
+        if target == "models":
+            print(f'  git commit -m "chore: release models-rten-v{new_ver}"')
+            print(f'  git tag -a models-rten-v{new_ver} -m "Release models-rten-v{new_ver}"')
+        elif target == "all":
+            print(f'  git commit -m "chore: release v{new_lib} & models-rten-v{new_models}"')
+            print(f'  git tag -a v{new_lib} -m "Release v{new_lib}"')
+            print(f'  git tag -a models-rten-v{new_models} -m "Release models-rten-v{new_models}"')
+        else:
+            print(f'  git commit -m "chore: release v{new_ver}"')
+            print(f'  git tag -a v{new_ver} -m "Release v{new_ver}"')
         print(f"  git push origin main --tags")
 
 if __name__ == "__main__":
     main()
+
 

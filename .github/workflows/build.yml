@@ -95,11 +95,11 @@ jobs:
           # mismatch between current bridge code and older static archives.
           (cd build && zip -r RustO.xcframework.zip RustO.xcframework)
 
-      - name: Package iOS Model Bundles
+      - name: Package iOS Model Bundle for Test Fixtures
         run: |
           chmod +x scripts/download_models.sh
           python3 -m pip install --upgrade rten-convert --break-system-packages || python3 -m pip install rten-convert || true
-          bash scripts/download_models.sh --all --convert-rten
+          bash scripts/download_models.sh --model ppocrv6 --tier tiny --convert-rten
 
           package_model_zip() {
             local model_src="$1"
@@ -113,27 +113,6 @@ jobs:
           }
 
           package_model_zip "models/PPOCR_v6_tiny" "RustO-Models-PPOCRv6-Tiny"
-          package_model_zip "models/PPOCR_v6_small" "RustO-Models-PPOCRv6-Small"
-          package_model_zip "models/PPOCR_v6_medium" "RustO-Models-PPOCRv6-Medium"
-          package_model_zip "models/PPOCR_v5_mobile" "RustO-Models-PPOCRv5-Mobile"
-          package_model_zip "models/PPOCR_v5_server" "RustO-Models-PPOCRv5-Server"
-          package_model_zip "models/PPOCR_v4_mobile" "RustO-Models-PPOCRv4-Mobile"
-          package_model_zip "models/PPOCR_v4_server" "RustO-Models-PPOCRv4-Server"
-
-          package_model_zip "models/PPOCR_v5_arabic" "RustO-Models-PPOCRv5-Arabic"
-          package_model_zip "models/PPOCR_v5_cyrillic" "RustO-Models-PPOCRv5-Cyrillic"
-          package_model_zip "models/PPOCR_v5_devanagari" "RustO-Models-PPOCRv5-Devanagari"
-          package_model_zip "models/PPOCR_v5_el" "RustO-Models-PPOCRv5-Greek"
-          package_model_zip "models/PPOCR_v5_eslav" "RustO-Models-PPOCRv5-EastSlavic"
-          package_model_zip "models/PPOCR_v5_korean" "RustO-Models-PPOCRv5-Korean"
-          package_model_zip "models/PPOCR_v5_latin" "RustO-Models-PPOCRv5-Latin"
-          package_model_zip "models/PPOCR_v5_ta" "RustO-Models-PPOCRv5-Tamil"
-          package_model_zip "models/PPOCR_v5_te" "RustO-Models-PPOCRv5-Telugu"
-          package_model_zip "models/PPOCR_v5_th" "RustO-Models-PPOCRv5-Thai"
-
-          package_model_zip "models/PPOCR_v4_japan" "RustO-Models-PPOCRv4-Japanese"
-          package_model_zip "models/PPOCR_v4_chinese_cht" "RustO-Models-PPOCRv4-TraditionalChinese"
-          package_model_zip "models/PPOCR_v4_kannada" "RustO-Models-PPOCRv4-Kannada"
 
       - name: Verify XCFramework exports canonical FFI ABI
         run: |
@@ -247,11 +226,11 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Download all OCR models
+      - name: Download PP-OCRv6 Tiny model for test fixture
         run: |
           chmod +x scripts/download_models.sh
           python3 -m pip install --upgrade rten-convert --break-system-packages || python3 -m pip install rten-convert || true
-          bash scripts/download_models.sh --all --convert-rten
+          bash scripts/download_models.sh --model ppocrv6 --tier tiny --convert-rten
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -273,22 +252,14 @@ jobs:
           cp artifacts/android/rusto-android-x86/librusto.so packages/android/src/main/jniLibs/x86/
           cp artifacts/android/rusto-android-x86_64/librusto.so packages/android/src/main/jniLibs/x86_64/
 
-          # Copy models into each Android model submodule
-          # PPOCR_v6_tiny -> lowercase -> sed ppocr_v -> ppocrv -> tr _ - -> ppocrv6-tiny
-          for model_dir in models/PPOCR_*; do
-            if [ -d "$model_dir" ]; then
-              base_name=$(basename "$model_dir" | tr '[:upper:]' '[:lower:]' | sed 's/ppocr_v/ppocrv/' | tr '_' '-')
-              pkg_dir="packages/android/models/rusto-models-$base_name"
-              if [ -d "$pkg_dir" ]; then
-                mkdir -p "$pkg_dir/src/main/assets"
-                cp -r "$model_dir"/* "$pkg_dir/src/main/assets/"
-                rm -f "$pkg_dir/src/main/assets/"*.onnx
-                echo "Copied $model_dir -> $pkg_dir/src/main/assets/"
-              else
-                echo "Warning: No Android package found for $model_dir (tried $pkg_dir)"
-              fi
-            fi
-          done
+          # Copy PP-OCRv6 Tiny model into Android model submodule for consumer validation
+          pkg_dir="packages/android/models/rusto-models-ppocrv6-tiny"
+          if [ -d "models/PPOCR_v6_tiny" ]; then
+            mkdir -p "$pkg_dir/src/main/assets"
+            cp -r models/PPOCR_v6_tiny/* "$pkg_dir/src/main/assets/"
+            rm -f "$pkg_dir/src/main/assets/"*.onnx
+            echo "Copied models/PPOCR_v6_tiny -> $pkg_dir/src/main/assets/"
+          fi
 
       - name: Make Gradle Wrapper executable
         working-directory: packages/android
@@ -425,37 +396,21 @@ jobs:
             fi
           done
 
-      - name: Download all OCR models
+      - name: Download PP-OCRv6 Tiny model for test fixture
         run: |
           chmod +x scripts/download_models.sh
           python3 -m pip install --upgrade rten-convert --break-system-packages || python3 -m pip install rten-convert || true
-          bash scripts/download_models.sh --all --convert-rten
+          bash scripts/download_models.sh --model ppocrv6 --tier tiny --convert-rten
 
-      - name: Prepare model packages
+      - name: Prepare test model package
         run: |
-          echo "=== Copying model files to model NuGet packages ==="
-          for proj_dir in packages/dotnet/models/*; do
-            if [ -d "$proj_dir" ]; then
-              proj_name=$(basename "$proj_dir")
-              # Map NuGet project name to model folder name
-              # e.g., RustODotnet.Models.PPOCRv5.Arabic -> models/PPOCR_v5_arabic
-              # e.g., RustODotnet.Models.PPOCRv5.Greek -> models/PPOCR_v5_el
-              # e.g., RustODotnet.Models.PPOCRv5.EastSlavic -> models/PPOCR_v5_eslav
-              model_name=$(echo "$proj_name" | sed 's/RustODotnet.Models.//' | sed 's/\./_/g' | tr '[:upper:]' '[:lower:]' \
-                | sed 's/ppocrv/PPOCR_v/' \
-                | sed 's/greek/el/' | sed 's/eastslavic/eslav/' | sed 's/tamil/ta/' | sed 's/telugu/te/' | sed 's/thai/th/' \
-                | sed 's/japanese/japan/' | sed 's/traditionalchinese/chinese_cht/')
-              
-              if [ -d "models/$model_name" ]; then
-                mkdir -p "$proj_dir/models"
-                cp -r "models/$model_name"/* "$proj_dir/models/"
-                rm -f "$proj_dir/models/"*.onnx
-                echo "Copied models/$model_name -> $proj_dir/models/"
-              else
-                echo "Warning: models/$model_name not found for $proj_name"
-              fi
-            fi
-          done
+          pkg_dir="packages/dotnet/models/RustODotnet.Models.PPOCRv6.Tiny"
+          if [ -d "models/PPOCR_v6_tiny" ]; then
+            mkdir -p "$pkg_dir/models"
+            cp -r models/PPOCR_v6_tiny/* "$pkg_dir/models/"
+            rm -f "$pkg_dir/models/"*.onnx
+            echo "Copied models/PPOCR_v6_tiny -> $pkg_dir/models/"
+          fi
 
       - name: Build and Pack NuGet Packages
         run: |
@@ -467,13 +422,11 @@ jobs:
           dotnet pack RustODotnet.csproj -c Release -o ../../nupkg -v detailed
           cd ../..
 
-          echo "=== Packing Model Packages ==="
-          for proj in packages/dotnet/models/*/*.csproj; do
-            if [ -f "$proj" ]; then
-              echo "Packing $proj..."
-              dotnet pack "$proj" -c Release -o nupkg -v detailed
-            fi
-          done
+          echo "=== Packing Test Model Package ==="
+          test_proj="packages/dotnet/models/RustODotnet.Models.PPOCRv6.Tiny/RustODotnet.Models.PPOCRv6.Tiny.csproj"
+          if [ -f "$test_proj" ]; then
+            dotnet pack "$test_proj" -c Release -o nupkg -v detailed
+          fi
 
           printf '\n=== Generated Packages ===\n'
           ls -lh nupkg/*.nupkg
@@ -624,22 +577,13 @@ jobs:
           if [ -d "rusto-ios-core-xcframework" ]; then
             find rusto-ios-core-xcframework -name 'RustO.xcframework.zip' -exec cp {} ../releases/ \;
           fi
-          if [ -d "rusto-ios-model-resources" ]; then
-            find rusto-ios-model-resources -name 'RustO-Models-*.zip' -exec cp {} ../releases/ \;
-          fi
 
           if [ -d "rusto-android-core-aar" ]; then
             find rusto-android-core-aar -name "*.aar" -exec cp {} ../releases/ \;
           fi
-          if [ -d "rusto-android-model-aars" ]; then
-            find rusto-android-model-aars -name "*.aar" -exec cp {} ../releases/ \;
-          fi
 
           if [ -d "rusto-dotnet-core-nupkg" ]; then
             find rusto-dotnet-core-nupkg -name 'RustODotnet.*.nupkg' -exec cp {} ../releases/ \;
-          fi
-          if [ -d "rusto-dotnet-model-nupkgs" ]; then
-            find rusto-dotnet-model-nupkgs -name 'RustODotnet.Models.*.nupkg' -exec cp {} ../releases/ \;
           fi
 
           for pkg_dir in rusto-react-native-package rusto-web-package react-rusto-package rusto-wasm-package rusto-web-packages; do
@@ -682,7 +626,7 @@ jobs:
             - Pure Rust OCR library powered by PaddleOCR models
             - Uses RTen pure-Rust neural network engine for optimal inference performance
             - Cross-platform support (Linux, macOS, Windows, iOS, Android, .NET, Web/WASM, React)
-            - Includes bundled model files and dictionary files
+            - OCR models are packaged and released separately under `models-rten-v*` tags
 
             ### Platform Support
             - **Linux**: x64, ARM64

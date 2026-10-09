@@ -1,0 +1,53 @@
+plugins {
+    id 'com.android.library'
+    id 'com.vanniktech.maven.publish'
+}
+
+android {
+    namespace 'com.byrizki.rusto.models.ppocrv6.tiny.int8'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "0.3.0"
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/main/assets']
+        }
+    }
+}
+
+mavenPublishing {
+
+    coordinates('com.github.byrizki.rusto-rs', 'rusto-models-ppocrv6-tiny-int8', '0.3.0')
+
+    pom {
+        name = 'RustO! Models PP-OCRv6 Tiny INT8'
+        description = 'PP-OCRv6 Tiny INT8 pre-trained models for RustO! Android'
+        url = 'https://github.com/byrizki/rusto-rs'
+        
+        licenses {
+            license {
+                name = 'MIT License'
+                url = 'https://opensource.org/licenses/MIT'
+            }
+        }
+        
+        developers {
+            developer {
+                id = 'rusto'
+                name = 'RustO Contributors'
+            }
+        }
+        
+        scm {
+            connection = 'scm:git:git://github.com/byrizki/rusto-rs.git'
+            developerConnection = 'scm:git:ssh://github.com/byrizki/rusto-rs.git'
+            url = 'https://github.com/byrizki/rusto-rs'
+        }
+    }
+}

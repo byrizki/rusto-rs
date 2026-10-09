@@ -60,6 +60,45 @@ MODEL_DEFINITIONS = [
         "is_core": True,
     },
     {
+        "id": "ppocrv6-tiny-int8",
+        "name": "rusto-models-ppocrv6-tiny-int8",
+        "title": "PP-OCRv6 Tiny (INT8)",
+        "description": "Pre-trained PP-OCRv6 Tiny INT8 quantized models (~3.4 MB) for RustO OCR",
+        "preset": "ppv6",
+        "tier": "tiny-int8",
+        "language": "multilingual",
+        "source_dirs": ["PPOCR_v6_tiny_int8", "PPOCR_v6_tiny"],
+        "files": ["det.rten", "rec.rten", "dict.txt"],
+        "optional_files": ["det.onnx", "rec.onnx"],
+        "is_core": True,
+    },
+    {
+        "id": "ppocrv6-small-int8",
+        "name": "rusto-models-ppocrv6-small-int8",
+        "title": "PP-OCRv6 Small (INT8)",
+        "description": "Pre-trained PP-OCRv6 Small INT8 quantized models (~16 MB) for RustO OCR",
+        "preset": "ppv6",
+        "tier": "small-int8",
+        "language": "multilingual",
+        "source_dirs": ["PPOCR_v6_small_int8", "PPOCR_v6_small"],
+        "files": ["det.rten", "rec.rten", "dict.txt"],
+        "optional_files": ["det.onnx", "rec.onnx"],
+        "is_core": True,
+    },
+    {
+        "id": "ppocrv6-medium-int8",
+        "name": "rusto-models-ppocrv6-medium-int8",
+        "title": "PP-OCRv6 Medium (INT8)",
+        "description": "Pre-trained PP-OCRv6 Medium INT8 quantized models (~76 MB) for RustO OCR",
+        "preset": "ppv6",
+        "tier": "medium-int8",
+        "language": "multilingual",
+        "source_dirs": ["PPOCR_v6_medium_int8", "PPOCR_v6_medium"],
+        "files": ["det.rten", "rec.rten", "dict.txt"],
+        "optional_files": ["det.onnx", "rec.onnx"],
+        "is_core": True,
+    },
+    {
         "id": "ppocrv5-mobile",
         "name": "rusto-models-ppocrv5-mobile",
         "title": "PP-OCRv5 Mobile",
@@ -267,11 +306,17 @@ MODEL_DEFINITIONS = [
 ]
 
 def get_current_version() -> str:
+    models_ver_file = REPO_ROOT / "MODELS_VERSION"
+    if models_ver_file.exists():
+        content = models_ver_file.read_text(encoding="utf-8").strip()
+        if content:
+            return content
     cargo_toml = REPO_ROOT / "Cargo.toml"
-    with open(cargo_toml, "r", encoding="utf-8") as f:
-        for line in f:
-            if line.strip().startswith('version = "'):
-                return line.strip().split('"')[1]
+    if cargo_toml.exists():
+        with open(cargo_toml, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip().startswith('version = "'):
+                    return line.strip().split('"')[1]
     return "0.3.0"
 
 def generate_package_json(definition: dict, version: str) -> dict:
@@ -367,8 +412,16 @@ def generate_src_index_ts(definition: dict, version: str) -> str:
     for f in definition["files"]:
         if f.startswith("det."):
             files_dict["detection"] = f"models/{f}"
+            if f.endswith(".rten"):
+                files_dict["detectionRten"] = f"models/{f}"
+            elif f.endswith(".onnx"):
+                files_dict["detectionOnnx"] = f"models/{f}"
         elif f.startswith("rec."):
             files_dict["recognition"] = f"models/{f}"
+            if f.endswith(".rten"):
+                files_dict["recognitionRten"] = f"models/{f}"
+            elif f.endswith(".onnx"):
+                files_dict["recognitionOnnx"] = f"models/{f}"
         elif f.startswith("dict.") or f.endswith("_dict.txt") or f == "dict.txt":
             files_dict["dictionary"] = f"models/{f}"
         elif f.startswith("cls."):
@@ -379,6 +432,20 @@ def generate_src_index_ts(definition: dict, version: str) -> str:
             files_dict["recognitionEnglish"] = f"models/{opt_f}"
         elif opt_f.startswith("dict_en."):
             files_dict["dictionaryEnglish"] = f"models/{opt_f}"
+        elif opt_f.startswith("det."):
+            if opt_f.endswith(".rten"):
+                files_dict["detectionRten"] = f"models/{opt_f}"
+            elif opt_f.endswith(".onnx"):
+                files_dict["detectionOnnx"] = f"models/{opt_f}"
+            if "detection" not in files_dict:
+                files_dict["detection"] = f"models/{opt_f}"
+        elif opt_f.startswith("rec."):
+            if opt_f.endswith(".rten"):
+                files_dict["recognitionRten"] = f"models/{opt_f}"
+            elif opt_f.endswith(".onnx"):
+                files_dict["recognitionOnnx"] = f"models/{opt_f}"
+            if "recognition" not in files_dict:
+                files_dict["recognition"] = f"models/{opt_f}"
 
     files_json = json.dumps(files_dict, indent=4)
     pkg_name = definition["name"]
@@ -395,6 +462,10 @@ def generate_src_index_ts(definition: dict, version: str) -> str:
 export interface ModelFilesConfig {{
   detection?: string;
   recognition?: string;
+  detectionRten?: string;
+  recognitionRten?: string;
+  detectionOnnx?: string;
+  recognitionOnnx?: string;
   dictionary?: string;
   classification?: string;
   recognitionEnglish?: string;
@@ -594,10 +665,11 @@ def main():
     parser.add_argument("--all", action="store_true", help="Generate all 20 model packages")
     parser.add_argument("--core", action="store_true", help="Generate core model packages (ppocrv6-tiny, ppocrv6-small, ppocrv6-medium, ppocrv5-mobile)")
     parser.add_argument("--model", type=str, help="Generate a specific model package by id (e.g. ppocrv6-tiny)")
+    parser.add_argument("--version", type=str, default=None, help="Explicit version for the generated packages")
     parser.add_argument("--copy-models", action="store_true", help="Copy available model assets from repo models/ directory")
     args = parser.parse_args()
 
-    version = get_current_version()
+    version = args.version or get_current_version()
     print(f"RustO Model NPM Package Generator (Version: {version})")
 
     if not args.all and not args.core and not args.model:

@@ -1,0 +1,342 @@
+name: Publish OCR Models
+
+on:
+  push:
+    tags:
+      - "models-rten-v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Model version to publish (e.g. 0.3.0)'
+        required: false
+        default: '0.3.0'
+      tag_name:
+        description: 'Model release tag (e.g. models-rten-v0.3.0). Leave empty to use tag from version'
+        required: false
+        type: string
+      publish_nuget:
+        description: 'Publish model packages to NuGet'
+        type: boolean
+        required: false
+        default: true
+      publish_npm:
+        description: 'Publish model packages to NPM'
+        type: boolean
+        required: false
+        default: true
+      publish_cocoapods:
+        description: 'Publish model pods to CocoaPods'
+        type: boolean
+        required: false
+        default: true
+      create_release:
+        description: 'Create GitHub Release for OCR models'
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+  build-and-package-models:
+    name: Build & Package OCR Models
+    runs-on: ubuntu-22.04
+
+    outputs:
+      tag: ${{ steps.release_info.outputs.tag }}
+      version: ${{ steps.release_info.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Determine model release tag and version
+        id: release_info
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#models-rten-v}"
+          elif [ -n "${{ inputs.tag_name }}" ]; then
+            TAG="${{ inputs.tag_name }}"
+            VERSION="${TAG#models-rten-v}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+            TAG="models-rten-v${VERSION}"
+          else
+            VERSION=$(cat MODELS_VERSION | tr -d '[:space:]')
+            TAG="models-rten-v${VERSION}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Using Tag: ${TAG}, Version: ${VERSION}"
+
+      - name: Download all OCR models
+        run: |
+          chmod +x scripts/download_models.sh
+          python3 -m pip install --upgrade rten-convert onnx onnxruntime --break-system-packages || python3 -m pip install rten-convert onnx onnxruntime || true
+          bash scripts/download_models.sh --all --convert-rten
+          chmod +x scripts/quantize_ppocrv6_int8.py
+          python3 scripts/quantize_ppocrv6_int8.py --all
+
+      - name: Package iOS Model Bundles
+        run: |
+          mkdir -p build
+          package_model_zip() {
+            local model_src="$1"
+            local zip_name="$2"
+            local tmp_dir="build/tmp_$zip_name"
+            mkdir -p "$tmp_dir"
+            cp -r "$model_src"/* "$tmp_dir/"
+            rm -f "$tmp_dir"/*.onnx
+            (cd "$tmp_dir" && zip -r "../../build/$zip_name.zip" .)
+            rm -rf "$tmp_dir"
+          }
+
+          package_model_zip "models/PPOCR_v6_tiny" "RustO-Models-PPOCRv6-Tiny"
+          package_model_zip "models/PPOCR_v6_tiny_int8" "RustO-Models-PPOCRv6-Tiny-INT8"
+          package_model_zip "models/PPOCR_v6_small" "RustO-Models-PPOCRv6-Small"
+          package_model_zip "models/PPOCR_v6_small_int8" "RustO-Models-PPOCRv6-Small-INT8"
+          package_model_zip "models/PPOCR_v6_medium" "RustO-Models-PPOCRv6-Medium"
+          package_model_zip "models/PPOCR_v6_medium_int8" "RustO-Models-PPOCRv6-Medium-INT8"
+          package_model_zip "models/PPOCR_v5_mobile" "RustO-Models-PPOCRv5-Mobile"
+          package_model_zip "models/PPOCR_v5_server" "RustO-Models-PPOCRv5-Server"
+          package_model_zip "models/PPOCR_v4_mobile" "RustO-Models-PPOCRv4-Mobile"
+          package_model_zip "models/PPOCR_v4_server" "RustO-Models-PPOCRv4-Server"
+
+          package_model_zip "models/PPOCR_v5_arabic" "RustO-Models-PPOCRv5-Arabic"
+          package_model_zip "models/PPOCR_v5_cyrillic" "RustO-Models-PPOCRv5-Cyrillic"
+          package_model_zip "models/PPOCR_v5_devanagari" "RustO-Models-PPOCRv5-Devanagari"
+          package_model_zip "models/PPOCR_v5_el" "RustO-Models-PPOCRv5-Greek"
+          package_model_zip "models/PPOCR_v5_eslav" "RustO-Models-PPOCRv5-EastSlavic"
+          package_model_zip "models/PPOCR_v5_korean" "RustO-Models-PPOCRv5-Korean"
+          package_model_zip "models/PPOCR_v5_latin" "RustO-Models-PPOCRv5-Latin"
+          package_model_zip "models/PPOCR_v5_ta" "RustO-Models-PPOCRv5-Tamil"
+          package_model_zip "models/PPOCR_v5_te" "RustO-Models-PPOCRv5-Telugu"
+          package_model_zip "models/PPOCR_v5_th" "RustO-Models-PPOCRv5-Thai"
+
+          package_model_zip "models/PPOCR_v4_japan" "RustO-Models-PPOCRv4-Japanese"
+          package_model_zip "models/PPOCR_v4_chinese_cht" "RustO-Models-PPOCRv4-TraditionalChinese"
+          package_model_zip "models/PPOCR_v4_kannada" "RustO-Models-PPOCRv4-Kannada"
+
+      - name: Package Android Model AARs
+        run: |
+          for model_dir in models/PPOCR_*; do
+            if [ -d "$model_dir" ]; then
+              base_name=$(basename "$model_dir" | tr '[:upper:]' '[:lower:]' | sed 's/ppocr_v/ppocrv/' | tr '_' '-')
+              pkg_dir="packages/android/models/rusto-models-$base_name"
+              if [ -d "$pkg_dir" ]; then
+                mkdir -p "$pkg_dir/src/main/assets"
+                cp -r "$model_dir"/* "$pkg_dir/src/main/assets/"
+                rm -f "$pkg_dir/src/main/assets/"*.onnx
+                echo "Copied $model_dir -> $pkg_dir/src/main/assets/"
+              fi
+            fi
+          done
+
+          cd packages/android
+          chmod +x gradlew || true
+          # Build all model submodules
+          ./gradlew assembleRelease
+
+      - name: Package .NET Model NuGet Packages
+        run: |
+          for proj_dir in packages/dotnet/models/*; do
+            if [ -d "$proj_dir" ]; then
+              proj_name=$(basename "$proj_dir")
+              model_name=$(echo "$proj_name" | sed 's/RustODotnet.Models.//' | sed 's/\./_/g' | tr '[:upper:]' '[:lower:]' \
+                | sed 's/ppocrv/PPOCR_v/' \
+                | sed 's/greek/el/' | sed 's/eastslavic/eslav/' | sed 's/tamil/ta/' | sed 's/telugu/te/' | sed 's/thai/th/' \
+                | sed 's/japanese/japan/' | sed 's/traditionalchinese/chinese_cht/')
+              
+              if [ -d "models/$model_name" ]; then
+                mkdir -p "$proj_dir/models"
+                cp -r "models/$model_name"/* "$proj_dir/models/"
+                rm -f "$proj_dir/models/"*.onnx
+                echo "Copied models/$model_name -> $proj_dir/models/"
+              fi
+            fi
+          done
+
+          mkdir -p nupkg
+          for proj in packages/dotnet/models/*/*.csproj; do
+            if [ -f "$proj" ]; then
+              echo "Packing $proj..."
+              dotnet pack "$proj" -c Release -o nupkg -v detailed
+            fi
+          done
+
+      - name: Package NPM Model Packages
+        run: |
+          python3 scripts/generate_npm_models.py --all --copy-models --version "${{ steps.release_info.outputs.version }}"
+          mkdir -p npm-models
+          for pkg_dir in packages/models/rusto-models-*; do
+            if [ -d "$pkg_dir" ]; then
+              echo "Building and packing $pkg_dir..."
+              (cd "$pkg_dir" && npm install && npm run build && npm pack --pack-destination ../../../npm-models)
+            fi
+          done
+
+      - name: Stage Model Release Directory
+        run: |
+          mkdir -p model-releases
+          cp build/RustO-Models-*.zip model-releases/
+          find packages/android/models/*/build/outputs/aar -name '*-release.aar' -exec cp {} model-releases/ \;
+          cp nupkg/RustODotnet.Models.*.nupkg model-releases/
+          cp npm-models/rusto-models-*.tgz model-releases/
+          (cd model-releases && sha256sum * > SHA256SUMS)
+
+      - name: Upload .NET Model Packages Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-models-dotnet-nupkg
+          path: nupkg/RustODotnet.Models.*.nupkg
+
+      - name: Upload NPM Model Packages Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-models-npm-packages
+          path: npm-models/rusto-models-*.tgz
+
+      - name: Upload All Model Release Files Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-models-release-files
+          path: model-releases/
+
+      - name: Create GitHub Release for OCR Models
+        if: github.event_name == 'push' || github.event.inputs.create_release != 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          name: RustO! OCR Models ${{ steps.release_info.outputs.tag }}
+          files: model-releases/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## RustO! Pre-trained OCR Models ${{ steps.release_info.outputs.tag }}
+
+            Pre-trained PaddleOCR weights converted to pure-Rust RTen format.
+            Compatible with RustO! core libraries.
+
+            ### Included Packages:
+            - **iOS**: Resource bundles (`RustO-Models-*.zip`)
+            - **Android**: Model AAR packages (`rusto-models-*.aar`)
+            - **.NET**: Model NuGet packages (`RustODotnet.Models.*.nupkg`)
+            - **NPM / Web**: Model NPM packages (`rusto-models-*.tgz`)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publish Model Packages to NuGet
+  publish-models-nuget:
+    name: Publish Models to NuGet
+    needs: [build-and-package-models]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.publish_nuget != 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Download .NET model packages
+        uses: actions/download-artifact@v4
+        with:
+          name: rusto-models-dotnet-nupkg
+          path: nupkg
+
+      - name: Publish Models to NuGet
+        run: |
+          for pkg in nupkg/*.nupkg; do
+            if [ -f "$pkg" ]; then
+              echo "Publishing $pkg to NuGet..."
+              dotnet nuget push "$pkg" \
+                --api-key ${{ secrets.NUGET_API_KEY }} \
+                --source https://api.nuget.org/v3/index.json \
+                --skip-duplicate || true
+            fi
+          done
+        continue-on-error: true
+
+  # Publish Model Packages to NPM
+  publish-models-npm:
+    name: Publish Models to NPM
+    needs: [build-and-package-models]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.inputs.publish_npm != 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download NPM model packages
+        uses: actions/download-artifact@v4
+        with:
+          name: rusto-models-npm-packages
+          path: npm-models
+
+      - name: Publish Models to NPM
+        run: |
+          for pkg in npm-models/*.tgz; do
+            if [ -f "$pkg" ]; then
+              echo "Publishing $pkg to NPM..."
+              npm publish "$pkg" --access public || true
+            fi
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
+
+  # Publish Model Pods to CocoaPods
+  publish-models-cocoapods:
+    name: Publish Model Pods to CocoaPods
+    needs: [build-and-package-models]
+    runs-on: macos-latest
+    if: github.event_name == 'push' || github.event.inputs.publish_cocoapods != 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup CocoaPods
+        run: gem install cocoapods
+
+      - name: Validate and Publish Model CocoaPods
+        working-directory: packages/ios
+        run: |
+          echo "=== Publishing Model Pods ==="
+          for spec in models/*.podspec; do
+            if [ -f "$spec" ]; then
+              echo "Publishing $spec..."
+              pod spec lint "$spec" --allow-warnings --skip-import-validation || true
+              pod trunk push "$spec" --allow-warnings || true
+            fi
+          done
+        env:
+          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
+        continue-on-error: true

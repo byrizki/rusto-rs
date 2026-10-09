@@ -7,8 +7,11 @@ REPO_ROOT="$(cd "$DOCS_DIR/.." && pwd)"
 PUBLIC_MODELS="$DOCS_DIR/public/models"
 
 mkdir -p "$PUBLIC_MODELS/ppocrv6-tiny"
+mkdir -p "$PUBLIC_MODELS/ppocrv6-tiny-int8"
 mkdir -p "$PUBLIC_MODELS/ppocrv6-small"
+mkdir -p "$PUBLIC_MODELS/ppocrv6-small-int8"
 mkdir -p "$PUBLIC_MODELS/ppocrv6-medium"
+mkdir -p "$PUBLIC_MODELS/ppocrv6-medium-int8"
 mkdir -p "$PUBLIC_MODELS/ppocrv5-mobile"
 mkdir -p "$PUBLIC_MODELS/ppocrv5-server"
 mkdir -p "$PUBLIC_MODELS/ppocrv4-mobile"
@@ -39,6 +42,26 @@ copy_or_download "ppocrv5-mobile" "$REPO_ROOT/models/PPOCR_v5_mobile" "ppocrv5" 
 copy_or_download "ppocrv5-server" "$REPO_ROOT/models/PPOCR_v5_server" "ppocrv5" "server"
 copy_or_download "ppocrv4-mobile" "$REPO_ROOT/models/PPOCR_v4_mobile" "ppocrv4" "mobile"
 copy_or_download "ppocrv4-server" "$REPO_ROOT/models/PPOCR_v4_server" "ppocrv4" "server"
+
+echo "=== Preparing PP-OCRv6 INT8 models for docs preview ==="
+for tier in tiny small medium; do
+  target_id="ppocrv6-${tier}-int8"
+  target_dir="$PUBLIC_MODELS/$target_id"
+  local_int8_dir="$REPO_ROOT/models/PPOCR_v6_${tier}_int8"
+  mkdir -p "$target_dir"
+
+  if [ -d "$local_int8_dir" ] && ([ -f "$local_int8_dir/det.rten" ] || [ -f "$local_int8_dir/det.onnx" ]); then
+    echo "Copying local INT8 models from $local_int8_dir to $target_dir/..."
+    cp -r "$local_int8_dir"/* "$target_dir/"
+  elif [ -f "$PUBLIC_MODELS/ppocrv6-${tier}/det.onnx" ] || [ -f "$REPO_ROOT/models/PPOCR_v6_${tier}/det.onnx" ]; then
+    echo "Quantizing PP-OCRv6 ${tier} to INT8..."
+    PYTHON_CMD="python3"
+    if [ -f "/tmp/rten-env/bin/python3" ]; then
+      PYTHON_CMD="/tmp/rten-env/bin/python3"
+    fi
+    $PYTHON_CMD "$REPO_ROOT/scripts/quantize_ppocrv6_int8.py" --tier "$tier" --output-dir "$target_dir" || true
+  fi
+done
 
 echo "=== Converting ONNX models to true .rten FlatBuffers format ==="
 RTEN_CONVERT=""

@@ -1,4 +1,4 @@
-name: Publish Packages
+name: Publish Libraries
 
 on:
   release:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish'
+        description: 'Version to publish (e.g. 0.3.0)'
         required: true
         default: '0.3.0'
       publish_crates:
@@ -15,17 +15,17 @@ on:
         required: false
         default: true
       publish_nuget:
-        description: 'Publish to NuGet'
+        description: 'Publish Core to NuGet'
         type: boolean
         required: false
         default: true
       publish_npm:
-        description: 'Publish to NPM'
+        description: 'Publish Core to NPM'
         type: boolean
         required: false
         default: true
       publish_cocoapods:
-        description: 'Publish to CocoaPods'
+        description: 'Publish Core to CocoaPods'
         type: boolean
         required: false
         default: true
@@ -35,7 +35,9 @@ jobs:
   publish-crates:
     name: Publish to crates.io
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event.inputs.publish_crates == 'true' 
+    if: >-
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') && !startsWith(github.event.release.tag_name, 'models-')) ||
+      github.event.inputs.publish_crates == 'true'
     steps:
       - uses: actions/checkout@v4
       
@@ -79,11 +81,13 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  # Publish to NuGet
+  # Publish Core to NuGet
   publish-nuget:
-    name: Publish to NuGet
+    name: Publish Core to NuGet
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event.inputs.publish_nuget == 'true'    
+    if: >-
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') && !startsWith(github.event.release.tag_name, 'models-')) ||
+      github.event.inputs.publish_nuget == 'true'
     steps:
       - uses: actions/checkout@v4
       
@@ -92,20 +96,21 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       
-      - name: Download NuGet package from release
+      - name: Download Core NuGet package from release
         run: |
-          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION="${{ github.event.inputs.version || github.event.release.tag_name || github.ref_name }}"
           VERSION="${VERSION#v}"  # Remove 'v' prefix
           
           # Download nupkg from GitHub release
-          gh release download "v${VERSION}" -p "*.nupkg" -Dpackages/dotnet || true
+          gh release download "v${VERSION}" -p "RustODotnet.*.nupkg" -Dpackages/dotnet || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Publish to NuGet
+      - name: Publish Core to NuGet
         working-directory: packages/dotnet
         run: |
-          find . -name "*.nupkg" | while read pkg; do
+          find . -name "RustODotnet.*.nupkg" ! -name "RustODotnet.Models.*" | while read pkg; do
+            echo "Pushing $pkg to NuGet..."
             dotnet nuget push "$pkg" \
               --api-key ${{ secrets.NUGET_API_KEY }} \
               --source https://api.nuget.org/v3/index.json \
@@ -113,11 +118,13 @@ jobs:
           done
         continue-on-error: true
 
-  # Publish to NPM
+  # Publish Core to NPM
   publish-npm:
-    name: Publish to NPM
+    name: Publish Core to NPM
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event.inputs.publish_npm == 'true'    
+    if: >-
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') && !startsWith(github.event.release.tag_name, 'models-')) ||
+      github.event.inputs.publish_npm == 'true'
     steps:
       - uses: actions/checkout@v4
       
@@ -127,21 +134,21 @@ jobs:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
           
-      - name: Download NPM packages from release
+      - name: Download Core NPM packages from release
         run: |
-          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION="${{ github.event.inputs.version || github.event.release.tag_name || github.ref_name }}"
           VERSION="${VERSION#v}"
           
           mkdir -p npm-packages
-          # Download all tgz from GitHub release
+          # Download core library tgz from GitHub release
           gh release download "v${VERSION}" -p "*.tgz" -D npm-packages/ || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
-      - name: Publish to NPM
+      - name: Publish Core to NPM
         run: |
           for pkg in npm-packages/*.tgz; do
-            if [ -f "$pkg" ]; then
+            if [ -f "$pkg" ] && [[ ! "$pkg" =~ rusto-models- ]]; then
               echo "Publishing $pkg..."
               npm publish "$pkg" --access public || true
             fi
@@ -150,32 +157,25 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         continue-on-error: true
 
-  # Publish to CocoaPods
+  # Publish Core to CocoaPods
   publish-cocoapods:
-    name: Publish to CocoaPods
+    name: Publish Core to CocoaPods
     runs-on: macos-latest
-    if: github.event_name == 'release' || github.event.inputs.publish_cocoapods == 'true'
+    if: >-
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') && !startsWith(github.event.release.tag_name, 'models-')) ||
+      github.event.inputs.publish_cocoapods == 'true'
     steps:
       - uses: actions/checkout@v4
       
       - name: Setup CocoaPods
         run: gem install cocoapods
       
-      - name: Validate and Publish CocoaPods
+      - name: Validate and Publish Core CocoaPod
         working-directory: packages/ios
         run: |
           echo "=== Publishing Core Pod ==="
           pod spec lint RustO.podspec --allow-warnings --skip-import-validation || true
           pod trunk push RustO.podspec --allow-warnings || true
-
-          echo "=== Publishing Model Pods ==="
-          for spec in models/*.podspec; do
-            if [ -f "$spec" ]; then
-              echo "Publishing $spec..."
-              pod spec lint "$spec" --allow-warnings --skip-import-validation || true
-              pod trunk push "$spec" --allow-warnings || true
-            fi
-          done
         env:
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
         continue-on-error: true

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>RustODotnet.Models.PPOCRv6.Tiny.Int8</PackageId>
+    <Version>0.3.0</Version>
+    <Authors>RustO Contributors</Authors>
+    <Description>PP-OCRv6 Tiny INT8 pre-trained models for RustODotnet (~3.4 MB lightweight)</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/byrizki/rusto-rs</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/byrizki/rusto-rs</PackageProjectUrl>
+    <PackageTags>OCR;PaddleOCR;ONNX;RTen;PP-OCRv6;Models;Tiny;INT8</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="models\**\*" Pack="true" PackagePath="content\models\" />
+    <None Include="buildTransitive\$(PackageId).targets" Pack="true" PackagePath="buildTransitive\$(PackageId).targets" />
+    <None Include="buildTransitive\$(PackageId).targets" Pack="true" PackagePath="build\$(PackageId).targets" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

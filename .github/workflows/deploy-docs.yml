@@ -33,6 +33,7 @@ jobs:
     outputs:
       has_rusto_web: ${{ steps.check.outputs.has_rusto_web }}
       release_tag: ${{ steps.check.outputs.release_tag }}
+      artifact_run_id: ${{ steps.check.outputs.artifact_run_id }}
     steps:
       - uses: actions/checkout@v4
       - name: Check if rusto-web is available
@@ -45,6 +46,7 @@ jobs:
             echo "Found local WASM bindings in packages/web/src/wasm."
             echo "has_rusto_web=true" >> $GITHUB_OUTPUT
             echo "release_tag=local" >> $GITHUB_OUTPUT
+            echo "artifact_run_id=" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -56,21 +58,46 @@ jobs:
           # Check exact target tag release
           if gh release view "$TARGET_TAG" --json assets -q '.assets[].name' 2>/dev/null | grep -q -E 'rusto-(web|wasm)'; then
             FOUND_TAG="$TARGET_TAG"
-          # Check latest published release
-          elif gh release view --json assets -q '.assets[].name' 2>/dev/null | grep -q -E 'rusto-(web|wasm)'; then
-            FOUND_TAG=$(gh release view --json tagName -q '.tagName' 2>/dev/null)
+          else
+            # Check recent published releases
+            for tag in $(gh release list --limit 10 --json tagName,isDraft,isPrerelease -q '.[] | select(.isDraft == false and .isPrerelease == false) | .tagName' 2>/dev/null); do
+              if gh release view "$tag" --json assets -q '.assets[].name' 2>/dev/null | grep -q -E 'rusto-(web|wasm)'; then
+                FOUND_TAG="$tag"
+                break
+              fi
+            done
           fi
 
           if [ -n "$FOUND_TAG" ]; then
             echo "Found prebuilt rusto-web/wasm in GitHub release: ${FOUND_TAG}"
             echo "has_rusto_web=true" >> $GITHUB_OUTPUT
             echo "release_tag=${FOUND_TAG}" >> $GITHUB_OUTPUT
-          else
-            echo "Notice: rusto-web prebuilt artifacts are not available in GitHub releases yet."
-            echo "Skipping docs deployment until a release with rusto-web is published."
-            echo "has_rusto_web=false" >> $GITHUB_OUTPUT
-            echo "release_tag=" >> $GITHUB_OUTPUT
+            echo "artifact_run_id=" >> $GITHUB_OUTPUT
+            exit 0
           fi
+
+          # 3. Check triggering workflow run or latest successful Build & Release run
+          echo "Checking GitHub Actions workflow runs for rusto-wasm-package artifact..."
+          CANDIDATE_RUN_ID="${{ github.event.workflow_run.id }}"
+          if [ -z "$CANDIDATE_RUN_ID" ] || [ "$CANDIDATE_RUN_ID" = "null" ]; then
+            CANDIDATE_RUN_ID=$(gh run list --workflow "Build & Release" --status success --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
+          fi
+
+          if [ -n "$CANDIDATE_RUN_ID" ] && [ "$CANDIDATE_RUN_ID" != "null" ]; then
+            if gh run view "$CANDIDATE_RUN_ID" --json artifacts -q '.artifacts[].name' 2>/dev/null | grep -q 'rusto-wasm-package'; then
+              echo "Found prebuilt rusto-wasm-package in workflow run: ${CANDIDATE_RUN_ID}"
+              echo "has_rusto_web=true" >> $GITHUB_OUTPUT
+              echo "release_tag=run" >> $GITHUB_OUTPUT
+              echo "artifact_run_id=${CANDIDATE_RUN_ID}" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+
+          # 4. Fallback: Build WASM on-the-fly during doc build
+          echo "Prebuilt WASM artifact not found in releases or CI runs. Fallback to on-the-fly wasm build."
+          echo "has_rusto_web=true" >> $GITHUB_OUTPUT
+          echo "release_tag=build" >> $GITHUB_OUTPUT
+          echo "artifact_run_id=" >> $GITHUB_OUTPUT
 
   build:
     name: Build Documentation
@@ -84,6 +111,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Rust (if building WASM)
+        if: needs.check-prerequisites.outputs.release_tag == 'build'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -95,27 +128,43 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Fetch prebuilt WASM and Models from GitHub Release
+      - name: Fetch WASM and Models
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.check-prerequisites.outputs.release_tag }}
+          ARTIFACT_RUN_ID: ${{ needs.check-prerequisites.outputs.artifact_run_id }}
         run: |
           mkdir -p /tmp/wasm-assets
           mkdir -p /tmp/model-assets
           mkdir -p ../packages/web/src/wasm
           mkdir -p public/wasm
           mkdir -p public/models/ppocrv6-tiny
+          mkdir -p public/models/ppocrv6-tiny-int8
           mkdir -p public/models/ppocrv6-small
+          mkdir -p public/models/ppocrv6-small-int8
           mkdir -p public/models/ppocrv6-medium
+          mkdir -p public/models/ppocrv6-medium-int8
           mkdir -p public/models/ppocrv5-mobile
           mkdir -p public/models/ppocrv5-server
           mkdir -p public/models/ppocrv4-mobile
           mkdir -p public/models/ppocrv4-server
 
-          if [ "$RELEASE_TAG" != "local" ] && [ -n "$RELEASE_TAG" ]; then
-            echo "Downloading prebuilt WASM and Models from release ${RELEASE_TAG}..."
+          # --- 1. Populate WASM bindings ---
+          if [ "$RELEASE_TAG" = "build" ]; then
+            echo "Building rten-wasm with wasm-pack on runner..."
+            curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+            (cd .. && wasm-pack build crates/rten-wasm --target web --out-dir packages/web/src/wasm)
+          elif [ "$RELEASE_TAG" = "run" ] && [ -n "$ARTIFACT_RUN_ID" ]; then
+            echo "Downloading prebuilt WASM from workflow run ${ARTIFACT_RUN_ID}..."
+            gh run download "$ARTIFACT_RUN_ID" -n rusto-wasm-package --dir /tmp/wasm-assets || true
+            if [ -f /tmp/wasm-assets/rusto-wasm.tar.gz ]; then
+              tar -xzf /tmp/wasm-assets/rusto-wasm.tar.gz -C ../packages/web/src/wasm
+            elif [ -f /tmp/wasm-assets/rusto-wasm.tgz ]; then
+              tar -xzf /tmp/wasm-assets/rusto-wasm.tgz -C ../packages/web/src/wasm
+            fi
+          elif [ "$RELEASE_TAG" != "local" ] && [ -n "$RELEASE_TAG" ]; then
+            echo "Downloading prebuilt WASM from release ${RELEASE_TAG}..."
             gh release download "$RELEASE_TAG" --pattern 'rusto-wasm.*' --pattern 'rusto-web-*.tgz' --dir /tmp/wasm-assets || true
-            gh release download "$RELEASE_TAG" --pattern 'RustO-Models-*.zip' --dir /tmp/model-assets || true
 
             if [ -f /tmp/wasm-assets/rusto-wasm.tar.gz ]; then
               echo "Extracting rusto-wasm.tar.gz..."
@@ -130,24 +179,45 @@ jobs:
                 cp -r /tmp/wasm-assets/package/src/wasm/* ../packages/web/src/wasm/
               fi
             fi
-
-            for zip_file in /tmp/model-assets/RustO-Models-*.zip; do
-              [ -f "$zip_file" ] || continue
-              name=$(basename "$zip_file" .zip)
-              case "$name" in
-                RustO-Models-PPOCRv6-Tiny) target="ppocrv6-tiny" ;;
-                RustO-Models-PPOCRv6-Small) target="ppocrv6-small" ;;
-                RustO-Models-PPOCRv6-Medium) target="ppocrv6-medium" ;;
-                RustO-Models-PPOCRv5-Mobile) target="ppocrv5-mobile" ;;
-                RustO-Models-PPOCRv5-Server) target="ppocrv5-server" ;;
-                RustO-Models-PPOCRv4-Mobile) target="ppocrv4-mobile" ;;
-                RustO-Models-PPOCRv4-Server) target="ppocrv4-server" ;;
-                *) continue ;;
-              esac
-              echo "Extracting $zip_file to public/models/$target/..."
-              unzip -o "$zip_file" -d "public/models/$target/"
-            done
           fi
+
+          # --- 2. Populate Models ---
+          MODELS_VERSION=$(cat ../MODELS_VERSION 2>/dev/null || echo "0.3.0")
+          MODEL_TAG="models-rten-v${MODELS_VERSION}"
+          echo "Attempting to download model assets from release ${MODEL_TAG}..."
+          gh release download "$MODEL_TAG" --pattern 'RustO-Models-*.zip' --dir /tmp/model-assets 2>/dev/null || true
+
+          if ! ls /tmp/model-assets/RustO-Models-*.zip 1>/dev/null 2>&1; then
+            if [ "$RELEASE_TAG" != "local" ] && [ "$RELEASE_TAG" != "build" ] && [ "$RELEASE_TAG" != "run" ] && [ -n "$RELEASE_TAG" ]; then
+              echo "Attempting to download model assets from library release ${RELEASE_TAG}..."
+              gh release download "$RELEASE_TAG" --pattern 'RustO-Models-*.zip' --dir /tmp/model-assets 2>/dev/null || true
+            fi
+          fi
+
+          if ! ls /tmp/model-assets/RustO-Models-*.zip 1>/dev/null 2>&1 && [ -n "$ARTIFACT_RUN_ID" ]; then
+            echo "Attempting to download model assets from workflow run ${ARTIFACT_RUN_ID}..."
+            gh run download "$ARTIFACT_RUN_ID" -n rusto-ios-model-resources --dir /tmp/model-assets 2>/dev/null || true
+          fi
+
+          for zip_file in /tmp/model-assets/RustO-Models-*.zip; do
+            [ -f "$zip_file" ] || continue
+            name=$(basename "$zip_file" .zip)
+            case "$name" in
+              RustO-Models-PPOCRv6-Tiny) target="ppocrv6-tiny" ;;
+              RustO-Models-PPOCRv6-Tiny-INT8|RustO-Models-PPOCRv6-Tiny-int8) target="ppocrv6-tiny-int8" ;;
+              RustO-Models-PPOCRv6-Small) target="ppocrv6-small" ;;
+              RustO-Models-PPOCRv6-Small-INT8|RustO-Models-PPOCRv6-Small-int8) target="ppocrv6-small-int8" ;;
+              RustO-Models-PPOCRv6-Medium) target="ppocrv6-medium" ;;
+              RustO-Models-PPOCRv6-Medium-INT8|RustO-Models-PPOCRv6-Medium-int8) target="ppocrv6-medium-int8" ;;
+              RustO-Models-PPOCRv5-Mobile) target="ppocrv5-mobile" ;;
+              RustO-Models-PPOCRv5-Server) target="ppocrv5-server" ;;
+              RustO-Models-PPOCRv4-Mobile) target="ppocrv4-mobile" ;;
+              RustO-Models-PPOCRv4-Server) target="ppocrv4-server" ;;
+              *) continue ;;
+            esac
+            echo "Extracting $zip_file to public/models/$target/..."
+            unzip -o "$zip_file" -d "public/models/$target/"
+          done
 
           # Fallback for models if not populated from release
           populate_model() {
@@ -174,6 +244,21 @@ jobs:
           populate_model "ppocrv5-server" "../models/PPOCR_v5_server" "ppocrv5" "server"
           populate_model "ppocrv4-mobile" "../models/PPOCR_v4_mobile" "ppocrv4" "mobile"
           populate_model "ppocrv4-server" "../models/PPOCR_v4_server" "ppocrv4" "server"
+
+          # Populate INT8 variants
+          for tier in tiny small medium; do
+            target_int8="ppocrv6-${tier}-int8"
+            if [ ! -f "public/models/$target_int8/det.rten" ]; then
+              if [ -d "../models/PPOCR_v6_${tier}_int8" ]; then
+                echo "Copying local INT8 models to public/models/$target_int8/..."
+                cp -r "../models/PPOCR_v6_${tier}_int8"/* "public/models/$target_int8/"
+              elif [ -f "public/models/ppocrv6-${tier}/det.onnx" ] || [ -f "../models/PPOCR_v6_${tier}/det.onnx" ]; then
+                echo "Quantizing PP-OCRv6 $tier to INT8..."
+                python3 -m pip install onnxruntime || true
+                python3 ../scripts/quantize_ppocrv6_int8.py --tier "$tier" --output-dir "public/models/$target_int8" || true
+              fi
+            fi
+          done
 
           # Convert ONNX models to true .rten FlatBuffers format and clean up
           python3 -m pip install --break-system-packages rten-convert || pip install rten-convert || true

@@ -7,7 +7,7 @@
 - **Model Preset:** `ppv6`
 - **Model Tier:** `small`
 - **Target Language:** `multilingual`
-- **Version:** `0.2.5`
+- **Version:** `0.3.0`
 
 ## Installation
 

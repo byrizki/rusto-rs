@@ -17,11 +17,20 @@ rootProject.name = "rusto-android"
 include ':rusto-models-ppocrv6-tiny'
 project(':rusto-models-ppocrv6-tiny').projectDir = file('models/rusto-models-ppocrv6-tiny')
 
+include ':rusto-models-ppocrv6-tiny-int8'
+project(':rusto-models-ppocrv6-tiny-int8').projectDir = file('models/rusto-models-ppocrv6-tiny-int8')
+
 include ':rusto-models-ppocrv6-small'
 project(':rusto-models-ppocrv6-small').projectDir = file('models/rusto-models-ppocrv6-small')
 
+include ':rusto-models-ppocrv6-small-int8'
+project(':rusto-models-ppocrv6-small-int8').projectDir = file('models/rusto-models-ppocrv6-small-int8')
+
 include ':rusto-models-ppocrv6-medium'
 project(':rusto-models-ppocrv6-medium').projectDir = file('models/rusto-models-ppocrv6-medium')
+
+include ':rusto-models-ppocrv6-medium-int8'
+project(':rusto-models-ppocrv6-medium-int8').projectDir = file('models/rusto-models-ppocrv6-medium-int8')
 
 include ':rusto-models-ppocrv5-mobile'
 project(':rusto-models-ppocrv5-mobile').projectDir = file('models/rusto-models-ppocrv5-mobile')

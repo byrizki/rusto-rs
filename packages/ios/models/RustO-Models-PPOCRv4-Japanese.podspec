@@ -7,7 +7,7 @@ Pod::Spec.new do |s|
   s.license          = { :type => 'MIT', :text => 'MIT License' }
   s.author           = { 'RustO Contributors' => 'support@rusto.dev' }
   s.source           = {
-    :http => "https://github.com/byrizki/rusto-rs/releases/download/v#{s.version}/RustO-Models-PPOCRv4-Japanese.zip"
+    :http => "https://github.com/byrizki/rusto-rs/releases/download/models-rten-v#{s.version}/RustO-Models-PPOCRv4-Japanese.zip"
   }
   s.ios.deployment_target = '12.0'
   s.resource_bundles = {

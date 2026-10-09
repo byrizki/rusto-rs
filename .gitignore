@@ -30,6 +30,9 @@ docs/public/models/ppocrv4-mobile/
 docs/public/models/ppocrv4-server/
 docs/public/models/ppocrv6-small/
 docs/public/models/ppocrv6-medium/
+docs/public/models/ppocrv6-tiny-int8/
+docs/public/models/ppocrv6-small-int8/
+docs/public/models/ppocrv6-medium-int8/
 
 # Debugging binary dumps, benchmark artifacts, and agent workspaces
 *.bin
@@ -59,6 +62,7 @@ packages/dotnet/models/*.txt
 packages/models/**/*.mnn
 packages/models/**/*.onnx
 packages/models/**/*.rten
+packages/models/**/models/
 packages/models/**/dist
 packages/web/dist
 packages/react/dist

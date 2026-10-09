@@ -17,6 +17,13 @@ export const availableModels: OcrModelOption[] = [
     trait: 'Ultra-lightweight',
   },
   {
+    id: 'ppocrv6-tiny-int8',
+    name: 'PP-OCRv6 Tiny (INT8)',
+    preset: 'ppv6',
+    size: '~3.4 MB',
+    trait: 'Ultra-lightweight INT8',
+  },
+  {
     id: 'ppocrv6-small',
     name: 'PP-OCRv6 Small',
     preset: 'ppv6',
@@ -24,11 +31,25 @@ export const availableModels: OcrModelOption[] = [
     trait: 'Balanced speed & quality',
   },
   {
+    id: 'ppocrv6-small-int8',
+    name: 'PP-OCRv6 Small (INT8)',
+    preset: 'ppv6',
+    size: '~16 MB',
+    trait: 'Balanced INT8',
+  },
+  {
     id: 'ppocrv6-medium',
     name: 'PP-OCRv6 Medium',
     preset: 'ppv6',
     size: '~138 MB',
     trait: 'Highest accuracy',
+  },
+  {
+    id: 'ppocrv6-medium-int8',
+    name: 'PP-OCRv6 Medium (INT8)',
+    preset: 'ppv6',
+    size: '~76 MB',
+    trait: 'Highest accuracy INT8',
   },
   {
     id: 'ppocrv5-mobile',

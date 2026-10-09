@@ -6,6 +6,10 @@
 export interface ModelFilesConfig {
   detection?: string;
   recognition?: string;
+  detectionRten?: string;
+  recognitionRten?: string;
+  detectionOnnx?: string;
+  recognitionOnnx?: string;
   dictionary?: string;
   classification?: string;
   recognitionEnglish?: string;
@@ -25,14 +29,16 @@ export interface ModelPackageMetadata {
 
 export const modelMetadata: ModelPackageMetadata = {
   name: 'rusto-models-ppocrv6-medium',
-  version: '0.2.5',
+  version: '0.3.0',
   title: 'PP-OCRv6 Medium',
   preset: 'ppv6',
   tier: 'medium',
   language: 'multilingual',
   files: {
     "detection": "models/det.onnx",
+    "detectionOnnx": "models/det.onnx",
     "recognition": "models/rec.onnx",
+    "recognitionOnnx": "models/rec.onnx",
     "dictionary": "models/dict.txt"
 },
 };
