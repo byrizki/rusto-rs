@@ -7,7 +7,7 @@
 - **Model Preset:** `ppv6`
 - **Model Tier:** `medium-int8`
 - **Target Language:** `multilingual`
-- **Version:** `0.3.0`
+- **Version:** `0.3.1`
 
 ## Installation
 

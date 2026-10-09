@@ -336,7 +336,7 @@ def get_current_version() -> str:
             for line in f:
                 if line.strip().startswith('version = "'):
                     return line.strip().split('"')[1]
-    return "0.3.0"
+    return "0.3.1"
 
 def generate_package_json(definition: dict, version: str) -> dict:
     pkg_name = definition["name"]

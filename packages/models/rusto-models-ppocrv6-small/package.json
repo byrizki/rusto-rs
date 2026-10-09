@@ -1,6 +1,6 @@
 {
   "name": "rusto-models-ppocrv6-small",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Pre-trained PP-OCRv6 Small models (~12 MB) for RustO OCR",
   "keywords": [
     "ocr",

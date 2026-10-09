@@ -1,6 +1,6 @@
 {
   "name": "rusto-models-ppocrv6-medium-int8",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Pre-trained PP-OCRv6 Medium INT8 quantized models (~76 MB) for RustO OCR",
   "keywords": [
     "ocr",
