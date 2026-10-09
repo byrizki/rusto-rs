@@ -147,10 +147,11 @@ jobs:
         
       - name: Publish Core to NPM
         run: |
-          for pkg in npm-packages/*.tgz; do
-            if [ -f "$pkg" ] && [[ ! "$pkg" =~ rusto-models- ]]; then
-              echo "Publishing $pkg..."
-              npm publish "$pkg" --access public || true
+          find npm-packages -name "*.tgz" -type f | while read -r pkg; do
+            if [[ ! "$pkg" =~ rusto-models- ]]; then
+              abs_pkg="$(readlink -f "$pkg")"
+              echo "Publishing $(basename "$abs_pkg")..."
+              npm publish "$abs_pkg" --access public || true
             fi
           done
         env:

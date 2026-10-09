@@ -317,11 +317,10 @@ jobs:
 
       - name: Publish Models to NPM
         run: |
-          for pkg in npm-models/*.tgz; do
-            if [ -f "$pkg" ]; then
-              echo "Publishing $pkg to NPM..."
-              npm publish "$pkg" --access public || true
-            fi
+          find npm-models -name "*.tgz" -type f | while read -r pkg; do
+            abs_pkg="$(readlink -f "$pkg")"
+            echo "Publishing $(basename "$abs_pkg") to NPM..."
+            npm publish "$abs_pkg" --access public || true
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
