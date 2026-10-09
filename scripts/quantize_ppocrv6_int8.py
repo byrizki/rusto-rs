@@ -22,6 +22,15 @@ def get_rten_convert_cmd():
     """Find the rten-convert executable."""
     if shutil.which("rten-convert"):
         return ["rten-convert"]
+    try:
+        import rten_convert.converter  # noqa: F401
+        return [
+            sys.executable,
+            "-c",
+            "import sys; from rten_convert.converter import main; sys.argv = ['rten-convert'] + sys.argv[1:]; sys.exit(main())",
+        ]
+    except ImportError:
+        pass
     if os.path.isfile("/tmp/rten-env/bin/rten-convert"):
         return ["/tmp/rten-env/bin/rten-convert"]
     user_local = os.path.expanduser("~/.local/bin/rten-convert")
@@ -120,6 +129,11 @@ def quantize_tier(tier: str, input_dir: Path, output_dir: Path, convert_rten: bo
 def main():
     parser = argparse.ArgumentParser(description="Quantize PP-OCRv6 models to INT8")
     parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Quantize all PP-OCRv6 tiers (tiny, small, medium)",
+    )
+    parser.add_argument(
         "--tier",
         choices=["tiny", "small", "medium", "all"],
         default="all",
@@ -151,7 +165,8 @@ def main():
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
-    tiers = ["tiny", "small", "medium"] if args.tier == "all" else [args.tier]
+    effective_tier = "all" if args.all else args.tier
+    tiers = ["tiny", "small", "medium"] if effective_tier == "all" else [effective_tier]
 
     success = True
     for t in tiers:
