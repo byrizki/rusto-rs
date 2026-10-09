@@ -1,0 +1,58 @@
+name: Unpublish NPM Models
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to unpublish (e.g. 0.3.0)'
+        required: true
+        default: '0.3.0'
+
+jobs:
+  unpublish-npm-models:
+    name: Unpublish NPM Models
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Unpublish Models from NPM
+        run: |
+          VERSION="${{ inputs.version }}"
+          PACKAGES=(
+            rusto-models-ppocrv6-tiny
+            rusto-models-ppocrv6-small
+            rusto-models-ppocrv6-medium
+            rusto-models-ppocrv6-tiny-int8
+            rusto-models-ppocrv6-small-int8
+            rusto-models-ppocrv6-medium-int8
+            rusto-models-ppocrv5-mobile
+            rusto-models-ppocrv5-server
+            rusto-models-ppocrv5-arabic
+            rusto-models-ppocrv5-cyrillic
+            rusto-models-ppocrv5-devanagari
+            rusto-models-ppocrv5-el
+            rusto-models-ppocrv5-eslav
+            rusto-models-ppocrv5-korean
+            rusto-models-ppocrv5-latin
+            rusto-models-ppocrv5-ta
+            rusto-models-ppocrv5-te
+            rusto-models-ppocrv5-th
+            rusto-models-ppocrv4-mobile
+            rusto-models-ppocrv4-server
+            rusto-models-ppocrv4-japan
+            rusto-models-ppocrv4-chinese-cht
+            rusto-models-ppocrv4-kannada
+          )
+
+          for pkg in "${PACKAGES[@]}"; do
+            echo "Unpublishing $pkg@$VERSION..."
+            npm unpublish "$pkg@$VERSION" --force || true
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
