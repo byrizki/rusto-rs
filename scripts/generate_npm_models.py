@@ -32,7 +32,8 @@ MODEL_DEFINITIONS = [
         "tier": "tiny",
         "language": "multilingual",
         "source_dirs": ["PPOCR_v6_tiny", "PPOCR_v6"],
-        "files": ["det.onnx", "rec.onnx", "dict.txt"],
+        "files": ["det.rten", "rec.rten", "dict.txt"],
+        "optional_files": ["det.onnx", "rec.onnx"],
         "is_core": True,
     },
     {
@@ -44,7 +45,8 @@ MODEL_DEFINITIONS = [
         "tier": "small",
         "language": "multilingual",
         "source_dirs": ["PPOCR_v6_small"],
-        "files": ["det.onnx", "rec.onnx", "dict.txt"],
+        "files": ["det.rten", "rec.rten", "dict.txt"],
+        "optional_files": ["det.onnx", "rec.onnx"],
         "is_core": True,
     },
     {
@@ -56,7 +58,8 @@ MODEL_DEFINITIONS = [
         "tier": "medium",
         "language": "multilingual",
         "source_dirs": ["PPOCR_v6_medium"],
-        "files": ["det.onnx", "rec.onnx", "dict.txt"],
+        "files": ["det.rten", "rec.rten", "dict.txt"],
+        "optional_files": ["det.onnx", "rec.onnx"],
         "is_core": True,
     },
     {
@@ -107,8 +110,8 @@ MODEL_DEFINITIONS = [
         "tier": "mobile",
         "language": "multilingual",
         "source_dirs": ["PPOCR_v5_mobile", "PPOCR_v5"],
-        "files": ["det.onnx", "rec.onnx", "dict.txt"],
-        "optional_files": ["rec_en.onnx", "dict_en.txt"],
+        "files": ["det.rten", "rec.rten", "dict.txt"],
+        "optional_files": ["det.onnx", "rec.onnx", "rec_en.rten", "rec_en.onnx", "dict_en.txt"],
         "is_core": True,
     },
     {
@@ -120,127 +123,138 @@ MODEL_DEFINITIONS = [
         "tier": "server",
         "language": "multilingual",
         "source_dirs": ["PPOCR_v5_server"],
-        "files": ["det.onnx", "rec.onnx", "dict.txt"],
+        "files": ["det.rten", "rec.rten", "dict.txt"],
+        "optional_files": ["det.onnx", "rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv5-arabic",
         "name": "rusto-models-ppocrv5-arabic",
         "title": "PP-OCRv5 Arabic",
-        "description": "Pre-trained PP-OCRv5 Arabic recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv5 Arabic recognition model for RustO OCR",
         "preset": "ppv5",
         "tier": "mobile",
         "language": "arabic",
         "source_dirs": ["PPOCR_v5_arabic"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv5-cyrillic",
         "name": "rusto-models-ppocrv5-cyrillic",
         "title": "PP-OCRv5 Cyrillic",
-        "description": "Pre-trained PP-OCRv5 Cyrillic recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv5 Cyrillic recognition model for RustO OCR",
         "preset": "ppv5",
         "tier": "mobile",
         "language": "cyrillic",
         "source_dirs": ["PPOCR_v5_cyrillic"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv5-devanagari",
         "name": "rusto-models-ppocrv5-devanagari",
         "title": "PP-OCRv5 Devanagari",
-        "description": "Pre-trained PP-OCRv5 Devanagari (Hindi) recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv5 Devanagari (Hindi) recognition model for RustO OCR",
         "preset": "ppv5",
         "tier": "mobile",
         "language": "devanagari",
         "source_dirs": ["PPOCR_v5_devanagari"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv5-el",
         "name": "rusto-models-ppocrv5-el",
         "title": "PP-OCRv5 Greek",
-        "description": "Pre-trained PP-OCRv5 Greek recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv5 Greek recognition model for RustO OCR",
         "preset": "ppv5",
         "tier": "mobile",
         "language": "greek",
         "source_dirs": ["PPOCR_v5_el"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv5-eslav",
         "name": "rusto-models-ppocrv5-eslav",
         "title": "PP-OCRv5 East Slavic",
-        "description": "Pre-trained PP-OCRv5 East Slavic recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv5 East Slavic recognition model for RustO OCR",
         "preset": "ppv5",
         "tier": "mobile",
         "language": "east_slavic",
         "source_dirs": ["PPOCR_v5_eslav"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv5-korean",
         "name": "rusto-models-ppocrv5-korean",
         "title": "PP-OCRv5 Korean",
-        "description": "Pre-trained PP-OCRv5 Korean recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv5 Korean recognition model for RustO OCR",
         "preset": "ppv5",
         "tier": "mobile",
         "language": "korean",
         "source_dirs": ["PPOCR_v5_korean"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv5-latin",
         "name": "rusto-models-ppocrv5-latin",
         "title": "PP-OCRv5 Latin",
-        "description": "Pre-trained PP-OCRv5 Latin multilingual recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv5 Latin multilingual recognition model for RustO OCR",
         "preset": "ppv5",
         "tier": "mobile",
         "language": "latin",
         "source_dirs": ["PPOCR_v5_latin"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv5-ta",
         "name": "rusto-models-ppocrv5-ta",
         "title": "PP-OCRv5 Tamil",
-        "description": "Pre-trained PP-OCRv5 Tamil recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv5 Tamil recognition model for RustO OCR",
         "preset": "ppv5",
         "tier": "mobile",
         "language": "tamil",
         "source_dirs": ["PPOCR_v5_ta"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv5-te",
         "name": "rusto-models-ppocrv5-te",
         "title": "PP-OCRv5 Telugu",
-        "description": "Pre-trained PP-OCRv5 Telugu recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv5 Telugu recognition model for RustO OCR",
         "preset": "ppv5",
         "tier": "mobile",
         "language": "telugu",
         "source_dirs": ["PPOCR_v5_te"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv5-th",
         "name": "rusto-models-ppocrv5-th",
         "title": "PP-OCRv5 Thai",
-        "description": "Pre-trained PP-OCRv5 Thai recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv5 Thai recognition model for RustO OCR",
         "preset": "ppv5",
         "tier": "mobile",
         "language": "thai",
         "source_dirs": ["PPOCR_v5_th"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
     {
@@ -252,7 +266,8 @@ MODEL_DEFINITIONS = [
         "tier": "mobile",
         "language": "multilingual",
         "source_dirs": ["PPOCR_v4_mobile"],
-        "files": ["det.onnx", "rec.onnx", "dict.txt"],
+        "files": ["det.rten", "rec.rten", "dict.txt"],
+        "optional_files": ["det.onnx", "rec.onnx"],
         "is_core": False,
     },
     {
@@ -264,43 +279,47 @@ MODEL_DEFINITIONS = [
         "tier": "server",
         "language": "multilingual",
         "source_dirs": ["PPOCR_v4_server"],
-        "files": ["det.onnx", "rec.onnx", "dict.txt"],
+        "files": ["det.rten", "rec.rten", "dict.txt"],
+        "optional_files": ["det.onnx", "rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv4-japan",
         "name": "rusto-models-ppocrv4-japan",
         "title": "PP-OCRv4 Japanese",
-        "description": "Pre-trained PP-OCRv4 Japanese recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv4 Japanese recognition model for RustO OCR",
         "preset": "ppv4",
         "tier": "mobile",
         "language": "japanese",
         "source_dirs": ["PPOCR_v4_japan"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv4-chinese-cht",
         "name": "rusto-models-ppocrv4-chinese-cht",
         "title": "PP-OCRv4 Traditional Chinese",
-        "description": "Pre-trained PP-OCRv4 Traditional Chinese recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv4 Traditional Chinese recognition model for RustO OCR",
         "preset": "ppv4",
         "tier": "mobile",
         "language": "chinese_traditional",
         "source_dirs": ["PPOCR_v4_chinese_cht"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
     {
         "id": "ppocrv4-kannada",
         "name": "rusto-models-ppocrv4-kannada",
         "title": "PP-OCRv4 Kannada",
-        "description": "Pre-trained PP-OCRv4 Kannada recognition MNN model for RustO OCR",
+        "description": "Pre-trained PP-OCRv4 Kannada recognition model for RustO OCR",
         "preset": "ppv4",
         "tier": "mobile",
         "language": "kannada",
         "source_dirs": ["PPOCR_v4_kannada"],
-        "files": ["rec.onnx", "dict.txt"],
+        "files": ["rec.rten", "dict.txt"],
+        "optional_files": ["rec.onnx"],
         "is_core": False,
     },
 ]
@@ -409,43 +428,41 @@ def generate_tsconfig_build_json() -> dict:
 
 def generate_src_index_ts(definition: dict, version: str) -> str:
     files_dict = {}
-    for f in definition["files"]:
+    all_files = list(definition["files"]) + list(definition.get("optional_files", []))
+    for f in all_files:
         if f.startswith("det."):
-            files_dict["detection"] = f"models/{f}"
             if f.endswith(".rten"):
                 files_dict["detectionRten"] = f"models/{f}"
+                if "detection" not in files_dict or not files_dict["detection"].endswith(".rten"):
+                    files_dict["detection"] = f"models/{f}"
             elif f.endswith(".onnx"):
                 files_dict["detectionOnnx"] = f"models/{f}"
+                if "detection" not in files_dict:
+                    files_dict["detection"] = f"models/{f}"
         elif f.startswith("rec."):
-            files_dict["recognition"] = f"models/{f}"
             if f.endswith(".rten"):
                 files_dict["recognitionRten"] = f"models/{f}"
+                if "recognition" not in files_dict or not files_dict["recognition"].endswith(".rten"):
+                    files_dict["recognition"] = f"models/{f}"
             elif f.endswith(".onnx"):
                 files_dict["recognitionOnnx"] = f"models/{f}"
+                if "recognition" not in files_dict:
+                    files_dict["recognition"] = f"models/{f}"
         elif f.startswith("dict.") or f.endswith("_dict.txt") or f == "dict.txt":
             files_dict["dictionary"] = f"models/{f}"
         elif f.startswith("cls."):
             files_dict["classification"] = f"models/{f}"
-
-    for opt_f in definition.get("optional_files", []):
-        if opt_f.startswith("rec_en."):
-            files_dict["recognitionEnglish"] = f"models/{opt_f}"
-        elif opt_f.startswith("dict_en."):
-            files_dict["dictionaryEnglish"] = f"models/{opt_f}"
-        elif opt_f.startswith("det."):
-            if opt_f.endswith(".rten"):
-                files_dict["detectionRten"] = f"models/{opt_f}"
-            elif opt_f.endswith(".onnx"):
-                files_dict["detectionOnnx"] = f"models/{opt_f}"
-            if "detection" not in files_dict:
-                files_dict["detection"] = f"models/{opt_f}"
-        elif opt_f.startswith("rec."):
-            if opt_f.endswith(".rten"):
-                files_dict["recognitionRten"] = f"models/{opt_f}"
-            elif opt_f.endswith(".onnx"):
-                files_dict["recognitionOnnx"] = f"models/{opt_f}"
-            if "recognition" not in files_dict:
-                files_dict["recognition"] = f"models/{opt_f}"
+        elif f.startswith("rec_en."):
+            if f.endswith(".rten"):
+                files_dict["recognitionEnglishRten"] = f"models/{f}"
+                if "recognitionEnglish" not in files_dict or not files_dict["recognitionEnglish"].endswith(".rten"):
+                    files_dict["recognitionEnglish"] = f"models/{f}"
+            elif f.endswith(".onnx"):
+                files_dict["recognitionEnglishOnnx"] = f"models/{f}"
+                if "recognitionEnglish" not in files_dict:
+                    files_dict["recognitionEnglish"] = f"models/{f}"
+        elif f.startswith("dict_en."):
+            files_dict["dictionaryEnglish"] = f"models/{f}"
 
     files_json = json.dumps(files_dict, indent=4)
     pkg_name = definition["name"]
@@ -650,7 +667,13 @@ def generate_model_package(definition: dict, version: str, copy_models: bool = F
         for sdir_name in definition["source_dirs"]:
             source_candidate = MODELS_SOURCE_DIR / sdir_name
             if source_candidate.exists() and source_candidate.is_dir():
-                for f_name in definition["files"] + definition.get("optional_files", []):
+                target_files = set(definition["files"] + definition.get("optional_files", []))
+                for item in source_candidate.iterdir():
+                    if item.is_file() and item.suffix in [".rten", ".onnx", ".txt"]:
+                        if not item.name.endswith("_tract.onnx"):
+                            target_files.add(item.name)
+
+                for f_name in sorted(target_files):
                     src_file = source_candidate / f_name
                     if src_file.exists():
                         shutil.copy2(src_file, models_dir / f_name)
