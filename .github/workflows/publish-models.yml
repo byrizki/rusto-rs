@@ -16,26 +16,26 @@ on:
         required: false
         type: string
         default: ''
-      create_release:
-        description: 'Create GitHub Release for OCR models'
+      publish_npm:
+        description: 'Package and publish models to NPM'
         type: boolean
         required: false
         default: true
       publish_nuget:
-        description: 'Publish model packages to NuGet'
+        description: 'Package and publish models to NuGet'
         type: boolean
         required: false
-        default: true
-      publish_npm:
-        description: 'Publish model packages to NPM'
-        type: boolean
-        required: false
-        default: true
+        default: false
       publish_cocoapods:
-        description: 'Publish model pods to CocoaPods'
+        description: 'Package and publish model pods to CocoaPods'
         type: boolean
         required: false
-        default: true
+        default: false
+      create_release:
+        description: 'Create GitHub Release for OCR models (includes Android, iOS, .NET, NPM)'
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   build-and-package-models:
@@ -57,17 +57,20 @@ jobs:
           python-version: "3.11"
 
       - name: Setup Java
+        if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
       - name: Setup .NET
+        if: github.event_name == 'push' || inputs.publish_nuget == true || inputs.create_release == true || github.event.inputs.publish_nuget == 'true' || github.event.inputs.create_release == 'true'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
 
       - name: Setup Node
+        if: github.event_name == 'push' || inputs.publish_npm == true || inputs.create_release == true || github.event.inputs.publish_npm == 'true' || github.event.inputs.create_release == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "24.x"
@@ -121,6 +124,7 @@ jobs:
           echo "✓ All models downloaded, quantized, and converted to .rten"
 
       - name: Package iOS Model Bundles
+        if: github.event_name == 'push' || inputs.publish_cocoapods == true || inputs.create_release == true || github.event.inputs.publish_cocoapods == 'true' || github.event.inputs.create_release == 'true'
         run: |
           mkdir -p build
           package_model_zip() {
@@ -164,7 +168,15 @@ jobs:
           wait
           echo "✓ All iOS model bundles packaged in parallel"
 
+      - name: Upload iOS Model Bundles Artifact
+        if: github.event_name == 'push' || inputs.publish_cocoapods == true || inputs.create_release == true || github.event.inputs.publish_cocoapods == 'true' || github.event.inputs.create_release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-models-ios-zip
+          path: build/RustO-Models-*.zip
+
       - name: Package Android Model AARs
+        if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
         run: |
           for model_dir in models/PPOCR_*; do
             if [ -d "$model_dir" ]; then
@@ -185,6 +197,7 @@ jobs:
           ./gradlew assembleRelease --parallel --max-workers=4
 
       - name: Package .NET Model NuGet Packages
+        if: github.event_name == 'push' || inputs.publish_nuget == true || inputs.create_release == true || github.event.inputs.publish_nuget == 'true' || github.event.inputs.create_release == 'true'
         run: |
           for proj_dir in packages/dotnet/models/*; do
             if [ -d "$proj_dir" ]; then
@@ -213,7 +226,15 @@ jobs:
           wait
           echo "✓ All .NET model packages packed in parallel"
 
+      - name: Upload .NET Model Packages Artifact
+        if: github.event_name == 'push' || inputs.publish_nuget == true || inputs.create_release == true || github.event.inputs.publish_nuget == 'true' || github.event.inputs.create_release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-models-dotnet-nupkg
+          path: nupkg/RustODotnet.Models.*.nupkg
+
       - name: Package NPM Model Packages
+        if: github.event_name == 'push' || inputs.publish_npm == true || inputs.create_release == true || github.event.inputs.publish_npm == 'true' || github.event.inputs.create_release == 'true'
         run: |
           npm install -g typescript
           python3 scripts/generate_npm_models.py --all --copy-models --version "${{ steps.release_info.outputs.version }}"
@@ -226,28 +247,25 @@ jobs:
           wait
           echo "✓ All NPM model packages built and packed in parallel"
 
-      - name: Stage Model Release Directory
-        run: |
-          mkdir -p model-releases
-          cp build/RustO-Models-*.zip model-releases/
-          find packages/android/models/*/build/outputs/aar -name '*-release.aar' -exec cp {} model-releases/ \;
-          cp nupkg/RustODotnet.Models.*.nupkg model-releases/
-          cp npm-models/rusto-models-*.tgz model-releases/
-          (cd model-releases && sha256sum * > SHA256SUMS)
-
-      - name: Upload .NET Model Packages Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: rusto-models-dotnet-nupkg
-          path: nupkg/RustODotnet.Models.*.nupkg
-
       - name: Upload NPM Model Packages Artifact
+        if: github.event_name == 'push' || inputs.publish_npm == true || inputs.create_release == true || github.event.inputs.publish_npm == 'true' || github.event.inputs.create_release == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: rusto-models-npm-packages
           path: npm-models/rusto-models-*.tgz
 
+      - name: Stage Model Release Directory
+        if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
+        run: |
+          mkdir -p model-releases
+          cp build/RustO-Models-*.zip model-releases/ 2>/dev/null || true
+          find packages/android/models/*/build/outputs/aar -name '*-release.aar' -exec cp {} model-releases/ \; 2>/dev/null || true
+          cp nupkg/RustODotnet.Models.*.nupkg model-releases/ 2>/dev/null || true
+          cp npm-models/rusto-models-*.tgz model-releases/ 2>/dev/null || true
+          (cd model-releases && sha256sum * > SHA256SUMS 2>/dev/null || true)
+
       - name: Upload All Model Release Files Artifact
+        if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: rusto-models-release-files
@@ -258,7 +276,7 @@ jobs:
     name: Create GitHub Release
     needs: [build-and-package-models]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event.inputs.create_release != 'false'
+    if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -296,7 +314,7 @@ jobs:
     name: Publish Models to NuGet
     needs: [build-and-package-models]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event.inputs.publish_nuget != 'false'
+    if: github.event_name == 'push' || inputs.publish_nuget == true || github.event.inputs.publish_nuget == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -327,7 +345,7 @@ jobs:
     name: Publish Models to NPM
     needs: [build-and-package-models]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event.inputs.publish_npm != 'false'
+    if: github.event_name == 'push' || inputs.publish_npm == true || github.event.inputs.publish_npm == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -359,7 +377,7 @@ jobs:
     name: Publish Model Pods to CocoaPods
     needs: [build-and-package-models]
     runs-on: macos-latest
-    if: github.event_name == 'push' || github.event.inputs.publish_cocoapods != 'false'
+    if: github.event_name == 'push' || inputs.publish_cocoapods == true || github.event.inputs.publish_cocoapods == 'true'
     steps:
       - uses: actions/checkout@v4
 
