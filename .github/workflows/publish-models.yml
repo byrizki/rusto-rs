@@ -25,17 +25,17 @@ on:
         description: 'Package and publish models to NuGet'
         type: boolean
         required: false
-        default: false
+        default: true
       publish_cocoapods:
         description: 'Package and publish model pods to CocoaPods'
         type: boolean
         required: false
-        default: false
+        default: true
       create_release:
         description: 'Create GitHub Release for OCR models (includes Android, iOS, .NET, NPM)'
         type: boolean
         required: false
-        default: false
+        default: true
 
 jobs:
   build-and-package-models:
