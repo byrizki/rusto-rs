@@ -91,13 +91,26 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Using Tag: ${TAG}, Version: ${VERSION}"
 
-      - name: Download all OCR models
+      - name: Download, quantize, and convert OCR models
         run: |
           chmod +x scripts/download_models.sh
-          python3 -m pip install --upgrade rten-convert onnx onnxruntime --break-system-packages || python3 -m pip install rten-convert onnx onnxruntime || true
-          bash scripts/download_models.sh --all --convert-rten --keep-onnx
           chmod +x scripts/quantize_ppocrv6_int8.py
-          python3 scripts/quantize_ppocrv6_int8.py --all
+          python3 -m pip install --upgrade rten-convert onnx onnxruntime --break-system-packages || python3 -m pip install rten-convert onnx onnxruntime || true
+
+          # 1. Download all models in source ONNX format
+          bash scripts/download_models.sh --all
+
+          # 2. Quantize PP-OCRv6 models to INT8 ONNX format
+          python3 scripts/quantize_ppocrv6_int8.py --all --no-rten
+
+          # 3. Convert all ONNX models to RTen format and clean up .onnx
+          find models -name "*.onnx" | while read -r onnx_path; do
+            rten_path="${onnx_path%.onnx}.rten"
+            echo "Converting $onnx_path -> $rten_path..."
+            rten-convert "$onnx_path" "$rten_path" || python3 -c "import sys; from rten_convert.converter import main; sys.argv=['rten-convert', sys.argv[1], sys.argv[2]]; sys.exit(main())" "$onnx_path" "$rten_path"
+            rm -f "$onnx_path"
+          done
+          echo "✓ All models downloaded, quantized, and converted to .rten"
 
       - name: Package iOS Model Bundles
         run: |
