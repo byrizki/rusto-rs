@@ -17,7 +17,7 @@ RustO! adalah mesin Optical Character Recognition (OCR) dan toolkit multi-platfo
 
 color: primary
 size: xl
-to: /id/demo
+to: /id/getting-started/live-demo
 trailing-icon: i-lucide-play
 ---
 

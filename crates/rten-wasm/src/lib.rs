@@ -363,14 +363,9 @@ impl RtenOcrPipeline {
             }
         }
 
-        // Sort boxes top-to-bottom then left-to-right
+        // Sort boxes top-to-bottom then left-to-right with strict total ordering
         raw_boxes.sort_by(|a, b| {
-            let y_diff = a.0[1] - b.0[1];
-            if y_diff.abs() > 12.0 {
-                y_diff.partial_cmp(&0.0).unwrap()
-            } else {
-                a.0[0].partial_cmp(&b.0[0]).unwrap()
-            }
+            a.0[1].total_cmp(&b.0[1]).then_with(|| a.0[0].total_cmp(&b.0[0]))
         });
 
         // 3. Recognition inference for each detected box

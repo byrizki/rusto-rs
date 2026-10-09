@@ -60,6 +60,60 @@ export const availableModels: OcrModelOption[] = [
   },
 ];
 
+export const defaultModel: OcrModelOption = availableModels[0] as OcrModelOption;
+
+export interface SampleImage {
+  id: string;
+  name: string;
+  description: string;
+  url: string;
+}
+
+export function getSampleImages(baseURL: string): SampleImage[] {
+  return [
+    {
+      id: 'invoice',
+      name: 'Invoice',
+      description: 'Structured layout with numbers & tables',
+      url: `${baseURL}samples/example1.png`,
+    },
+    {
+      id: 'idcard',
+      name: 'Passport',
+      description: 'Identity document with personal details & MRZ',
+      url: `${baseURL}samples/idcard.jpg`,
+    },
+    {
+      id: 'handwritten',
+      name: 'Handwritten',
+      description: 'Vintage cursive handwriting receipt',
+      url: `${baseURL}samples/invoice1.jpg`,
+    },
+  ];
+}
+
+export interface ProgressStep {
+  current: number;
+  total: number;
+}
+
+export interface ProgressState {
+  active: boolean;
+  phase: 'download' | 'init' | 'inference';
+  stageText: string;
+  percent: number;
+  detailText: string;
+  step?: ProgressStep;
+}
+
+export const defaultProgressState: ProgressState = {
+  active: false,
+  phase: 'download',
+  stageText: '',
+  percent: 0,
+  detailText: '',
+};
+
 export interface OcrConfig {
   // Confidence & filtering
   textScore: number;
@@ -121,6 +175,18 @@ export const defaultOcrConfig: OcrConfig = {
   cropPaddingX: 10,
   cropPaddingY: 10,
 };
+
+export interface ActiveRunConfig {
+  modelId: string;
+  modelName: string;
+  modelPreset: ModelPreset;
+  outputMode: 'lines' | 'words';
+  timestamp: number;
+  durationMs: number | null;
+  itemsCount: number;
+  options: DetectTextOptions;
+  rawConfig: OcrConfig;
+}
 
 export function buildDetectTextOptions(
   config: OcrConfig,

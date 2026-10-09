@@ -10,7 +10,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessageRequest>) => {
     if (type === 'INIT') {
       engine = new WebOcrEngine();
       // In worker thread, run without nested worker
-      await engine.initialize({ ...(config ?? {}), worker: false });
+      await engine.initialize({ ...config, worker: false });
       const response: WorkerMessageResponse = { id, type: 'INIT_SUCCESS' };
       self.postMessage(response);
     } else if (type === 'DETECT') {

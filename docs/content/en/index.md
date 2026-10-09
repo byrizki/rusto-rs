@@ -17,7 +17,7 @@ RustO! is an Optical Character Recognition engine and multi-platform toolkit wri
 
 color: primary
 size: xl
-to: /en/demo
+to: /en/getting-started/live-demo
 trailing-icon: i-lucide-play
 ---
 

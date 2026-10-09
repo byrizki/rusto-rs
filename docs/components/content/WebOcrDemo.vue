@@ -1,47 +1,37 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRuntimeConfig } from '#app';
-import {
-  initialize,
-  detectText,
-  isInitialized,
-  formatSpatialText,
-  groupCandidatesIntoLines,
-  type TextResult,
-  type OutputGranularity,
-} from 'rusto-web';
+import { detectText, isInitialized, type TextResult } from 'rusto-web';
 import {
   availableModels,
+  defaultModel,
   defaultOcrConfig,
+  defaultProgressState,
+  getSampleImages,
   buildDetectTextOptions,
   type OcrConfig,
+  type OcrModelOption,
+  type ActiveRunConfig,
+  type ProgressState,
+  type ProgressStep,
 } from '../../types/ocrConfig';
+import {
+  loadAndInitModel,
+  formatResultsCsv,
+  buildActiveConfigJson,
+  buildActiveRunConfig,
+  processOcrOutput,
+  isRunConfigModified,
+  getImageDimensions,
+} from '../../utils/ocrModelLoader';
+import OcrActiveConfigView from '../OcrActiveConfigView.vue';
+import OcrLoadingOverlay from '../OcrLoadingOverlay.vue';
 
-const runtimeConfig = useRuntimeConfig();
-const rawBaseURL = runtimeConfig.app.baseURL || '/';
+const rawBaseURL = useRuntimeConfig().app.baseURL || '/';
 const baseURL = rawBaseURL.endsWith('/') ? rawBaseURL : `${rawBaseURL}/`;
 
-// Sample images configuration
-const samples = [
-  {
-    id: 'invoice',
-    name: 'Invoice',
-    description: 'Structured layout with numbers & tables',
-    url: `${baseURL}samples/example1.png`,
-  },
-  {
-    id: 'idcard',
-    name: 'Passport',
-    description: 'Identity document with personal details & MRZ',
-    url: `${baseURL}samples/idcard.jpg`,
-  },
-  {
-    id: 'handwritten',
-    name: 'Handwritten',
-    description: 'Vintage cursive handwriting receipt',
-    url: `${baseURL}samples/invoice1.jpg`,
-  },
-];
+const samples = getSampleImages(baseURL);
+const defaultSample = samples[0]!;
 
 const ocrConfig = ref<OcrConfig>({ ...defaultOcrConfig });
 const isConfigOpen = ref<boolean>(false);
@@ -50,178 +40,108 @@ const configTab = ref<'detection' | 'layout' | 'resizing' | 'preprocess'>('detec
 function toggleConfigPopover() {
   isConfigOpen.value = !isConfigOpen.value;
 }
-
 function resetConfigDefaults() {
   ocrConfig.value = { ...defaultOcrConfig };
 }
 
-// Progress State for Download and OCR
-interface ProgressState {
-  active: boolean;
-  phase: 'download' | 'inference';
-  stageText: string;
-  percent: number;
-  detailText: string;
-}
-
-const progress = ref<ProgressState>({
-  active: false,
-  phase: 'download',
-  stageText: '',
-  percent: 0,
-  detailText: '',
-});
+const progress = ref<ProgressState>({ ...defaultProgressState });
 
 // Reactive state
 const selectedModel = ref<string>('ppocrv6-tiny');
 const activeLoadedModel = ref<string | null>(null);
-const currentModel = computed(
-  () => availableModels.find((m) => m.id === selectedModel.value) || availableModels[0]
+const currentModel = computed<OcrModelOption>(
+  () => availableModels.find((m) => m.id === selectedModel.value) ?? defaultModel
 );
 
 const selectedSample = ref<string>('invoice');
-const imageSrc = ref<string>(samples[0].url);
+const imageSrc = ref<string>(defaultSample.url);
 const status = ref<'idle' | 'initializing' | 'ready' | 'error'>('idle');
 const statusMessage = ref<string>('PP-OCRv6 Tiny selected (click Run OCR to load)');
 const isScanning = ref<boolean>(false);
 const durationMs = ref<number | null>(null);
 
 // Configuration state
-const outputMode = ref<OutputGranularity>('lines');
-const activeTab = ref<'structured' | 'spatial' | 'csv' | 'json'>('structured');
+const outputMode = ref<'lines' | 'words'>('lines');
+const activeTab = ref<'structured' | 'spatial' | 'csv' | 'json' | 'config'>('structured');
 const copied = ref<boolean>(false);
+
+// Active OCR Run state
+const activeRunConfig = ref<ActiveRunConfig | null>(null);
+
+const isConfigModifiedSinceRun = computed(() =>
+  isRunConfigModified(activeRunConfig.value, selectedModel.value, outputMode.value, ocrConfig.value)
+);
 
 // Results state
 const results = ref<TextResult[]>([]);
 const spatialText = ref<string>('');
 const hoveredIndex = ref<number | null>(null);
+const ocrError = ref<string | null>(null);
 
 // Image scaling state
 const imgRef = ref<HTMLImageElement | null>(null);
-const naturalWidth = ref<number>(1);
-const naturalHeight = ref<number>(1);
-const renderWidth = ref<number>(1);
-const renderHeight = ref<number>(1);
+const imgDims = ref({ naturalW: 1, naturalH: 1, renderW: 1, renderH: 1 });
+const scaleX = computed(() => imgDims.value.renderW / imgDims.value.naturalW || 1);
+const scaleY = computed(() => imgDims.value.renderH / imgDims.value.naturalH || 1);
 
-const scaleX = computed(() => renderWidth.value / naturalWidth.value || 1);
-const scaleY = computed(() => renderHeight.value / naturalHeight.value || 1);
-
-// Download binary model with stream progress
-async function downloadBinaryWithProgress(
-  url: string,
-  label: string,
-  stepIndex: number,
-  totalSteps: number
-): Promise<Uint8Array> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} loading ${url}`);
-  const total = Number(res.headers.get('content-length')) || 0;
-  const reader = res.body?.getReader();
-  if (!reader) {
-    const ab = await res.arrayBuffer();
-    return new Uint8Array(ab);
-  }
-  let received = 0;
-  const chunks: Uint8Array[] = [];
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    received += value.length;
-    const fraction = total > 0 ? received / total : 0.5;
-    const overallPct = Math.round(((stepIndex - 1 + fraction) / totalSteps) * 100);
-    const mbRec = (received / (1024 * 1024)).toFixed(1);
-    const mbTot = total > 0 ? `${(total / (1024 * 1024)).toFixed(1)} MB` : '...';
-    progress.value = {
-      active: true,
-      phase: 'download',
-      stageText: `Downloading ${label}`,
-      percent: Math.min(overallPct, 99),
-      detailText: `${mbRec} / ${mbTot} (${overallPct}%)`,
-    };
-  }
-  const output = new Uint8Array(received);
-  let offset = 0;
-  for (const c of chunks) {
-    output.set(c, offset);
-    offset += c.length;
-  }
-  return output;
-}
-
-// Download text dictionary asset
-async function downloadTextAsset(url: string): Promise<string> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} loading ${url}`);
-  return await res.text();
+function setProgress(
+  phase: 'download' | 'init' | 'inference',
+  stageText: string,
+  percent: number,
+  detailText: string,
+  step?: ProgressStep
+) {
+  progress.value = { active: true, phase, stageText, percent, detailText, step };
 }
 
 // Initialize engine with RTen models (no ONNX)
-async function initEngine(modelId = selectedModel.value): Promise<boolean> {
+async function initEngine(
+  modelId = selectedModel.value,
+  opts?: { keepProgress?: boolean; step?: ProgressStep; progressRange?: [number, number] }
+): Promise<boolean> {
   if (isInitialized() && activeLoadedModel.value === modelId) {
     status.value = 'ready';
     return true;
   }
-  const modelMeta = availableModels.find((m) => m.id === modelId) || availableModels[0];
+  const modelMeta = availableModels.find((m) => m.id === modelId) ?? defaultModel;
+  const isPipeline = opts?.keepProgress ?? false;
+  const step = opts?.step;
+  const range: [number, number] = opts?.progressRange ?? (isPipeline ? [0, 60] : [0, 100]);
   try {
     status.value = 'initializing';
     statusMessage.value = `Loading ${modelMeta.name}...`;
-
-    progress.value = {
-      active: true,
-      phase: 'download',
-      stageText: `Downloading ${modelMeta.name}...`,
-      percent: 5,
-      detailText: 'Connecting to model repository...',
-    };
-
-    const detUrl = `${baseURL}models/${modelMeta.id}/det.rten`;
-    const recUrl = `${baseURL}models/${modelMeta.id}/rec.rten`;
-    const dictUrl = `${baseURL}models/${modelMeta.id}/dict.txt`;
-
-    const detBuffer = await downloadBinaryWithProgress(
-      detUrl,
-      `${modelMeta.name} (det.rten)`,
-      1,
-      2
+    setProgress(
+      'download',
+      `Downloading ${modelMeta.name}...`,
+      range[0] + 5,
+      'Connecting...',
+      step
     );
-    const recBuffer = await downloadBinaryWithProgress(
-      recUrl,
-      `${modelMeta.name} (rec.rten)`,
-      2,
-      2
-    );
-    const dictText = await downloadTextAsset(dictUrl);
 
-    progress.value = {
-      active: true,
-      phase: 'download',
-      stageText: 'Initializing RTen WebAssembly Pipeline...',
-      percent: 100,
-      detailText: 'Configuring inference engine...',
-    };
-
-    await initialize({
-      preset: modelMeta.preset,
-      wasmUrl: `${baseURL}wasm/rusto_rten_wasm_bg.wasm`,
-      models: {
-        detection: detBuffer,
-        recognition: recBuffer,
-        dictionary: dictText,
-      },
+    await loadAndInitModel(baseURL, modelMeta, range, (p) => {
+      setProgress('download', p.stageText, p.percent, p.detailText, step);
     });
 
+    setProgress(
+      'init',
+      'Configuring inference engine...',
+      isPipeline ? 70 : 100,
+      'Ready',
+      isPipeline && step ? { current: 2, total: step.total } : undefined
+    );
     activeLoadedModel.value = modelId;
     status.value = 'ready';
     statusMessage.value = 'Engine Ready';
     return true;
   } catch (err: unknown) {
     status.value = 'error';
-    statusMessage.value = `Failed to load ${modelMeta.name}: ${err instanceof Error ? err.message : String(err)}`;
+    const msg = `Failed to load ${modelMeta.name}: ${err instanceof Error ? err.message : String(err)}`;
+    statusMessage.value = msg;
+    ocrError.value = msg;
     console.error(`OCR Init Error [${modelMeta.name}]:`, err);
     return false;
   } finally {
-    progress.value.active = false;
+    if (!isPipeline) progress.value.active = false;
   }
 }
 
@@ -229,26 +149,16 @@ async function initEngine(modelId = selectedModel.value): Promise<boolean> {
 function switchModel(modelId: string) {
   selectedModel.value = modelId;
   resetResults();
-  if (activeLoadedModel.value === modelId) {
-    status.value = 'ready';
-    statusMessage.value = 'Engine Ready';
-  } else {
-    status.value = 'idle';
-    statusMessage.value = `${currentModel.value.name} selected (click Run OCR to load)`;
-  }
+  const isLoaded = activeLoadedModel.value === modelId;
+  status.value = isLoaded ? 'ready' : 'idle';
+  statusMessage.value = isLoaded
+    ? 'Engine Ready'
+    : `${currentModel.value.name} selected (click Run OCR to load)`;
 }
 
-// Switch granularity and align active inspector tab
-function setGranularity(mode: OutputGranularity) {
+function setGranularity(mode: 'lines' | 'words') {
   outputMode.value = mode;
-  if (mode === 'spatial') {
-    activeTab.value = 'spatial';
-  } else {
-    activeTab.value = 'structured';
-  }
-  if (results.value.length > 0 || spatialText.value) {
-    runOcr();
-  }
+  if (results.value.length > 0 || spatialText.value) runOcr();
 }
 
 // Clear results helper
@@ -257,63 +167,79 @@ function resetResults() {
   spatialText.value = '';
   durationMs.value = null;
   hoveredIndex.value = null;
+  activeRunConfig.value = null;
+  ocrError.value = null;
 }
 
-// Run OCR detection manually (downloads model on demand if needed)
-async function runOcr() {
-  if (isScanning.value || status.value === 'initializing') return;
+function applyOcrOutput(
+  output: TextResult[] | string,
+  opts: ReturnType<typeof buildDetectTextOptions>
+) {
+  const processed = processOcrOutput(
+    output,
+    ocrConfig.value.lineYThreshold,
+    ocrConfig.value.wordXThreshold
+  );
+  results.value = processed.results;
+  spatialText.value = processed.spatialText;
+  activeRunConfig.value = buildActiveRunConfig(
+    currentModel.value,
+    outputMode.value,
+    durationMs.value,
+    results.value.length,
+    opts,
+    ocrConfig.value
+  );
+}
 
-  // If model is not loaded yet, download and initialize first
-  if (!isInitialized() || activeLoadedModel.value !== selectedModel.value) {
-    const success = await initEngine(selectedModel.value);
-    if (!success) return;
-  }
-
-  resetResults();
-  isScanning.value = true;
-  progress.value = {
-    active: true,
-    phase: 'inference',
-    stageText: 'Running OCR Inference...',
-    percent: 25,
-    detailText: 'Preprocessing & detecting text boxes...',
-  };
-
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, 20);
+async function executeInference(step?: ProgressStep) {
+  setProgress(
+    'inference',
+    'Running OCR Inference...',
+    step ? 75 : 25,
+    'Detecting text regions...',
+    step
+  );
+  await new Promise<void>((r) => {
+    setTimeout(r, 20);
   });
   const startTime = performance.now();
+  setProgress(
+    'inference',
+    'Running OCR Inference...',
+    step ? 88 : 65,
+    'Decoding characters...',
+    step
+  );
+  const opts = buildDetectTextOptions(ocrConfig.value, outputMode.value);
+  const output = await detectText(imageSrc.value, opts);
+  durationMs.value = Math.round(performance.now() - startTime);
+  setProgress('inference', 'Finalizing OCR Output...', 100, 'Formatting results...', step);
+  applyOcrOutput(output, opts);
+}
+
+// Run OCR detection manually (single unified pipeline with model download if needed)
+async function runOcr() {
+  if (isScanning.value || status.value === 'initializing') return;
+  resetResults();
+  isScanning.value = true;
+  const needsInit = !isInitialized() || activeLoadedModel.value !== selectedModel.value;
 
   try {
-    progress.value = {
-      active: true,
-      phase: 'inference',
-      stageText: 'Running OCR Inference...',
-      percent: 60,
-      detailText: 'Decoding character probabilities...',
-    };
-
-    const isSpatial = outputMode.value === 'spatial';
-    const opts = buildDetectTextOptions(ocrConfig.value, outputMode.value);
-
-    const output = await detectText(imageSrc.value, opts);
-    durationMs.value = Math.round(performance.now() - startTime);
-
-    if (Array.isArray(output)) {
-      results.value = output;
-      spatialText.value = formatSpatialText(
-        groupCandidatesIntoLines(output, ocrConfig.value.lineYThreshold),
-        ocrConfig.value.wordXThreshold
-      );
-    } else {
-      spatialText.value = output;
-      results.value = [];
+    if (needsInit) {
+      const ok = await initEngine(selectedModel.value, {
+        keepProgress: true,
+        step: { current: 1, total: 3 },
+        progressRange: [0, 60],
+      });
+      if (!ok) return;
     }
-
-    if (isSpatial) {
-      activeTab.value = 'spatial';
-    }
-  } catch (err) {
+    await executeInference(needsInit ? { current: 3, total: 3 } : undefined);
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    ocrError.value = errorMsg;
+    status.value = 'error';
+    statusMessage.value = `OCR Error: ${errorMsg}`;
     console.error('OCR Detection error:', err);
   } finally {
     isScanning.value = false;
@@ -341,11 +267,7 @@ function handleFileUpload(event: Event) {
 
 // Handle image load event to record natural & displayed dimensions
 function onImageLoad(e: Event) {
-  const img = e.target as HTMLImageElement;
-  naturalWidth.value = img.naturalWidth || 1;
-  naturalHeight.value = img.naturalHeight || 1;
-  renderWidth.value = img.clientWidth || img.naturalWidth || 1;
-  renderHeight.value = img.clientHeight || img.naturalHeight || 1;
+  imgDims.value = getImageDimensions(e.target);
 }
 
 // Copy results to clipboard
@@ -353,26 +275,22 @@ async function copyToClipboard(text: string) {
   try {
     await navigator.clipboard.writeText(text);
     copied.value = true;
-    setTimeout(() => {
-      copied.value = false;
-    }, 2000);
+    setTimeout(() => (copied.value = false), 2000);
   } catch (err) {
     console.error('Copy failed:', err);
   }
 }
 
-// Computed CSV
-const csvExport = computed(() => {
-  const header = 'text,score,left,top,width,height';
-  const rows = results.value.map(
-    (r) =>
-      `"${r.text.replaceAll('"', '""')}",${r.score.toFixed(4)},${r.frame.left},${r.frame.top},${r.frame.width},${r.frame.height}`
-  );
-  return [header, ...rows].join('\n');
-});
-
-// Computed JSON
+const csvExport = computed(() => formatResultsCsv(results.value));
 const jsonExport = computed(() => JSON.stringify(results.value, null, 2));
+const activeConfigJson = computed(() =>
+  buildActiveConfigJson(
+    activeRunConfig.value,
+    currentModel.value.name,
+    outputMode.value,
+    ocrConfig.value
+  )
+);
 
 onMounted(() => {
   status.value = 'idle';
@@ -382,8 +300,11 @@ onMounted(() => {
 
 <template>
   <div
-    class="rusto-demo-container not-prose my-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl overflow-hidden"
+    class="rusto-demo-container not-prose relative my-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl overflow-hidden"
   >
+    <!-- Blocking Whole-Component Loading Overlay with Circular Progress -->
+    <OcrLoadingOverlay :progress="progress" />
+
     <!-- Top Action & Status Bar -->
     <div
       class="demo-header flex flex-wrap items-center justify-between gap-3 p-3.5 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950"
@@ -427,7 +348,7 @@ onMounted(() => {
               v-model="selectedModel"
               :disabled="status === 'initializing' || isScanning"
               @change="switchModel(selectedModel)"
-              class="appearance-none pl-2.5 pr-7 py-1 text-xs font-semibold rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed shadow-xs transition-all cursor-pointer"
+              class="appearance-none pl-2.5 pr-7 py-1 text-xs font-semibold rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed shadow-xs transition-all enabled:cursor-pointer"
             >
               <option v-for="model in availableModels" :key="model.id" :value="model.id">
                 {{ model.name }} ({{ model.size }})
@@ -491,7 +412,7 @@ onMounted(() => {
           <!-- Floating Popover Modal -->
           <div
             v-if="isConfigOpen"
-            class="absolute right-0 top-full mt-2 w-84 sm:w-[420px] max-h-[85vh] flex flex-col rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-50 text-xs overflow-hidden"
+            class="absolute right-0 top-full mt-2 w-84 sm:w-105 max-h-[85vh] flex flex-col rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-50 text-xs overflow-hidden"
           >
             <!-- Popover Header -->
             <div
@@ -521,8 +442,12 @@ onMounted(() => {
             </div>
 
             <!-- Category Tabs -->
-            <div class="px-3.5 pt-2.5 pb-1 border-b border-neutral-100 dark:border-neutral-800 shrink-0">
-              <div class="flex items-center gap-1 p-1 bg-neutral-100 dark:bg-neutral-800/80 rounded-lg">
+            <div
+              class="px-3.5 pt-2.5 pb-1 border-b border-neutral-100 dark:border-neutral-800 shrink-0"
+            >
+              <div
+                class="flex items-center gap-1 p-1 bg-neutral-100 dark:bg-neutral-800/80 rounded-lg"
+              >
                 <button
                   type="button"
                   @click="configTab = 'detection'"
@@ -604,7 +529,9 @@ onMounted(() => {
                     <label class="font-medium text-neutral-700 dark:text-neutral-300">
                       DBNet Pixel Threshold (threshold)
                     </label>
-                    <span class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold">
+                    <span
+                      class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                    >
                       {{ ocrConfig.postprocessThreshold.toFixed(2) }}
                     </span>
                   </div>
@@ -624,7 +551,9 @@ onMounted(() => {
                     <label class="font-medium text-neutral-700 dark:text-neutral-300">
                       Box Confidence (boxThreshold)
                     </label>
-                    <span class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold">
+                    <span
+                      class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                    >
                       {{ ocrConfig.postprocessBoxThreshold.toFixed(2) }}
                     </span>
                   </div>
@@ -644,7 +573,9 @@ onMounted(() => {
                     <label class="font-medium text-neutral-700 dark:text-neutral-300">
                       Bounding Box Expansion (unclipRatio)
                     </label>
-                    <span class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold">
+                    <span
+                      class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                    >
                       {{ ocrConfig.postprocessUnclipRatio.toFixed(1) }}
                     </span>
                   </div>
@@ -659,7 +590,9 @@ onMounted(() => {
                 </div>
 
                 <!-- Max Candidates & Limit Side -->
-                <div class="grid grid-cols-2 gap-2 pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                <div
+                  class="grid grid-cols-2 gap-2 pt-1 border-t border-neutral-100 dark:border-neutral-800"
+                >
                   <div class="space-y-1">
                     <label class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
                       Max Candidates
@@ -690,7 +623,9 @@ onMounted(() => {
 
                 <div class="flex items-center justify-between pt-1">
                   <div class="flex items-center gap-2">
-                    <label class="text-[11px] text-neutral-600 dark:text-neutral-400">Limit Type:</label>
+                    <label class="text-[11px] text-neutral-600 dark:text-neutral-400"
+                      >Limit Type:</label
+                    >
                     <select
                       v-model="ocrConfig.detectionLimitType"
                       class="px-2 py-0.5 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
@@ -705,7 +640,9 @@ onMounted(() => {
                       v-model="ocrConfig.postprocessUseDilation"
                       class="rounded accent-primary w-3.5 h-3.5 cursor-pointer"
                     />
-                    <span class="text-neutral-700 dark:text-neutral-300 text-[11px]">Use Dilation</span>
+                    <span class="text-neutral-700 dark:text-neutral-300 text-[11px]"
+                      >Use Dilation</span
+                    >
                   </label>
                 </div>
               </template>
@@ -718,7 +655,9 @@ onMounted(() => {
                     <label class="font-medium text-neutral-700 dark:text-neutral-300">
                       Row Center Tolerance (lineYThreshold)
                     </label>
-                    <span class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold">
+                    <span
+                      class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                    >
                       {{ ocrConfig.lineYThreshold.toFixed(2) }}
                     </span>
                   </div>
@@ -730,7 +669,9 @@ onMounted(() => {
                     v-model.number="ocrConfig.lineYThreshold"
                     class="w-full accent-primary cursor-pointer"
                   />
-                  <p class="text-[10px] text-neutral-400">Vertical center distance tolerance for same-row clustering.</p>
+                  <p class="text-[10px] text-neutral-400">
+                    Vertical center distance tolerance for same-row clustering.
+                  </p>
                 </div>
 
                 <!-- wordXThreshold -->
@@ -739,7 +680,9 @@ onMounted(() => {
                     <label class="font-medium text-neutral-700 dark:text-neutral-300">
                       Word Gap Tolerance (wordXThreshold)
                     </label>
-                    <span class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold">
+                    <span
+                      class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                    >
                       {{ ocrConfig.wordXThreshold.toFixed(2) }}
                     </span>
                   </div>
@@ -751,7 +694,9 @@ onMounted(() => {
                     v-model.number="ocrConfig.wordXThreshold"
                     class="w-full accent-primary cursor-pointer"
                   />
-                  <p class="text-[10px] text-neutral-400">Horizontal gap multiplier when reconstructing words.</p>
+                  <p class="text-[10px] text-neutral-400">
+                    Horizontal gap multiplier when reconstructing words.
+                  </p>
                 </div>
 
                 <!-- Classification & Orientation Toggles -->
@@ -782,12 +727,16 @@ onMounted(() => {
               <!-- Tab 3: Image Resizing & Geometry -->
               <template v-else-if="configTab === 'resizing'">
                 <div class="space-y-3">
-                  <label class="flex items-center justify-between cursor-pointer pb-2 border-b border-neutral-100 dark:border-neutral-800">
+                  <label
+                    class="flex items-center justify-between cursor-pointer pb-2 border-b border-neutral-100 dark:border-neutral-800"
+                  >
                     <div>
                       <span class="font-medium text-neutral-800 dark:text-neutral-200">
                         Enable Geometry Resize Overrides
                       </span>
-                      <p class="text-[10px] text-neutral-400">Override input dimensions before sending to detector.</p>
+                      <p class="text-[10px] text-neutral-400">
+                        Override input dimensions before sending to detector.
+                      </p>
                     </div>
                     <input
                       type="checkbox"
@@ -802,7 +751,9 @@ onMounted(() => {
                   >
                     <div class="grid grid-cols-2 gap-2">
                       <div class="space-y-1">
-                        <label class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+                        <label
+                          class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400"
+                        >
                           Max Side Length (px)
                         </label>
                         <input
@@ -815,7 +766,9 @@ onMounted(() => {
                         />
                       </div>
                       <div class="space-y-1">
-                        <label class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+                        <label
+                          class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400"
+                        >
                           Min Side Length (px)
                         </label>
                         <input
@@ -831,7 +784,9 @@ onMounted(() => {
 
                     <div class="grid grid-cols-2 gap-2">
                       <div class="space-y-1">
-                        <label class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+                        <label
+                          class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400"
+                        >
                           Min Height (px)
                         </label>
                         <input
@@ -844,7 +799,9 @@ onMounted(() => {
                         />
                       </div>
                       <div class="space-y-1">
-                        <label class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+                        <label
+                          class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400"
+                        >
                           Aspect Ratio (-1 for auto)
                         </label>
                         <input
@@ -893,7 +850,9 @@ onMounted(() => {
                         <label class="text-[11px] text-neutral-600 dark:text-neutral-400">
                           Descreen Strength
                         </label>
-                        <span class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold">
+                        <span
+                          class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                        >
                           {{ ocrConfig.descreenStrength.toFixed(2) }}
                         </span>
                       </div>
@@ -966,32 +925,10 @@ onMounted(() => {
             v-if="isScanning || status === 'initializing'"
             class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"
           />
-          {{ isScanning ? 'Processing...' : status === 'initializing' ? 'Downloading...' : 'Run OCR' }}
+          {{
+            isScanning ? 'Processing...' : status === 'initializing' ? 'Downloading...' : 'Run OCR'
+          }}
         </button>
-      </div>
-    </div>
-
-    <!-- Active Progress Bar (Download or OCR) -->
-    <div
-      v-if="progress.active"
-      class="px-4 py-2 border-b border-primary/20 bg-primary/5 dark:bg-primary/10 transition-all"
-    >
-      <div class="flex items-center justify-between text-xs mb-1">
-        <span class="font-medium text-primary flex items-center gap-2">
-          <span
-            class="inline-block w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin"
-          />
-          {{ progress.stageText }}
-        </span>
-        <span class="font-mono text-[11px] text-neutral-600 dark:text-neutral-400">
-          {{ progress.detailText }}
-        </span>
-      </div>
-      <div class="w-full bg-neutral-200 dark:bg-neutral-800 h-1.5 rounded-full overflow-hidden">
-        <div
-          class="bg-primary h-full rounded-full transition-all duration-200"
-          :style="{ width: `${progress.percent}%` }"
-        />
       </div>
     </div>
 
@@ -1028,10 +965,10 @@ onMounted(() => {
     </div>
 
     <!-- Main Workspace: Image Visualizer + Inspector Panel -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 min-h-[480px]">
+    <div class="grid grid-cols-1 lg:grid-cols-12 min-h-96 lg:min-h-105">
       <!-- Left: Interactive Image Canvas & Overlays (7 cols) -->
       <div
-        class="lg:col-span-7 p-4 flex flex-col items-center justify-center bg-neutral-950/5 dark:bg-black/30 border-b lg:border-b-0 lg:border-r border-neutral-200 dark:border-neutral-800 overflow-auto"
+        class="lg:col-span-7 p-3.5 sm:p-4 flex flex-col items-center justify-center bg-neutral-950/5 dark:bg-black/30 border-b lg:border-b-0 lg:border-r border-neutral-200 dark:border-neutral-800 overflow-auto"
       >
         <div
           class="relative max-w-full inline-block rounded-lg shadow-md overflow-hidden bg-white dark:bg-neutral-950"
@@ -1041,7 +978,7 @@ onMounted(() => {
             :src="imageSrc"
             alt="OCR Target Document"
             @load="onImageLoad"
-            class="block max-w-full max-h-[500px] w-auto h-auto object-contain"
+            class="block max-w-full max-h-125 w-auto h-auto object-contain"
           />
 
           <!-- Scanning Laser Bar Effect -->
@@ -1081,7 +1018,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <p class="mt-3 text-[11px] text-neutral-400">
+        <p class="mt-2 text-[11px] text-neutral-400">
           Tip: Hover over bounding boxes to highlight recognized text. Click to copy.
         </p>
       </div>
@@ -1094,7 +1031,7 @@ onMounted(() => {
         >
           <div class="flex items-center gap-1">
             <button
-              v-for="mode in ['lines', 'words', 'spatial'] as OutputGranularity[]"
+              v-for="mode in ['lines', 'words'] as const"
               :key="mode"
               type="button"
               @click="setGranularity(mode)"
@@ -1119,7 +1056,9 @@ onMounted(() => {
                     ? csvExport
                     : activeTab === 'json'
                       ? jsonExport
-                      : results.map((r) => r.text).join('\n')
+                      : activeTab === 'config'
+                        ? activeConfigJson
+                        : results.map((r) => r.text).join('\n')
               )
             "
             class="px-2.5 py-1 text-[11px] rounded border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all cursor-pointer"
@@ -1128,14 +1067,14 @@ onMounted(() => {
           </button>
         </div>
 
-        <!-- Secondary Tabs: Structured List / Spatial / CSV / JSON -->
+        <!-- Secondary Tabs: Structured List / Spatial / CSV / JSON / Active Config -->
         <div
-          class="flex border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-950/50 text-[11px]"
+          class="flex border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-950/50 text-[11px] overflow-x-auto"
         >
           <button
             type="button"
             @click="activeTab = 'structured'"
-            class="px-3 py-1.5 border-b-2 font-medium transition-all cursor-pointer"
+            class="px-3 py-1.5 border-b-2 font-medium transition-all cursor-pointer whitespace-nowrap"
             :class="
               activeTab === 'structured'
                 ? 'border-primary text-primary'
@@ -1147,7 +1086,7 @@ onMounted(() => {
           <button
             type="button"
             @click="activeTab = 'spatial'"
-            class="px-3 py-1.5 border-b-2 font-medium transition-all cursor-pointer"
+            class="px-3 py-1.5 border-b-2 font-medium transition-all cursor-pointer whitespace-nowrap"
             :class="
               activeTab === 'spatial'
                 ? 'border-primary text-primary'
@@ -1159,7 +1098,7 @@ onMounted(() => {
           <button
             type="button"
             @click="activeTab = 'csv'"
-            class="px-3 py-1.5 border-b-2 font-medium transition-all cursor-pointer"
+            class="px-3 py-1.5 border-b-2 font-medium transition-all cursor-pointer whitespace-nowrap"
             :class="
               activeTab === 'csv'
                 ? 'border-primary text-primary'
@@ -1171,7 +1110,7 @@ onMounted(() => {
           <button
             type="button"
             @click="activeTab = 'json'"
-            class="px-3 py-1.5 border-b-2 font-medium transition-all cursor-pointer"
+            class="px-3 py-1.5 border-b-2 font-medium transition-all cursor-pointer whitespace-nowrap"
             :class="
               activeTab === 'json'
                 ? 'border-primary text-primary'
@@ -1180,10 +1119,66 @@ onMounted(() => {
           >
             JSON
           </button>
+          <button
+            type="button"
+            @click="activeTab = 'config'"
+            class="px-3 py-1.5 border-b-2 font-medium transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5"
+            :class="
+              activeTab === 'config'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
+            "
+          >
+            <span>Config</span>
+            <span
+              v-if="isConfigModifiedSinceRun"
+              class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"
+              title="Settings modified since last run"
+            />
+          </button>
         </div>
 
         <!-- Tab Body Content -->
-        <div class="flex-1 p-3 overflow-y-auto max-h-[420px] text-xs font-mono">
+        <div class="flex-1 min-h-0 p-3 overflow-y-auto max-h-96 lg:max-h-none text-xs font-mono">
+          <!-- OCR Error Message Box -->
+          <div
+            v-if="ocrError"
+            class="mb-3 p-3.5 rounded-xl border border-red-200 dark:border-red-900/80 bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 flex items-start gap-3 shadow-xs select-text"
+            role="alert"
+          >
+            <div
+              class="p-1 rounded-md bg-red-100 dark:bg-red-900/60 text-red-600 dark:text-red-400 shrink-0 mt-0.5"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fill-rule="evenodd"
+                  d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h4 class="text-xs font-semibold text-red-800 dark:text-red-200">
+                OCR Execution Error
+              </h4>
+              <pre
+                class="mt-1 text-[11px] font-mono whitespace-pre-wrap break-all text-red-600 dark:text-red-400 select-text"
+                >{{ ocrError }}</pre>
+            </div>
+            <button
+              type="button"
+              @click="ocrError = null"
+              class="text-red-400 hover:text-red-600 dark:hover:text-red-200 p-0.5 rounded cursor-pointer"
+              title="Dismiss error"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"
+                />
+              </svg>
+            </button>
+          </div>
+
           <!-- Scanning Skeleton State -->
           <template v-if="isScanning">
             <!-- Structured items skeleton -->
@@ -1212,6 +1207,16 @@ onMounted(() => {
               <div class="h-3 rounded bg-neutral-200 dark:bg-neutral-800 w-1/2" />
               <div class="h-3 rounded bg-neutral-200 dark:bg-neutral-800 w-3/4 ml-8" />
               <div class="h-3 rounded bg-neutral-200 dark:bg-neutral-800 w-2/3 ml-16" />
+            </div>
+
+            <!-- Active Config skeleton -->
+            <div
+              v-else-if="activeTab === 'config'"
+              class="p-4 rounded-lg bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 space-y-3 animate-pulse"
+            >
+              <div class="h-4 rounded bg-neutral-200 dark:bg-neutral-800 w-1/3" />
+              <div class="h-16 rounded bg-neutral-200 dark:bg-neutral-800 w-full" />
+              <div class="h-24 rounded bg-neutral-200 dark:bg-neutral-800 w-full" />
             </div>
 
             <!-- Raw Tabular / JSON / CSV skeleton -->
@@ -1300,7 +1305,48 @@ onMounted(() => {
                 tab-size: 4;
               "
               >{{ jsonExport }}</pre>
+
+            <!-- Active Run Configuration view -->
+            <OcrActiveConfigView
+              v-else-if="activeTab === 'config'"
+              :active-run="activeRunConfig"
+              :current-ocr-config="ocrConfig"
+              :current-model-name="currentModel.name"
+              :current-output-mode="outputMode"
+              :is-modified-since-run="isConfigModifiedSinceRun"
+            />
           </template>
+        </div>
+
+        <!-- Active Config Summary Footer -->
+        <div
+          class="mt-auto px-3 py-1.5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-950/70 flex items-center justify-between text-[11px] shrink-0"
+        >
+          <div class="flex items-center gap-1.5 min-w-0 mr-2">
+            <span
+              v-if="activeRunConfig"
+              class="truncate font-mono text-[10px] text-neutral-700 dark:text-neutral-300"
+              :title="`${activeRunConfig.modelName} • ${activeRunConfig.outputMode} • score ≥ ${Math.round((activeRunConfig.options.textScore ?? 0) * 100)}%`"
+            >
+              {{ activeRunConfig.modelName }} • {{ activeRunConfig.outputMode }} • score ≥
+              {{ Math.round((activeRunConfig.options.textScore ?? 0) * 100) }}%
+            </span>
+            <span v-else class="text-neutral-400 italic">No run yet</span>
+            <span
+              v-if="isConfigModifiedSinceRun"
+              class="inline-flex items-center text-[9px] px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 shrink-0 font-medium"
+              title="Configuration modified in settings - click Run OCR to apply"
+            >
+              modified
+            </span>
+          </div>
+          <button
+            type="button"
+            @click="activeTab = 'config'"
+            class="text-primary hover:underline font-medium shrink-0 cursor-pointer text-[11px]"
+          >
+            {{ activeTab === 'config' ? 'Viewing' : 'Details' }}
+          </button>
         </div>
       </div>
     </div>
