@@ -1,7 +1,7 @@
 ---
 seo:
   title: RustO! - High-Performance Pure Rust OCR Library & Toolkit
-  description: RustO! is a blazing-fast OCR engine and cross-platform toolkit written in pure Rust, powered by PaddleOCR models and pure-Rust RTen inference.
+  description: RustO! is a pure Rust OCR engine and cross-platform toolkit, powered by PaddleOCR models and RTen inference.
 ---
 
 ::u-page-hero

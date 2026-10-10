@@ -4,10 +4,10 @@
 
 ## Features
 
-- **Provider Lifecycle**: Effortless engine initialization, status tracking (`idle`, `initializing`, `ready`, `error`), and error recovery with `<RustoProvider>`.
-- **Easy Hooks**: `useRusto()` to access engine status, and `useOcr()` for running OCR and managing state (`isProcessing`, `results`, `spatialText`).
+- **Provider Lifecycle**: Engine initialization, status tracking (`idle`, `initializing`, `ready`, `error`), and error recovery with `<RustoProvider>`.
+- **Hooks**: `useRusto()` to access engine status, and `useOcr()` for running OCR and managing state (`isProcessing`, `results`, `spatialText`).
 - **Composite Components**: `<OcrOverlay>` for displaying interactive bounding boxes, and `<OcrDropzone>` for drag-and-drop scanning.
-- **Architectural Purity**: Functional logic is strictly separated into testable services and hooks; components remain clean and declarative.
+- **Clean Architecture**: Functional logic is separated into testable services and hooks; components remain focused on presentation.
 
 ## Installation
 

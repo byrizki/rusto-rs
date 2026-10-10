@@ -5,8 +5,8 @@
 ## Features
 
 - **Canonical API**: 100% consistent with RustO across Android, iOS, .NET, and React Native.
-- **Multiple Source Types**: Works seamlessly with URLs, Base64 strings, `Blob`, `File`, `HTMLImageElement`, `HTMLCanvasElement`, `ImageData`, `ImageBitmap`, or byte buffers.
-- **Off-Thread Execution**: Web Worker support keeps the browser UI thread running smoothly at 60fps.
+- **Multiple Source Types**: Works with URLs, Base64 strings, `Blob`, `File`, `HTMLImageElement`, `HTMLCanvasElement`, `ImageData`, `ImageBitmap`, or byte buffers.
+- **Off-Thread Execution**: Web Worker support keeps inference off the main browser UI thread.
 - **Flexible Output**: Supports `'lines'`, `'words'`, and formatted `'spatial'` text outputs.
 - **Zero Dependencies**: Lightweight with full TypeScript definitions.
 

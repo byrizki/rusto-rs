@@ -1,7 +1,7 @@
 ---
 seo:
-  title: RustO! - Mesin OCR Berperforma Tinggi & Multi-Platform Berbasis Rust Murni
-  description: RustO! adalah mesin OCR ultra-cepat dan perangkat lintas-platform berbasis Rust murni, ditenagai oleh model PaddleOCR dan mesin inferensi RTen Rust murni.
+  title: RustO! - Mesin OCR Berkinerja Tinggi & Multi-Platform Berbasis Rust Murni
+  description: RustO! adalah mesin OCR berkinerja tinggi dan toolkit lintas-platform berbasis Rust murni, ditenagai oleh model PaddleOCR dan inferensi RTen.
 ---
 
 ::u-page-hero

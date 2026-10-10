@@ -22,11 +22,11 @@
 ## 🎯 Key Features
 
 - **🚀 100% Pure Rust Core** — Zero OpenCV and zero C++ dependencies. Powered by pure-Rust RTen inference, image processing, DBNet polygon contour detection, and unclip algorithms.
-- **⚡ Blazing Fast & Lightweight** — Pure-Rust vector-accelerated inference with SIMD optimizations (AVX, NEON), link-time optimization (LTO), and single codegen unit compilation.
+- **⚡ Fast & Lightweight** — Pure-Rust vector-accelerated inference with SIMD optimizations (AVX, NEON), link-time optimization (LTO), and single codegen unit compilation.
 - **📄 Spatial Layout Text Reconstruction** — Reconstructs human-readable document layouts (multi-column tables, invoices, forms) with configurable visual XY spatial spacing.
-- **🧠 Full Model Series Support** — Seamless support for **PP-OCRv6** (Tiny, Small, Medium), **PP-OCRv5** (Mobile, Server), and **PP-OCRv4** (Mobile, Server) with orientation classification.
+- **🧠 Full Model Series Support** — Support for **PP-OCRv6** (Tiny, Small, Medium), **PP-OCRv5** (Mobile, Server), and **PP-OCRv4** (Mobile, Server) with orientation classification.
 - **📦 Modular Distribution** — Core runtimes are stripped of forced model bloat. Users can choose pre-packaged model tiers or bring their own custom models.
-- **🌐 First-Class Cross-Platform SDKs** — Ready-to-use packages for **Rust**, **.NET / C#**, **React Native**, **iOS (Swift)**, **Android (Kotlin)**, and **C FFI**.
+- **🌐 Universal Multi-Platform SDKs** — Ready-to-use packages for **Rust**, **.NET / C#**, **React Native**, **iOS (Swift)**, **Android (Kotlin)**, and **C FFI**.
 
 ---
 
@@ -421,9 +421,9 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## 🙏 Acknowledgments
 
-RustO! is inspired by and builds upon the incredible work of:
+RustO! is inspired by and builds upon the work of:
 - **[RapidOCR](https://github.com/RapidAI/RapidOCR)** — Architecture and OCR pipeline reference
-- **[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)** — State-of-the-art OCR models (PP-OCRv6, PP-OCRv5, PP-OCRv4)
+- **[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)** — Pretrained OCR models (PP-OCRv6, PP-OCRv5, PP-OCRv4)
 - **[RTen](https://github.com/robertknight/rten)** — Pure Rust deep learning inference engine powering RustO! v0.3+
 - **[Alibaba MNN](https://github.com/alibaba/MNN)** — High-performance inference engine that powered RustO! in version 0.2.x
 - **Rust Community** — `image`, `imageproc`, `nalgebra`, and `rayon` crates
