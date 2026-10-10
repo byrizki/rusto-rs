@@ -704,7 +704,7 @@ def main():
     if args.model:
         targets = [
             d for d in MODEL_DEFINITIONS
-            if d["id"] == args.model or d["name"] == args.model or f"@rustors/model-{d['id']}" == args.model:
+            if d["id"] == args.model or d["name"] == args.model or f"@rustors/model-{d['id']}" == args.model
         ]
         if not targets:
             print(f"Error: Model '{args.model}' not found in definitions.", file=sys.stderr)
