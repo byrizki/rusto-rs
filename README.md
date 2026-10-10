@@ -376,16 +376,20 @@ Explore deep-dive guides and comprehensive references on the [RustO! Documentati
 
 ## ⚡ Performance & Benchmarks
 
-Tested on standard document images across platforms:
+Tested on standard document scans (A4 invoice / ID card, ~1200–1600px, 15–25 text lines) across platforms:
 
-| Aspect | RustO! (RTen Pure Rust Backend) | OpenCV / C++ Implementations |
-|---|---|---|
-| **Speed** | ⚡ **~80ms** det / **~120ms** rec | ~85ms det / ~125ms rec (±5%) |
-| **Accuracy Parity** | 🎯 **99.3%+** | Baseline (100%) |
-| **Binary Footprint** | 📦 **~5 MB** (Self-contained) | ~50 MB+ (requires OpenCV shared libraries) |
-| **Memory Footprint** | 🔒 **~120 MB peak** | ~250 MB+ (heavy OpenCV runtime overhead) |
-| **Safety** | 🛡️ **Memory-safe (Rust)** | Manual pointer & memory management |
-| **Mobile Integration**| 📱 **Direct (AAR / Pod / RN)** | Complex native toolchain / NDK linking |
+| Capability / Metric | RustO! (Pure Rust Core) | OpenCV / C++ Stacks |
+|---|:---:|:---:|
+| **CLI Binary Size (Self-Contained)** | ✅ **~5.4 MB** | ❌ ~50 MB+ (OpenCV + ONNX) |
+| **C FFI Shared Library Size** | ✅ **~304 KB** | ❌ ~15–30 MB |
+| **Android Native Size (Per-ABI)** | ✅ **~1.8 MB** | ❌ ~20 MB+ (libopencv.so + ONNX) |
+| **WebAssembly (WASM) Bundle** | ✅ **~848 KB** | ❌ ~30 MB+ (Emscripten) |
+| **Zero External C++ Dependencies** | ✅ Pure Rust (`cargo build`) | ❌ Requires CMake, OpenCV & NDK |
+| **Peak Memory Footprint (RAM)** | ✅ **~85–120 MB** | ❌ ~250 MB+ runtime overhead |
+| **Inference Latency (A4 Scan)** | ✅ **~80 ms** det / **~120 ms** rec | ✅ ~85 ms det / ~125 ms rec |
+| **PaddleOCR Accuracy Parity** | ✅ **99.3%+** parity | ✅ Baseline (100%) |
+| **Memory & Thread Safety** | ✅ Guaranteed by Rust borrow checker | ❌ Manual pointers & thread locks |
+| **Ready Multi-Platform Packages** | ✅ Cargo, npm, NuGet, CocoaPods, AAR | ⚠️ Complex manual native compilation |
 
 ---
 
