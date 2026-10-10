@@ -141,18 +141,28 @@ jobs:
           
           mkdir -p npm-packages
           # Download core library tgz from GitHub release
-          gh release download "v${VERSION}" -p "*.tgz" -D npm-packages/ || true
+          gh release download "v${VERSION}" -p "rustors-*.tgz" -D npm-packages/ || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
       - name: Publish Core to NPM
         run: |
           find npm-packages -name "*.tgz" -type f | while read -r pkg; do
-            if [[ ! "$pkg" =~ rustors-model ]]; then
-              abs_pkg="$(readlink -f "$pkg")"
-              echo "Publishing $(basename "$abs_pkg")..."
-              npm publish "$abs_pkg" --access public || true
+            pkg_name="$(basename "$pkg")"
+            if [[ "$pkg_name" =~ rustors-model ]]; then
+              continue
             fi
+            if [[ "$pkg_name" =~ (react-rust|react-rusto|react-native-rusto|rusto-web|rusto-wasm) ]]; then
+              echo "Skipping deprecated/internal package: $pkg_name"
+              continue
+            fi
+            if [[ ! "$pkg_name" =~ ^rustors- ]]; then
+              echo "Skipping non-core package: $pkg_name"
+              continue
+            fi
+            abs_pkg="$(readlink -f "$pkg")"
+            echo "Publishing $pkg_name..."
+            npm publish "$abs_pkg" --access public || true
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

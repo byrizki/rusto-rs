@@ -485,6 +485,10 @@ jobs:
           tar czf artifacts/wasm/rusto-wasm.tar.gz -C packages/web/src/wasm .
           cp artifacts/wasm/rusto-wasm.tar.gz artifacts/wasm/rusto-wasm.tgz
 
+      - name: Clean stale packages
+        run: |
+          rm -f packages/*.tgz packages/*.tar.gz
+
       - name: Build and pack @rustors/web
         working-directory: packages/web
         run: |
@@ -519,13 +523,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rusto-web-package
-          path: packages/rust*web-*.tgz
+          path: packages/rustors-web-*.tgz
 
       - name: Upload @rustors/react package
         uses: actions/upload-artifact@v4
         with:
           name: rusto-react-package
-          path: packages/rust*react-*.tgz
+          path: packages/rustors-react-*.tgz
 
       - name: Upload rusto-wasm package
         uses: actions/upload-artifact@v4
@@ -588,7 +592,11 @@ jobs:
 
           for pkg_dir in rusto-react-native-package rusto-web-package rusto-react-package rusto-wasm-package; do
             if [ -d "$pkg_dir" ]; then
-              find "$pkg_dir" -type f \( -name '*.tgz' -o -name '*.tar.gz' \) -exec cp {} ../releases/ \;
+              find "$pkg_dir" -type f \( -name '*.tgz' -o -name '*.tar.gz' \) \
+                ! -name '*react-rust*' \
+                ! -name '*react-native-rusto*' \
+                ! -name '*rusto-web*' \
+                -exec cp {} ../releases/ \;
             fi
           done
 
