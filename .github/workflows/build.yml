@@ -90,10 +90,10 @@ jobs:
             -library build/ios-simulator/libRustoCore.a \
             -output build/RustO.xcframework
 
-          # Keep release framework artifact binary-only. Swift sources belong
-          # in CocoaPods/npm source packages; staging them here can hide an ABI
-          # mismatch between current bridge code and older static archives.
-          (cd build && zip -r RustO.xcframework.zip RustO.xcframework)
+          # Package XCFramework along with Swift sources and LICENSE required by CocoaPods
+          cp -r packages/ios/src build/
+          cp packages/ios/LICENSE build/
+          (cd build && zip -r RustO.xcframework.zip RustO.xcframework src LICENSE)
 
       - name: Package iOS Model Bundle for Test Fixtures
         run: |
