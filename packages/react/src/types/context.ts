@@ -1,4 +1,4 @@
-import type { InitializeConfig } from '@rusto/web';
+import type { InitializeConfig } from '@rustors/web';
 import type { OcrService } from '../services/ocrService.js';
 
 export type RustoStatus = 'idle' | 'initializing' | 'ready' | 'error';

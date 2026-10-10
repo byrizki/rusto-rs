@@ -1,5 +1,5 @@
 {
-  "name": "@rusto/react-native",
+  "name": "@rustors/react-native",
   "version": "0.3.0",
   "description": "React Native bindings for RustO! OCR library",
   "keywords": [

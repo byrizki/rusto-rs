@@ -1,5 +1,5 @@
 {
-  "name": "@rusto/model-ppocrv6-medium-int8",
+  "name": "@rustors/model-ppocrv6-medium-int8",
   "version": "0.3.2",
   "description": "Pre-trained PP-OCRv6 Medium INT8 quantized models (~76 MB) for RustO OCR",
   "keywords": [

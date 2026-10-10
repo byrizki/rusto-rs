@@ -1,4 +1,4 @@
-import type { DetectTextOptions, ModelPreset, OutputGranularity } from '@rusto/web';
+import type { DetectTextOptions, ModelPreset, OutputGranularity } from '@rustors/web';
 
 export interface OcrModelOption {
   id: string;

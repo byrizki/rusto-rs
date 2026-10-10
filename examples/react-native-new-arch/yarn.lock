@@ -4415,9 +4415,9 @@ react-is@^19.1.4:
   resolved "http://devops.quadrant-si.id/nexus/repository/npm-group/react-is/-/react-is-19.2.8.tgz#09826f9fbc187bc668e3e5c62edc001f804d5018"
   integrity sha512-s5un28nYxKJw5gvUHyW5PCC28CvBqLu9r3cWgzHT4Vo/5fqqkFcdRYsGcKf50WMPpjjFZS5d76fn3YCo2njKwQ==
 
-"@rusto/react-native@file:../../artifacts/rusto-react-native-package/react-native-rusto.tgz":
+"@rustors/react-native@file:../../artifacts/rusto-react-native-package/rustors-react-native.tgz":
   version "0.2.2"
-  resolved "file:../../artifacts/rusto-react-native-package/react-native-rusto.tgz#0277f22974dfb48be99de6f584492b50c0cbd9f9"
+  resolved "file:../../artifacts/rusto-react-native-package/rustors-react-native.tgz#0277f22974dfb48be99de6f584492b50c0cbd9f9"
 
 react-native@0.81.6:
   version "0.81.6"

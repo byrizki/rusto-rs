@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   check-prerequisites:
-    name: Check rusto-web availability
+    name: Check @rustors/web availability
     runs-on: ubuntu-latest
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     outputs:
@@ -36,7 +36,7 @@ jobs:
       artifact_run_id: ${{ steps.check.outputs.artifact_run_id }}
     steps:
       - uses: actions/checkout@v4
-      - name: Check if rusto-web is available
+      - name: Check if @rustors/web is available
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -56,12 +56,12 @@ jobs:
 
           FOUND_TAG=""
           # Check exact target tag release
-          if gh release view "$TARGET_TAG" --json assets -q '.assets[].name' 2>/dev/null | grep -q -E 'rusto-(web|wasm)'; then
+          if gh release view "$TARGET_TAG" --json assets -q '.assets[].name' 2>/dev/null | grep -q -E '(rustors|rusto)-(web|wasm)'; then
             FOUND_TAG="$TARGET_TAG"
           else
             # Check recent published releases
             for tag in $(gh release list --limit 10 --json tagName,isDraft,isPrerelease -q '.[] | select(.isDraft == false and .isPrerelease == false) | .tagName' 2>/dev/null); do
-              if gh release view "$tag" --json assets -q '.assets[].name' 2>/dev/null | grep -q -E 'rusto-(web|wasm)'; then
+              if gh release view "$tag" --json assets -q '.assets[].name' 2>/dev/null | grep -q -E '(rustors|rusto)-(web|wasm)'; then
                 FOUND_TAG="$tag"
                 break
               fi
@@ -69,7 +69,7 @@ jobs:
           fi
 
           if [ -n "$FOUND_TAG" ]; then
-            echo "Found prebuilt rusto-web/wasm in GitHub release: ${FOUND_TAG}"
+            echo "Found prebuilt @rustors/web/wasm in GitHub release: ${FOUND_TAG}"
             echo "has_rusto_web=true" >> $GITHUB_OUTPUT
             echo "release_tag=${FOUND_TAG}" >> $GITHUB_OUTPUT
             echo "artifact_run_id=" >> $GITHUB_OUTPUT
@@ -164,7 +164,7 @@ jobs:
             fi
           elif [ "$RELEASE_TAG" != "local" ] && [ -n "$RELEASE_TAG" ]; then
             echo "Downloading prebuilt WASM from release ${RELEASE_TAG}..."
-            gh release download "$RELEASE_TAG" --pattern 'rusto-wasm.*' --pattern 'rusto-web-*.tgz' --dir /tmp/wasm-assets || true
+            gh release download "$RELEASE_TAG" --pattern 'rusto-wasm.*' --pattern 'rustors-web-*.tgz' --dir /tmp/wasm-assets || true
 
             if [ -f /tmp/wasm-assets/rusto-wasm.tar.gz ]; then
               echo "Extracting rusto-wasm.tar.gz..."
@@ -172,9 +172,9 @@ jobs:
             elif [ -f /tmp/wasm-assets/rusto-wasm.tgz ]; then
               echo "Extracting rusto-wasm.tgz..."
               tar -xzf /tmp/wasm-assets/rusto-wasm.tgz -C ../packages/web/src/wasm
-            elif ls /tmp/wasm-assets/rusto-web-*.tgz 1>/dev/null 2>&1; then
-              echo "Extracting from rusto-web npm package tarball..."
-              tar -xzf /tmp/wasm-assets/rusto-web-*.tgz -C /tmp/wasm-assets
+            elif ls /tmp/wasm-assets/rust*web-*.tgz 1>/dev/null 2>&1; then
+              echo "Extracting from @rustors/web npm package tarball..."
+              tar -xzf /tmp/wasm-assets/rust*web-*.tgz -C /tmp/wasm-assets
               if [ -d /tmp/wasm-assets/package/src/wasm ]; then
                 cp -r /tmp/wasm-assets/package/src/wasm/* ../packages/web/src/wasm/
               fi

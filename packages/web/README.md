@@ -1,4 +1,4 @@
-# @rusto/web
+# @rustors/web
 
 > Pure Web and Browser OCR library for [RustO!](https://github.com/byrizki/rusto-rs) powered by PaddleOCR models.
 
@@ -13,18 +13,18 @@
 ## Installation
 
 ```bash
-npm install @rusto/web
+npm install @rustors/web
 # or
-yarn add @rusto/web
+yarn add @rustors/web
 # or
-pnpm add @rusto/web
+pnpm add @rustors/web
 ```
 
 ## Quick Start
 
 ```ts
-import { initialize, detectText } from '@rusto/web';
-import { getModelUrls } from '@rusto/model-ppocrv6-tiny';
+import { initialize, detectText } from '@rustors/web';
+import { getModelUrls } from '@rustors/model-ppocrv6-tiny';
 
 // 1. Initialize with pre-trained models
 const urls = getModelUrls('/models/ppocrv6-tiny');

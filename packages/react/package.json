@@ -1,5 +1,5 @@
 {
-  "name": "@rusto/react",
+  "name": "@rustors/react",
   "version": "0.3.0",
   "description": "React hooks, provider, and UI components for RustO! OCR engine",
   "keywords": [
@@ -50,12 +50,12 @@
   },
   "peerDependencies": {
     "react": ">=18.0.0",
-    "@rusto/web": ">=0.2.5"
+    "@rustors/web": ">=0.2.5"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
     "react": "^18.2.0",
-    "@rusto/web": "file:../web",
+    "@rustors/web": "file:../web",
     "typescript": "^5.0.2"
   }
 }

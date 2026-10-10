@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stage release-native artifacts after react-native-rusto.tgz installation.
+# Stage release-native artifacts after @rustors/react-native installation.
 # Never publish staged binaries in npm; CI injects them into a disposable example.
 set -euo pipefail
 
@@ -23,11 +23,8 @@ while (($#)); do
   esac
 done
 [[ -n "$platform" && -n "$app" && -n "$core" && -n "$model" && -n "$version" ]] || usage
-rn_pkg_dir="$app/node_modules/@rusto/react-native"
-if [[ ! -d "$rn_pkg_dir" ]]; then
-  rn_pkg_dir="$app/node_modules/react-native-rusto"
-fi
-[[ -d "$rn_pkg_dir" ]] || { echo "@rusto/react-native is not installed: $app" >&2; exit 1; }
+rn_pkg_dir="$app/node_modules/@rustors/react-native"
+[[ -d "$rn_pkg_dir" ]] || { echo "@rustors/react-native is not installed: $app" >&2; exit 1; }
 [[ -s "$core" && -s "$model" ]] || { echo "missing staged release artifact" >&2; exit 1; }
 
 case "$platform" in

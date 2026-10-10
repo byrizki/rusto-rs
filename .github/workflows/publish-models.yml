@@ -252,7 +252,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rusto-models-npm-packages
-          path: npm-models/rusto-model*.tgz
+          path: npm-models/*model*.tgz
 
       - name: Stage Model Release Directory
         if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
@@ -261,7 +261,7 @@ jobs:
           cp build/RustO-Models-*.zip model-releases/ 2>/dev/null || true
           find packages/android/models/*/build/outputs/aar -name '*-release.aar' -exec cp {} model-releases/ \; 2>/dev/null || true
           cp nupkg/RustODotnet.Models.*.nupkg model-releases/ 2>/dev/null || true
-          cp npm-models/rusto-model*.tgz model-releases/ 2>/dev/null || true
+          cp npm-models/*model*.tgz model-releases/ 2>/dev/null || true
           (cd model-releases && sha256sum * > SHA256SUMS 2>/dev/null || true)
 
       - name: Upload All Model Release Files Artifact
@@ -305,7 +305,7 @@ jobs:
             - **iOS**: Resource bundles (`RustO-Models-*.zip`)
             - **Android**: Model AAR packages (`rusto-models-*.aar`)
             - **.NET**: Model NuGet packages (`RustODotnet.Models.*.nupkg`)
-            - **NPM / Web**: Model NPM packages (`rusto-models-*.tgz`)
+            - **NPM / Web**: Model NPM packages (`@rustors/model-*`)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

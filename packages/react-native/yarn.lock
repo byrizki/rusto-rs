@@ -2892,9 +2892,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rusto/react-native@workspace:.":
+"@rustors/react-native@workspace:.":
   version: 0.0.0-use.local
-  resolution: "@rusto/react-native@workspace:."
+  resolution: "@rustors/react-native@workspace:."
   dependencies:
     "@commitlint/config-conventional": "npm:^17.0.2"
     "@evilmartians/lefthook": "npm:^1.5.0"

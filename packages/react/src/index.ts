@@ -23,7 +23,7 @@ export { resultsToText, resultsToCsv, resultsToJson } from './utils/formatters.j
 // Types
 export * from './types/index.js';
 
-// Re-export common types from @rusto/web
+// Re-export common types from @rustors/web
 export type {
   TextResult,
   Frame,
@@ -31,4 +31,4 @@ export type {
   DetectTextOptions,
   InitializeConfig,
   ModelPreset,
-} from '@rusto/web';
+} from '@rustors/web';

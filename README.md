@@ -7,7 +7,7 @@
 [![Crates.io](https://img.shields.io/crates/v/rusto-rs.svg?logo=rust&logoColor=white&color=orange)](https://crates.io/crates/rusto-rs)
 [![docs.rs](https://img.shields.io/docsrs/rusto-rs?logo=docs.rs&logoColor=white)](https://docs.rs/rusto-rs)
 [![NuGet](https://img.shields.io/nuget/v/RustODotnet.svg?logo=nuget&logoColor=white&color=004880)](https://www.nuget.org/packages/RustODotnet)
-[![npm](https://img.shields.io/npm/v/@rusto/react-native.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/@rusto/react-native)
+[![npm](https://img.shields.io/npm/v/@rustors/react-native.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/@rustors/react-native)
 [![CocoaPods](https://img.shields.io/cocoapods/v/RustO.svg?logo=cocoapods&logoColor=white&color=EE3322)](https://cocoapods.org/pods/RustO)
 [![JitPack](https://jitpack.io/v/byrizki/rusto-rs.svg)](https://jitpack.io/#byrizki/rusto-rs)
 [![Build & Release](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml/badge.svg)](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml)
@@ -35,10 +35,10 @@
 | Platform | Package / Registry | Description |
 |---|---|---|
 | **Rust** | `cargo add rusto-rs` ([crates.io](https://crates.io/crates/rusto-rs)) | Pure Rust library + CLI tool |
-| **Web (WASM)** | `npm install @rusto/web` ([npm](https://www.npmjs.com/package/@rusto/web)) | Browser-native pure Rust RTen WASM OCR engine |
-| **React** | `npm install @rusto/react` ([npm](https://www.npmjs.com/package/@rusto/react)) | React hooks & components for browser OCR |
+| **Web (WASM)** | `npm install @rustors/web` ([npm](https://www.npmjs.com/package/@rustors/web)) | Browser-native pure Rust RTen WASM OCR engine |
+| **React** | `npm install @rustors/react` ([npm](https://www.npmjs.com/package/@rustors/react)) | React hooks & components for browser OCR |
 | **.NET / C#** | `dotnet add package RustODotnet` ([NuGet](https://www.nuget.org/packages/RustODotnet)) | Managed .NET library + Windows/Linux/macOS native runtimes |
-| **React Native** | `npm install @rusto/react-native` ([npm](https://www.npmjs.com/package/@rusto/react-native)) | Cross-platform React Native TypeScript bridge |
+| **React Native** | `npm install @rustors/react-native` ([npm](https://www.npmjs.com/package/@rustors/react-native)) | Cross-platform React Native TypeScript bridge |
 | **iOS** | `pod 'RustO'` ([CocoaPods](https://cocoapods.org/pods/RustO)) | Swift library + Universal XCFramework (Device & Simulator) |
 | **Android** | `com.github.byrizki.rusto-rs:rusto-android` ([JitPack](https://jitpack.io/#byrizki/rusto-rs)) | Kotlin library + AAR with ARM64, ARMv7, x86, x86_64 |
 | **C / Native** | `librusto.so` / `librusto.dylib` / `rusto.dll` | C FFI shared libraries for custom integrations |
@@ -65,9 +65,14 @@ Upgrading from **v0.2.x** to **v0.3.0** introduces significant architectural upg
 - **Flat options hierarchy**: `detection` and `postprocess` are now direct sibling fields on `OcrRunOptions` (the legacy nested `preprocessing` block has been removed).
 - **Calibration & Optimization**: ID card and document preprocessing options (`CalibrationOptions`, `OptimizationOptions`) are passed per request via `OcrRunOptions.calibration` and `OcrRunOptions.optimization`.
 
-### 4. Ecosystem & Model Package Updates
+### 4. Ecosystem & NPM Package Namespace Migration (`@rustors/*`)
+- **Unified `@rustors` scope**: All npm packages have migrated from legacy 0.2.x standalone package names to the official `@rustors` scope:
+  - `react-native-rusto` → [`@rustors/react-native`](https://www.npmjs.com/package/@rustors/react-native)
+  - `rusto-web` → [`@rustors/web`](https://www.npmjs.com/package/@rustors/web)
+  - `react-rusto` → [`@rustors/react`](https://www.npmjs.com/package/@rustors/react)
+  - `rusto-models-*` → `@rustors/model-*` (e.g. `@rustors/model-ppocrv6-tiny`)
+- **No legacy fallbacks**: In line with the v0.3.0 breaking release, legacy package names and fallbacks are deprecated and removed.
 - Prepackaged model distributions for Android (AAR), iOS (CocoaPods), .NET (NuGet), and React Native (npm) have been upgraded to v0.3.0 with `.rten` / `.onnx` models.
-- Introduced `@rusto/web` and `@rusto/react` packages for pure client-side in-browser OCR via WebAssembly.
 
 ---
 
@@ -112,8 +117,8 @@ if (result is StructuredDetectTextResult structured)
 Install the npm package and choose your model package for iOS and Android:
 
 ```bash
-npm install @rusto/react-native
-# or yarn add @rusto/react-native / pnpm add @rusto/react-native
+npm install @rustors/react-native
+# or yarn add @rustors/react-native / pnpm add @rustors/react-native
 ```
 
 **iOS Setup (`ios/Podfile`):**
@@ -139,7 +144,7 @@ dependencies {
 
 **JavaScript / TypeScript Usage:**
 ```typescript
-import { initialize, detectText } from '@rusto/react-native';
+import { initialize, detectText } from '@rustors/react-native';
 
 // Initialize bundled default models once.
 await initialize();
@@ -419,7 +424,8 @@ This project is licensed under the [MIT License](LICENSE).
 RustO! is inspired by and builds upon the incredible work of:
 - **[RapidOCR](https://github.com/RapidAI/RapidOCR)** — Architecture and OCR pipeline reference
 - **[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)** — State-of-the-art OCR models (PP-OCRv6, PP-OCRv5, PP-OCRv4)
-- **[RTen](https://github.com/robertknight/rten)** — Pure Rust deep learning inference engine
+- **[RTen](https://github.com/robertknight/rten)** — Pure Rust deep learning inference engine powering RustO! v0.3+
+- **[Alibaba MNN](https://github.com/alibaba/MNN)** — High-performance inference engine that powered RustO! in version 0.2.x
 - **Rust Community** — `image`, `imageproc`, `nalgebra`, and `rayon` crates
 
 ---

@@ -25,7 +25,7 @@ MODELS_SOURCE_DIR = REPO_ROOT / "models"
 MODEL_DEFINITIONS = [
     {
         "id": "ppocrv6-tiny",
-        "name": "@rusto/model-ppocrv6-tiny",
+        "name": "@rustors/model-ppocrv6-tiny",
         "title": "PP-OCRv6 Tiny",
         "description": "Pre-trained PP-OCRv6 Tiny models (~6 MB) for RustO OCR",
         "preset": "ppv6",
@@ -38,7 +38,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv6-small",
-        "name": "@rusto/model-ppocrv6-small",
+        "name": "@rustors/model-ppocrv6-small",
         "title": "PP-OCRv6 Small",
         "description": "Pre-trained PP-OCRv6 Small models (~12 MB) for RustO OCR",
         "preset": "ppv6",
@@ -51,7 +51,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv6-medium",
-        "name": "@rusto/model-ppocrv6-medium",
+        "name": "@rustors/model-ppocrv6-medium",
         "title": "PP-OCRv6 Medium",
         "description": "Pre-trained PP-OCRv6 Medium models (~24 MB) for RustO OCR",
         "preset": "ppv6",
@@ -64,7 +64,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv6-tiny-int8",
-        "name": "@rusto/model-ppocrv6-tiny-int8",
+        "name": "@rustors/model-ppocrv6-tiny-int8",
         "title": "PP-OCRv6 Tiny (INT8)",
         "description": "Pre-trained PP-OCRv6 Tiny INT8 quantized models (~3.4 MB) for RustO OCR",
         "preset": "ppv6",
@@ -77,7 +77,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv6-small-int8",
-        "name": "@rusto/model-ppocrv6-small-int8",
+        "name": "@rustors/model-ppocrv6-small-int8",
         "title": "PP-OCRv6 Small (INT8)",
         "description": "Pre-trained PP-OCRv6 Small INT8 quantized models (~16 MB) for RustO OCR",
         "preset": "ppv6",
@@ -90,7 +90,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv6-medium-int8",
-        "name": "@rusto/model-ppocrv6-medium-int8",
+        "name": "@rustors/model-ppocrv6-medium-int8",
         "title": "PP-OCRv6 Medium (INT8)",
         "description": "Pre-trained PP-OCRv6 Medium INT8 quantized models (~76 MB) for RustO OCR",
         "preset": "ppv6",
@@ -103,7 +103,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv5-mobile",
-        "name": "@rusto/model-ppocrv5-mobile",
+        "name": "@rustors/model-ppocrv5-mobile",
         "title": "PP-OCRv5 Mobile",
         "description": "Pre-trained PP-OCRv5 Mobile models (~8 MB) for RustO OCR",
         "preset": "ppv5",
@@ -116,7 +116,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv5-server",
-        "name": "@rusto/model-ppocrv5-server",
+        "name": "@rustors/model-ppocrv5-server",
         "title": "PP-OCRv5 Server",
         "description": "Pre-trained PP-OCRv5 Server high-accuracy models for RustO OCR",
         "preset": "ppv5",
@@ -129,7 +129,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv5-arabic",
-        "name": "@rusto/model-ppocrv5-arabic",
+        "name": "@rustors/model-ppocrv5-arabic",
         "title": "PP-OCRv5 Arabic",
         "description": "Pre-trained PP-OCRv5 Arabic recognition model for RustO OCR",
         "preset": "ppv5",
@@ -142,7 +142,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv5-cyrillic",
-        "name": "@rusto/model-ppocrv5-cyrillic",
+        "name": "@rustors/model-ppocrv5-cyrillic",
         "title": "PP-OCRv5 Cyrillic",
         "description": "Pre-trained PP-OCRv5 Cyrillic recognition model for RustO OCR",
         "preset": "ppv5",
@@ -155,7 +155,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv5-devanagari",
-        "name": "@rusto/model-ppocrv5-devanagari",
+        "name": "@rustors/model-ppocrv5-devanagari",
         "title": "PP-OCRv5 Devanagari",
         "description": "Pre-trained PP-OCRv5 Devanagari (Hindi) recognition model for RustO OCR",
         "preset": "ppv5",
@@ -168,7 +168,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv5-el",
-        "name": "@rusto/model-ppocrv5-el",
+        "name": "@rustors/model-ppocrv5-el",
         "title": "PP-OCRv5 Greek",
         "description": "Pre-trained PP-OCRv5 Greek recognition model for RustO OCR",
         "preset": "ppv5",
@@ -181,7 +181,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv5-eslav",
-        "name": "@rusto/model-ppocrv5-eslav",
+        "name": "@rustors/model-ppocrv5-eslav",
         "title": "PP-OCRv5 East Slavic",
         "description": "Pre-trained PP-OCRv5 East Slavic recognition model for RustO OCR",
         "preset": "ppv5",
@@ -194,7 +194,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv5-korean",
-        "name": "@rusto/model-ppocrv5-korean",
+        "name": "@rustors/model-ppocrv5-korean",
         "title": "PP-OCRv5 Korean",
         "description": "Pre-trained PP-OCRv5 Korean recognition model for RustO OCR",
         "preset": "ppv5",
@@ -207,7 +207,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv5-latin",
-        "name": "@rusto/model-ppocrv5-latin",
+        "name": "@rustors/model-ppocrv5-latin",
         "title": "PP-OCRv5 Latin",
         "description": "Pre-trained PP-OCRv5 Latin multilingual recognition model for RustO OCR",
         "preset": "ppv5",
@@ -220,7 +220,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv5-ta",
-        "name": "@rusto/model-ppocrv5-ta",
+        "name": "@rustors/model-ppocrv5-ta",
         "title": "PP-OCRv5 Tamil",
         "description": "Pre-trained PP-OCRv5 Tamil recognition model for RustO OCR",
         "preset": "ppv5",
@@ -233,7 +233,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv5-te",
-        "name": "@rusto/model-ppocrv5-te",
+        "name": "@rustors/model-ppocrv5-te",
         "title": "PP-OCRv5 Telugu",
         "description": "Pre-trained PP-OCRv5 Telugu recognition model for RustO OCR",
         "preset": "ppv5",
@@ -246,7 +246,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv5-th",
-        "name": "@rusto/model-ppocrv5-th",
+        "name": "@rustors/model-ppocrv5-th",
         "title": "PP-OCRv5 Thai",
         "description": "Pre-trained PP-OCRv5 Thai recognition model for RustO OCR",
         "preset": "ppv5",
@@ -259,7 +259,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv4-mobile",
-        "name": "@rusto/model-ppocrv4-mobile",
+        "name": "@rustors/model-ppocrv4-mobile",
         "title": "PP-OCRv4 Mobile",
         "description": "Pre-trained PP-OCRv4 Mobile models for RustO OCR",
         "preset": "ppv4",
@@ -272,7 +272,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv4-server",
-        "name": "@rusto/model-ppocrv4-server",
+        "name": "@rustors/model-ppocrv4-server",
         "title": "PP-OCRv4 Server",
         "description": "Pre-trained PP-OCRv4 Server high-accuracy models for RustO OCR",
         "preset": "ppv4",
@@ -285,7 +285,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv4-japan",
-        "name": "@rusto/model-ppocrv4-japan",
+        "name": "@rustors/model-ppocrv4-japan",
         "title": "PP-OCRv4 Japanese",
         "description": "Pre-trained PP-OCRv4 Japanese recognition model for RustO OCR",
         "preset": "ppv4",
@@ -298,7 +298,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv4-chinese-cht",
-        "name": "@rusto/model-ppocrv4-chinese-cht",
+        "name": "@rustors/model-ppocrv4-chinese-cht",
         "title": "PP-OCRv4 Traditional Chinese",
         "description": "Pre-trained PP-OCRv4 Traditional Chinese recognition model for RustO OCR",
         "preset": "ppv4",
@@ -311,7 +311,7 @@ MODEL_DEFINITIONS = [
     },
     {
         "id": "ppocrv4-kannada",
-        "name": "@rusto/model-ppocrv4-kannada",
+        "name": "@rustors/model-ppocrv4-kannada",
         "title": "PP-OCRv4 Kannada",
         "description": "Pre-trained PP-OCRv4 Kannada recognition model for RustO OCR",
         "preset": "ppv4",
@@ -591,11 +591,11 @@ pnpm add {pkg_name}
 
 ## Usage
 
-### In Web / React apps (`@rusto/web` or `@rusto/react`)
+### In Web / React apps (`@rustors/web` or `@rustors/react`)
 
 ```ts
 import {{ modelMetadata, getModelUrls }} from '{pkg_name}';
-import {{ initialize }} from '@rusto/web';
+import {{ initialize }} from '@rustors/web';
 
 // Initialize with model URLs (e.g. hosted under public/cdn)
 const urls = getModelUrls('/models/{definition["id"]}');
@@ -704,7 +704,7 @@ def main():
     if args.model:
         targets = [
             d for d in MODEL_DEFINITIONS
-            if d["id"] == args.model or d["name"] == args.model or f"rusto-models-{d['id']}" == args.model or f"@rusto/model-{d['id']}" == args.model
+            if d["id"] == args.model or d["name"] == args.model or f"@rustors/model-{d['id']}" == args.model:
         ]
         if not targets:
             print(f"Error: Model '{args.model}' not found in definitions.", file=sys.stderr)

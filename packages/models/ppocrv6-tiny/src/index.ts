@@ -1,6 +1,6 @@
 /**
  * RustO Pre-trained Model Package: PP-OCRv6 Tiny
- * Package: @rusto/model-ppocrv6-tiny
+ * Package: @rustors/model-ppocrv6-tiny
  */
 
 export interface ModelFilesConfig {
@@ -28,8 +28,8 @@ export interface ModelPackageMetadata {
 }
 
 export const modelMetadata: ModelPackageMetadata = {
-  name: '@rusto/model-ppocrv6-tiny',
-  version: '0.3.1',
+  name: '@rustors/model-ppocrv6-tiny',
+  version: '0.3.2',
   title: 'PP-OCRv6 Tiny',
   preset: 'ppv6',
   tier: 'tiny',

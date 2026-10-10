@@ -485,14 +485,14 @@ jobs:
           tar czf artifacts/wasm/rusto-wasm.tar.gz -C packages/web/src/wasm .
           cp artifacts/wasm/rusto-wasm.tar.gz artifacts/wasm/rusto-wasm.tgz
 
-      - name: Build and pack rusto-web
+      - name: Build and pack @rustors/web
         working-directory: packages/web
         run: |
           npm install
           npm run build
           npm pack --pack-destination ..
 
-      - name: Build and pack @rusto/react
+      - name: Build and pack @rustors/react
         working-directory: packages/react
         run: |
           npm install
@@ -507,25 +507,25 @@ jobs:
         working-directory: packages/react-native
         run: |
           yarn prepare
-          yarn pack --filename ../react-native-rusto.tgz
+          yarn pack --filename ../rustors-react-native.tgz
 
       - name: Upload React Native package
         uses: actions/upload-artifact@v4
         with:
           name: rusto-react-native-package
-          path: packages/react-native-rusto.tgz
+          path: packages/rustors-react-native.tgz
 
-      - name: Upload rusto-web package
+      - name: Upload @rustors/web package
         uses: actions/upload-artifact@v4
         with:
           name: rusto-web-package
-          path: packages/rusto-web-*.tgz
+          path: packages/rust*web-*.tgz
 
-      - name: Upload react package
+      - name: Upload @rustors/react package
         uses: actions/upload-artifact@v4
         with:
           name: rusto-react-package
-          path: packages/rusto-react-*.tgz
+          path: packages/rust*react-*.tgz
 
       - name: Upload rusto-wasm package
         uses: actions/upload-artifact@v4
@@ -586,7 +586,7 @@ jobs:
             find rusto-dotnet-core-nupkg -name 'RustODotnet.*.nupkg' -exec cp {} ../releases/ \;
           fi
 
-          for pkg_dir in rusto-react-native-package rusto-web-package rusto-react-package react-rusto-package rusto-wasm-package rusto-web-packages; do
+          for pkg_dir in rusto-react-native-package rusto-web-package rusto-react-package rusto-wasm-package; do
             if [ -d "$pkg_dir" ]; then
               find "$pkg_dir" -type f \( -name '*.tgz' -o -name '*.tar.gz' \) -exec cp {} ../releases/ \;
             fi
@@ -635,8 +635,8 @@ jobs:
             - **iOS**: Universal XCFramework (device + simulator)
             - **Android**: AAR with all architectures (arm64-v8a, armeabi-v7a, x86, x86_64)
             - **.NET**: NuGet package with native libraries for all desktop platforms
-            - **NPM / React Native**: React Native bindings (`@rusto/react-native`)
-            - **NPM / Web**: WebAssembly engine (`@rusto/web`) and React UI hooks (`@rusto/react`)
+            - **NPM / React Native**: React Native bindings (`@rustors/react-native`)
+            - **NPM / Web**: WebAssembly engine (`@rustors/web`) and React UI hooks (`@rustors/react`)
 
             ### Installation
             Download the appropriate package for your platform and extract it.

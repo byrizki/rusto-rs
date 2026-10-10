@@ -1,4 +1,4 @@
-# @rusto/model-ppocrv6-small-int8
+# @rustors/model-ppocrv6-small-int8
 
 > Pre-trained PP-OCRv6 Small (INT8) model package for [RustO!](https://github.com/byrizki/rusto-rs)
 
@@ -12,20 +12,20 @@
 ## Installation
 
 ```bash
-npm install @rusto/model-ppocrv6-small-int8
+npm install @rustors/model-ppocrv6-small-int8
 # or
-yarn add @rusto/model-ppocrv6-small-int8
+yarn add @rustors/model-ppocrv6-small-int8
 # or
-pnpm add @rusto/model-ppocrv6-small-int8
+pnpm add @rustors/model-ppocrv6-small-int8
 ```
 
 ## Usage
 
-### In Web / React apps (`@rusto/web` or `@rusto/react`)
+### In Web / React apps (`@rustors/web` or `@rustors/react`)
 
 ```ts
-import { modelMetadata, getModelUrls } from '@rusto/model-ppocrv6-small-int8';
-import { initialize } from '@rusto/web';
+import { modelMetadata, getModelUrls } from '@rustors/model-ppocrv6-small-int8';
+import { initialize } from '@rustors/web';
 
 // Initialize with model URLs (e.g. hosted under public/cdn)
 const urls = getModelUrls('/models/ppocrv6-small-int8');
@@ -43,7 +43,7 @@ await initialize({
 ### In Node.js / Server environments
 
 ```ts
-import { modelMetadata, getModelRelativePaths } from '@rusto/model-ppocrv6-small-int8';
+import { modelMetadata, getModelRelativePaths } from '@rustors/model-ppocrv6-small-int8';
 
 console.log(modelMetadata.files);
 ```

@@ -5,7 +5,7 @@ import {
   initialize,
   type InitializeConfig,
   type TextResult,
-} from '@rusto/react-native';
+} from '@rustors/react-native';
 
 const config: InitializeConfig = {preset: 'ppv6'};
 

@@ -1,6 +1,6 @@
 /**
  * RustO Pre-trained Model Package: PP-OCRv5 Mobile
- * Package: @rusto/model-ppocrv5-mobile
+ * Package: @rustors/model-ppocrv5-mobile
  */
 
 export interface ModelFilesConfig {
@@ -28,8 +28,8 @@ export interface ModelPackageMetadata {
 }
 
 export const modelMetadata: ModelPackageMetadata = {
-  name: '@rusto/model-ppocrv5-mobile',
-  version: '0.3.1',
+  name: '@rustors/model-ppocrv5-mobile',
+  version: '0.3.2',
   title: 'PP-OCRv5 Mobile',
   preset: 'ppv5',
   tier: 'mobile',

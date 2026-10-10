@@ -78,7 +78,7 @@ nuget
 ---
 
 size: sm
-to: https://www.npmjs.com/package/@rusto/react-native
+to: https://www.npmjs.com/package/@rustors/react-native
 variant: outline
 icon: simple-icons-react
 ---

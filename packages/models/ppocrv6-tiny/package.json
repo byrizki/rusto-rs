@@ -1,5 +1,5 @@
 {
-  "name": "@rusto/model-ppocrv6-tiny",
+  "name": "@rustors/model-ppocrv6-tiny",
   "version": "0.3.2",
   "description": "Pre-trained PP-OCRv6 Tiny models (~6 MB) for RustO OCR",
   "keywords": [

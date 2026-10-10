@@ -12,8 +12,8 @@ Initialize model resources once. Run `detectText` many times with request-local 
 ## Install
 
 ```bash
-yarn add @rusto/react-native
-# or npm install @rusto/react-native
+yarn add @rustors/react-native
+# or npm install @rustors/react-native
 ```
 
 ### iOS
@@ -34,7 +34,7 @@ end
 cd ios && pod install
 ```
 
-`@rusto/react-native`, `RustO`, and selected `RustO-Models-*` pod must use matching versions.
+`@rustors/react-native`, `RustO`, and selected `RustO-Models-*` pod must use matching versions.
 
 ### Android
 
@@ -61,7 +61,7 @@ Use a matching model version. Custom absolute model paths need no model package.
 ## Complete example
 
 ```tsx
-import { detectText, initialize, type TextResult } from '@rusto/react-native';
+import { detectText, initialize, type TextResult } from '@rustors/react-native';
 
 export async function readReceipt(uri: string): Promise<TextResult[]> {
   await initialize({ preset: 'ppv6' });

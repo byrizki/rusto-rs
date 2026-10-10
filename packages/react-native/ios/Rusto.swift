@@ -119,7 +119,7 @@ class RustoModule: NSObject {
     // MARK: - Helper Methods
 
     private func validationError(_ message: String) -> NSError {
-        NSError(domain: "@rusto/react-native", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+        NSError(domain: "@rustors/react-native", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
 
     private func validatedInitializeConfig(_ config: [String: Any]?) throws -> [String: Any] {

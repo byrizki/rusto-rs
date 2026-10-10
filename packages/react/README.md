@@ -1,4 +1,4 @@
-# @rusto/react
+# @rustors/react
 
 > Official React hooks, provider, and UI components for [RustO!](https://github.com/byrizki/rusto-rs)
 
@@ -12,11 +12,11 @@
 ## Installation
 
 ```bash
-npm install @rusto/react @rusto/web
+npm install @rustors/react @rustors/web
 # or
-yarn add @rusto/react @rusto/web
+yarn add @rustors/react @rustors/web
 # or
-pnpm add @rusto/react @rusto/web
+pnpm add @rustors/react @rustors/web
 ```
 
 ## Quick Start
@@ -25,8 +25,8 @@ pnpm add @rusto/react @rusto/web
 
 ```tsx
 import React from 'react';
-import { RustoProvider } from '@rusto/react';
-import { getModelUrls } from '@rusto/model-ppocrv6-tiny';
+import { RustoProvider } from '@rustors/react';
+import { getModelUrls } from '@rustors/model-ppocrv6-tiny';
 
 const modelUrls = getModelUrls('/models/ppocrv6-tiny');
 
@@ -52,7 +52,7 @@ export function App() {
 
 ```tsx
 import React, { useState } from 'react';
-import { useOcr, OcrOverlay, OcrDropzone } from '@rusto/react';
+import { useOcr, OcrOverlay, OcrDropzone } from '@rustors/react';
 
 export function OcrScanner() {
   const [imageSrc, setImageSrc] = useState<string | null>(null);

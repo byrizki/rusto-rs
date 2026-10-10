@@ -2,7 +2,7 @@ import React from 'react';
 import renderer, {act} from 'react-test-renderer';
 import App from '../App';
 
-jest.mock('@rusto/react-native', () => ({
+jest.mock('@rustors/react-native', () => ({
   initialize: jest.fn(() => Promise.resolve()),
   detectText: jest.fn((source, options) =>
     Promise.resolve(options?.output === 'spatial' ? 'receipt total' : []),
