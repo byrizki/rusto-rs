@@ -81,6 +81,10 @@ onnxruntime
 .gradle
 node_modules
 **/node_modules
+.yarn
+**/.yarn
+.pnp.*
+**/.pnp.*
 packages/react-native/lib
 
 __pycache__/

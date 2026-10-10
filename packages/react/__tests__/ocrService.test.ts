@@ -1,5 +1,5 @@
 import { OcrService } from '../src/services/ocrService.js';
-import { WebOcrEngine } from 'rusto-web';
+import { WebOcrEngine } from '@rusto/web';
 
 describe('OcrService tests', () => {
   test('isReady returns false before init, true after init', async () => {

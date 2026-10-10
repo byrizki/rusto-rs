@@ -1,0 +1,57 @@
+{
+  "name": "@rusto/model-ppocrv5-mobile",
+  "version": "0.3.1",
+  "description": "Pre-trained PP-OCRv5 Mobile models (~8 MB) for RustO OCR",
+  "keywords": [
+    "ocr",
+    "rusto",
+    "models",
+    "paddleocr",
+    "onnx",
+    "rten",
+    "ppv5",
+    "mobile",
+    "multilingual"
+  ],
+  "homepage": "https://github.com/byrizki/rusto-rs#readme",
+  "bugs": {
+    "url": "https://github.com/byrizki/rusto-rs/issues"
+  },
+  "license": "MIT",
+  "author": "byrizki <contact@byrizki.com> (https://github.com/byrizki)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/byrizki/rusto-rs.git",
+    "directory": "packages/models/ppocrv5-mobile"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./models/*": "./models/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "models",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.2"
+  }
+}

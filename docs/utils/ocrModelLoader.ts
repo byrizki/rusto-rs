@@ -5,7 +5,7 @@ import {
   formatSpatialText,
   groupCandidatesIntoLines,
   initialize,
-} from 'rusto-web';
+} from '@rusto/web';
 import {
   type OcrModelOption,
   type ActiveRunConfig,

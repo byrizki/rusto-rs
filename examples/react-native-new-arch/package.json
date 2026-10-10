@@ -16,7 +16,7 @@
   "dependencies": {
     "react": "19.1.4",
     "react-native": "0.81.6",
-    "react-native-rusto": "file:../../artifacts/rusto-react-native-package/react-native-rusto.tgz"
+    "@rusto/react-native": "file:../../artifacts/rusto-react-native-package/react-native-rusto.tgz"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

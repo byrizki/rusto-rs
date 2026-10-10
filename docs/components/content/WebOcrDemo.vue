@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRuntimeConfig } from '#app';
-import { detectText, isInitialized, type TextResult } from 'rusto-web';
+import { detectText, isInitialized, type TextResult } from '@rusto/web';
 import {
   availableModels,
   defaultModel,

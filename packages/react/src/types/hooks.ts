@@ -2,7 +2,7 @@ import type {
   DetectTextOptions,
   ImageSource,
   TextResult,
-} from 'rusto-web';
+} from '@rusto/web';
 
 export interface UseOcrOptions extends DetectTextOptions {
   onSuccess?: (results: TextResult[] | string) => void;

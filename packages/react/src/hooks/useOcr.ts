@@ -3,7 +3,7 @@ import type {
   DetectTextOptions,
   ImageSource,
   TextResult,
-} from 'rusto-web';
+} from '@rusto/web';
 import { RustoContext } from '../context/RustoContext.js';
 import { defaultOcrService } from '../services/ocrService.js';
 import type { UseOcrOptions, UseOcrReturn } from '../types/index.js';

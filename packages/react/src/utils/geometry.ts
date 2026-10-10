@@ -1,4 +1,4 @@
-import type { Frame } from 'rusto-web';
+import type { Frame } from '@rusto/web';
 
 export type QuadPoints = [[number, number], [number, number], [number, number], [number, number]];
 

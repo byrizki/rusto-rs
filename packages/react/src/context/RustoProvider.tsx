@@ -5,7 +5,7 @@ import {
   useMemo,
   type ReactElement,
 } from 'react';
-import type { InitializeConfig } from 'rusto-web';
+import type { InitializeConfig } from '@rusto/web';
 import { RustoContext } from './RustoContext.js';
 import { defaultOcrService } from '../services/ocrService.js';
 import type {

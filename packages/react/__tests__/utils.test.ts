@@ -1,8 +1,8 @@
 import { calculateScale, scaleFrame, scaleQuad } from '../src/utils/geometry.js';
 import { resultsToCsv, resultsToJson, resultsToText } from '../src/utils/formatters.js';
-import type { TextResult } from 'rusto-web';
+import type { TextResult } from '@rusto/web';
 
-describe('react-rusto utils', () => {
+describe('@rusto/react utils', () => {
   test('calculateScale computes correct scaling factors', () => {
     const scale = calculateScale(1000, 500, 500, 250);
     expect(scale.scaleX).toBe(0.5);

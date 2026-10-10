@@ -200,13 +200,13 @@ jobs:
           from pathlib import Path
           lock = Path("yarn.lock")
           text = lock.read_text()
-          prefix = '"react-native-rusto@file:../../artifacts/rusto-react-native-package/react-native-rusto.tgz":\n'
+          prefix = '"@rusto/react-native@file:../../artifacts/rusto-react-native-package/react-native-rusto.tgz":\n'
           start = text.find(prefix)
           if start < 0:
-              raise SystemExit("missing react-native-rusto artifact stanza in yarn.lock")
+              raise SystemExit("missing @rusto/react-native artifact stanza in yarn.lock")
           end = text.find("\n\n", start)
           if end < 0:
-              raise SystemExit("unterminated react-native-rusto artifact stanza in yarn.lock")
+              raise SystemExit("unterminated @rusto/react-native artifact stanza in yarn.lock")
           lock.write_text(text[:start] + text[end + 2:])
           PY
       - name: Install consumer dependencies from current release NPM artifact
@@ -217,12 +217,12 @@ jobs:
           core="$(find "$GITHUB_WORKSPACE/artifacts/rusto-android-core-aar" -name '*.aar' -print -quit)"
           model="$(find "$GITHUB_WORKSPACE/artifacts/rusto-android-model-aars/ppocrv6-tiny" -name '*.aar' -print -quit)"
           "$GITHUB_WORKSPACE/scripts/patch-rn-example-artifacts.sh" \
-            --platform android --app . --core "$core" --model "$model" --version "$(node -p "require('./node_modules/react-native-rusto/package.json').version")"
+            --platform android --app . --core "$core" --model "$model" --version "$(node -p "require('./node_modules/@rusto/react-native/package.json').version")"
       - name: Assert artifact mode and autolinking
         run: |
           ! grep -Fq "include ':rusto-android'" android/settings.gradle
           npx react-native config > /tmp/react-native-config.json
-          node -e "const c=require('/tmp/react-native-config.json'); const p=c.dependencies['react-native-rusto']?.platforms?.android; if (!p?.packageImportPath?.includes('RustoPackage')) process.exit(1)"
+          node -e "const c=require('/tmp/react-native-config.json'); const p=c.dependencies['@rusto/react-native']?.platforms?.android; if (!p?.packageImportPath?.includes('RustoPackage')) process.exit(1)"
       - name: Assemble debug app against release AAR
         run: ./gradlew :app:assembleDebug --stacktrace
         working-directory: examples/react-native-${{ matrix.app }}/android
@@ -335,13 +335,13 @@ jobs:
           from pathlib import Path
           lock = Path("yarn.lock")
           text = lock.read_text()
-          prefix = '"react-native-rusto@file:../../artifacts/rusto-react-native-package/react-native-rusto.tgz":\n'
+          prefix = '"@rusto/react-native@file:../../artifacts/rusto-react-native-package/react-native-rusto.tgz":\n'
           start = text.find(prefix)
           if start < 0:
-              raise SystemExit("missing react-native-rusto artifact stanza in yarn.lock")
+              raise SystemExit("missing @rusto/react-native artifact stanza in yarn.lock")
           end = text.find("\n\n", start)
           if end < 0:
-              raise SystemExit("unterminated react-native-rusto artifact stanza in yarn.lock")
+              raise SystemExit("unterminated @rusto/react-native artifact stanza in yarn.lock")
           lock.write_text(text[:start] + text[end + 2:])
           PY
       - name: Install consumer dependencies from current release NPM artifact
@@ -353,7 +353,7 @@ jobs:
           set -euo pipefail
           core="$(find artifacts/rusto-ios-core-xcframework -name 'RustO.xcframework.zip' -print -quit)"
           model="$(find artifacts/rusto-ios-model-resources/ppocrv6-tiny -name 'RustO-Models-PPOCRv6-Tiny.zip' -print -quit)"
-          version="$(node -p "require('./examples/react-native-${{ matrix.app }}/node_modules/react-native-rusto/package.json').version")"
+          version="$(node -p "require('./examples/react-native-${{ matrix.app }}/node_modules/@rusto/react-native/package.json').version")"
           scripts/patch-rn-example-artifacts.sh \
             --platform ios --app "examples/react-native-${{ matrix.app }}" \
             --core "$core" --model "$model" --model-pod RustO-Models-PPOCRv6-Tiny \

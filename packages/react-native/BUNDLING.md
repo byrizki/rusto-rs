@@ -110,7 +110,7 @@ When the app runs, the Swift module checks the `RustoModels.bundle` resource bun
 Simply call `initialize()` without parameters to use the bundled default models:
 
 ```typescript
-import { initialize, detectText } from 'react-native-rusto';
+import { initialize, detectText } from '@rusto/react-native';
 
 // Initialize with bundled models
 await initialize();

@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.0] - 2026-10-07
 
 ### Added
-- **packages**: Add rusto-web, react-rusto, and model packages
+- **packages**: Add @rusto/web, @rusto/react, and model packages
 - **wasm**: Add rten-wasm crate for high-performance browser OCR inference
 - **core**: Add configurable image calibration, descreening, and optimization pipeline
 

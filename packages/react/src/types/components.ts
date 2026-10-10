@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import type { TextResult, DetectTextOptions } from 'rusto-web';
+import type { TextResult, DetectTextOptions } from '@rusto/web';
 
 export interface BoundingBoxProps {
   item: TextResult;

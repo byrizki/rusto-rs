@@ -4,7 +4,7 @@ import {
   type ImageSource,
   type InitializeConfig,
   type TextResult,
-} from 'rusto-web';
+} from '@rusto/web';
 
 export class OcrService {
   private engine: WebOcrEngine;

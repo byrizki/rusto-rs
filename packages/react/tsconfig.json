@@ -13,7 +13,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "rusto-web": ["../web/dist/index.d.ts"]
+      "@rusto/web": ["../web/dist/index.d.ts"]
     },
     "rootDir": "src",
     "outDir": "dist"

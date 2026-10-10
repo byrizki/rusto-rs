@@ -492,7 +492,7 @@ jobs:
           npm run build
           npm pack --pack-destination ..
 
-      - name: Build and pack react-rusto
+      - name: Build and pack @rusto/react
         working-directory: packages/react
         run: |
           npm install
@@ -521,11 +521,11 @@ jobs:
           name: rusto-web-package
           path: packages/rusto-web-*.tgz
 
-      - name: Upload react-rusto package
+      - name: Upload react package
         uses: actions/upload-artifact@v4
         with:
-          name: react-rusto-package
-          path: packages/react-rusto-*.tgz
+          name: rusto-react-package
+          path: packages/rusto-react-*.tgz
 
       - name: Upload rusto-wasm package
         uses: actions/upload-artifact@v4
@@ -586,7 +586,7 @@ jobs:
             find rusto-dotnet-core-nupkg -name 'RustODotnet.*.nupkg' -exec cp {} ../releases/ \;
           fi
 
-          for pkg_dir in rusto-react-native-package rusto-web-package react-rusto-package rusto-wasm-package rusto-web-packages; do
+          for pkg_dir in rusto-react-native-package rusto-web-package rusto-react-package react-rusto-package rusto-wasm-package rusto-web-packages; do
             if [ -d "$pkg_dir" ]; then
               find "$pkg_dir" -type f \( -name '*.tgz' -o -name '*.tar.gz' \) -exec cp {} ../releases/ \;
             fi
@@ -635,8 +635,8 @@ jobs:
             - **iOS**: Universal XCFramework (device + simulator)
             - **Android**: AAR with all architectures (arm64-v8a, armeabi-v7a, x86, x86_64)
             - **.NET**: NuGet package with native libraries for all desktop platforms
-            - **NPM / React Native**: React Native bindings (`react-native-rusto`)
-            - **NPM / Web**: WebAssembly engine (`rusto-web`) and React UI hooks (`react-rusto`)
+            - **NPM / React Native**: React Native bindings (`@rusto/react-native`)
+            - **NPM / Web**: WebAssembly engine (`@rusto/web`) and React UI hooks (`@rusto/react`)
 
             ### Installation
             Download the appropriate package for your platform and extract it.

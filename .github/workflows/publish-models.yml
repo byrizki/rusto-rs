@@ -239,8 +239,8 @@ jobs:
           npm install -g typescript
           python3 scripts/generate_npm_models.py --all --copy-models --version "${{ steps.release_info.outputs.version }}"
           mkdir -p npm-models
-          for pkg_dir in packages/models/rusto-models-*; do
-            if [ -d "$pkg_dir" ]; then
+          for pkg_dir in packages/models/*; do
+            if [ -d "$pkg_dir" ] && [ -f "$pkg_dir/package.json" ]; then
               (cd "$pkg_dir" && tsc -p tsconfig.build.json && npm pack --pack-destination ../../../npm-models) &
             fi
           done
@@ -252,7 +252,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rusto-models-npm-packages
-          path: npm-models/rusto-models-*.tgz
+          path: npm-models/rusto-model*.tgz
 
       - name: Stage Model Release Directory
         if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
@@ -261,7 +261,7 @@ jobs:
           cp build/RustO-Models-*.zip model-releases/ 2>/dev/null || true
           find packages/android/models/*/build/outputs/aar -name '*-release.aar' -exec cp {} model-releases/ \; 2>/dev/null || true
           cp nupkg/RustODotnet.Models.*.nupkg model-releases/ 2>/dev/null || true
-          cp npm-models/rusto-models-*.tgz model-releases/ 2>/dev/null || true
+          cp npm-models/rusto-model*.tgz model-releases/ 2>/dev/null || true
           (cd model-releases && sha256sum * > SHA256SUMS 2>/dev/null || true)
 
       - name: Upload All Model Release Files Artifact

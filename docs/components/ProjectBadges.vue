@@ -17,8 +17,8 @@ const badges = [
   },
   {
     alt: 'npm',
-    src: 'https://img.shields.io/npm/v/react-native-rusto.svg?logo=npm&logoColor=white&color=CB3837',
-    href: 'https://www.npmjs.com/package/react-native-rusto',
+    src: 'https://img.shields.io/npm/v/@rusto/react-native.svg?logo=npm&logoColor=white&color=CB3837',
+    href: 'https://www.npmjs.com/package/@rusto/react-native',
   },
   {
     alt: 'CocoaPods',

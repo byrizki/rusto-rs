@@ -23,19 +23,23 @@ while (($#)); do
   esac
 done
 [[ -n "$platform" && -n "$app" && -n "$core" && -n "$model" && -n "$version" ]] || usage
-[[ -d "$app/node_modules/react-native-rusto" ]] || { echo "react-native-rusto is not installed: $app" >&2; exit 1; }
+rn_pkg_dir="$app/node_modules/@rusto/react-native"
+if [[ ! -d "$rn_pkg_dir" ]]; then
+  rn_pkg_dir="$app/node_modules/react-native-rusto"
+fi
+[[ -d "$rn_pkg_dir" ]] || { echo "@rusto/react-native is not installed: $app" >&2; exit 1; }
 [[ -s "$core" && -s "$model" ]] || { echo "missing staged release artifact" >&2; exit 1; }
 
 case "$platform" in
   android)
     [[ "$core" == *.aar && "$model" == *.aar ]] || { echo "Android requires .aar artifacts" >&2; exit 1; }
-    libs="$app/node_modules/react-native-rusto/android/libs"
+    libs="$rn_pkg_dir/android/libs"
     rm -rf "$libs"
     mkdir -p "$libs"
     cp "$core" "$model" "$libs/"
     test "$(find "$libs" -maxdepth 1 -name '*.aar' | wc -l | tr -d ' ')" = 2
     # Artifact mode must win before bridge's JitPack fallback.
-    grep -Fq 'else if (hasLocalAar)' "$app/node_modules/react-native-rusto/android/build.gradle"
+    grep -Fq 'else if (hasLocalAar)' "$rn_pkg_dir/android/build.gradle"
     ! grep -Fq "include ':rusto-android'" "$app/android/settings.gradle"
     ;;
   ios)
@@ -104,7 +108,7 @@ PY
     # Old packed npm artifacts used `s.pod_target_xcconfig` as both writer and
     # reader. Current CocoaPods only exposes writer. Patch only disposable
     # node_modules copy used by release-artifact validation.
-    bridge_podspec="$app/node_modules/react-native-rusto/react-native-rusto.podspec"
+    bridge_podspec="$rn_pkg_dir/react-native-rusto.podspec"
     if grep -Fq 's.pod_target_xcconfig ||' "$bridge_podspec"; then
       python3 - "$bridge_podspec" <<'PY'
 import re, sys

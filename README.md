@@ -7,7 +7,7 @@
 [![Crates.io](https://img.shields.io/crates/v/rusto-rs.svg?logo=rust&logoColor=white&color=orange)](https://crates.io/crates/rusto-rs)
 [![docs.rs](https://img.shields.io/docsrs/rusto-rs?logo=docs.rs&logoColor=white)](https://docs.rs/rusto-rs)
 [![NuGet](https://img.shields.io/nuget/v/RustODotnet.svg?logo=nuget&logoColor=white&color=004880)](https://www.nuget.org/packages/RustODotnet)
-[![npm](https://img.shields.io/npm/v/react-native-rusto.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/react-native-rusto)
+[![npm](https://img.shields.io/npm/v/@rusto/react-native.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/@rusto/react-native)
 [![CocoaPods](https://img.shields.io/cocoapods/v/RustO.svg?logo=cocoapods&logoColor=white&color=EE3322)](https://cocoapods.org/pods/RustO)
 [![JitPack](https://jitpack.io/v/byrizki/rusto-rs.svg)](https://jitpack.io/#byrizki/rusto-rs)
 [![Build & Release](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml/badge.svg)](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml)
@@ -38,7 +38,7 @@
 | **Web (WASM)** | `npm install @rusto/web` ([npm](https://www.npmjs.com/package/@rusto/web)) | Browser-native pure Rust RTen WASM OCR engine |
 | **React** | `npm install @rusto/react` ([npm](https://www.npmjs.com/package/@rusto/react)) | React hooks & components for browser OCR |
 | **.NET / C#** | `dotnet add package RustODotnet` ([NuGet](https://www.nuget.org/packages/RustODotnet)) | Managed .NET library + Windows/Linux/macOS native runtimes |
-| **React Native** | `npm install react-native-rusto` ([npm](https://www.npmjs.com/package/react-native-rusto)) | Cross-platform React Native TypeScript bridge |
+| **React Native** | `npm install @rusto/react-native` ([npm](https://www.npmjs.com/package/@rusto/react-native)) | Cross-platform React Native TypeScript bridge |
 | **iOS** | `pod 'RustO'` ([CocoaPods](https://cocoapods.org/pods/RustO)) | Swift library + Universal XCFramework (Device & Simulator) |
 | **Android** | `com.github.byrizki.rusto-rs:rusto-android` ([JitPack](https://jitpack.io/#byrizki/rusto-rs)) | Kotlin library + AAR with ARM64, ARMv7, x86, x86_64 |
 | **C / Native** | `librusto.so` / `librusto.dylib` / `rusto.dll` | C FFI shared libraries for custom integrations |
@@ -107,14 +107,13 @@ if (result is StructuredDetectTextResult structured)
 
 ---
 
-
 ### 3. React Native
 
 Install the npm package and choose your model package for iOS and Android:
 
 ```bash
-npm install react-native-rusto
-# or yarn add react-native-rusto / pnpm add react-native-rusto
+npm install @rusto/react-native
+# or yarn add @rusto/react-native / pnpm add @rusto/react-native
 ```
 
 **iOS Setup (`ios/Podfile`):**
@@ -140,7 +139,7 @@ dependencies {
 
 **JavaScript / TypeScript Usage:**
 ```typescript
-import { initialize, detectText } from 'react-native-rusto';
+import { initialize, detectText } from '@rusto/react-native';
 
 // Initialize bundled default models once.
 await initialize();

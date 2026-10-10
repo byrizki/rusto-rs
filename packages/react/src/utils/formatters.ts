@@ -1,4 +1,4 @@
-import type { TextResult } from 'rusto-web';
+import type { TextResult } from '@rusto/web';
 
 /**
  * Combines all recognized text tokens into a single text block.
