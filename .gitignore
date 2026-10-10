@@ -22,17 +22,7 @@ onnxruntime.lib
 models/**/*.mnn
 models/**/*.onnx
 models/**/*.rten
-docs/public/models/**/*.rten
-docs/public/models/**/*.onnx
-docs/public/models/ppocrv5-mobile/
-docs/public/models/ppocrv5-server/
-docs/public/models/ppocrv4-mobile/
-docs/public/models/ppocrv4-server/
-docs/public/models/ppocrv6-small/
-docs/public/models/ppocrv6-medium/
-docs/public/models/ppocrv6-tiny-int8/
-docs/public/models/ppocrv6-small-int8/
-docs/public/models/ppocrv6-medium-int8/
+docs/public/models/
 
 # Debugging binary dumps, benchmark artifacts, and agent workspaces
 *.bin

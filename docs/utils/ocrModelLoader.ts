@@ -95,18 +95,35 @@ export async function downloadTextAsset(url: string): Promise<string> {
   return await res.text();
 }
 
+export const JSDELIVR_CDN_BASE = 'https://cdn.jsdelivr.net/npm';
+
+export function getModelCdnUrls(
+  modelId: string,
+  cdnBase: string = JSDELIVR_CDN_BASE
+): {
+  detection: string;
+  recognition: string;
+  dictionary: string;
+} {
+  const pkg = `@rustors/model-${modelId}`;
+  const base = cdnBase.endsWith('/') ? cdnBase.slice(0, -1) : cdnBase;
+  return {
+    detection: `${base}/${pkg}/models/det.rten`,
+    recognition: `${base}/${pkg}/models/rec.rten`,
+    dictionary: `${base}/${pkg}/models/dict.txt`,
+  };
+}
+
 export async function fetchModelAssets(
-  baseURL: string,
   model: OcrModelOption,
   onProgress?: (progress: ModelDownloadProgress) => void,
-  progressRange: [number, number] = [0, 100]
+  progressRange: [number, number] = [0, 100],
+  cdnBase: string = JSDELIVR_CDN_BASE
 ): Promise<LoadedModelAssets> {
-  const detUrl = `${baseURL}models/${model.id}/det.rten`;
-  const recUrl = `${baseURL}models/${model.id}/rec.rten`;
-  const dictUrl = `${baseURL}models/${model.id}/dict.txt`;
+  const urls = getModelCdnUrls(model.id, cdnBase);
 
   const detBuffer = await downloadBinaryWithProgress(
-    detUrl,
+    urls.detection,
     `${model.name} (det.rten)`,
     1,
     2,
@@ -114,14 +131,14 @@ export async function fetchModelAssets(
     progressRange
   );
   const recBuffer = await downloadBinaryWithProgress(
-    recUrl,
+    urls.recognition,
     `${model.name} (rec.rten)`,
     2,
     2,
     onProgress,
     progressRange
   );
-  const dictText = await downloadTextAsset(dictUrl);
+  const dictText = await downloadTextAsset(urls.dictionary);
 
   return {
     detection: detBuffer,
@@ -136,7 +153,7 @@ export async function loadAndInitModel(
   progressRange: [number, number] = [0, 100],
   onProgress?: (progress: ModelDownloadProgress) => void
 ): Promise<void> {
-  const assets = await fetchModelAssets(baseURL, model, onProgress, progressRange);
+  const assets = await fetchModelAssets(model, onProgress, progressRange);
   await initialize({
     preset: model.preset,
     wasmUrl: `${baseURL}wasm/rusto_rten_wasm_bg.wasm`,
