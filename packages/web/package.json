@@ -1,6 +1,6 @@
 {
   "name": "@rustors/web",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "High-performance Web and Browser OCR engine for RustO! powered by PaddleOCR models",
   "keywords": [
     "ocr",

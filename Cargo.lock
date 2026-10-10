@@ -1056,7 +1056,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-rs"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "clap",
  "criterion",
@@ -1077,7 +1077,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-rten-wasm"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "image",
  "rten",

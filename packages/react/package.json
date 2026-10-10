@@ -1,6 +1,6 @@
 {
   "name": "@rustors/react",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "React hooks, provider, and UI components for RustO! OCR engine",
   "keywords": [
     "ocr",

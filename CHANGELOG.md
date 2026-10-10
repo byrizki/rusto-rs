@@ -5,6 +5,35 @@ All notable changes to RustO! will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-10-10
+
+### Changed
+- **docs**: Load rten models from jsdelivr cdn instead of bundling
+- Update readme
+- Update content
+- Rename to @rustors for npm packages
+- Release models-rten-v0.3.2
+- Rename packages
+- Release models-rten-v0.3.1
+- Remove unpublish-models workflow as npm requires interactive 2FA
+- Add workflow to unpublish npm model packages
+- Set default to true for all model publish workflow dispatch options
+- Selectively run packaging and artifact uploads based on checked options
+- Auto-read MODELS_VERSION and run all checkable release/publish items in parallel
+- Use absolute paths for npm publish to avoid git repo misinterpretation
+- Update live demo docs
+- Update demo content
+- Improve live demo
+
+### Fixed
+- **ci**: Bundle Swift sources and LICENSE in RustO.xcframework.zip for CocoaPods
+- Generate_npm_models
+- **npm**: Include .rten models as primary files in npm packages
+- **ci**: Streamline pipeline to download ONNX -> quantize to INT8 -> convert all to RTen
+- **ci**: Preserve onnx models with --keep-onnx for INT8 quantization in publish-models workflow
+- **scripts**: Support --all flag and python module fallback in quantize_ppocrv6_int8.py
+- Separate models publishing
+
 ## [0.3.0] - 2026-10-07
 
 ### Added
@@ -181,7 +210,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Project Status
 
-**Version**: 0.3.0  
+**Version**: 0.3.1  
 **Status**: Production Ready  
 **Accuracy**: 99.3% OpenCV parity  
-**Last Updated**: October 07, 2026
+**Last Updated**: October 10, 2026

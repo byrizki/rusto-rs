@@ -1,6 +1,6 @@
 {
   "name": "@rustors/react-native",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "React Native bindings for RustO! OCR library",
   "keywords": [
     "android",
