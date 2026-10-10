@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>RustODotnet.Models.PPOCRv6.Tiny.Int8</PackageId>
-    <Version>0.3.1</Version>
+    <Version>0.3.2</Version>
     <Authors>RustO Contributors</Authors>
     <Description>PP-OCRv6 Tiny INT8 pre-trained models for RustODotnet (~3.4 MB lightweight)</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

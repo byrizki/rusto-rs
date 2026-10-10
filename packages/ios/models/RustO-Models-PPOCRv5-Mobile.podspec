@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'RustO-Models-PPOCRv5-Mobile'
-  s.version          = '0.3.1'
+  s.version          = '0.3.2'
   s.summary          = 'PP-OCRv5 Mobile pre-trained models for RustO! iOS'
   s.description      = 'Pre-trained PP-OCRv5 Mobile models (~28 MB) bundled as a resource bundle for RustO on iOS.'
   s.homepage         = 'https://github.com/byrizki/rusto-rs'

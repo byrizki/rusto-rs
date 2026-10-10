@@ -1,6 +1,6 @@
 {
   "name": "@rusto/model-ppocrv5-mobile",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Pre-trained PP-OCRv5 Mobile models (~8 MB) for RustO OCR",
   "keywords": [
     "ocr",

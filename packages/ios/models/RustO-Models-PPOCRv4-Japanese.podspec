@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'RustO-Models-PPOCRv4-Japanese'
-  s.version          = '0.3.1'
+  s.version          = '0.3.2'
   s.summary          = 'PP-OCRv4 Japanese script recognition model for RustO! iOS'
   s.description      = 'Pre-trained PP-OCRv4 Japanese script recognition model bundled as a resource bundle for RustO on iOS.'
   s.homepage         = 'https://github.com/byrizki/rusto-rs'

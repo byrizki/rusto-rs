@@ -7,7 +7,7 @@
 - **Model Preset:** `ppv5`
 - **Model Tier:** `mobile`
 - **Target Language:** `multilingual`
-- **Version:** `0.3.1`
+- **Version:** `0.3.2`
 
 ## Installation
 
