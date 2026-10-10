@@ -112,7 +112,92 @@ if (result is StructuredDetectTextResult structured)
 
 ---
 
-### 3. React Native
+### 3. Web (WASM / Browser)
+
+```bash
+npm install @rustors/web @rustors/model-ppocrv6-tiny
+# or with INT8 quantized model for smaller bundle size:
+# npm install @rustors/web @rustors/model-ppocrv6-tiny-int8
+```
+
+```typescript
+import { initialize, detectText } from '@rustors/web';
+import { getModelUrls } from '@rustors/model-ppocrv6-tiny';
+
+// 1. Initialize engine with model URLs (hosted locally or via CDN)
+const urls = getModelUrls('/models/ppocrv6-tiny');
+await initialize({
+  preset: 'ppv6',
+  models: {
+    detection: urls.detection,
+    recognition: urls.recognition,
+    dictionary: urls.dictionary,
+  },
+});
+
+// 2. Run OCR on an Image, Canvas, File, Blob, or URL
+const results = await detectText(document.getElementById('receipt') as HTMLImageElement);
+for (const item of results) {
+  console.log(`${item.text} (${item.score})`);
+}
+```
+
+---
+
+### 4. React
+
+```bash
+npm install @rustors/react @rustors/web @rustors/model-ppocrv6-tiny
+```
+
+```tsx
+import React, { useState } from 'react';
+import { RustoProvider, useOcr, OcrOverlay, OcrDropzone } from '@rustors/react';
+import { getModelUrls } from '@rustors/model-ppocrv6-tiny';
+
+const urls = getModelUrls('/models/ppocrv6-tiny');
+
+export function App() {
+  return (
+    <RustoProvider
+      config={{
+        preset: 'ppv6',
+        models: {
+          detection: urls.detection,
+          recognition: urls.recognition,
+          dictionary: urls.dictionary,
+        },
+      }}
+    >
+      <OcrScanner />
+    </RustoProvider>
+  );
+}
+
+function OcrScanner() {
+  const { detect, results, isProcessing } = useOcr();
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+
+  return (
+    <div>
+      <OcrDropzone
+        onFileSelect={async (file) => {
+          setImageSrc(URL.createObjectURL(file));
+          await detect(file);
+        }}
+      />
+      {isProcessing && <p>Scanning document...</p>}
+      {imageSrc && results.length > 0 && (
+        <OcrOverlay imageSrc={imageSrc} results={results} />
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+### 5. React Native
 
 Install the npm package and choose your model package for iOS and Android:
 
@@ -168,7 +253,7 @@ console.log(spatialText);
 
 ---
 
-### 4. iOS (Swift)
+### 6. iOS (Swift)
 
 ```swift
 let ocr = try RustO.initialize(config: .ppv6())
@@ -181,8 +266,7 @@ if case .structured(let items) = result {
 
 ---
 
-
-### 5. Android (Kotlin)
+### 7. Android (Kotlin)
 
 ```kotlin
 RustO.initialize(context).use { ocr ->
@@ -198,8 +282,7 @@ RustO.initialize(context).use { ocr ->
 
 ---
 
-
-### 6. Command Line Interface (CLI)
+### 8. Command Line Interface (CLI)
 
 ```bash
 # JSON output (default)
@@ -216,137 +299,78 @@ cargo run --release -- --det-model det.rten --rec-model rec.rten --dict dict.txt
 
 ## 🧠 Supported OCR Models & Tiers
 
-RustO! supports all PaddleOCR model series in lightweight RTen format:
+RustO! supports all PaddleOCR model generations in lightweight RTen format (`.rten` FlatBuffers and `.onnx`), including standard FP32 and quantized INT8 models:
 
 | Series | Tier / Variant | Total Size | Description |
 |---|---|---|---|
+| **PP-OCRv6** | **Tiny (INT8)** | **~3.4 MB** | Quantized INT8 weights. Minimal memory & size for web, mobile, and IoT. |
 | **PP-OCRv6** | **Tiny** (Default) | **~6.0 MB** | MetaFormer PPLCNetV4 + 50-language unified dictionary. Ideal for mobile & edge. |
+| **PP-OCRv6** | **Small (INT8)** | **~16.2 MB** | Quantized INT8 weights with high accuracy and reduced memory. |
 | **PP-OCRv6** | **Small** | ~30 MB | Higher accuracy PP-OCRv6 models with expanded capacity. |
+| **PP-OCRv6** | **Medium (INT8)** | **~75.7 MB** | Quantized INT8 weights for server-grade accuracy at half the footprint. |
 | **PP-OCRv6** | **Medium** | ~134 MB | Server-grade accuracy PP-OCRv6 models. |
 | **PP-OCRv5** | **Mobile** | ~28 MB | PP-OCRv5 lightweight mobile models (Chinese/English). |
 | **PP-OCRv5** | **Server** | ~270 MB | PP-OCRv5 high-capacity server detection & recognition. |
 | **PP-OCRv4** | **Mobile** | ~23 MB | PP-OCRv4 mobile models with orientation/direction classifier. |
 | **PP-OCRv4** | **Server** | ~300 MB | PP-OCRv4 server models with orientation/direction classifier. |
 
-### 🌐 Multi-Language Support Across Model Versions
+### 🌐 Prepackaged Models & Multilingual Support
 
-- **PP-OCRv6 (Recommended Default)**: Uses a **unified 50-language dictionary** (`ppocrv6_dict.txt`) and multilingual model architecture. All language scripts (Latin, Cyrillic, CJK, Devanagari, Arabic, etc.) are supported out-of-the-box in the base `PPOCRv6` packages without needing separate language model downloads.
-- **PP-OCRv5 & PP-OCRv4**: Use dedicated language recognition models (`rec.rten` + `dict.txt`) for specific non-Chinese scripts. Text detection (`det.rten`) remains language-agnostic.
+- **PP-OCRv6 (Unified Default)**: Recognizes 50+ languages simultaneously (Latin, Cyrillic, CJK, Devanagari, Arabic, etc.) out-of-the-box using a unified dictionary (`ppocrv6_dict.txt`). No separate language model downloads needed.
+- **PP-OCRv6 INT8 Packages**: Ready-to-use quantized model packages are available on [npm](https://www.npmjs.com/search?q=%40rustors%2Fmodel-ppocrv6) (`@rustors/model-ppocrv6-*-int8`) and [NuGet](https://www.nuget.org/packages?q=RustODotnet.Models.PPOCRv6) (`RustODotnet.Models.PPOCRv6.*.Int8`).
+- **PP-OCRv5 & PP-OCRv4 Language Packs**: Dedicated recognition models for Arabic, Cyrillic, Devanagari, Greek, Japanese, Korean, Latin, Tamil, Telugu, Thai, and Traditional Chinese across Android (AAR), iOS (Pods), and .NET (NuGet).
 
-#### PP-OCRv5 Language Packages
-
-| Language / Script | Key | Rec Size | Android Package | iOS Podspec | .NET NuGet Package |
-|---|---|---|---|---|---|
-| **Arabic** | `arabic` | ~7.6 MB | `rusto-models-ppocrv5-arabic` | `RustO-Models-PPOCRv5-Arabic` | `RustODotnet.Models.PPOCRv5.Arabic` |
-| **Cyrillic** (Russian, Ukrainian, etc.) | `cyrillic` | ~7.7 MB | `rusto-models-ppocrv5-cyrillic` | `RustO-Models-PPOCRv5-Cyrillic` | `RustODotnet.Models.PPOCRv5.Cyrillic` |
-| **Devanagari** (Hindi, Marathi, etc.) | `devanagari` | ~7.5 MB | `rusto-models-ppocrv5-devanagari` | `RustO-Models-PPOCRv5-Devanagari` | `RustODotnet.Models.PPOCRv5.Devanagari` |
-| **East Slavic** | `eslav` | ~7.5 MB | `rusto-models-ppocrv5-eslav` | `RustO-Models-PPOCRv5-EastSlavic` | `RustODotnet.Models.PPOCRv5.EastSlavic` |
-| **Greek** | `el` | ~7.4 MB | `rusto-models-ppocrv5-el` | `RustO-Models-PPOCRv5-Greek` | `RustODotnet.Models.PPOCRv5.Greek` |
-| **Korean** | `korean` | ~12.8 MB | `rusto-models-ppocrv5-korean` | `RustO-Models-PPOCRv5-Korean` | `RustODotnet.Models.PPOCRv5.Korean` |
-| **Latin** (Spanish, French, German, etc.) | `latin` | ~7.5 MB | `rusto-models-ppocrv5-latin` | `RustO-Models-PPOCRv5-Latin` | `RustODotnet.Models.PPOCRv5.Latin` |
-| **Tamil** | `ta` | ~7.5 MB | `rusto-models-ppocrv5-ta` | `RustO-Models-PPOCRv5-Tamil` | `RustODotnet.Models.PPOCRv5.Tamil` |
-| **Telugu** | `te` | ~7.5 MB | `rusto-models-ppocrv5-te` | `RustO-Models-PPOCRv5-Telugu` | `RustODotnet.Models.PPOCRv5.Telugu` |
-| **Thai** | `th` | ~7.5 MB | `rusto-models-ppocrv5-th` | `RustO-Models-PPOCRv5-Thai` | `RustODotnet.Models.PPOCRv5.Thai` |
-
-#### PP-OCRv4 Language Packages
-
-PP-OCRv4 specialized recognition packages pair a language-specific `rec.rten` + `dict.txt` with language-agnostic PP-OCRv4 detection. Install matching package for target platform:
-
-| Language / Script | Key | Rec Size | Android Package | iOS Podspec | .NET NuGet Package |
-|---|---|---:|---|---|---|
-| **Japanese** | `japan` | ~9.3 MB | `rusto-models-ppocrv4-japan` | `RustO-Models-PPOCRv4-Japanese` | `RustODotnet.Models.PPOCRv4.Japanese` |
-| **Traditional Chinese** | `chinese_cht` | ~10.6 MB | `rusto-models-ppocrv4-chinese-cht` | `RustO-Models-PPOCRv4-TraditionalChinese` | `RustODotnet.Models.PPOCRv4.TraditionalChinese` |
-| **Kannada** | `ka` | ~7.3 MB | `rusto-models-ppocrv4-kannada` | `RustO-Models-PPOCRv4-Kannada` | `RustODotnet.Models.PPOCRv4.Kannada` |
-
-### Downloading Models on the Fly
-
-You can use the built-in downloader to fetch pre-converted ONNX models directly from [ModelScope RapidOCR](https://www.modelscope.cn/models/RapidAI/RapidOCR):
-
-```bash
-# Download all models for all tiers and languages
-bash scripts/download_models.sh --all
-
-# Download specific model tier
-bash scripts/download_models.sh --model ppocrv6 --tier tiny --output-dir models/PPOCR_v6
-bash scripts/download_models.sh --model ppocrv5 --tier mobile --output-dir models/PPOCR_v5
-bash scripts/download_models.sh --model ppocrv4 --tier mobile --output-dir models/PPOCR_v4
-
-# Download specific language model
-bash scripts/download_models.sh --model ppocrv5 --lang arabic --output-dir models/PPOCR_v5_arabic
-```
+👉 **[View the Complete Multilingual OCR Guide & Package Matrix](https://byrizki.github.io/rusto-rs/en/advance-guide/multilingual-ocr)** ([local docs](./docs/content/en/03.advance-guide/02.multilingual-ocr.md))
 
 ---
 
-## ⚙️ Public configuration and request options
+## ⚙️ Configuration & Runtime Options
 
-RustO API has two separate layers:
+RustO separates static initialization from per-request execution:
 
-1. **`InitializeConfig`** creates model sessions. Use it for model family, model files, dictionary, and optional classifier/orientation resources.
-2. **`OcrRunOptions`** controls one image. Use it for output shape, grouping, confidence cutoff, resize, detector input, and postprocess tuning.
-
-Do not put per-image preprocessing under initialization or a nested `preprocessing` object. Every request starts from engine defaults; supplied fields override only that request.
-
-### Initialize model resources
+1. **`InitializeConfig`** — Configures model sessions, vocabulary dictionary, and hardware threads.
+2. **`OcrRunOptions`** — Configures per-image options: output shape (`lines`, `words`, `spatial`), score threshold, resize bounds, and postprocessing.
 
 ```rust
-use rusto::{InitializeConfig, RustO};
+use rusto::{InitializeConfig, OcrRunOptions, OutputGranularity, RustO};
 
-let config = InitializeConfig::ppv6(
+// 1. Initialize engine once
+let mut ocr = RustO::initialize(InitializeConfig::ppv6(
     "models/det.rten",
     "models/rec.rten",
     "models/dict.txt",
-);
-let mut ocr = RustO::initialize(config)?;
-```
+))?;
 
-| Preset | Detector resize default | Resize mode | Unclip default |
-|---|---:|---|---:|
-| `InitializeConfig::ppv6(...)` | 736 | `min` | 2.0 |
-| `InitializeConfig::ppv5(...)` | 736 | `min` | 2.0 |
-| `InitializeConfig::ppv4(...)` | 960 | `max` | 1.5 |
-| `InitializeConfig::ppv3(...)` | 960 | `max` | 1.5 |
-
-Paths must identify compatible detection model, recognition model, and dictionary. Recreate engine to change them.
-
-### Tune one request
-
-```rust
-use rusto::{
-    DetectionRunOptions, DetectTextResult, ImageSource, OcrRunOptions,
-    OutputGranularity, PostprocessRunOptions,
-};
-
+// 2. Configure per request without mutating engine state
 let result = ocr.detect_text(
     &ImageSource::Path("document.jpg".into()),
     &OcrRunOptions {
-        output: OutputGranularity::Words,
+        output: OutputGranularity::Spatial,
         text_score: Some(0.55),
         max_side_len: Some(1600.0),
-        detection: Some(DetectionRunOptions {
-            limit_side_len: Some(960),
-            limit_type: Some("max".into()),
-            ..Default::default()
-        }),
-        postprocess: Some(PostprocessRunOptions {
-            use_dilation: Some(true),
-            ..Default::default()
-        }),
         ..Default::default()
     },
 )?;
-
-if let DetectTextResult::Structured(items) = result {
-    for item in items {
-        println!("{} ({:.2})", item.text, item.score);
-    }
-}
-// Total (0.98)
-// $12.50 (0.96)
 ```
 
-Root options: `minHeight`, `maxSideLen`, `minSideLen`, `widthHeightRatio`, `detection`, and `postprocess`. Wire JSON uses camelCase; Rust field names use snake_case. `detection` and `postprocess` are sibling root fields.
+👉 **[Read the Full API Reference & Option Specifications](https://byrizki.github.io/rusto-rs/en/api-reference/ocr-run-options)** ([local docs](./docs/content/en/04.api-reference/))
 
-Full public reference, validation ranges, source contracts, result shapes, and binding-specific examples: [documentation site](./docs/content/en/04.api-reference/).
+---
+
+## 📖 Documentation & Advanced Guides
+
+Explore deep-dive guides and comprehensive references on the [RustO! Documentation Site](https://byrizki.github.io/rusto-rs/):
+
+| Topic | Description | Link |
+|---|---|---|
+| **Models & Tiers Architecture** | Model formats (`.rten`, `.onnx`), INT8 quantization, and pluggable `InferenceSession` engines | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/models-and-tiers) ([docs](./docs/content/en/03.advance-guide/01.models-and-tiers.md)) |
+| **Multilingual OCR** | 50+ languages support, scripts matrix, and dedicated PP-OCRv5/v4 language packages | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/multilingual-ocr) ([docs](./docs/content/en/03.advance-guide/02.multilingual-ocr.md)) |
+| **Spatial Layout Reconstruction** | 2D XY spatial layout reconstruction for invoices, receipts, and multi-column tables | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/spatial-layout-reconstruction) ([docs](./docs/content/en/03.advance-guide/03.spatial-layout-reconstruction.md)) |
+| **Image Preprocessing & Tuning** | DBNet binarization thresholds, polygon unclipping, morphological dilation, and dimension limits | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/image-preprocessing-and-tuning) ([docs](./docs/content/en/03.advance-guide/04.image-preprocessing-and-tuning.md)) |
+| **Orientation & Classification** | 180° line direction classifier and 0°/90°/180°/270° document page rotation | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/classification-and-orientation) ([docs](./docs/content/en/03.advance-guide/05.classification-and-orientation.md)) |
+| **Performance & Benchmarks** | Latency, memory footprint, and parity benchmarks across x86-64, ARM64, and mobile | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/performance-and-benchmarks) ([docs](./docs/content/en/03.advance-guide/06.performance-and-benchmarks.md)) |
+| **Troubleshooting Guide** | Resolving model paths, Android JNI linking, React Native pods, and high-resolution camera OOM | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/troubleshooting) ([docs](./docs/content/en/03.advance-guide/07.troubleshooting.md)) |
+| **API Reference** | Specifications for `InitializeConfig`, `OcrRunOptions`, and `TextResult` across all platforms | [API Reference](https://byrizki.github.io/rusto-rs/en/api-reference/initialize-config) ([docs](./docs/content/en/04.api-reference/)) |
 
 ---
 
