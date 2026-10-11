@@ -95,7 +95,7 @@ impl TableStructure {
             md.push('\n');
 
             // Separator
-            md.push_str("|");
+            md.push('|');
             for _ in &first_row.cells {
                 md.push_str("---|");
             }
@@ -184,7 +184,7 @@ impl TableDetector {
         #[cfg(not(feature = "use-opencv"))]
         let size = image.size()?;
         #[cfg(not(feature = "use-opencv"))]
-        let (orig_h, orig_w) = (size.height as i32, size.width as i32);
+        let (orig_h, orig_w) = (size.height, size.width);
         
         // RT-DETR expects 640x640 input
         let target_size = 640;
@@ -241,17 +241,17 @@ impl TableDetector {
             let mean = [0.485f32, 0.456, 0.406];
             let std = [0.229f32, 0.224, 0.225];
             
-            let mut data = vec![0.0f32; 3 * target_size * target_size];
-            
-            let mut float_img = Mat::default();
-            resized.convert_to(&mut float_img, opencv::core::CV_32F, 1.0 / 255.0, 0.0)?;
+            let hw = target_size * target_size;
+            let mut data = vec![0.0f32; 3 * hw];
             
             for y in 0..new_h as usize {
                 for x in 0..new_w as usize {
+                    let pix = resized.at_2d::<core::Vec3b>(y as i32, x as i32)?;
+                    let idx = y * target_size + x;
                     for c in 0..3 {
-                        let val: f32 = *float_img.at_2d(y as i32, x as i32)?;
+                        let val = pix[c] as f32 / 255.0;
                         let normalized = (val - mean[c]) / std[c];
-                        data[c * target_size * target_size + y * target_size + x] = normalized;
+                        data[c * hw + idx] = normalized;
                     }
                 }
             }
@@ -337,7 +337,7 @@ impl TableStructureRecognizer {
         #[cfg(not(feature = "use-opencv"))]
         let size = image.size()?;
         #[cfg(not(feature = "use-opencv"))]
-        let (_orig_h, _orig_w) = (size.height as i32, size.width as i32);
+        let (_orig_h, _orig_w) = (size.height, size.width);
         
         // SLANet expects 488x488 input
         let target_h = 488;
@@ -358,8 +358,8 @@ impl TableStructureRecognizer {
             for y in 0..target_h {
                 for x in 0..target_w {
                     let pixel = resized.get_pixel(x as u32, y as u32);
-                    for c in 0..3 {
-                        let val = pixel[c] as f32 / 255.0;
+                    for (c, &pixel_c) in pixel.iter().enumerate() {
+                        let val = pixel_c as f32 / 255.0;
                         let idx = c * target_h_usize * target_w_usize + (y as usize) * target_w_usize + (x as usize);
                         data[idx] = val;
                     }
@@ -386,21 +386,23 @@ impl TableStructureRecognizer {
                 imgproc::INTER_LINEAR,
             )?;
             
-            let mut data = vec![0.0f32; 3 * target_h * target_w];
+            let target_h_usize = target_h as usize;
+            let target_w_usize = target_w as usize;
+            let hw = target_h_usize * target_w_usize;
+            let mut data = vec![0.0f32; 3 * hw];
             
-            let mut float_img = Mat::default();
-            resized.convert_to(&mut float_img, opencv::core::CV_32F, 1.0 / 255.0, 0.0)?;
-            
-            for y in 0..target_h {
-                for x in 0..target_w {
+            for y in 0..target_h_usize {
+                for x in 0..target_w_usize {
+                    let pix = resized.at_2d::<core::Vec3b>(y as i32, x as i32)?;
+                    let idx = y * target_w_usize + x;
                     for c in 0..3 {
-                        let val: f32 = *float_img.at_2d(y, x)?;
-                        data[c * target_h * target_w + y * target_w + x] = val;
+                        let val = pix[c] as f32 / 255.0;
+                        data[c * hw + idx] = val;
                     }
                 }
             }
             
-            let arr = Array3::from_shape_vec((3, target_h, target_w), data)
+            let arr = Array3::from_shape_vec((3, target_h_usize, target_w_usize), data)
                 .map_err(|e| EngineError::Preprocess(e.to_string()))?;
             
             Ok(arr.insert_axis(ndarray::Axis(0)).into_dyn())

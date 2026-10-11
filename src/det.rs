@@ -101,7 +101,7 @@ impl TextDetector {
     }
 
     #[cfg(feature = "use-opencv")]
-    pub fn sorted_boxes(&self, dt_boxes: &mut Vec<[opencv::core::Point2f; 4]>) {
+    pub fn sorted_boxes(&self, dt_boxes: &mut [[opencv::core::Point2f; 4]]) {
         dt_boxes.sort_by(|a, b| {
             let ay = a[0].y as i32;
             let by = b[0].y as i32;
@@ -116,7 +116,7 @@ impl TextDetector {
     }
 
     #[cfg(not(feature = "use-opencv"))]
-    pub fn sorted_boxes(&self, dt_boxes: &mut Vec<[crate::image_impl::Point2f; 4]>) {
+    pub fn sorted_boxes(&self, dt_boxes: &mut [[crate::image_impl::Point2f; 4]]) {
         sort_det_boxes(dt_boxes);
     }
 }

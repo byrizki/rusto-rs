@@ -5,6 +5,8 @@ use crate::image_impl::Point2f;
 
 use crate::rec::{TextRecOutput, WordInfo, WordType};
 
+type CalWordBoxResult = (Vec<String>, Vec<(f32, f32, f32, f32)>, Vec<f32>);
+
 pub struct CalRecBoxes;
 
 impl CalRecBoxes {
@@ -24,8 +26,7 @@ impl CalRecBoxes {
             .min(rec_res.txts.len())
             .min(rec_res.word_infos.len());
 
-        for idx in 0..num {
-            let txt = &rec_res.txts[idx];
+        for (idx, txt) in rec_res.txts.iter().enumerate().take(num) {
             let word_info_opt = &rec_res.word_infos[idx];
 
             if txt.is_empty() {
@@ -79,7 +80,7 @@ impl CalRecBoxes {
         bbox_points: (f32, f32, f32, f32),
         word_info: &WordInfo,
         return_single_char_box: bool,
-    ) -> (Vec<String>, Vec<(f32, f32, f32, f32)>, Vec<f32>) {
+    ) -> CalWordBoxResult {
         let (x0, y0, x1, y1) = bbox_points;
 
         if rec_txt.is_empty() || word_info.line_txt_len == 0.0 {

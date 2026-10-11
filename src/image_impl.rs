@@ -107,12 +107,6 @@ mod rust_impl {
             self.image.width() == 0 || self.image.height() == 0
         }
 
-        pub fn clone(&self) -> Self {
-            Self {
-                image: self.image.clone(),
-            }
-        }
-
         pub fn to_rgb8(&self) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
             self.image.to_rgb8()
         }
@@ -284,7 +278,7 @@ mod rust_impl {
 
         for i in 0..4 {
             let x = src_pts[i][0] as f64;
-            let y = src_pts[i][0] as f64;
+            let y = src_pts[i][1] as f64;
             let u = dst_pts[i][0] as f64;
             let v = dst_pts[i][1] as f64;
 

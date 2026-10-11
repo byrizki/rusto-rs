@@ -99,7 +99,7 @@ impl InferenceSession for Box<dyn InferenceSession> {
 /// Generic engine session enum supporting both default pure-Rust RTen
 /// and any custom backend implementing `InferenceSession`.
 pub enum EngineSession {
-    Rten(RtenSession),
+    Rten(Box<RtenSession>),
     Custom(Box<dyn InferenceSession>),
 }
 
@@ -109,7 +109,7 @@ pub type MnnSession = EngineSession;
 impl EngineSession {
     pub fn from_path(model_path: &Path, engine_cfg: &EngineConfig) -> Result<Self, EngineError> {
         let session = RtenSession::from_path(model_path, engine_cfg)?;
-        Ok(Self::Rten(session))
+        Ok(Self::Rten(Box::new(session)))
     }
 
     pub fn from_det_config(cfg: &DetConfig) -> Result<Self, EngineError> {

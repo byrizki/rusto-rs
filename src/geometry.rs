@@ -99,7 +99,7 @@ pub fn apply_vertical_padding(
 fn get_padding_h(h: i32, w: i32, width_height_ratio: f32, min_height: f32) -> i32 {
     // Match Python: max(int(w / width_height_ratio), min_height) * 2
     let new_h = ((w as f32 / width_height_ratio) as i32).max(min_height as i32) * 2;
-    ((new_h - h).abs() / 2) as i32
+    (new_h - h).abs() / 2
 }
 
 #[cfg(feature = "use-opencv")]
@@ -203,8 +203,8 @@ pub fn resize_image_within_bounds(
     max_side_len: f32,
 ) -> Result<(Mat, f32, f32), EngineError> {
     let size = img.size()?;
-    let mut h = size.height as i32;
-    let mut w = size.width as i32;
+    let mut h = size.height;
+    let mut w = size.width;
 
     let mut ratio_h = 1.0f32;
     let mut ratio_w = 1.0f32;
@@ -219,8 +219,8 @@ pub fn resize_image_within_bounds(
     }
 
     let size2 = img_out.size()?;
-    h = size2.height as i32;
-    w = size2.width as i32;
+    h = size2.height;
+    w = size2.width;
     let min_value = h.min(w) as f32;
     if min_value < min_side_len {
         let (resized, rh, rw) = increase_min_side(&img_out, min_side_len)?;
