@@ -504,9 +504,18 @@ mod rust_impl {
         sorted[1..].sort_by(|a, b| {
             let angle_a = (a.y - start.y).atan2(a.x - start.x);
             let angle_b = (b.y - start.y).atan2(b.x - start.x);
-            angle_a
+            let angle_cmp = angle_a
                 .partial_cmp(&angle_b)
-                .unwrap_or(std::cmp::Ordering::Equal)
+                .unwrap_or(std::cmp::Ordering::Equal);
+            if angle_cmp == std::cmp::Ordering::Equal {
+                let dist_a = (a.x - start.x).powi(2) + (a.y - start.y).powi(2);
+                let dist_b = (b.x - start.x).powi(2) + (b.y - start.y).powi(2);
+                dist_a
+                    .partial_cmp(&dist_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            } else {
+                angle_cmp
+            }
         });
 
         // Graham scan

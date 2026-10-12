@@ -155,19 +155,45 @@ fn sample_bilinear(rgba: &[u8], w: usize, h: usize, x: f32, y: f32) -> (f32, f32
     (r, g, b)
 }
 
-/// Descreen background security patterns (e.g. blue/cyan guilloche lines on ID cards)
+/// Attenuate chromatic background patterns, security guilloche lines, and paper tint
+/// across diverse document types (ID cards, banknotes, checks, certificates, forms).
+///
+/// Dark ink (low luminance) is preserved, while chromatic tint (color saturation) on mid-to-bright
+/// background regions is neutralized toward the paper level.
 fn descreen_background(rgba: &mut [u8], strength: f32) {
+    if strength <= 0.0 {
+        return;
+    }
+
     for chunk in rgba.chunks_exact_mut(4) {
         let r = chunk[0] as f32;
         let g = chunk[1] as f32;
         let b = chunk[2] as f32;
 
-        let bg_bias = ((b + g) * 0.5 - r).max(0.0);
-        let lift = (bg_bias * strength).clamp(0.0, 160.0);
+        let lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        if lum < 70.0 {
+            continue;
+        }
 
-        chunk[0] = (r + lift * 1.25).clamp(0.0, 255.0) as u8;
-        chunk[1] = (g + lift * 0.85).clamp(0.0, 255.0) as u8;
-        chunk[2] = (b + lift * 0.50).clamp(0.0, 255.0) as u8;
+        let max_c = r.max(g.max(b));
+        let min_c = r.min(g.min(b));
+        let chroma = max_c - min_c;
+        if chroma < 4.0 {
+            continue;
+        }
+
+        let weight = ((lum - 70.0) / 50.0).clamp(0.0, 1.0);
+        let factor = (strength * weight).clamp(0.0, 2.0);
+
+        let r_lift = (max_c - r) * factor;
+        let g_lift = (max_c - g) * factor;
+        let b_lift = (max_c - b) * factor;
+
+        let white_lift = (255.0 - max_c) * (chroma / 255.0) * (factor * 0.25);
+
+        chunk[0] = (r + r_lift + white_lift).clamp(0.0, 255.0) as u8;
+        chunk[1] = (g + g_lift + white_lift).clamp(0.0, 255.0) as u8;
+        chunk[2] = (b + b_lift + white_lift).clamp(0.0, 255.0) as u8;
     }
 }
 
@@ -208,6 +234,8 @@ impl RtenOcrPipeline {
         box_thresh: f32,
         unclip_ratio: f32,
         apply_calibration: bool,
+        max_side_len: Option<u32>,
+        descreen_strength: Option<f32>,
     ) -> Result<String, String> {
         if width == 0 || height == 0 || image_rgba.len() < (width * height * 4) as usize {
             return Err("Invalid image dimensions or buffer size".to_string());
@@ -216,14 +244,15 @@ impl RtenOcrPipeline {
         let orig_w = width as usize;
         let orig_h = height as usize;
 
-        // Apply background descreening if requested or if document has blue/cyan bias
+        // Apply background descreening if requested
         let mut processed_rgba = image_rgba[..orig_w * orig_h * 4].to_vec();
         if apply_calibration {
-            descreen_background(&mut processed_rgba, 1.15);
+            let strength = descreen_strength.unwrap_or(1.15);
+            descreen_background(&mut processed_rgba, strength);
         }
 
-        // 1. Detection preprocessing: resize keeping aspect ratio, round to multiple of 32, max 960
-        let max_side = 960.0f32;
+        // 1. Detection preprocessing: resize keeping aspect ratio, round to multiple of 32
+        let max_side = (max_side_len.unwrap_or(960) as f32).clamp(320.0, 2560.0);
         let ratio = (max_side / (orig_w.max(orig_h) as f32)).min(1.0);
         let mut target_w = ((orig_w as f32 * ratio / 32.0).round() as usize * 32).max(32);
         let mut target_h = ((orig_h as f32 * ratio / 32.0).round() as usize * 32).max(32);
@@ -280,7 +309,6 @@ impl RtenOcrPipeline {
             _ => return Err("Invalid detection output tensor".to_string()),
         };
 
-        // 2. Heatmap postprocessing: Connected components labeling
         let mut visited = vec![false; target_w * target_h];
         let mut raw_boxes: Vec<([f32; 4], f32)> = Vec::new(); // [x0, y0, x1, y1], score
 
@@ -376,7 +404,7 @@ impl RtenOcrPipeline {
 
         let mut results = Vec::new();
 
-        // Crop padding parameters: expand height by 4.5% and width by 3.5% to prevent ascenders/descenders/edges cut-off
+        // Crop padding parameters: expand height by 4.5% and width by 3.5%
         let pad_x_ratio = 0.035f32;
         let pad_y_ratio = 0.045f32;
 
@@ -505,3 +533,4 @@ impl RtenOcrPipeline {
         serde_json::to_string(&results).map_err(|e| format!("Serialization error: {:?}", e))
     }
 }
+

@@ -1,4 +1,6 @@
 // FFI bindings for C/C++/C#
+#![allow(clippy::missing_safety_doc, clippy::needless_borrow)]
+
 use crate::{DetectTextResult, ImageSource, OcrRunOptions, OutputGranularity, RustO, InitializeConfig};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int};
@@ -109,8 +111,7 @@ pub unsafe extern "C" fn rocr_detect_text_file(
     };
     let c_results = text_results_to_c(&projected);
     *count_out = c_results.len();
-    *results_out = c_results.as_ptr() as *mut CTextResult;
-    std::mem::forget(c_results);
+    *results_out = Box::into_raw(c_results) as *mut CTextResult;
     0
 }
 
@@ -185,8 +186,7 @@ pub unsafe extern "C" fn rocr_detect_text_data(
     };
     let c_results = text_results_to_c(&results);
     *count_out = c_results.len();
-    *results_out = c_results.as_ptr() as *mut CTextResult;
-    std::mem::forget(c_results);
+    *results_out = Box::into_raw(c_results) as *mut CTextResult;
     0
 }
 
@@ -239,16 +239,18 @@ pub unsafe extern "C" fn rocr_free_string(s: *mut c_char) {
 /// - count must match the count returned by text detection
 #[no_mangle]
 pub unsafe extern "C" fn rocr_free_results(results: *mut CTextResult, count: usize) {
-    if results.is_null() {
+    if results.is_null() || count == 0 {
         return;
     }
 
-    let results_vec = Vec::from_raw_parts(results, count, count);
-    for result in results_vec {
+    let slice = std::slice::from_raw_parts_mut(results, count);
+    let boxed = Box::from_raw(slice);
+    for result in boxed.iter() {
         if !result.text.is_null() {
             drop(CString::from_raw(result.text));
         }
     }
+    drop(boxed);
 }
 
 /// Free a RustO instance
@@ -269,7 +271,7 @@ pub extern "C" fn rocr_version() -> *const c_char {
     VERSION.as_ptr() as *const c_char
 }
 
-fn text_results_to_c(results: &[crate::TextResult]) -> Vec<CTextResult> {
+fn text_results_to_c(results: &[crate::TextResult]) -> Box<[CTextResult]> {
     results
         .iter()
         .map(|result| CTextResult {
@@ -290,7 +292,8 @@ fn text_results_to_c(results: &[crate::TextResult]) -> Vec<CTextResult> {
             frame_top: result.frame.top,
             frame_left: result.frame.left,
         })
-        .collect()
+        .collect::<Vec<_>>()
+        .into_boxed_slice()
 }
 
 // ============================================================================
@@ -309,23 +312,22 @@ unsafe fn write_jni_results(
     env: &mut JNIEnv,
     results_out: &JLongArray,
     count_out: &JIntArray,
-    results: Vec<CTextResult>,
+    results: Box<[CTextResult]>,
 ) -> jint {
     let count = results.len();
     let ptr = results.as_ptr() as jlong;
     if env.set_long_array_region(results_out, 0, &[ptr]).is_err()
         || env.set_int_array_region(count_out, 0, &[count as jint]).is_err()
     {
-        // `results` still owns allocations here; normal Vec drop releases the
-        // buffer but not individual CString allocations.
-        for result in results {
+        for result in results.iter() {
             if !result.text.is_null() {
                 drop(CString::from_raw(result.text));
             }
         }
+        drop(results);
         return -4;
     }
-    std::mem::forget(results);
+    let _ = Box::into_raw(results);
     0
 }
 

@@ -2,10 +2,12 @@ use std::time::Instant;
 use ndarray::{Array3, Array4};
 
 #[cfg(feature = "use-opencv")]
+use opencv::core::Point2f;
+#[cfg(feature = "use-opencv")]
 use opencv::prelude::*;
 
 #[cfg(not(feature = "use-opencv"))]
-use crate::image_impl::Mat;
+use crate::image_impl::{Mat, Point2f};
 
 use crate::engine::{EngineError, EngineSession, InferenceSession};
 use crate::types::OrientConfig;
@@ -52,33 +54,59 @@ impl Orientation {
             Orientation::Rotate270 => -270,  // 90 clockwise for image correction
         }
     }
+
+    /// Rotate bounding box points from corrected image space back to original image space
+    pub fn rotate_box_points_back(&self, box_points: &mut [Point2f; 4], corr_w: f32, corr_h: f32) {
+        match self {
+            Orientation::Normal => {}
+            Orientation::Rotate90 => {
+                for p in box_points.iter_mut() {
+                    let old_x = p.x;
+                    let old_y = p.y;
+                    p.x = corr_h - 1.0 - old_y;
+                    p.y = old_x;
+                }
+            }
+            Orientation::Rotate180 => {
+                for p in box_points.iter_mut() {
+                    p.x = corr_w - 1.0 - p.x;
+                    p.y = corr_h - 1.0 - p.y;
+                }
+            }
+            Orientation::Rotate270 => {
+                for p in box_points.iter_mut() {
+                    let old_x = p.x;
+                    let old_y = p.y;
+                    p.x = old_y;
+                    p.y = corr_w - 1.0 - old_x;
+                }
+            }
+        }
+    }
     
     /// Apply rotation to correct the image orientation
     #[cfg(feature = "use-opencv")]
     pub fn rotate_image(&self, img: &Mat) -> Result<Mat, EngineError> {
-        use opencv::core::{Mat as CvMat, Point2f, BORDER_CONSTANT, Scalar};
-        use opencv::imgproc::{get_rotation_matrix_2d, warp_affine, INTER_LINEAR};
-        
-        let degrees = self.degrees();
-        if degrees == 0 {
-            return Ok(img.clone());
+        use opencv::core::Mat as CvMat;
+
+        match self {
+            Orientation::Normal => Ok(img.clone()),
+            Orientation::Rotate90 => {
+                let mut rotated = CvMat::default();
+                opencv::core::rotate(img, &mut rotated, opencv::core::ROTATE_90_COUNTERCLOCKWISE)?;
+                Ok(rotated)
+            }
+            Orientation::Rotate180 => {
+                let mut rotated = CvMat::default();
+                opencv::core::rotate(img, &mut rotated, opencv::core::ROTATE_180)?;
+                Ok(rotated)
+            }
+            Orientation::Rotate270 => {
+                let mut rotated = CvMat::default();
+                opencv::core::rotate(img, &mut rotated, opencv::core::ROTATE_90_CLOCKWISE)?;
+                Ok(rotated)
+            }
         }
-        
-        let size = img.size()?;
-        let center = Point2f::new(size.width as f32 / 2.0, size.height as f32 / 2.0);
-        let rot_mat = get_rotation_matrix_2d(center, degrees as f64, 1.0)?;
-        let mut rotated = CvMat::default();
-        warp_affine(
-            img,
-            &mut rotated,
-            &rot_mat,
-            size,
-            INTER_LINEAR,
-            BORDER_CONSTANT,
-            Scalar::all(255.0),
-        )?;
-        
-        Ok(rotated)
     }
     
     /// Apply rotation to correct the image orientation (Pure Rust)
@@ -229,11 +257,62 @@ impl OrientClassifier {
         let (class_id, &confidence) = probs
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .ok_or_else(|| EngineError::OutputError("No class found".to_string()))?;
 
         let orientation = Orientation::from_class(class_id, num_classes);
 
         Ok((orientation, confidence))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rotate_box_points_back_90() {
+        let mut pts = [
+            Point2f::new(20.0, 10.0),
+            Point2f::new(50.0, 10.0),
+            Point2f::new(50.0, 30.0),
+            Point2f::new(20.0, 30.0),
+        ];
+        // corrected width = 200, height = 100
+        Orientation::Rotate90.rotate_box_points_back(&mut pts, 200.0, 100.0);
+        // x_orig = corr_h - 1 - y = 100 - 1 - y = 99 - y
+        // y_orig = x
+        assert_eq!(pts[0].x, 89.0);
+        assert_eq!(pts[0].y, 20.0);
+        assert_eq!(pts[1].x, 89.0);
+        assert_eq!(pts[1].y, 50.0);
+    }
+
+    #[test]
+    fn test_rotate_box_points_back_180() {
+        let mut pts = [
+            Point2f::new(10.0, 20.0),
+            Point2f::new(100.0, 20.0),
+            Point2f::new(100.0, 50.0),
+            Point2f::new(10.0, 50.0),
+        ];
+        Orientation::Rotate180.rotate_box_points_back(&mut pts, 200.0, 100.0);
+        assert_eq!(pts[0].x, 189.0);
+        assert_eq!(pts[0].y, 79.0);
+    }
+
+    #[test]
+    fn test_rotate_box_points_back_270() {
+        let mut pts = [
+            Point2f::new(20.0, 10.0),
+            Point2f::new(50.0, 10.0),
+            Point2f::new(50.0, 30.0),
+            Point2f::new(20.0, 30.0),
+        ];
+        // corr_w = 200, corr_h = 100
+        // x_orig = y, y_orig = corr_w - 1 - x = 199 - x
+        Orientation::Rotate270.rotate_box_points_back(&mut pts, 200.0, 100.0);
+        assert_eq!(pts[0].x, 10.0);
+        assert_eq!(pts[0].y, 179.0);
     }
 }

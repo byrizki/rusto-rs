@@ -823,21 +823,6 @@ fn point_in_polygon(x: f32, y: f32, polygon: &[crate::image_impl::Point2f; 4]) -
 
 #[cfg(not(feature = "use-opencv"))]
 fn calculate_contour_area(contour: &crate::contours::Contour) -> f32 {
-    if contour.points.len() < 3 {
-        return 0.0;
-    }
-    
-    // Use shoelace formula to calculate polygon area
-    let mut area = 0.0f32;
-    let n = contour.points.len();
-    
-    for i in 0..n {
-        let j = (i + 1) % n;
-        let (x1, y1) = contour.points[i];
-        let (x2, y2) = contour.points[j];
-        area += (x1 as f32 * y2 as f32) - (x2 as f32 * y1 as f32);
-    }
-    
-    (area * 0.5).abs()
+    contour.area as f32
 }
 

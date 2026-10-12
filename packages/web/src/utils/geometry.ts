@@ -67,6 +67,66 @@ export function groupCandidatesIntoLines(
 }
 
 /**
+ * Clusters adjacent items on the same horizontal line into merged line segments.
+ * Only merges adjacent items whose horizontal gap is within maxGap (avgHeight * wordXThreshold).
+ * Items separated by gaps greater than maxGap remain distinct candidates (e.g. separate columns).
+ */
+export function clusterLineSegments(
+  line: TextResult[],
+  wordXThreshold: number = 0.4
+): TextResult[] {
+  if (line.length <= 1) return line;
+
+  const segments: TextResult[] = [];
+  let currentSegment: TextResult | null = null;
+
+  for (const item of line) {
+    if (!currentSegment) {
+      currentSegment = { ...item };
+      continue;
+    }
+
+    const prevRight = currentSegment.frame.left + currentSegment.frame.width;
+    const gap = item.frame.left - prevRight;
+    const avgHeight = (currentSegment.frame.height + item.frame.height) / 2;
+    const maxGap = Math.max(1, avgHeight * wordXThreshold);
+
+    if (gap <= maxGap) {
+      const text = `${currentSegment.text} ${item.text}`.trim();
+      const avgScore: number = (currentSegment.score + item.score) / 2;
+      const minX = Math.min(currentSegment.frame.left, item.frame.left);
+      const minY = Math.min(currentSegment.frame.top, item.frame.top);
+      const maxX = Math.max(prevRight, item.frame.left + item.frame.width);
+      const maxY = Math.max(
+        currentSegment.frame.top + currentSegment.frame.height,
+        item.frame.top + item.frame.height
+      );
+      const quad: QuadPoints = [
+        [minX, minY],
+        [maxX, minY],
+        [maxX, maxY],
+        [minX, maxY],
+      ];
+      currentSegment = {
+        text,
+        score: Math.round(avgScore * 1000) / 1000,
+        box_points: quad,
+        frame: calculateFrameFromQuad(quad),
+      };
+    } else {
+      segments.push(currentSegment);
+      currentSegment = { ...item };
+    }
+  }
+
+  if (currentSegment) {
+    segments.push(currentSegment);
+  }
+
+  return segments;
+}
+
+/**
  * Merges grouped line segments into formatted spatial text output.
  */
 export function formatSpatialText(

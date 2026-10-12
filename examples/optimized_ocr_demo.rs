@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         models_dir.join("dict.txt"),
     )
     .with_calibration(CalibrationOptions::for_id_card())
-    .with_optimization(OptimizationOptions::for_id_card());
+    .with_optimization(OptimizationOptions::for_id_card().with_target_max_side(960));
 
     let mut ocr = RustO::initialize(config)?;
 
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let DetectTextResult::Structured(items) = result {
         for (i, item) in items.iter().enumerate() {
-            println!("{:<4} | {:<40} | {:.3}", i + 1, item.text, item.score);
+            println!("{:<4} | {:<32} | {:.3} | [l:{:.1}, t:{:.1}, w:{:.1}, h:{:.1}]", i + 1, item.text, item.score, item.frame.left, item.frame.top, item.frame.width, item.frame.height);
         }
     }
     println!("================================================================================\n");

@@ -58,14 +58,14 @@ impl TextDetector {
         let ori_w = img.cols();
         let max_wh = ori_h.max(ori_w);
 
-        let limit_side_len = if limit_type == "min" {
+        let limit_side_len = if let Some(explicit_limit) = options.limit_side_len {
+            explicit_limit
+        } else if limit_type == "min" {
             configured_limit_side_len
         } else if max_wh < 960 {
             960
         } else if max_wh < 1500 {
             1500
-        } else if options.limit_side_len.is_some() {
-            configured_limit_side_len
         } else {
             2000
         };

@@ -247,21 +247,39 @@ pub fn apply_calibration(mat: &Mat, _options: &CalibrationOptions) -> Result<Mat
 
 #[cfg(not(feature = "use-opencv"))]
 fn descreen_background(img: &mut image::RgbImage, strength: f32) {
+    if strength <= 0.0 {
+        return;
+    }
+
     for p in img.pixels_mut() {
         let r = p[0] as f32;
         let g = p[1] as f32;
         let b = p[2] as f32;
 
-        let bg_bias = ((b + g) * 0.5 - r).max(0.0);
-        let lift = (bg_bias * strength).clamp(0.0, 160.0);
+        let lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        if lum < 70.0 {
+            continue;
+        }
 
-        let nr = (r + lift * 1.25).clamp(0.0, 255.0) as u8;
-        let ng = (g + lift * 0.85).clamp(0.0, 255.0) as u8;
-        let nb = (b + lift * 0.50).clamp(0.0, 255.0) as u8;
+        let max_c = r.max(g.max(b));
+        let min_c = r.min(g.min(b));
+        let chroma = max_c - min_c;
+        if chroma < 4.0 {
+            continue;
+        }
 
-        p[0] = nr;
-        p[1] = ng;
-        p[2] = nb;
+        let weight = ((lum - 70.0) / 50.0).clamp(0.0, 1.0);
+        let factor = (strength * weight).clamp(0.0, 2.0);
+
+        let r_lift = (max_c - r) * factor;
+        let g_lift = (max_c - g) * factor;
+        let b_lift = (max_c - b) * factor;
+
+        let white_lift = (255.0 - max_c) * (chroma / 255.0) * (factor * 0.25);
+
+        p[0] = (r + r_lift + white_lift).clamp(0.0, 255.0) as u8;
+        p[1] = (g + g_lift + white_lift).clamp(0.0, 255.0) as u8;
+        p[2] = (b + b_lift + white_lift).clamp(0.0, 255.0) as u8;
     }
 }
 

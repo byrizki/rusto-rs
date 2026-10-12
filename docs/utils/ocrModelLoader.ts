@@ -156,7 +156,7 @@ export async function loadAndInitModel(
   const assets = await fetchModelAssets(model, onProgress, progressRange);
   await initialize({
     preset: model.preset,
-    wasmUrl: `${baseURL}wasm/rusto_rten_wasm_bg.wasm`,
+    wasmUrl: `${baseURL}wasm/rusto_rten_wasm_bg.wasm?v=0.3.3`,
     models: assets,
   });
 }

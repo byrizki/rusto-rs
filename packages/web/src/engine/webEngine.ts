@@ -12,6 +12,7 @@ import {
 import { extractImageData, type RawImageData } from '../utils/imageUtils.js';
 import {
   calculateFrameFromQuad,
+  clusterLineSegments,
   formatSpatialText,
   groupCandidatesIntoLines,
   type QuadPoints,
@@ -129,7 +130,7 @@ export class WebOcrEngine {
     const outputMode = options.output ?? 'lines';
     const lineYThreshold = options.lineYThreshold ?? 0.5;
     const wordXThreshold = options.wordXThreshold ?? 0.4;
-    const minScore = options.textScore ?? 0.0;
+    const minScore = typeof options.textScore === 'number' ? options.textScore : 0.5;
 
     let rawCandidates: TextResult[] = [];
 
@@ -145,14 +146,23 @@ export class WebOcrEngine {
 
       const detThresh = options.postprocess?.threshold ?? 0.3;
       const boxThresh = options.postprocess?.boxThreshold ?? 0.5;
-      const unclipRatio = options.postprocess?.unclipRatio ?? 1.6;
+      const unclipRatio = options.postprocess?.unclipRatio ?? 1.8;
       const applyCalibration =
-        options.calibration?.enabled ?? this.currentConfig.calibration?.enabled ?? true;
+        options.calibration?.enabled ??
+        options.calibration?.descreenBackground ??
+        this.currentConfig.calibration?.enabled ??
+        true;
+      const maxSideLen = options.detection?.limitSideLen ?? options.maxSideLen ?? 960;
 
       const pixelBytes =
         image.data instanceof Uint8Array
           ? image.data
           : new Uint8Array(image.data.buffer, image.data.byteOffset, image.data.byteLength);
+
+      const descreenStrength =
+        options.calibration?.descreenStrength ??
+        this.currentConfig.calibration?.descreenStrength ??
+        1.15;
 
       const jsonStr = this.pipeline.detectAndRecognize(
         pixelBytes,
@@ -161,7 +171,9 @@ export class WebOcrEngine {
         detThresh,
         boxThresh,
         unclipRatio,
-        applyCalibration
+        applyCalibration,
+        maxSideLen,
+        descreenStrength
       );
 
       try {
@@ -225,31 +237,11 @@ export class WebOcrEngine {
       return words;
     }
 
-    // Default 'lines': return line-level candidates
+    // Default 'lines': return clustered line-level candidates
     const flatLines: TextResult[] = [];
     for (const line of groupedLines) {
-      if (line.length === 1) {
-        flatLines.push(line[0]);
-      } else if (line.length > 1) {
-        const text = line.map((item) => item.text).join(' ');
-        const avgScore = line.reduce((sum, item) => sum + item.score, 0) / line.length;
-        const minX = Math.min(...line.map((item) => item.frame.left));
-        const minY = Math.min(...line.map((item) => item.frame.top));
-        const maxX = Math.max(...line.map((item) => item.frame.left + item.frame.width));
-        const maxY = Math.max(...line.map((item) => item.frame.top + item.frame.height));
-        const quad: QuadPoints = [
-          [minX, minY],
-          [maxX, minY],
-          [maxX, maxY],
-          [minX, maxY],
-        ];
-        flatLines.push({
-          text,
-          score: Math.round(avgScore * 1000) / 1000,
-          box_points: quad,
-          frame: calculateFrameFromQuad(quad),
-        });
-      }
+      const segments = clusterLineSegments(line, wordXThreshold);
+      flatLines.push(...segments);
     }
 
     return flatLines;

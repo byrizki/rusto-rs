@@ -52,9 +52,9 @@ impl InferenceSession for CountingSession {
 
 #[test]
 fn test_custom_inference_session_pluggability() {
-    let det_path = "models/ppocrv6-tiny/det.rten";
-    let rec_path = "models/ppocrv6-tiny/rec.rten";
-    let dict_path = "models/ppocrv6-tiny/dict.txt";
+    let det_path = "models/PPOCR_v6_tiny/det.rten";
+    let rec_path = "models/PPOCR_v6_tiny/rec.rten";
+    let dict_path = "models/PPOCR_v6_tiny/dict.txt";
 
     if !std::path::Path::new(det_path).exists() {
         return;
@@ -74,7 +74,7 @@ fn test_custom_inference_session_pluggability() {
     let mut ocr = RustO::with_custom_engines(config, custom_det, custom_rec)
         .expect("Initialize with custom engines");
 
-    let img_path = "tests/test_imgs/test_simple.png";
+    let img_path = "models/test_images/example1.png";
     let res = ocr.detect_text(&ImageSource::Path(img_path.into()), &OcrRunOptions::default())
         .expect("Run OCR with custom engines");
 
@@ -91,9 +91,9 @@ fn test_custom_inference_session_pluggability() {
 
 #[test]
 fn test_with_components_composition() {
-    let det_path = "models/ppocrv6-tiny/det.rten";
-    let rec_path = "models/ppocrv6-tiny/rec.rten";
-    let dict_path = "models/ppocrv6-tiny/dict.txt";
+    let det_path = "models/PPOCR_v6_tiny/det.rten";
+    let rec_path = "models/PPOCR_v6_tiny/rec.rten";
+    let dict_path = "models/PPOCR_v6_tiny/dict.txt";
 
     if !std::path::Path::new(det_path).exists() {
         return;
@@ -106,7 +106,7 @@ fn test_with_components_composition() {
     let mut ocr = RustO::with_components(config.global, det, rec)
         .expect("Initialize with components");
 
-    let img_path = "tests/test_imgs/test_simple.png";
+    let img_path = "models/test_images/example1.png";
     let res = ocr.detect_text(&ImageSource::Path(img_path.into()), &OcrRunOptions::default())
         .expect("Run OCR with composed components");
 

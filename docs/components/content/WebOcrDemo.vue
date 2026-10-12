@@ -9,8 +9,10 @@ import {
   defaultProgressState,
   getSampleImages,
   buildDetectTextOptions,
+  ocrProfilePresets,
   type OcrConfig,
   type OcrModelOption,
+  type OcrProfilePreset,
   type ActiveRunConfig,
   type ProgressState,
   type ProgressStep,
@@ -42,6 +44,14 @@ function toggleConfigPopover() {
 }
 function resetConfigDefaults() {
   ocrConfig.value = { ...defaultOcrConfig };
+}
+function applyPreset(preset: OcrProfilePreset) {
+  ocrConfig.value = { ...ocrConfig.value, ...preset.config };
+}
+function isPresetActive(preset: OcrProfilePreset): boolean {
+  return Object.entries(preset.config).every(
+    ([k, v]) => (ocrConfig.value as Record<string, unknown>)[k] === v
+  );
 }
 
 const progress = ref<ProgressState>({ ...defaultProgressState });
@@ -437,6 +447,34 @@ onMounted(() => {
                   class="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 cursor-pointer text-sm font-bold px-1"
                 >
                   ✕
+                </button>
+              </div>
+            </div>
+
+            <!-- Presets Bar -->
+            <div
+              class="px-3.5 py-2 border-b border-neutral-100 dark:border-neutral-800 bg-neutral-50/80 dark:bg-neutral-800/40 shrink-0"
+            >
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span
+                  class="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider shrink-0 mr-0.5"
+                >
+                  Preset:
+                </span>
+                <button
+                  v-for="preset in ocrProfilePresets"
+                  :key="preset.id"
+                  type="button"
+                  @click="applyPreset(preset)"
+                  class="px-2 py-0.5 text-[10px] rounded-md transition-all border cursor-pointer"
+                  :class="
+                    isPresetActive(preset)
+                      ? 'bg-primary text-white border-primary font-semibold shadow-xs'
+                      : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-300 hover:border-neutral-400 dark:hover:border-neutral-600'
+                  "
+                  :title="preset.description"
+                >
+                  {{ preset.name }}
                 </button>
               </div>
             </div>

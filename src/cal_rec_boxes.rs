@@ -45,7 +45,15 @@ impl CalRecBoxes {
             }
 
             let box_pts = &dt_boxes[idx];
-            let bbox_rect = quads_to_rect_bbox(box_pts);
+            let w1 = (box_pts[1].x - box_pts[0].x).hypot(box_pts[1].y - box_pts[0].y);
+            let w2 = (box_pts[2].x - box_pts[3].x).hypot(box_pts[2].y - box_pts[3].y);
+            let quad_width = w1.max(w2).max(1.0);
+
+            let h1 = (box_pts[3].x - box_pts[0].x).hypot(box_pts[3].y - box_pts[0].y);
+            let h2 = (box_pts[2].x - box_pts[1].x).hypot(box_pts[2].y - box_pts[1].y);
+            let quad_height = h1.max(h2).max(1.0);
+
+            let bbox_rect = (0.0, 0.0, quad_width, quad_height);
 
             let (word_contents, rects, confs) = self.cal_ocr_word_box(
                 txt,
@@ -133,17 +141,6 @@ impl CalRecBoxes {
     }
 }
 
-fn quads_to_rect_bbox(quad: &[Point2f; 4]) -> (f32, f32, f32, f32) {
-    let mut xs = [quad[0].x, quad[1].x, quad[2].x, quad[3].x];
-    let mut ys = [quad[0].y, quad[1].y, quad[2].y, quad[3].y];
-    xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    ys.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let x_min = xs[0];
-    let x_max = xs[3];
-    let y_min = ys[0];
-    let y_max = ys[3];
-    (x_min, y_min, x_max, y_max)
-}
 
 fn rect_to_quad_in_box(
     box_pts: &[Point2f; 4],

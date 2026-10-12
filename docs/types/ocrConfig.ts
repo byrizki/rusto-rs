@@ -171,7 +171,7 @@ export interface OcrConfig {
 }
 
 export const defaultOcrConfig: OcrConfig = {
-  textScore: 0.0,
+  textScore: 0.5,
   lineYThreshold: 0.5,
   wordXThreshold: 0.4,
   classification: false,
@@ -185,17 +185,71 @@ export const defaultOcrConfig: OcrConfig = {
   detectionLimitType: 'max',
   postprocessThreshold: 0.3,
   postprocessBoxThreshold: 0.5,
-  postprocessUnclipRatio: 1.6,
+  postprocessUnclipRatio: 1.8,
   postprocessMaxCandidates: 1000,
   postprocessUseDilation: false,
   calibrationEnabled: true,
   descreenBackground: true,
   descreenStrength: 1.15,
   optimizationEnabled: true,
-  optimizationTargetMaxSide: 1280,
-  cropPaddingX: 10,
-  cropPaddingY: 10,
+  optimizationTargetMaxSide: 960,
+  cropPaddingX: 0,
+  cropPaddingY: 0.02,
 };
+
+export interface OcrProfilePreset {
+  id: string;
+  name: string;
+  description: string;
+  config: Partial<OcrConfig>;
+}
+
+export const ocrProfilePresets: OcrProfilePreset[] = [
+  {
+    id: 'id-card',
+    name: 'ID Card / Form',
+    description: 'Background descreening and 960px limit tuned for ID cards, KTP, and passports.',
+    config: {
+      textScore: 0.5,
+      detectionLimitSideLen: 960,
+      calibrationEnabled: true,
+      descreenBackground: true,
+      descreenStrength: 1.15,
+      postprocessThreshold: 0.3,
+      postprocessBoxThreshold: 0.5,
+      postprocessUnclipRatio: 1.8,
+    },
+  },
+  {
+    id: 'clean-document',
+    name: 'Clean Document',
+    description: 'Standard document pipeline for high-contrast invoices, receipts, and articles.',
+    config: {
+      textScore: 0.5,
+      detectionLimitSideLen: 960,
+      calibrationEnabled: false,
+      descreenBackground: false,
+      postprocessThreshold: 0.3,
+      postprocessBoxThreshold: 0.5,
+      postprocessUnclipRatio: 1.8,
+    },
+  },
+  {
+    id: 'dense-faint',
+    name: 'Dense / Faint',
+    description: 'Lower thresholds and expanded search for thermal slips or small faint text.',
+    config: {
+      textScore: 0.35,
+      detectionLimitSideLen: 1280,
+      calibrationEnabled: true,
+      descreenBackground: true,
+      descreenStrength: 1.15,
+      postprocessThreshold: 0.2,
+      postprocessBoxThreshold: 0.4,
+      postprocessUnclipRatio: 2.0,
+    },
+  },
+];
 
 export interface ActiveRunConfig {
   modelId: string;

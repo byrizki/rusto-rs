@@ -374,10 +374,6 @@ impl RustO {
         detection: Option<&DetectionRunOptions>,
         postprocess: Option<&PostprocessRunOptions>,
     ) -> Result<RustOOutput, EngineError> {
-        let size = img.size()?;
-        let ori_h = size.height;
-        let ori_w = size.width;
-
         let mut elapse_orient = 0.0;
         let mut orientation = None;
         let mut debug_oriented_image = None;
@@ -396,24 +392,23 @@ impl RustO {
         // Step 1: Orientation classification and correction (if enabled)
         // Apply to ENTIRE image before detection
         let mut working_img = calibrated_img;
+        let mut active_orientation = None;
         if global.use_orient && self.orient.is_some() {
             if let Some(orient_classifier) = &mut self.orient {
-                let orient_result = orient_classifier.classify(img)?;
+                let orient_result = orient_classifier.classify(&working_img)?;
                 elapse_orient = orient_result.elapse;
 
-                // Apply rotation for internal processing if orientation detected
-                if orient_result.orientation.degrees() != 0 {
-                    let rotated = orient_result.orientation.rotate_image(&working_img)?;
-                    if global.debug_images {
-                        debug_oriented_image = Some(rotated.clone());
+                if orient_result.confidence >= orient_classifier.config.confidence_threshold {
+                    orientation = Some(orient_result.orientation);
+                    if orient_result.orientation.degrees() != 0 {
+                        let rotated = orient_result.orientation.rotate_image(&working_img)?;
+                        if global.debug_images {
+                            debug_oriented_image = Some(rotated.clone());
+                        }
+                        working_img = rotated;
+                        active_orientation = Some(orient_result.orientation);
                     }
-                    working_img = rotated;
-
-                    // Only report orientation if confidence meets threshold
-                    if orient_result.confidence >= orient_classifier.config.confidence_threshold {
-                        orientation = Some(orient_result.orientation);
-                    }
-                } else {
+                } else if orient_result.orientation.degrees() == 0 {
                     orientation = Some(orient_result.orientation);
                 }
             }
@@ -473,7 +468,15 @@ impl RustO {
             }
         };
 
-        // Step 4: Crop text regions from padded image
+        let working_size = working_img.size()?;
+        let working_h = working_size.height;
+        let working_w = working_size.width;
+
+        // Map boxes back to working image coords for high-fidelity cropping and final output
+        let mut boxes = padded_boxes.clone();
+        map_boxes_to_original(&mut boxes, &op_record, working_h, working_w);
+
+        // Step 4: Crop text regions from high-resolution working image (preserves character fidelity)
         let (pad_x, pad_y) = if let Some(opt) = &global.optimization {
             if opt.enabled.unwrap_or(true) {
                 (opt.crop_padding_x.unwrap_or(0.0), opt.crop_padding_y.unwrap_or(0.0))
@@ -484,34 +487,31 @@ impl RustO {
             (0.0, 0.0)
         };
 
-        let mut crop_imgs: Vec<Mat> = Vec::with_capacity(padded_boxes.len());
-        for b in &padded_boxes {
+        let mut crop_imgs: Vec<Mat> = Vec::with_capacity(boxes.len());
+        for b in &boxes {
             let crop_box = if pad_x > 0.0 || pad_y > 0.0 {
                 crate::calibration::expand_box_padding(
                     b,
                     pad_x,
                     pad_y,
-                    padded.cols() as f32,
-                    padded.rows() as f32,
+                    working_w as f32,
+                    working_h as f32,
                 )
             } else {
                 *b
             };
-            let crop = get_rotate_crop_image(&padded, &crop_box)?;
+            let crop = get_rotate_crop_image(&working_img, &crop_box)?;
             crop_imgs.push(crop);
         }
 
         // Step 4.5: Text Line Orientation Classification (CLS) on cropped images
-        // If enabled, classify each crop and rotate if needed (0 vs 180 degrees)
         if global.use_cls && self.cls.is_some() {
             if let Some(cls_classifier) = &mut self.cls {
                 for crop in &mut crop_imgs {
                     if let Ok(cls_result) = cls_classifier.classify(crop) {
-                        // Only rotate if orientation is 180 degrees and confidence is high
                         if cls_result.orientation == Orientation::Rotate180
                             && cls_result.confidence >= cls_classifier.config.confidence_threshold
                         {
-                            // Rotate crop 180 degrees
                             if let Ok(rotated) = cls_result.orientation.rotate_image(crop) {
                                 *crop = rotated;
                             }
@@ -521,20 +521,28 @@ impl RustO {
             }
         }
 
-        // Map boxes back to original image coords for final output and word boxes
-        let mut boxes = padded_boxes.clone();
-        map_boxes_to_original(&mut boxes, &op_record, ori_h, ori_w);
-
         // Recognition
         let rec_res: TextRecOutput = self.rec.run(&crop_imgs, global.return_word_box)?;
 
         // Optional word boxes (computed before we move fields out of rec_res)
-        let word_results_all: Vec<Vec<(String, f32, [Point2f; 4])>> = if global.return_word_box {
+        let mut word_results_all: Vec<Vec<(String, f32, [Point2f; 4])>> = if global.return_word_box {
             self.cal_rec_boxes
                 .calc_word_boxes(&boxes, &rec_res, global.return_single_char_box)
         } else {
             vec![Vec::new(); boxes.len()]
         };
+
+        // If orientation was applied, rotate boxes and word results back to original image space
+        if let Some(orient) = active_orientation {
+            for b in &mut boxes {
+                orient.rotate_box_points_back(b, working_w as f32, working_h as f32);
+            }
+            for line_words in &mut word_results_all {
+                for (_, _, word_box) in line_words.iter_mut() {
+                    orient.rotate_box_points_back(word_box, working_w as f32, working_h as f32);
+                }
+            }
+        }
 
         let mut txts = rec_res.txts;
         let mut scores = rec_res.scores;
@@ -677,6 +685,9 @@ fn group_words(
 }
 
 fn merge_text_results(mut entries: Vec<crate::TextResult>, separator: &str) -> crate::TextResult {
+    if entries.len() == 1 {
+        return entries.remove(0);
+    }
     entries.sort_by(|a, b| {
         a.frame
             .left
@@ -807,42 +818,41 @@ impl RustOOutput {
         }
         lines
             .into_iter()
-            .map(|mut line| {
+            .flat_map(|mut line| {
+                if line.len() == 1 {
+                    return line;
+                }
                 line.sort_by(|a, b| {
                     a.frame
                         .left
                         .partial_cmp(&b.frame.left)
                         .unwrap_or(std::cmp::Ordering::Equal)
                 });
-                let text = line
-                    .iter()
-                    .map(|item| item.text.as_str())
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                let score = line.iter().map(|item| item.score).fold(1.0, f32::min);
-                let left = line
-                    .iter()
-                    .map(|item| item.frame.left)
-                    .fold(f32::INFINITY, f32::min);
-                let top = line
-                    .iter()
-                    .map(|item| item.frame.top)
-                    .fold(f32::INFINITY, f32::min);
-                let right = line
-                    .iter()
-                    .map(|item| item.frame.left + item.frame.width)
-                    .fold(f32::NEG_INFINITY, f32::max);
-                let bottom = line
-                    .iter()
-                    .map(|item| item.frame.top + item.frame.height)
-                    .fold(f32::NEG_INFINITY, f32::max);
-                let box_points = [(left, top), (right, top), (right, bottom), (left, bottom)];
-                crate::TextResult {
-                    text,
-                    score,
-                    box_points,
-                    frame: crate::Frame::from_points(&box_points),
+                let mut segments: Vec<crate::TextResult> = Vec::new();
+                for entry in line {
+                    if let Some(prev) = segments.last_mut() {
+                        let prev_right = prev.frame.left + prev.frame.width;
+                        let gap = entry.frame.left - prev_right;
+                        let avg_height = (prev.frame.height + entry.frame.height) / 2.0;
+                        let max_gap = (avg_height * options.word_x_threshold.unwrap_or(0.4)).max(1.0);
+                        if gap <= max_gap {
+                            prev.text.push(' ');
+                            prev.text.push_str(&entry.text);
+                            prev.score = prev.score.min(entry.score);
+                            let left = prev.frame.left.min(entry.frame.left);
+                            let top = prev.frame.top.min(entry.frame.top);
+                            let right = prev_right.max(entry.frame.left + entry.frame.width);
+                            let bottom = (prev.frame.top + prev.frame.height)
+                                .max(entry.frame.top + entry.frame.height);
+                            let box_points = [(left, top), (right, top), (right, bottom), (left, bottom)];
+                            prev.box_points = box_points;
+                            prev.frame = crate::Frame::from_points(&box_points);
+                            continue;
+                        }
+                    }
+                    segments.push(entry);
                 }
+                segments
             })
             .collect()
     }
@@ -1125,7 +1135,7 @@ impl RustOOutput {
         // Calculate median height
         let median_height = if !tokens.is_empty() {
             let mut heights: Vec<f32> = tokens.iter().map(|t| t.height).collect();
-            heights.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            heights.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             heights[heights.len() / 2]
         } else {
             10.0
@@ -1150,8 +1160,8 @@ impl RustOOutput {
         // Sort by Top Y first, then by X
         tokens.sort_by(|a, b| {
             a.y.partial_cmp(&b.y)
-                .unwrap()
-                .then(a.x.partial_cmp(&b.x).unwrap())
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal))
         });
 
         // Group into lines based on Top Y alignment
@@ -1179,12 +1189,6 @@ impl RustOOutput {
         if !current_line.is_empty() {
             lines.push(current_line);
         }
-
-        // Build output using cursor-based approach
-        // Note: Need to verify if `prev_line_avg_y` below needs update to `prev_line_avg_cy` logic.
-        // In the existing code block below this chunk, `prev_line_avg_y` uses `t.y`.
-        // I should leave `t.y` logic for blank lines or update it?
-        // The chunk ends before that logic, so I'm safe, but I should check the subsequent context.
 
         // Build output using cursor-based approach
         let mut result = String::new();
@@ -1223,7 +1227,7 @@ impl RustOOutput {
 
             // Sort line by X position
             let mut line_sorted = line.clone();
-            line_sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap());
+            line_sorted.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
 
             // Render line
             let mut current_char_pos: f32 = 0.0;
