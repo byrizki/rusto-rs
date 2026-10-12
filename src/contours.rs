@@ -5,6 +5,13 @@
 
 use image::GrayImage;
 
+#[derive(Clone, Copy)]
+struct ImageDims {
+    width: i32,
+    height: i32,
+    stride: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct Contour {
     pub points: Vec<(i32, i32)>,
@@ -24,23 +31,39 @@ impl Contour {
     }
 }
 
+impl Default for Contour {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Find contours in a binary image
 /// This matches OpenCV's findContours with RETR_LIST mode
 pub fn find_contours(binary_img: &GrayImage) -> Vec<Contour> {
     let (width, height) = binary_img.dimensions();
-    let mut label_map = vec![vec![0u32; width as usize]; height as usize];
+    let w_usize = width as usize;
+    let h_usize = height as usize;
+    let mut label_map = vec![0u32; w_usize * h_usize];
     let mut contours = Vec::with_capacity(50); // Estimate typical contour count
     let mut label = 1u32;
     
+    let w_i32 = width as i32;
+    let h_i32 = height as i32;
+
+    let dims = ImageDims {
+        width: w_i32,
+        height: h_i32,
+        stride: w_usize,
+    };
+
     // First pass: label connected components using flood fill
     for y in 0..height {
         for x in 0..width {
-            let ux = x as usize;
-            let uy = y as usize;
+            let idx = (y as usize) * w_usize + (x as usize);
             
-            if binary_img.get_pixel(x, y)[0] > 127 && label_map[uy][ux] == 0 {
+            if binary_img.get_pixel(x, y)[0] > 127 && label_map[idx] == 0 {
                 // Label this component
-                flood_fill_label(binary_img, &mut label_map, x as i32, y as i32, label, width as i32, height as i32);
+                flood_fill_label(binary_img, &mut label_map, (x as i32, y as i32), label, dims);
                 label += 1;
             }
         }
@@ -48,31 +71,8 @@ pub fn find_contours(binary_img: &GrayImage) -> Vec<Contour> {
     
     // Second pass: extract contours for each label
     for current_label in 1..label {
-        // Find the topmost-leftmost pixel of this label
-        let mut _start_x = 0;
-        let mut _start_y = 0;
-        let mut found = false;
-        
-        'outer: for y in 0..height {
-            for x in 0..width {
-                if label_map[y as usize][x as usize] == current_label {
-                    _start_x = x as i32;
-                    _start_y = y as i32;
-                    found = true;
-                    break 'outer;
-                }
-            }
-        }
-        
-        if !found {
-            continue;
-        }
-        
-        // Note: In a future implementation, we could use start_x/start_y for contour tracing
-        // For now, we extract all boundary pixels directly
-        
         // Extract all boundary pixels for this contour
-        let boundary_pixels = extract_boundary(&label_map, current_label, width as i32, height as i32);
+        let boundary_pixels = extract_boundary(&label_map, current_label, dims);
         
         if boundary_pixels.len() >= 3 {
             contours.push(Contour { points: boundary_pixels });
@@ -85,25 +85,22 @@ pub fn find_contours(binary_img: &GrayImage) -> Vec<Contour> {
 /// Flood fill to label a connected component
 fn flood_fill_label(
     img: &GrayImage,
-    labels: &mut Vec<Vec<u32>>,
-    start_x: i32,
-    start_y: i32,
+    labels: &mut [u32],
+    start: (i32, i32),
     label: u32,
-    width: i32,
-    height: i32,
+    dims: ImageDims,
 ) {
     let mut stack = Vec::with_capacity(256); // Pre-allocate stack
-    stack.push((start_x, start_y));
+    stack.push(start);
     
     while let Some((x, y)) = stack.pop() {
-        if x < 0 || x >= width || y < 0 || y >= height {
+        if x < 0 || x >= dims.width || y < 0 || y >= dims.height {
             continue;
         }
         
-        let ux = x as usize;
-        let uy = y as usize;
+        let idx = (y as usize) * dims.stride + (x as usize);
         
-        if labels[uy][ux] != 0 {
+        if labels[idx] != 0 {
             continue;
         }
         
@@ -112,36 +109,35 @@ fn flood_fill_label(
             continue;
         }
         
-        labels[uy][ux] = label;
+        labels[idx] = label;
         
         // 4-connected neighbors - bounds checking integrated
-        if x + 1 < width { stack.push((x + 1, y)); }
+        if x + 1 < dims.width { stack.push((x + 1, y)); }
         if x > 0 { stack.push((x - 1, y)); }
-        if y + 1 < height { stack.push((x, y + 1)); }
+        if y + 1 < dims.height { stack.push((x, y + 1)); }
         if y > 0 { stack.push((x, y - 1)); }
     }
 }
 
 /// Check if a pixel is on the boundary of its labeled region
 fn is_boundary_pixel_label(
-    label_map: &[Vec<u32>],
+    label_map: &[u32],
     x: i32,
     y: i32,
     target_label: u32,
-    width: i32,
-    height: i32,
+    dims: ImageDims,
 ) -> bool {
     // Check 4-connected neighbors
-    for (dx, dy) in [(0, -1), (1, 0), (0, 1), (-1, 0)].iter() {
+    for (dx, dy) in [(0, -1), (1, 0), (0, 1), (-1, 0)] {
         let nx = x + dx;
         let ny = y + dy;
         
         // Edge or different label = boundary
-        if nx < 0 || nx >= width || ny < 0 || ny >= height {
+        if nx < 0 || nx >= dims.width || ny < 0 || ny >= dims.height {
             return true;
         }
         
-        if label_map[ny as usize][nx as usize] != target_label {
+        if label_map[(ny as usize) * dims.stride + (nx as usize)] != target_label {
             return true;
         }
     }
@@ -151,17 +147,16 @@ fn is_boundary_pixel_label(
 
 /// Extract all boundary pixels for a labeled region
 fn extract_boundary(
-    label_map: &[Vec<u32>],
+    label_map: &[u32],
     target_label: u32,
-    width: i32,
-    height: i32,
+    dims: ImageDims,
 ) -> Vec<(i32, i32)> {
     let mut boundary = Vec::with_capacity(100); // Typical boundary size estimate
     
-    for y in 0..height {
-        for x in 0..width {
-            if label_map[y as usize][x as usize] == target_label &&
-               is_boundary_pixel_label(label_map, x, y, target_label, width, height) {
+    for y in 0..dims.height {
+        for x in 0..dims.width {
+            if label_map[(y as usize) * dims.stride + (x as usize)] == target_label &&
+               is_boundary_pixel_label(label_map, x, y, target_label, dims) {
                 boundary.push((x, y));
             }
         }
@@ -170,16 +165,18 @@ fn extract_boundary(
     boundary
 }
 
-/// Follow a contour border using the square tracing algorithm (simplified Suzuki-Abe)
-fn follow_border(
-    img: &[Vec<u8>],
+struct BorderStart {
     start_i: i32,
     start_j: i32,
     second_i: i32,
     second_j: i32,
-    _nbd: i32,
+}
+
+/// Follow a contour border using the square tracing algorithm (simplified Suzuki-Abe)
+fn follow_border(
+    img: &[Vec<u8>],
+    start: BorderStart,
     border: &mut Vec<(i32, i32)>,
-    _lnbd_img: &mut [Vec<u8>],
 ) {
     // 8-connectivity: clockwise from (di, dj) = (0, 1)
     const DIR: [(i32, i32); 8] = [
@@ -193,12 +190,12 @@ fn follow_border(
         (1, 1),   // 7: SE
     ];
     
-    border.push((start_i, start_j));
+    border.push((start.start_i, start.start_j));
     
-    let mut curr_i = start_i;
-    let mut curr_j = start_j;
-    let mut prev_i = second_i;
-    let mut prev_j = second_j;
+    let mut curr_i = start.start_i;
+    let mut curr_j = start.start_j;
+    let mut prev_i = start.second_i;
+    let mut prev_j = start.second_j;
     
     let mut step_count = 0;
     let max_steps = (img.len() * img[0].len()) * 2;
@@ -227,22 +224,21 @@ fn follow_border(
             let ni = curr_i + di;
             let nj = curr_j + dj;
             
-            if ni >= 0 && ni < img.len() as i32 && nj >= 0 && nj < img[0].len() as i32 {
-                if img[ni as usize][nj as usize] >= 1 {
-                    // Found next border pixel
-                    if ni == start_i && nj == start_j && border.len() > 2 {
-                        // Closed the contour
-                        return;
-                    }
-                    
-                    border.push((ni, nj));
-                    prev_i = curr_i;
-                    prev_j = curr_j;
-                    curr_i = ni;
-                    curr_j = nj;
-                    found = true;
-                    break;
+            if ni >= 0 && ni < img.len() as i32 && nj >= 0 && nj < img[0].len() as i32
+                && img[ni as usize][nj as usize] >= 1 {
+                // Found next border pixel
+                if ni == start.start_i && nj == start.start_j && border.len() > 2 {
+                    // Closed the contour
+                    return;
                 }
+
+                border.push((ni, nj));
+                prev_i = curr_i;
+                prev_j = curr_j;
+                curr_i = ni;
+                curr_j = nj;
+                found = true;
+                break;
             }
         }
         
@@ -254,7 +250,7 @@ fn follow_border(
 
 /// Check if a foreground pixel has at least one background neighbor (4-connected)
 fn is_border_pixel(img: &GrayImage, x: i32, y: i32, width: i32, height: i32) -> bool {
-    for (dx, dy) in [(0, -1), (1, 0), (0, 1), (-1, 0)].iter() {
+    for (dx, dy) in [(0, -1), (1, 0), (0, 1), (-1, 0)] {
         let nx = x + dx;
         let ny = y + dy;
         
@@ -275,7 +271,7 @@ fn is_border_pixel(img: &GrayImage, x: i32, y: i32, width: i32, height: i32) -> 
 /// Trace boundary contour using square tracing algorithm
 fn trace_boundary(
     img: &GrayImage,
-    visited: &mut Vec<Vec<bool>>,
+    visited: &mut [Vec<bool>],
     start_x: i32,
     start_y: i32,
     width: i32,
@@ -359,7 +355,7 @@ fn trace_boundary(
 /// Mark all pixels in a connected region as visited
 fn flood_fill_visited(
     img: &GrayImage,
-    visited: &mut Vec<Vec<bool>>,
+    visited: &mut [Vec<bool>],
     start_x: i32,
     start_y: i32,
     width: i32,
@@ -438,7 +434,7 @@ fn simplify_contour(points: &[(i32, i32)]) -> Vec<(i32, i32)> {
 /// Flood fill to label connected components
 fn flood_fill(
     img: &GrayImage,
-    labels: &mut Vec<Vec<i32>>,
+    labels: &mut [Vec<i32>],
     x: i32,
     y: i32,
     label: i32,
@@ -483,7 +479,7 @@ fn is_boundary_pixel(x: i32, y: i32, labels: &[Vec<i32>], width: i32, height: i3
     let label = labels[y as usize][x as usize];
     
     // Check 4-connected neighbors
-    for (dx, dy) in [(0, -1), (1, 0), (0, 1), (-1, 0)].iter() {
+    for (dx, dy) in [(0, -1), (1, 0), (0, 1), (-1, 0)] {
         let nx = x + dx;
         let ny = y + dy;
         
@@ -503,7 +499,7 @@ fn is_boundary_pixel(x: i32, y: i32, labels: &[Vec<i32>], width: i32, height: i3
 #[allow(dead_code)]
 fn trace_contour(
     img: &GrayImage,
-    visited: &mut Vec<Vec<bool>>,
+    visited: &mut [Vec<bool>],
     start_x: i32,
     start_y: i32,
 ) -> Option<Contour> {

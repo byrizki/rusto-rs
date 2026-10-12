@@ -162,24 +162,19 @@ impl OrientClassifier {
                 imgproc::INTER_LINEAR,
             )?;
 
-            // Convert to RGB float and normalize
-            let mut float_img = Mat::default();
-            resized.convert_to(&mut float_img, opencv::core::CV_32F, 1.0 / 255.0, 0.0)?;
-
-            // Convert to ndarray [1, 3, H, W]
-            let channels = float_img.channels() as usize;
-            let rows = float_img.rows() as usize;
-            let cols = float_img.cols() as usize;
+            let rows = resized.rows() as usize;
+            let cols = resized.cols() as usize;
+            let hw = rows * cols;
             
-            let mut data = vec![0.0f32; channels * rows * cols];
-            let mat_data = float_img.data_bytes()?;
+            let mut data = vec![0.0f32; 3 * hw];
             
             for i in 0..rows {
                 for j in 0..cols {
-                    for c in 0..channels {
-                        let idx = (i * cols + j) * channels + c;
-                        data[c * rows * cols + i * cols + j] = mat_data[idx * 4] as f32 / 255.0;
-                    }
+                    let pix = resized.at_2d::<core::Vec3b>(i as i32, j as i32)?;
+                    let idx = i * cols + j;
+                    data[idx] = pix[0] as f32 / 255.0;
+                    data[hw + idx] = pix[1] as f32 / 255.0;
+                    data[2 * hw + idx] = pix[2] as f32 / 255.0;
                 }
             }
 
@@ -197,15 +192,16 @@ impl OrientClassifier {
             resize(image, &mut resized, Size::new(w, h), INTER_LINEAR)?;
             let (_orig_h, _orig_w) = (image.size()?.height, image.size()?.width);
             
-            // Convert to float and normalize [1, 3, H, W]
-            let mut data = vec![0.0f32; 3 * h as usize * w as usize];
+            let hw = h as usize * w as usize;
+            let mut data = vec![0.0f32; 3 * hw];
             
             for y in 0..h as usize {
                 for x in 0..w as usize {
                     let pixel = resized.get_pixel(x as u32, y as u32);
-                    data[0 * (h as usize * w as usize) + y * w as usize + x] = pixel[0] as f32 / 255.0;
-                    data[1 * (h as usize * w as usize) + y * w as usize + x] = pixel[1] as f32 / 255.0;
-                    data[2 * (h as usize * w as usize) + y * w as usize + x] = pixel[2] as f32 / 255.0;
+                    let idx = y * w as usize + x;
+                    data[idx] = pixel[0] as f32 / 255.0;
+                    data[hw + idx] = pixel[1] as f32 / 255.0;
+                    data[2 * hw + idx] = pixel[2] as f32 / 255.0;
                 }
             }
 

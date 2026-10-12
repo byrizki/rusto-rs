@@ -119,11 +119,11 @@ impl LayoutDetector {
         // im_shape should be [H, W] in the resized space
         let target_size = self.config.target_size as f32;
         let im_shape = Array2::from_shape_vec((1, 2), vec![target_size, target_size])
-            .map_err(|e| EngineError::ShapeError(e))?;
+            .map_err(EngineError::ShapeError)?;
         inputs.insert("im_shape".to_string(), im_shape.into_dyn());
 
         let scale_factor = Array2::from_shape_vec((1, 2), vec![scale_h, scale_w])
-            .map_err(|e| EngineError::ShapeError(e))?;
+            .map_err(EngineError::ShapeError)?;
         inputs.insert("scale_factor".to_string(), scale_factor.into_dyn());
 
         // Run inference
@@ -170,22 +170,19 @@ impl LayoutDetector {
             let mean = self.config.mean;
             let std = self.config.std;
 
-            let mut float_img = Mat::default();
-            resized.convert_to(&mut float_img, opencv::core::CV_32F, 1.0 / 255.0, 0.0)?;
+            let rows = resized.rows() as usize;
+            let cols = resized.cols() as usize;
+            let hw = rows * cols;
 
-            let channels = float_img.channels() as usize;
-            let rows = float_img.rows() as usize;
-            let cols = float_img.cols() as usize;
-
-            let mut data = vec![0.0f32; channels * rows * cols];
-            let mat_data = float_img.data_bytes()?;
+            let mut data = vec![0.0f32; 3 * hw];
 
             for i in 0..rows {
                 for j in 0..cols {
-                    for c in 0..channels {
-                        let idx = (i * cols + j) * channels + c;
-                        let val = mat_data[idx * 4] as f32 / 255.0;
-                        data[c * rows * cols + i * cols + j] = (val - mean[c]) / std[c];
+                    let pix = resized.at_2d::<core::Vec3b>(i as i32, j as i32)?;
+                    let idx = i * cols + j;
+                    for c in 0..3 {
+                        let val = pix[c] as f32 / 255.0;
+                        data[c * hw + idx] = (val - mean[c]) / std[c];
                     }
                 }
             }
@@ -237,7 +234,7 @@ impl LayoutDetector {
         // Find the output tensor containing boxes
         // Usually it's the one with shape [N, 6]
         let mut boxes_tensor = None;
-        for (_name, tensor) in &outputs {
+        for tensor in outputs.values() {
             let shape = tensor.shape();
             if shape.len() == 2 && shape[1] == 6 {
                 boxes_tensor = Some(tensor);

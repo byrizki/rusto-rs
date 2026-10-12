@@ -66,6 +66,10 @@ impl TextDetOutput {
     pub fn len(&self) -> usize {
         self.boxes.as_ref().map(|b| b.len()).unwrap_or(0)
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 pub struct DBPostProcess {

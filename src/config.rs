@@ -217,8 +217,10 @@ impl InitializeConfig {
         rec.rec_img_shape = preset.rec_img_shape;
         rec.rec_batch_num = preset.rec_batch_num;
 
-        let mut global = GlobalConfig::default();
-        global.text_score = preset.text_score;
+        let global = GlobalConfig {
+            text_score: preset.text_score,
+            ..Default::default()
+        };
 
         Self {
             det,

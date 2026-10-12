@@ -165,7 +165,7 @@ impl DocPipeline {
         #[cfg(not(feature = "use-opencv"))]
         let size = table_crop.size()?;
         #[cfg(not(feature = "use-opencv"))]
-        let (img_h, img_w) = (size.height as i32, size.width as i32);
+        let (img_h, img_w) = (size.height, size.width);
         
         for row in &mut structure.rows {
             for cell in &mut row.cells {
@@ -251,12 +251,12 @@ impl DocPipeline {
         let img_w = size.width;
         let img_h = size.height;
 
-        let x = rect.x.max(0).min(img_w as i32 - 1);
-        let y = rect.y.max(0).min(img_h as i32 - 1);
-        let w = rect.width.min((img_w as i32 - x) as u32);
-        let h = rect.height.min((img_h as i32 - y) as u32);
+        let x = rect.x.max(0).min(img_w - 1);
+        let y = rect.y.max(0).min(img_h - 1);
+        let w = rect.width.min((img_w - x) as u32);
+        let h = rect.height.min((img_h - y) as u32);
 
-        if w <= 0 || h <= 0 {
+        if w == 0 || h == 0 {
             return Err(EngineError::ImageError("Invalid crop region".to_string()));
         }
 
