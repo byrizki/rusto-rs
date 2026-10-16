@@ -35,6 +35,11 @@ const badges = [
     src: 'https://img.shields.io/badge/License-MIT-yellow.svg',
     href: 'https://opensource.org/licenses/MIT',
   },
+  {
+    alt: 'Known Vulnerabilities',
+    src: 'https://snyk.io/test/github/byrizki/rusto-rs/badge.svg',
+    href: 'https://snyk.io/test/github/byrizki/rusto-rs',
+  },
 ];
 </script>
 

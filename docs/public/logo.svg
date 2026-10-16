@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" fill="none">
+  <rect width="256" height="256" rx="48" fill="#0f172a"/>
+  <g stroke="#ea580c" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+    <!-- OCR Scan corners -->
+    <path d="M48 96V64a16 16 0 0 1 16-16h32" />
+    <path d="M160 48h32a16 16 0 0 1 16 16v32" />
+    <path d="M208 160v32a16 16 0 0 1-16 16h-32" />
+    <path d="M96 208H64a16 16 0 0 1-16-16v-32" />
+    <!-- Text / Scanner lines -->
+    <path d="M76 96h104" stroke="#f97316" stroke-width="12" />
+    <path d="M76 128h104" stroke="#f97316" stroke-width="12" />
+    <path d="M76 160h68" stroke="#fb923c" stroke-width="12" />
+  </g>
+</svg>

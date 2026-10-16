@@ -12,6 +12,7 @@
 [![JitPack](https://jitpack.io/v/byrizki/rusto-rs.svg)](https://jitpack.io/#byrizki/rusto-rs)
 [![Build & Release](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml/badge.svg)](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Known Vulnerabilities](https://snyk.io/test/github/byrizki/rusto-rs/badge.svg)](https://snyk.io/test/github/byrizki/rusto-rs)
 
 </div>
 
@@ -337,6 +338,16 @@ cargo fmt --check
 
 ---
 
+## 🛡️ Security & Snyk Partnership
+
+RustO! is a community-driven open source project protected and monitored with the support of the **[Snyk Open Source Program](https://snyk.io/open-source/)**. Snyk provides automated developer security tooling to detect, track, and remediate vulnerabilities across our Rust engine, dependencies, container environments, and multi-platform packages.
+
+- **Vulnerability Status**: [![Known Vulnerabilities](https://snyk.io/test/github/byrizki/rusto-rs/badge.svg)](https://snyk.io/test/github/byrizki/rusto-rs)
+- **Reporting Vulnerabilities**: If you discover a security issue or vulnerability, please refer to our [Security Policy](SECURITY.md) for responsible disclosure steps.
+- **Co-branding Grant**: We hereby grant [Snyk](https://snyk.io/) permission and a non-exclusive license to use, reproduce, and display the RustO! project logo and related project content on Snyk's website and marketing materials in accordance with the Snyk Open Source Program.
+
+---
+
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
@@ -350,6 +361,7 @@ RustO! is inspired by and builds upon the work of:
 - **[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)** — Pretrained OCR models (PP-OCRv6, PP-OCRv5, PP-OCRv4)
 - **[RTen](https://github.com/robertknight/rten)** — Pure Rust deep learning inference engine powering RustO! v0.3+
 - **[Alibaba MNN](https://github.com/alibaba/MNN)** — High-performance inference engine that powered RustO! in version 0.2.x
+- **[Snyk](https://snyk.io)** — Developer security and vulnerability monitoring through the Snyk Open Source Program
 - **Rust Community** — `image`, `imageproc`, `nalgebra`, and `rayon` crates
 
 ---

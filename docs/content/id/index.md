@@ -109,4 +109,16 @@ icon: simple-icons-android
 
 jitpack
 :::
+
+:::u-button{class="mr-2"}
+---
+
+size: sm
+to: https://snyk.io/open-source/
+variant: outline
+icon: simple-icons-snyk
+---
+
+snyk
+:::
 ::
