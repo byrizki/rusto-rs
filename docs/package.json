@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.6.2",
-    "docus": "5.12.3",
+    "docus": "5.13.0",
     "mermaid": "^11.17.0",
     "nuxt": "^4.3.1"
   },
