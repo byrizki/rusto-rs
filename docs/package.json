@@ -10,7 +10,7 @@
     "format:check": "oxfmt --check"
   },
   "dependencies": {
-    "better-sqlite3": "^12.6.2",
+    "better-sqlite3": "^12.11.1",
     "docus": "5.12.3",
     "mermaid": "^11.17.0",
     "nuxt": "^4.3.1"
