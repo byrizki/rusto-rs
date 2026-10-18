@@ -13,7 +13,7 @@
     "better-sqlite3": "^12.6.2",
     "docus": "5.12.3",
     "mermaid": "^11.17.0",
-    "nuxt": "^4.3.1"
+    "nuxt": "^4.5.2"
   },
   "devDependencies": {
     "oxfmt": "^0.64.0",
