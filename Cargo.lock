@@ -242,12 +242,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d728cc89cf3aee9ff92b05e62b19ee65a02b5702cff7d5a377e32c6ae29d8d"
 
 [[package]]
-name = "clipper-sys"
-version = "0.8.0"
+name = "clipper2-rust"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5141c32419064aef7322f754b92fd4ea53c360c1ad984ec38b58af533eba3ac"
+checksum = "210e9ea90a5f6c731c23bf642383ad7c006d8b24803c5c33afd5aaeae5a33f66"
 dependencies = [
- "cc",
+ "num-traits",
 ]
 
 [[package]]
@@ -387,27 +387,6 @@ checksum = "bfe33edd8e85a12a67454e37f8c75e730830d83e313556ab9ebf9ee7fbeb3bfb"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
-]
-
-[[package]]
-name = "geo-clipper"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2370335cc0c40c7bc1e5b0ead27bdbb2132d54cfbb96248a4bdd65db1a6873aa"
-dependencies = [
- "clipper-sys",
- "geo-types",
-]
-
-[[package]]
-name = "geo-types"
-version = "0.7.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75a4dcd69d35b2c87a7c83bce9af69fd65c9d68d3833a0ded568983928f3fc99"
-dependencies = [
- "approx",
- "num-traits",
- "serde",
 ]
 
 [[package]]
@@ -569,12 +548,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
 
 [[package]]
-name = "libm"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
-
-[[package]]
 name = "log"
 version = "0.4.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -705,7 +678,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
- "libm",
 ]
 
 [[package]]
@@ -1059,9 +1031,8 @@ name = "rusto-rs"
 version = "0.3.1"
 dependencies = [
  "clap",
+ "clipper2-rust",
  "criterion",
- "geo-clipper",
- "geo-types",
  "image",
  "jni",
  "nalgebra",

@@ -11,9 +11,7 @@ use opencv::core::Mat;
 use crate::image_impl::Mat;
 
 #[cfg(feature = "use-opencv")]
-use geo_clipper::{Clipper, EndType, JoinType};
-#[cfg(feature = "use-opencv")]
-use geo_types::{Coord, LineString, Polygon};
+use clipper2_rust::{inflate_paths_d, EndType, JoinType, PathD, PointD};
 
 use crate::engine::EngineError;
 
@@ -373,33 +371,22 @@ impl DBPostProcess {
 
         let distance = area * self.unclip_ratio / length;
 
-        // Build a geo-types polygon from the 4-point box.
-        let coords: Vec<Coord<f64>> = box_pts
+        let poly: PathD = box_pts
             .iter()
-            .map(|p| Coord { x: p.x as f64, y: p.y as f64 })
+            .map(|p| PointD::new(p.x as f64, p.y as f64))
             .collect();
 
-        // Ensure closed ring for polygon (first point == last point).
-        let mut ring = coords.clone();
-        if let Some(first) = coords.first() {
-            if coords.last().map(|c| c.x != first.x || c.y != first.y).unwrap_or(false) {
-                ring.push(*first);
-            }
-        }
-
-        let poly = Polygon::new(LineString::from(ring), vec![]);
-
-        // Use geo-clipper offset with round joins and closed polygon, like pyclipper JT_ROUND/ET_CLOSEDPOLYGON.
-        let mpoly = poly.offset(distance, JoinType::Round(1.0), EndType::ClosedPolygon, 1.0f64);
-        let first_poly = match mpoly.0.first() {
+        // Use clipper2-rust inflate with round joins and polygon end type, matching pyclipper JT_ROUND/ET_CLOSEDPOLYGON.
+        let paths = vec![poly];
+        let inflated = inflate_paths_d(&paths, distance, JoinType::Round, EndType::Polygon, 2.0, 2, 0.25);
+        let first_path = match inflated.first() {
             Some(p) => p,
             None => return Ok(Vec::new()),
         };
 
-        let mut result = Vec::new();
-        // Return all points from the expanded polygon, not just 4
-        for coord in first_poly.exterior().0.iter() {
-            result.push(core::Point2f::new(coord.x as f32, coord.y as f32));
+        let mut result = Vec::with_capacity(first_path.len());
+        for pt in first_path {
+            result.push(core::Point2f::new(pt.x as f32, pt.y as f32));
         }
 
         // Remove last point if it's a duplicate of first (closed ring)
@@ -696,8 +683,7 @@ impl DBPostProcess {
     }
 
     fn unclip_pure(&self, box_pts: &[crate::image_impl::Point2f; 4]) -> Result<Vec<crate::image_impl::Point2f>, EngineError> {
-        use geo_clipper::Clipper;
-        use geo_types::{Coord, LineString, Polygon};
+        use clipper2_rust::{inflate_paths_d, EndType, JoinType, PathD, PointD};
 
         // Compute area and perimeter
         let mut area = 0.0f64;
@@ -713,23 +699,18 @@ impl DBPostProcess {
 
         let distance = area * self.unclip_ratio / length;
 
-        let coords: Vec<Coord<f64>> = box_pts
+        let poly: PathD = box_pts
             .iter()
-            .map(|p| Coord { x: p.x as f64, y: p.y as f64 })
+            .map(|p| PointD::new(p.x as f64, p.y as f64))
             .collect();
 
-        let mut ring = coords.clone();
-        ring.push(coords[0]);
-        let line_string = LineString(ring);
-        let poly = Polygon::new(line_string, vec![]);
-
-        let expanded = poly.offset(distance, geo_clipper::JoinType::Miter(2.0), geo_clipper::EndType::ClosedPolygon, 2.0);
+        let paths = vec![poly];
+        let expanded = inflate_paths_d(&paths, distance, JoinType::Miter, EndType::Polygon, 2.0, 2, 0.25);
 
         let mut result = Vec::new();
-        if !expanded.0.is_empty() {
-            let first_poly = &expanded.0[0];
-            for coord in first_poly.exterior().0.iter() {
-                result.push(crate::image_impl::Point2f::new(coord.x as f32, coord.y as f32));
+        if let Some(first_path) = expanded.first() {
+            for pt in first_path {
+                result.push(crate::image_impl::Point2f::new(pt.x as f32, pt.y as f32));
             }
             if let Some(last) = result.last() {
                 if let Some(first) = result.first() {
