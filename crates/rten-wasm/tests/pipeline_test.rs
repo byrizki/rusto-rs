@@ -8,14 +8,18 @@ fn test_idcard_inference_pipeline() {
     let img_path = Path::new("../../models/test_images/idcard.jpg");
     let models_dir = Path::new("../../models/PPOCR_v6_tiny");
 
-    if !img_path.exists() || !models_dir.exists() {
-        println!("Skipping test: idcard.jpg or models not found");
+    let det_file = models_dir.join("det.rten");
+    let rec_file = models_dir.join("rec.rten");
+    let dict_file = models_dir.join("dict.txt");
+
+    if !img_path.exists() || !det_file.exists() || !rec_file.exists() || !dict_file.exists() {
+        println!("Skipping test: idcard.jpg or model files not found");
         return;
     }
 
-    let det_data = fs::read(models_dir.join("det.rten")).expect("read det.rten");
-    let rec_data = fs::read(models_dir.join("rec.rten")).expect("read rec.rten");
-    let dict_text = fs::read_to_string(models_dir.join("dict.txt")).expect("read dict.txt");
+    let det_data = fs::read(&det_file).expect("read det.rten");
+    let rec_data = fs::read(&rec_file).expect("read rec.rten");
+    let dict_text = fs::read_to_string(&dict_file).expect("read dict.txt");
 
     let pipeline = RtenOcrPipeline::new(det_data, rec_data, &dict_text)
         .expect("pipeline init");
@@ -38,12 +42,17 @@ fn test_idcard_inference_pipeline() {
 #[test]
 fn test_sample_images() {
     let models_dir = Path::new("../../docs/public/models/ppocrv6-small");
-    if !models_dir.exists() {
+    let det_file = models_dir.join("det.rten");
+    let rec_file = models_dir.join("rec.rten");
+    let dict_file = models_dir.join("dict.txt");
+
+    if !det_file.exists() || !rec_file.exists() || !dict_file.exists() {
+        println!("Skipping test: sample models not found");
         return;
     }
-    let det_data = fs::read(models_dir.join("det.rten")).expect("read det.rten");
-    let rec_data = fs::read(models_dir.join("rec.rten")).expect("read rec.rten");
-    let dict_text = fs::read_to_string(models_dir.join("dict.txt")).expect("read dict.txt");
+    let det_data = fs::read(&det_file).expect("read det.rten");
+    let rec_data = fs::read(&rec_file).expect("read rec.rten");
+    let dict_text = fs::read_to_string(&dict_file).expect("read dict.txt");
 
     let pipeline = RtenOcrPipeline::new(det_data, rec_data, &dict_text).expect("pipeline init");
 

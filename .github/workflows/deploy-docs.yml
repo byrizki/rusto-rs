@@ -1,19 +1,14 @@
 name: Deploy docs to GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'docs/**'
-      - 'packages/web/**'
-      - '.github/workflows/deploy-docs.yml'
-  release:
-    types: [published]
   workflow_run:
-    workflows: ["Build & Release"]
+    workflows: ["Docs CI", "Build & Release"]
     types:
       - completed
+    branches:
+      - main
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:

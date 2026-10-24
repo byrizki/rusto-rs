@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'docs/**'
+      - 'packages/web/**'
       - '.github/workflows/docs-ci.yml'
       - '.github/workflows/deploy-docs.yml'
   pull_request:
@@ -13,6 +14,7 @@ on:
       - main
     paths:
       - 'docs/**'
+      - 'packages/web/**'
       - '.github/workflows/docs-ci.yml'
       - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
@@ -48,6 +50,11 @@ jobs:
 
       - name: Lint documentation
         run: yarn lint
+
+      - name: Prepare WASM runtime
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/prepare-wasm.sh
 
       - name: Build documentation
         run: yarn build
