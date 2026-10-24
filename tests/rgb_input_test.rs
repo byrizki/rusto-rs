@@ -24,6 +24,22 @@ fn null_rgb_handle_resets_outputs() {
     assert_eq!(count, 0);
 }
 
+#[test]
+fn null_rgb_spatial_handle_returns_null() {
+    let result = unsafe {
+        rocr_detect_text_rgb_spatial(
+            ptr::null_mut(),
+            ptr::null(),
+            0,
+            0,
+            0,
+            0,
+            ptr::null(),
+        )
+    };
+    assert!(result.is_null());
+}
+
 /// Run with RUSTO_TEST_MODELS pointing to PP-OCRv6 det.onnx/rec.onnx/dict.txt.
 #[test]
 #[ignore = "requires downloaded PP-OCRv6 models; set RUSTO_TEST_MODELS"]
@@ -55,6 +71,12 @@ fn rgb_matches_png_and_checks_ffi_contract() {
     assert!(lines.iter().any(|line| line.text.contains("HELLO")));
     assert_eq!(
         ocr.detect_text_rgb(&padded, w, h, stride, &opts).unwrap(),
+        expected
+    );
+    // Packed contiguous buffer fast path (stride == row)
+    let packed_rgb = img.as_raw().clone();
+    assert_eq!(
+        ocr.detect_text_rgb(&packed_rgb, w, h, row, &opts).unwrap(),
         expected
     );
     assert_eq!(padded, original);
@@ -135,6 +157,19 @@ fn rgb_matches_png_and_checks_ffi_contract() {
             }
             rocr_free_results(results, count);
         }
+        let spatial_ptr = rocr_detect_text_rgb_spatial(
+            handle,
+            padded.as_ptr(),
+            padded.len(),
+            w,
+            h,
+            stride,
+            options.as_ptr(),
+        );
+        assert!(!spatial_ptr.is_null());
+        let spatial_str = std::ffi::CStr::from_ptr(spatial_ptr).to_str().unwrap();
+        assert!(spatial_str.contains("HELLO"));
+        rocr_free_string(spatial_ptr);
         rocr_free(handle);
     }
 }

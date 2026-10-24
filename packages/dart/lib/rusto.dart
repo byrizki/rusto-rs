@@ -215,6 +215,92 @@ class RustO {
     }
   }
 
+  List<TextResult> detectTextRgb(
+    Uint8List pixels,
+    int width,
+    int height,
+    int stride, [
+    String optionsJson = '{}',
+  ]) {
+    _ensureNotDisposed();
+    if (pixels.isEmpty) return const [];
+
+    final cPixels = calloc<ffi.Uint8>(pixels.length);
+    cPixels.asTypedList(pixels.length).setAll(0, pixels);
+    final cOpts = optionsJson.toNativeUtf8();
+    final resultsPtrPtr = calloc<ffi.Pointer<CTextResult>>();
+    final countPtr = calloc<ffi.Size>();
+
+    try {
+      final status = _bindings.detectTextRgb(
+        _handle,
+        cPixels,
+        pixels.length,
+        width,
+        height,
+        stride,
+        cOpts,
+        resultsPtrPtr,
+        countPtr,
+      );
+      if (status != 0) {
+        throw StateError('Text detection failed with status: $status');
+      }
+      final results = resultsPtrPtr.value;
+      final count = countPtr.value;
+      try {
+        return _convertResults(results, count);
+      } finally {
+        if (results != ffi.nullptr) {
+          _bindings.freeResults(results.cast(), count);
+        }
+      }
+    } finally {
+      calloc.free(cPixels);
+      calloc.free(cOpts);
+      calloc.free(resultsPtrPtr);
+      calloc.free(countPtr);
+    }
+  }
+
+  String detectTextRgbSpatial(
+    Uint8List pixels,
+    int width,
+    int height,
+    int stride, [
+    String optionsJson = '{"output":"spatial"}',
+  ]) {
+    _ensureNotDisposed();
+    if (pixels.isEmpty) return '';
+
+    final cPixels = calloc<ffi.Uint8>(pixels.length);
+    cPixels.asTypedList(pixels.length).setAll(0, pixels);
+    final cOpts = optionsJson.toNativeUtf8();
+
+    try {
+      final strPtr = _bindings.detectTextRgbSpatial(
+        _handle,
+        cPixels,
+        pixels.length,
+        width,
+        height,
+        stride,
+        cOpts,
+      );
+      if (strPtr == ffi.nullptr) {
+        throw StateError('Spatial text detection failed');
+      }
+      try {
+        return strPtr.toDartString();
+      } finally {
+        _bindings.freeString(strPtr);
+      }
+    } finally {
+      calloc.free(cPixels);
+      calloc.free(cOpts);
+    }
+  }
+
   void dispose() {
     if (!_isDisposed && _handle != ffi.nullptr) {
       _bindings.free(_handle);

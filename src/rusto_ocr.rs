@@ -395,12 +395,17 @@ impl RustO {
         }
         #[cfg(not(feature = "use-opencv"))]
         {
-            let mut packed = Vec::new();
-            packed.try_reserve_exact(row_bytes * height as usize)
-                .map_err(|error| EngineError::ImageError(error.to_string()))?;
-            for row in 0..height as usize {
-                packed.extend_from_slice(&pixels[row * stride..row * stride + row_bytes]);
-            }
+            let packed = if stride == row_bytes {
+                pixels[..required].to_vec()
+            } else {
+                let mut buf = Vec::new();
+                buf.try_reserve_exact(row_bytes * height as usize)
+                    .map_err(|error| EngineError::ImageError(error.to_string()))?;
+                for row in 0..height as usize {
+                    buf.extend_from_slice(&pixels[row * stride..row * stride + row_bytes]);
+                }
+                buf
+            };
             let image = Mat::from_rgb8(width, height, packed)?;
             let output = self.run_on_mat_with_options(&image, options)?;
             match options.output {

@@ -221,6 +221,25 @@ impl RustO {
         Ok(convert_result(result))
     }
 
+    pub fn detect_text_rgb(
+        &self,
+        pixels: Vec<u8>,
+        width: u32,
+        height: u32,
+        stride: u64,
+        options: OcrRunOptions,
+    ) -> Result<DetectTextResult, RustoBindingError> {
+        let internal_options = convert_options(&options)?;
+        let mut guard = self.inner.lock().map_err(|_| RustoBindingError::Inference {
+            msg: "Internal engine lock poisoned".into(),
+        })?;
+        let stride_usize = usize::try_from(stride).map_err(|_| RustoBindingError::InvalidInput {
+            msg: "stride exceeds platform address space".into(),
+        })?;
+        let result = guard.detect_text_rgb(&pixels, width, height, stride_usize, &internal_options)?;
+        Ok(convert_result(result))
+    }
+
     pub fn version(&self) -> String {
         env!("CARGO_PKG_VERSION").to_string()
     }

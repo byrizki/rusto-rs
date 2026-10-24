@@ -1,4 +1,3 @@
-import 'dart:ffi' as ffi;
 import 'dart:io';
 import 'package:test/test.dart';
 import 'package:rusto/rusto.dart';

@@ -97,6 +97,48 @@ typedef RocrDetectTextDataSpatialDart = ffi.Pointer<Utf8> Function(
   ffi.Pointer<Utf8> optionsJson,
 );
 
+typedef RocrDetectTextRgbNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Void> handle,
+  ffi.Pointer<ffi.Uint8> pixels,
+  ffi.Size imageLen,
+  ffi.Uint32 width,
+  ffi.Uint32 height,
+  ffi.Size stride,
+  ffi.Pointer<Utf8> optionsJson,
+  ffi.Pointer<ffi.Pointer<CTextResult>> results,
+  ffi.Pointer<ffi.Size> count,
+);
+typedef RocrDetectTextRgbDart = int Function(
+  ffi.Pointer<ffi.Void> handle,
+  ffi.Pointer<ffi.Uint8> pixels,
+  int imageLen,
+  int width,
+  int height,
+  int stride,
+  ffi.Pointer<Utf8> optionsJson,
+  ffi.Pointer<ffi.Pointer<CTextResult>> results,
+  ffi.Pointer<ffi.Size> count,
+);
+
+typedef RocrDetectTextRgbSpatialNative = ffi.Pointer<Utf8> Function(
+  ffi.Pointer<ffi.Void> handle,
+  ffi.Pointer<ffi.Uint8> pixels,
+  ffi.Size imageLen,
+  ffi.Uint32 width,
+  ffi.Uint32 height,
+  ffi.Size stride,
+  ffi.Pointer<Utf8> optionsJson,
+);
+typedef RocrDetectTextRgbSpatialDart = ffi.Pointer<Utf8> Function(
+  ffi.Pointer<ffi.Void> handle,
+  ffi.Pointer<ffi.Uint8> pixels,
+  int imageLen,
+  int width,
+  int height,
+  int stride,
+  ffi.Pointer<Utf8> optionsJson,
+);
+
 typedef RocrFreeStringNative = ffi.Void Function(ffi.Pointer<Utf8> s);
 typedef RocrFreeStringDart = void Function(ffi.Pointer<Utf8> s);
 
@@ -112,6 +154,8 @@ class RustONativeBindings {
   final RocrDetectTextFileSpatialDart detectTextFileSpatial;
   final RocrDetectTextDataDart detectTextData;
   final RocrDetectTextDataSpatialDart detectTextDataSpatial;
+  final RocrDetectTextRgbDart detectTextRgb;
+  final RocrDetectTextRgbSpatialDart detectTextRgbSpatial;
   final RocrFreeStringDart freeString;
   final RocrFreeResultsDart freeResults;
   final RocrFreeDart free;
@@ -131,6 +175,12 @@ class RustONativeBindings {
             .asFunction(),
         detectTextDataSpatial = dylib
             .lookup<ffi.NativeFunction<RocrDetectTextDataSpatialNative>>('rocr_detect_text_data_spatial')
+            .asFunction(),
+        detectTextRgb = dylib
+            .lookup<ffi.NativeFunction<RocrDetectTextRgbNative>>('rocr_detect_text_rgb')
+            .asFunction(),
+        detectTextRgbSpatial = dylib
+            .lookup<ffi.NativeFunction<RocrDetectTextRgbSpatialNative>>('rocr_detect_text_rgb_spatial')
             .asFunction(),
         freeString = dylib
             .lookup<ffi.NativeFunction<RocrFreeStringNative>>('rocr_free_string')
