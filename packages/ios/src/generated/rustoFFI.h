@@ -268,6 +268,11 @@ uint64_t uniffi_rusto_fn_constructor_rusto_initialize_from_json(RustBuffer confi
 RustBuffer uniffi_rusto_fn_method_rusto_detect_text(uint64_t ptr, RustBuffer source, RustBuffer options, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_DETECT_TEXT_RGB
+#define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_DETECT_TEXT_RGB
+RustBuffer uniffi_rusto_fn_method_rusto_detect_text_rgb(uint64_t ptr, RustBuffer pixels, uint32_t width, uint32_t height, uint64_t stride, RustBuffer options, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_VERSION
 #define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_VERSION
 RustBuffer uniffi_rusto_fn_method_rusto_version(uint64_t ptr, RustCallStatus *_Nonnull out_status
@@ -571,6 +576,12 @@ uint16_t uniffi_rusto_checksum_func_rusto_version(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_DETECT_TEXT
 #define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_DETECT_TEXT
 uint16_t uniffi_rusto_checksum_method_rusto_detect_text(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_DETECT_TEXT_RGB
+#define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_DETECT_TEXT_RGB
+uint16_t uniffi_rusto_checksum_method_rusto_detect_text_rgb(void
     
 );
 #endif

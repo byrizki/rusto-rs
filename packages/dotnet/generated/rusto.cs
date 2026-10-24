@@ -15,7 +15,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
-namespace uniffi.rusto;
+namespace RustODotnet.Generated;
 
 
 
@@ -189,38 +189,38 @@ struct UniffiRustCallStatus {
 }
 
 // Base class for all uniffi exceptions
-internal class UniffiException: System.Exception {
+public class UniffiException: System.Exception {
     public UniffiException(): base() {}
     public UniffiException(string message): base(message) {}
 }
 
-internal class UndeclaredErrorException: UniffiException {
+public class UndeclaredErrorException: UniffiException {
     public UndeclaredErrorException(string message): base(message) {}
 }
 
-internal class PanicException: UniffiException {
+public class PanicException: UniffiException {
     public PanicException(string message): base(message) {}
 }
 
-internal class AllocationException: UniffiException {
+public class AllocationException: UniffiException {
     public AllocationException(string message): base(message) {}
 }
 
-internal class InternalException: UniffiException {
+public class InternalException: UniffiException {
     public InternalException(string message): base(message) {}
 }
 
-internal class InvalidEnumException: InternalException {
+public class InvalidEnumException: InternalException {
     public InvalidEnumException(string message): base(message) {
     }
 }
 
-internal class UniffiContractVersionException: UniffiException {
+public class UniffiContractVersionException: UniffiException {
     public UniffiContractVersionException(string message): base(message) {
     }
 }
 
-internal class UniffiContractChecksumException: UniffiException {
+public class UniffiContractChecksumException: UniffiException {
     public UniffiContractChecksumException(string message): base(message) {
     }
 }
@@ -1606,56 +1606,56 @@ static class _UniFFILib {
     static void uniffiCheckContractApiVersion() {
         var scaffolding_contract_version = _UniFFILib.ffi_rusto_uniffi_contract_version();
         if (30 != scaffolding_contract_version) {
-            throw new UniffiContractVersionException($"uniffi.rusto: uniffi bindings expected version `30`, library returned `{scaffolding_contract_version}`");
+            throw new UniffiContractVersionException($"RustODotnet.Generated: uniffi bindings expected version `30`, library returned `{scaffolding_contract_version}`");
         }
     }
     static void uniffiCheckApiChecksums() {
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_func_create_initialize_config_ppv6();
             if (checksum != 12132) {
-                throw new UniffiContractChecksumException($"uniffi.rusto: uniffi bindings expected function `uniffi_rusto_checksum_func_create_initialize_config_ppv6` checksum `12132`, library returned `{checksum}`");
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_create_initialize_config_ppv6` checksum `12132`, library returned `{checksum}`");
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_func_default_ocr_run_options();
             if (checksum != 50314) {
-                throw new UniffiContractChecksumException($"uniffi.rusto: uniffi bindings expected function `uniffi_rusto_checksum_func_default_ocr_run_options` checksum `50314`, library returned `{checksum}`");
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_default_ocr_run_options` checksum `50314`, library returned `{checksum}`");
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_func_rusto_version();
             if (checksum != 48676) {
-                throw new UniffiContractChecksumException($"uniffi.rusto: uniffi bindings expected function `uniffi_rusto_checksum_func_rusto_version` checksum `48676`, library returned `{checksum}`");
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_rusto_version` checksum `48676`, library returned `{checksum}`");
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_detect_text();
             if (checksum != 7671) {
-                throw new UniffiContractChecksumException($"uniffi.rusto: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text` checksum `7671`, library returned `{checksum}`");
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text` checksum `7671`, library returned `{checksum}`");
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_detect_text_rgb();
             if (checksum != 14239) {
-                throw new UniffiContractChecksumException($"uniffi.rusto: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text_rgb` checksum `14239`, library returned `{checksum}`");
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text_rgb` checksum `14239`, library returned `{checksum}`");
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_version();
             if (checksum != 27087) {
-                throw new UniffiContractChecksumException($"uniffi.rusto: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_version` checksum `27087`, library returned `{checksum}`");
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_version` checksum `27087`, library returned `{checksum}`");
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_constructor_rusto_initialize();
             if (checksum != 334) {
-                throw new UniffiContractChecksumException($"uniffi.rusto: uniffi bindings expected function `uniffi_rusto_checksum_constructor_rusto_initialize` checksum `334`, library returned `{checksum}`");
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_constructor_rusto_initialize` checksum `334`, library returned `{checksum}`");
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_constructor_rusto_initialize_from_json();
             if (checksum != 23041) {
-                throw new UniffiContractChecksumException($"uniffi.rusto: uniffi bindings expected function `uniffi_rusto_checksum_constructor_rusto_initialize_from_json` checksum `23041`, library returned `{checksum}`");
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_constructor_rusto_initialize_from_json` checksum `23041`, library returned `{checksum}`");
             }
         }
     }
@@ -1874,14 +1874,14 @@ class FfiConverterByteArray: FfiConverterRustBuffer<byte[]> {
 
 
 
-internal interface IRustO {
+public interface IRustO {
     /// <exception cref="RustoBindingException"></exception>
     DetectTextResult DetectText(ImageSource @source, OcrRunOptions @options);
     /// <exception cref="RustoBindingException"></exception>
     DetectTextResult DetectTextRgb(byte[] @pixels, uint @width, uint @height, ulong @stride, OcrRunOptions @options);
     string Version();
 }
-internal class RustO : IRustO, IDisposable {
+public class RustO : IRustO, IDisposable {
     protected ulong pointer;
     private int _wasDestroyed = 0;
     private long _callCounter = 1;
@@ -2043,7 +2043,7 @@ class FfiConverterTypeRustO: FfiConverter<RustO, ulong> {
 
 
 
-internal record CalibrationOptions (
+public record CalibrationOptions (
     float? DescreenStrength
 ) {
 }
@@ -2069,7 +2069,7 @@ class FfiConverterTypeCalibrationOptions: FfiConverterRustBuffer<CalibrationOpti
 
 
 
-internal record ClassificationConfig (
+public record ClassificationConfig (
     bool? Enabled, 
     string? ModelPath, 
     float? Thresh
@@ -2103,7 +2103,7 @@ class FfiConverterTypeClassificationConfig: FfiConverterRustBuffer<Classificatio
 
 
 
-internal record DetectionConfig (
+public record DetectionConfig (
     bool? Enabled, 
     string? ModelPath, 
     float? Thresh, 
@@ -2157,7 +2157,7 @@ class FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionConfig> {
 
 
 
-internal record DetectionRunOptions (
+public record DetectionRunOptions (
     int? LimitSideLen, 
     string? LimitType, 
     float[]? Mean, 
@@ -2199,7 +2199,7 @@ class FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer<DetectionRunOp
 
 
 
-internal record Frame (
+public record Frame (
     float Width, 
     float Height, 
     float Top, 
@@ -2237,7 +2237,7 @@ class FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
 
 
 
-internal record InitializeConfig (
+public record InitializeConfig (
     string? Template, 
     DetectionConfig? Detection, 
     RecognitionConfig? Recognition, 
@@ -2283,7 +2283,7 @@ class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig>
 
 
 
-internal record OcrRunOptions (
+public record OcrRunOptions (
     OutputGranularity Output, 
     float? LineYThreshold, 
     float? WordXThreshold, 
@@ -2361,7 +2361,7 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
 
 
 
-internal record OptimizationOptions (
+public record OptimizationOptions (
     float? CropPaddingX, 
     float? CropPaddingY
 ) {
@@ -2391,7 +2391,7 @@ class FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOp
 
 
 
-internal record OrientationConfig (
+public record OrientationConfig (
     bool? Enabled, 
     string? ModelPath, 
     float? Thresh
@@ -2425,7 +2425,7 @@ class FfiConverterTypeOrientationConfig: FfiConverterRustBuffer<OrientationConfi
 
 
 
-internal record Point2D (
+public record Point2D (
     float X, 
     float Y
 ) {
@@ -2455,7 +2455,7 @@ class FfiConverterTypePoint2D: FfiConverterRustBuffer<Point2D> {
 
 
 
-internal record PostprocessRunOptions (
+public record PostprocessRunOptions (
     float? Threshold, 
     float? BoxThreshold, 
     int? MaxCandidates, 
@@ -2497,7 +2497,7 @@ class FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<PostprocessR
 
 
 
-internal record RecognitionConfig (
+public record RecognitionConfig (
     bool? Enabled, 
     string? ModelPath, 
     string? DictPath
@@ -2531,7 +2531,7 @@ class FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<RecognitionConfi
 
 
 
-internal record TextResult (
+public record TextResult (
     string Text, 
     float Score, 
     Point2D[] BoxPoints, 
@@ -2569,7 +2569,7 @@ class FfiConverterTypeTextResult: FfiConverterRustBuffer<TextResult> {
 
 
 
-internal record UnwarpConfig (
+public record UnwarpConfig (
     bool? Enabled, 
     string? ModelPath
 ) {
@@ -2601,7 +2601,7 @@ class FfiConverterTypeUnwarpConfig: FfiConverterRustBuffer<UnwarpConfig> {
 
 
 
-internal record DetectTextResult {
+public record DetectTextResult {
     
     public record Structured (
         TextResult[] Results
@@ -2669,7 +2669,7 @@ class FfiConverterTypeDetectTextResult : FfiConverterRustBuffer<DetectTextResult
 
 
 
-internal record ImageSource {
+public record ImageSource {
     
     public record Path (
         string PathValue
@@ -2737,7 +2737,7 @@ class FfiConverterTypeImageSource : FfiConverterRustBuffer<ImageSource>{
 
 
 
-internal enum OutputGranularity: int {
+public enum OutputGranularity: int {
     Lines,
     Words,
     Spatial
@@ -2776,7 +2776,7 @@ class FfiConverterTypeOutputGranularity: FfiConverterRustBuffer<OutputGranularit
 
 
 
-internal class RustoBindingException: UniffiException {
+public class RustoBindingException: UniffiException {
     RustoBindingException() : base() {}
     RustoBindingException(String @Message) : base(@Message) {}
 
@@ -3509,7 +3509,7 @@ class FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer<TextResult[]> {
     }
 }
 #pragma warning restore 8625
-internal static class RustoMethods {
+public static class RustoMethods {
     public static InitializeConfig CreateInitializeConfigPpv6(string @detModelPath, string @recModelPath, string @dictPath) {
         return FfiConverterTypeInitializeConfig.INSTANCE.Lift(
     _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>

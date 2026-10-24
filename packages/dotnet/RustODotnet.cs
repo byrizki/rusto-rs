@@ -181,7 +181,7 @@ namespace RustODotnet
 
     public class RustO : IDisposable
     {
-        private readonly uniffi.rusto.RustO _inner;
+        private readonly RustODotnet.Generated.RustO _inner;
         private bool _disposed;
 
         static RustO()
@@ -224,7 +224,7 @@ namespace RustODotnet
         }
 #endif
 
-        public static string Version => uniffi.rusto.RustoMethods.RustoVersion();
+        public static string Version => RustODotnet.Generated.RustoMethods.RustoVersion();
 
         private RustO(InitializeConfig config)
         {
@@ -254,7 +254,7 @@ namespace RustODotnet
             string json = JsonSerializer.Serialize(config, options);
             try
             {
-                _inner = uniffi.rusto.RustO.InitializeFromJson(json);
+                _inner = RustODotnet.Generated.RustO.InitializeFromJson(json);
             }
             catch (Exception ex)
             {
@@ -302,10 +302,10 @@ namespace RustODotnet
             options ??= new OcrRunOptions();
             ValidateOptions(options, allowSpatial: true);
 
-            uniffi.rusto.ImageSource uniffiSource = source switch
+            RustODotnet.Generated.ImageSource uniffiSource = source switch
             {
-                UriImageSource uri => new uniffi.rusto.ImageSource.Path(uri.Value),
-                BytesImageSource bytes when bytes.Value != null => new uniffi.rusto.ImageSource.Bytes(bytes.Value),
+                UriImageSource uri => new RustODotnet.Generated.ImageSource.Path(uri.Value),
+                BytesImageSource bytes when bytes.Value != null => new RustODotnet.Generated.ImageSource.Bytes(bytes.Value),
                 _ => throw new ArgumentException("ImageSource must contain a URI or image bytes.", nameof(source))
             };
 
@@ -316,7 +316,7 @@ namespace RustODotnet
                 var result = _inner.DetectText(uniffiSource, uniffiOpts);
                 return result switch
                 {
-                    uniffi.rusto.DetectTextResult.Structured structured => new StructuredDetectTextResult(
+                    RustODotnet.Generated.DetectTextResult.Structured structured => new StructuredDetectTextResult(
                         structured.Results.Select(r => new TextResult
                         {
                             Text = r.Text,
@@ -325,7 +325,7 @@ namespace RustODotnet
                             Frame = new Frame(r.Frame.Width, r.Frame.Height, r.Frame.Top, r.Frame.Left)
                         }).ToArray()
                     ),
-                    uniffi.rusto.DetectTextResult.Spatial spatial => new SpatialDetectTextResult(spatial.Text),
+                    RustODotnet.Generated.DetectTextResult.Spatial spatial => new SpatialDetectTextResult(spatial.Text),
                     _ => throw new RustOException("Unexpected detection result format")
                 };
             }
@@ -348,7 +348,7 @@ namespace RustODotnet
                 var result = _inner.DetectTextRgb(pixels, width, height, stride, uniffiOpts);
                 return result switch
                 {
-                    uniffi.rusto.DetectTextResult.Structured structured => new StructuredDetectTextResult(
+                    RustODotnet.Generated.DetectTextResult.Structured structured => new StructuredDetectTextResult(
                         structured.Results.Select(r => new TextResult
                         {
                             Text = r.Text,
@@ -357,7 +357,7 @@ namespace RustODotnet
                             Frame = new Frame(r.Frame.Width, r.Frame.Height, r.Frame.Top, r.Frame.Left)
                         }).ToArray()
                     ),
-                    uniffi.rusto.DetectTextResult.Spatial spatial => new SpatialDetectTextResult(spatial.Text),
+                    RustODotnet.Generated.DetectTextResult.Spatial spatial => new SpatialDetectTextResult(spatial.Text),
                     _ => throw new RustOException("Unexpected detection result format")
                 };
             }
@@ -367,14 +367,14 @@ namespace RustODotnet
             }
         }
 
-        private static uniffi.rusto.OcrRunOptions BuildUniffiOptions(OcrRunOptions options)
+        private static RustODotnet.Generated.OcrRunOptions BuildUniffiOptions(OcrRunOptions options)
         {
-            var defaultOpts = uniffi.rusto.RustoMethods.DefaultOcrRunOptions();
+            var defaultOpts = RustODotnet.Generated.RustoMethods.DefaultOcrRunOptions();
             var uniffiOutput = options.Output switch
             {
-                OutputGranularity.Words => uniffi.rusto.OutputGranularity.Words,
-                OutputGranularity.Spatial => uniffi.rusto.OutputGranularity.Spatial,
-                _ => uniffi.rusto.OutputGranularity.Lines
+                OutputGranularity.Words => RustODotnet.Generated.OutputGranularity.Words,
+                OutputGranularity.Spatial => RustODotnet.Generated.OutputGranularity.Spatial,
+                _ => RustODotnet.Generated.OutputGranularity.Lines
             };
 
             return defaultOpts with
@@ -389,14 +389,14 @@ namespace RustODotnet
                 MaxSideLen = options.MaxSideLen,
                 MinSideLen = options.MinSideLen,
                 WidthHeightRatio = options.WidthHeightRatio,
-                Detection = options.Detection != null ? new uniffi.rusto.DetectionRunOptions(
+                Detection = options.Detection != null ? new RustODotnet.Generated.DetectionRunOptions(
                     options.Detection.LimitSideLen,
                     options.Detection.LimitType,
                     options.Detection.Mean,
                     options.Detection.Std,
                     null
                 ) : defaultOpts.Detection,
-                Postprocess = options.Postprocess != null ? new uniffi.rusto.PostprocessRunOptions(
+                Postprocess = options.Postprocess != null ? new RustODotnet.Generated.PostprocessRunOptions(
                     options.Postprocess.Threshold,
                     options.Postprocess.BoxThreshold,
                     options.Postprocess.MaxCandidates,

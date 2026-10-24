@@ -6,5 +6,5 @@ module_name = "RustOFFI"
 
 [bindings.csharp]
 cdylib_name = "rusto"
-namespace = "RustODotnet"
+namespace = "RustODotnet.Generated"
 access_modifier = "public"
