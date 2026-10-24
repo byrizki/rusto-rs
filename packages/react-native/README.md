@@ -1,5 +1,8 @@
 # React Native RustO
 
+[![npm](https://img.shields.io/npm/v/@rustors/react-native.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/@rustors/react-native)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 React Native OCR binding for RustO. Public API intentionally small:
 
 ```ts
@@ -52,7 +55,7 @@ dependencyResolutionManagement {
 
 // android/app/build.gradle
 dependencies {
-  implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:v0.3.1'
+  implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:0.3.2'
 }
 ```
 

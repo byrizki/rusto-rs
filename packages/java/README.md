@@ -1,5 +1,8 @@
 # rusto-java
 
+[![JitPack](https://jitpack.io/v/byrizki/rusto-rs.svg)](https://jitpack.io/#byrizki/rusto-rs)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Pure-Rust Optical Character Recognition (OCR) engine for JVM environments (Java, Kotlin, Scala) via JNA.
 
 ## Features

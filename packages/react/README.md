@@ -1,5 +1,8 @@
 # @rustors/react
 
+[![npm](https://img.shields.io/npm/v/@rustors/react.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/@rustors/react)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 > Official React hooks, provider, and UI components for [RustO!](https://github.com/byrizki/rusto-rs)
 
 ## Features

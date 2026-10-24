@@ -11,13 +11,33 @@ const badges = [
     href: 'https://docs.rs/rusto-rs',
   },
   {
+    alt: 'PyPI',
+    src: 'https://img.shields.io/pypi/v/rusto.svg?logo=pypi&logoColor=white&color=blue',
+    href: 'https://pypi.org/project/rusto/',
+  },
+  {
+    alt: 'npm (node)',
+    src: 'https://img.shields.io/npm/v/@rustors/node.svg?logo=node.js&logoColor=white&color=339933&label=npm%20node',
+    href: 'https://www.npmjs.com/package/@rustors/node',
+  },
+  {
+    alt: 'pub.dev (dart)',
+    src: 'https://img.shields.io/pub/v/rusto.svg?logo=dart&logoColor=white&color=0175C2&label=pub%20dart',
+    href: 'https://pub.dev/packages/rusto',
+  },
+  {
+    alt: 'pub.dev (flutter)',
+    src: 'https://img.shields.io/pub/v/rusto_flutter.svg?logo=flutter&logoColor=white&color=02569B&label=pub%20flutter',
+    href: 'https://pub.dev/packages/rusto_flutter',
+  },
+  {
     alt: 'NuGet',
     src: 'https://img.shields.io/nuget/v/RustODotnet.svg?logo=nuget&logoColor=white&color=004880',
     href: 'https://www.nuget.org/packages/RustODotnet',
   },
   {
-    alt: 'npm',
-    src: 'https://img.shields.io/npm/v/@rustors/react-native.svg?logo=npm&logoColor=white&color=CB3837',
+    alt: 'npm (react-native)',
+    src: 'https://img.shields.io/npm/v/@rustors/react-native.svg?logo=react&logoColor=white&color=61DAFB&label=npm%20rn',
     href: 'https://www.npmjs.com/package/@rustors/react-native',
   },
   {

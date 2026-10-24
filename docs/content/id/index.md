@@ -114,6 +114,30 @@ jitpack
 ---
 
 size: sm
+to: https://pypi.org/project/rusto/
+variant: outline
+icon: simple-icons-pypi
+---
+
+pypi
+:::
+
+:::u-button{class="mr-2"}
+---
+
+size: sm
+to: https://pub.dev/packages/rusto
+variant: outline
+icon: simple-icons-dart
+---
+
+pub.dev
+:::
+
+:::u-button{class="mr-2"}
+---
+
+size: sm
 to: https://snyk.io/open-source/
 variant: outline
 icon: simple-icons-snyk

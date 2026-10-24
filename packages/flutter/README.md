@@ -1,5 +1,8 @@
 # rusto_flutter
 
+[![pub.dev](https://img.shields.io/pub/v/rusto_flutter.svg?logo=flutter&logoColor=white&color=02569B)](https://pub.dev/packages/rusto_flutter)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Flutter plugin for RustO, a high-performance pure Rust OCR engine based on RapidOCR and PaddleOCR.
 
 ## Features

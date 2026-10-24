@@ -1,5 +1,8 @@
 # @rustors/node
 
+[![npm](https://img.shields.io/npm/v/@rustors/node.svg?logo=node.js&logoColor=white&color=339933)](https://www.npmjs.com/package/@rustors/node)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Pure Rust Optical Character Recognition (OCR) engine for Node.js via native N-API addons.
 
 ## Features

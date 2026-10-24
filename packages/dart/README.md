@@ -1,5 +1,8 @@
 # rusto
 
+[![pub.dev](https://img.shields.io/pub/v/rusto.svg?logo=dart&logoColor=white&color=0175C2)](https://pub.dev/packages/rusto)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Pure Rust OCR library bindings for Dart and Flutter based on RapidOCR and PaddleOCR.
 
 ## Features

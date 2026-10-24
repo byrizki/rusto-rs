@@ -6,8 +6,12 @@
 
 [![Crates.io](https://img.shields.io/crates/v/rusto-rs.svg?logo=rust&logoColor=white&color=orange)](https://crates.io/crates/rusto-rs)
 [![docs.rs](https://img.shields.io/docsrs/rusto-rs?logo=docs.rs&logoColor=white)](https://docs.rs/rusto-rs)
+[![PyPI](https://img.shields.io/pypi/v/rusto.svg?logo=pypi&logoColor=white&color=blue)](https://pypi.org/project/rusto/)
+[![npm (node)](https://img.shields.io/npm/v/@rustors/node.svg?logo=node.js&logoColor=white&color=339933&label=npm%20node)](https://www.npmjs.com/package/@rustors/node)
+[![npm (react-native)](https://img.shields.io/npm/v/@rustors/react-native.svg?logo=react&logoColor=white&color=61DAFB&label=npm%20rn)](https://www.npmjs.com/package/@rustors/react-native)
+[![pub.dev (dart)](https://img.shields.io/pub/v/rusto.svg?logo=dart&logoColor=white&color=0175C2&label=pub%20dart)](https://pub.dev/packages/rusto)
+[![pub.dev (flutter)](https://img.shields.io/pub/v/rusto_flutter.svg?logo=flutter&logoColor=white&color=02569B&label=pub%20flutter)](https://pub.dev/packages/rusto_flutter)
 [![NuGet](https://img.shields.io/nuget/v/RustODotnet.svg?logo=nuget&logoColor=white&color=004880)](https://www.nuget.org/packages/RustODotnet)
-[![npm](https://img.shields.io/npm/v/@rustors/react-native.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/@rustors/react-native)
 [![CocoaPods](https://img.shields.io/cocoapods/v/RustO.svg?logo=cocoapods&logoColor=white&color=EE3322)](https://cocoapods.org/pods/RustO)
 [![JitPack](https://jitpack.io/v/byrizki/rusto-rs.svg)](https://jitpack.io/#byrizki/rusto-rs)
 [![Build & Release](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml/badge.svg)](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml)

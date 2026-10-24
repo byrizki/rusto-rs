@@ -1,5 +1,8 @@
 # RustODotnet
 
+[![NuGet](https://img.shields.io/nuget/v/RustODotnet.svg?logo=nuget&logoColor=white&color=004880)](https://www.nuget.org/packages/RustODotnet)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 `RustODotnet` exposes canonical RustO OCR API for .NET. Initialize model session once, run many request-local detections, then dispose engine.
 
 ```bash

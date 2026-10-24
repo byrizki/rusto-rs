@@ -1,5 +1,8 @@
 # RustO for Python
 
+[![PyPI](https://img.shields.io/pypi/v/rusto.svg?logo=pypi&logoColor=white&color=blue)](https://pypi.org/project/rusto/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Pure Rust OCR library for Python based on RapidOCR and PaddleOCR architectures.
 
 ## Installation
