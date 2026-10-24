@@ -14,6 +14,8 @@ include = [
     "/src/**",
     "/Cargo.toml",
     "/README.md",
+    "/include/rusto.h",
+    "/docs/decoded-rgb.md",
     "/LICENSE*",
     "/CHANGELOG.md"
 ]
