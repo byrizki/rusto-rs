@@ -39,8 +39,8 @@ on:
         type: boolean
         required: false
         default: true
-      publish_java:
-        description: 'Publish Java & Android to Maven'
+      publish_jitpack:
+        description: 'Trigger JitPack Build (Android & Java)'
         type: boolean
         required: false
         default: true
@@ -306,66 +306,29 @@ jobs:
           PUB_TOKEN: ${{ secrets.PUB_DEV_TOKEN }}
         continue-on-error: true
 
-  # Publish Java & Android to Maven
-  publish-java:
-    name: Publish Java & Android to Maven
+  # Trigger JitPack build for Android & Java
+  publish-jitpack:
+    name: Trigger JitPack Build (Android & Java)
     runs-on: ubuntu-latest
     if: >-
       (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') && !startsWith(github.event.release.tag_name, 'models-')) ||
-      github.event.inputs.publish_java == 'true'
+      github.event.inputs.publish_jitpack == 'true'
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Download release packages
+      - name: Trigger JitPack build
         run: |
-          VERSION="${{ github.event.inputs.version || github.event.release.tag_name || github.ref_name }}"
-          VERSION="${VERSION#v}"
-
-          mkdir -p release-packages
-          gh release download "v${VERSION}" -p "*.jar" -p "*.aar" -D release-packages/ || true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify release packages before publishing
-        run: |
-          if compgen -G "release-packages/*" > /dev/null; then
-            chmod +x scripts/verify-packed-packages.py
-            python3 scripts/verify-packed-packages.py --dir release-packages/
+          TAG="${{ github.event.inputs.version || github.event.release.tag_name || github.ref_name }}"
+          if [[ ! "$TAG" =~ ^v ]]; then
+            TAG="v${TAG}"
           fi
+          echo "Triggering JitPack build for byrizki/rusto-rs tag: $TAG..."
 
-      - name: Publish Android AAR to Maven
-        working-directory: packages/android
-        run: |
-          chmod +x gradlew || true
-          if [ -n "${{ secrets.OSSRH_TOKEN }}" ]; then
-            ./gradlew publishToMavenCentral --no-daemon || ./gradlew publish || true
-          else
-            echo "OSSRH_TOKEN not configured; skipping Android Maven publish"
-          fi
-        env:
-          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          OSSRH_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
-          SIGNING_KEY_ID: ${{ secrets.SIGNING_KEY_ID }}
-          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
-          SIGNING_SECRET_KEY: ${{ secrets.SIGNING_SECRET_KEY }}
-        continue-on-error: true
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "https://jitpack.io/api/builds/com.github.byrizki/rusto-rs/${TAG}")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
 
-      - name: Publish Java JAR to Maven
-        working-directory: packages/java
-        run: |
-          chmod +x gradlew || true
-          if [ -n "${{ secrets.OSSRH_TOKEN }}" ]; then
-            ./gradlew publish --no-daemon || true
-          else
-            echo "OSSRH_TOKEN not configured; skipping Java Maven publish"
-          fi
-        env:
-          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          OSSRH_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
+          echo "JitPack API response ($HTTP_CODE):"
+          echo "$BODY"
+
+          curl -s -I "https://jitpack.io/com/github/byrizki/rusto-rs/${TAG}/build.log" || true
+          echo "JitPack build request dispatched for $TAG"
         continue-on-error: true

@@ -24,3 +24,4 @@ before_install:
 
 install:
   - cd packages/android && ./gradlew publishToMavenLocal -x test
+  - cd ../java && ./gradlew publishToMavenLocal -x test
