@@ -21,11 +21,9 @@
   "files": [
     "src",
     "lib",
-    "android/build.gradle",
-    "android/src",
-    "ios/Rusto.m",
-    "ios/Rusto.swift",
-    "ios/react-native-rusto-Bridging-Header.h",
+    "android",
+    "ios",
+    "Package.swift",
     "cpp",
     "react-native.config.js",
     "*.podspec"
@@ -40,6 +38,10 @@
   },
   "scripts": {
     "test": "jest",
+    "test:both-arch": "cd example && npx tsx scripts/test-both-arch.ts",
+    "test:e2e:maestro": "cd example && maestro test .maestro/ocr-flow.yaml",
+    "test:e2e:android": "cd example && bash scripts/run-android-e2e.sh",
+    "test:e2e:ios": "cd example && bash scripts/run-ios-e2e.sh",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
@@ -77,6 +79,10 @@
     ]
   },
   "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/example/"
+    ],
     "modulePathIgnorePatterns": [
       "<rootDir>/example/node_modules",
       "<rootDir>/lib/"

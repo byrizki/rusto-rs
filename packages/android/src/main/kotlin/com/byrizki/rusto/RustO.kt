@@ -169,6 +169,7 @@ data class DetectionRunOptions(
     val limitType: String? = null,
     val mean: FloatArray? = null,
     val std: FloatArray? = null,
+    val postprocess: PostprocessRunOptions? = null,
 )
 
 data class OcrRunOptions(
@@ -260,25 +261,18 @@ sealed interface DetectTextResult {
 
 class RustO private constructor(
     private val context: Context,
-    private var nativeHandle: Long,
+    private var engine: uniffi.rusto.RustO?,
 ) : AutoCloseable {
 
     companion object {
-        init { System.loadLibrary("rusto") }
-
-        @JvmStatic private external fun nativeInitialize(configJson: String): Long
-        @JvmStatic private external fun nativeDetectTextFile(handle: Long, imagePath: String, optionsJson: String, resultsOut: LongArray, countOut: IntArray): Int
-        @JvmStatic private external fun nativeDetectTextData(handle: Long, imageData: ByteArray, optionsJson: String, resultsOut: LongArray, countOut: IntArray): Int
-        @JvmStatic private external fun nativeDetectTextFileSpatial(handle: Long, imagePath: String, optionsJson: String): String?
-        @JvmStatic private external fun nativeDetectTextDataSpatial(handle: Long, imageData: ByteArray, optionsJson: String): String?
-        @JvmStatic private external fun nativeGetResult(resultsPtr: Long, index: Int, textOut: Array<String>, scoreOut: FloatArray, boxOut: FloatArray)
-        @JvmStatic private external fun nativeFreeResults(resultsPtr: Long, count: Int)
-        @JvmStatic private external fun nativeFree(handle: Long)
-
         fun initialize(context: Context, config: InitializeConfig = InitializeConfig()): RustO {
-            val handle = nativeInitialize(config.toJson(context))
-            if (handle == 0L) throw RustOException("Failed to initialize RustO with config")
-            return RustO(context.applicationContext, handle)
+            val json = config.toJson(context)
+            val engine = try {
+                uniffi.rusto.RustO.initializeFromJson(json)
+            } catch (e: Exception) {
+                throw RustOException("Failed to initialize RustO with config: ${e.message}")
+            }
+            return RustO(context.applicationContext, engine)
         }
 
         internal fun copyAssetToCache(context: Context, assetName: String): String {
@@ -286,48 +280,104 @@ class RustO private constructor(
             if (cacheFile.exists() && cacheFile.length() > 0) return cacheFile.absolutePath
             cacheFile.parentFile?.mkdirs()
             val tmpFile = File(cacheFile.parent, "${cacheFile.name}.tmp")
-            try {
-                context.assets.open(assetName).use { input -> tmpFile.outputStream().use(input::copyTo) }
-                tmpFile.renameTo(cacheFile)
-            } catch (e: java.io.IOException) {
-                tmpFile.delete()
-                throw RustOException("Model asset not found or unreadable: '$assetName'. Cause: ${e.message}")
+            val candidates = mutableListOf(assetName)
+            if (assetName.endsWith(".rten")) {
+                candidates.add(assetName.removeSuffix(".rten") + ".onnx")
+            } else if (assetName.endsWith(".onnx")) {
+                candidates.add(assetName.removeSuffix(".onnx") + ".rten")
             }
-            return cacheFile.absolutePath
+            var lastEx: Exception? = null
+            for (candidate in candidates) {
+                try {
+                    context.assets.open(candidate).use { input -> tmpFile.outputStream().use(input::copyTo) }
+                    tmpFile.renameTo(cacheFile)
+                    return cacheFile.absolutePath
+                } catch (e: Exception) {
+                    lastEx = e
+                    tmpFile.delete()
+                }
+            }
+            throw RustOException("Model asset not found or unreadable: '$assetName'. Cause: ${lastEx?.message}")
         }
     }
 
     fun detectText(source: ImageSource, options: OcrRunOptions = OcrRunOptions()): DetectTextResult {
-        check(nativeHandle != 0L) { "RustO is closed." }
-        val optionsJson = options.toJson()
-        return when (options.output) {
-            OutputGranularity.SPATIAL -> DetectTextResult.Spatial(detectSpatial(source, optionsJson))
-            OutputGranularity.LINES, OutputGranularity.WORDS -> DetectTextResult.Structured(detectStructured(source, optionsJson))
-        }
-    }
-
-    private fun detectStructured(source: ImageSource, optionsJson: String): List<TextResult> {
-        val resultsOut = LongArray(1)
-        val countOut = IntArray(1)
-        val status = when (source) {
-            is ImageSource.Bytes -> nativeDetectTextData(nativeHandle, source.value, optionsJson, resultsOut, countOut)
+        val activeEngine = engine ?: throw IllegalStateException("RustO is closed.")
+        val uniffiSource = when (source) {
+            is ImageSource.Bytes -> uniffi.rusto.ImageSource.Bytes(source.value)
             is ImageSource.Uri -> withUriInput(source.value) { path, bytes ->
-                if (bytes != null) nativeDetectTextData(nativeHandle, bytes, optionsJson, resultsOut, countOut)
-                else nativeDetectTextFile(nativeHandle, path!!, optionsJson, resultsOut, countOut)
+                if (bytes != null) uniffi.rusto.ImageSource.Bytes(bytes)
+                else uniffi.rusto.ImageSource.Path(path!!)
             }
         }
-        if (status != 0) throw RustOException("OCR detection failed with status: $status")
-        try { return parseResults(resultsOut[0], countOut[0]) }
-        finally { nativeFreeResults(resultsOut[0], countOut[0]) }
-    }
+        val uniffiOptions = uniffi.rusto.OcrRunOptions(
+            output = when (options.output) {
+                OutputGranularity.LINES -> uniffi.rusto.OutputGranularity.LINES
+                OutputGranularity.WORDS -> uniffi.rusto.OutputGranularity.WORDS
+                OutputGranularity.SPATIAL -> uniffi.rusto.OutputGranularity.SPATIAL
+            },
+            lineYThreshold = options.lineYThreshold,
+            wordXThreshold = options.wordXThreshold,
+            textScore = options.textScore,
+            classification = options.classification,
+            orientation = options.orientation,
+            minHeight = options.minHeight,
+            maxSideLen = options.maxSideLen,
+            minSideLen = options.minSideLen,
+            widthHeightRatio = options.widthHeightRatio,
+            detection = options.detection?.let { d ->
+                uniffi.rusto.DetectionRunOptions(
+                    limitSideLen = d.limitSideLen,
+                    limitType = d.limitType,
+                    mean = d.mean?.toList(),
+                    std = d.std?.toList(),
+                    postprocess = d.postprocess?.let { p ->
+                        uniffi.rusto.PostprocessRunOptions(
+                            threshold = p.threshold,
+                            boxThreshold = p.boxThreshold,
+                            maxCandidates = p.maxCandidates,
+                            unclipRatio = p.unclipRatio,
+                            useDilation = p.useDilation,
+                        )
+                    }
+                )
+            },
+            postprocess = options.postprocess?.let { p ->
+                uniffi.rusto.PostprocessRunOptions(
+                    threshold = p.threshold,
+                    boxThreshold = p.boxThreshold,
+                    maxCandidates = p.maxCandidates,
+                    unclipRatio = p.unclipRatio,
+                    useDilation = p.useDilation,
+                )
+            },
+            calibration = null,
+            optimization = null,
+        )
 
-    private fun detectSpatial(source: ImageSource, optionsJson: String): String = when (source) {
-        is ImageSource.Bytes -> nativeDetectTextDataSpatial(nativeHandle, source.value, optionsJson)
-        is ImageSource.Uri -> withUriInput(source.value) { path, bytes ->
-            if (bytes != null) nativeDetectTextDataSpatial(nativeHandle, bytes, optionsJson)
-            else nativeDetectTextFileSpatial(nativeHandle, path!!, optionsJson)
+        return try {
+            when (val res = activeEngine.detectText(uniffiSource, uniffiOptions)) {
+                is uniffi.rusto.DetectTextResult.Spatial -> DetectTextResult.Spatial(res.text)
+                is uniffi.rusto.DetectTextResult.Structured -> DetectTextResult.Structured(
+                    res.results.map { item ->
+                        TextResult(
+                            text = item.text,
+                            score = item.score,
+                            boxPoints = item.boxPoints.map { Point2D(it.x, it.y) },
+                            frame = Frame(
+                                width = item.frame.width,
+                                height = item.frame.height,
+                                top = item.frame.top,
+                                left = item.frame.left,
+                            )
+                        )
+                    }
+                )
+            }
+        } catch (e: Exception) {
+            throw RustOException("OCR detection failed: ${e.message}")
         }
-    } ?: throw RustOException("OCR detection failed")
+    }
 
     private inline fun <T> withUriInput(value: String, action: (String?, ByteArray?) -> T): T {
         require(value.isNotBlank()) { "Image URI must be non-empty." }
@@ -344,23 +394,9 @@ class RustO private constructor(
         return action(path, null)
     }
 
-    private fun parseResults(resultsPtr: Long, count: Int): List<TextResult> {
-        val results = ArrayList<TextResult>(count)
-        val textOut = arrayOf("")
-        val scoreOut = FloatArray(1)
-        val boxOut = FloatArray(8)
-        for (i in 0 until count) {
-            nativeGetResult(resultsPtr, i, textOut, scoreOut, boxOut)
-            val points = listOf(Point2D(boxOut[0], boxOut[1]), Point2D(boxOut[2], boxOut[3]), Point2D(boxOut[4], boxOut[5]), Point2D(boxOut[6], boxOut[7]))
-            results += TextResult(textOut[0], scoreOut[0], points)
-        }
-        return results
-    }
-
     override fun close() {
-        if (nativeHandle != 0L) {
-            nativeFree(nativeHandle)
-            nativeHandle = 0L
-        }
+        engine?.close()
+        engine = null
     }
 }
+

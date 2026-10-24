@@ -18,8 +18,9 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '12.0'
   s.swift_version = '5.0'
 
-  # Swift source files
-  s.source_files = 'src/**/*.swift'
+  # Swift, Objective-C, and FFI header source files
+  s.source_files = 'src/**/*.{swift,h}', 'src/generated/**/*.{swift,h}'
+  s.public_header_files = 'src/**/*.h'
   
   # XCFramework selects exactly one platform slice. Do not glob individual
   # static archives: CocoaPods otherwise adds device and simulator libraries,

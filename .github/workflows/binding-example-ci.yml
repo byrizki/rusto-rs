@@ -441,3 +441,105 @@ jobs:
             --source https://api.nuget.org/v3/index.json
       - run: dotnet build examples/dotnet/RustODotnet.Example.sln --configuration Release --no-restore -p:RustOArtifactVersion="$RUSTO_ARTIFACT_VERSION"
       - run: dotnet test examples/dotnet/RustODotnet.Example.sln --configuration Release --no-build -p:RustOArtifactVersion="$RUSTO_ARTIFACT_VERSION"
+
+  flutter-example:
+    name: Flutter example app, widget test & Maestro flow validation
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      - name: Flutter plugin analyze
+        working-directory: packages/flutter
+        run: |
+          flutter pub get
+          flutter analyze
+      - name: Flutter example analyze & test
+        working-directory: packages/flutter/example
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Verify Maestro flow specification
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          export PATH="${PATH}:${HOME}/.maestro/bin"
+          maestro --version
+          test -f packages/flutter/example/.maestro/ocr-flow.yaml
+
+  node-contract:
+    name: Node.js N-API binding contract test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test Node binding
+        working-directory: packages/node
+        run: |
+          npm test
+
+  python-contract:
+    name: Python binding contract test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test Python binding
+        working-directory: packages/python
+        run: |
+          python -m unittest discover -s tests
+
+  dart-contract:
+    name: Dart FFI binding test & analyze
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - name: Analyze & test Dart package
+        working-directory: packages/dart
+        run: |
+          dart pub get
+          dart analyze
+          dart test
+
+  go-contract:
+    name: Go Cgo binding contract test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build Rust library
+        run: cargo build --release --features ffi
+      - name: Test Go binding
+        working-directory: packages/go
+        run: |
+          go test -v ./...
+
+  java-contract:
+    name: Java JNA binding contract test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build Rust library
+        run: cargo build --release --features ffi
+      - name: Test Java binding
+        working-directory: packages/java
+        run: |
+          ./gradlew test
+

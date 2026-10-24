@@ -264,6 +264,12 @@ jobs:
           cp npm-models/*model*.tgz model-releases/ 2>/dev/null || true
           (cd model-releases && sha256sum * > SHA256SUMS 2>/dev/null || true)
 
+      - name: Verify Packed Model Release Packages
+        if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
+        run: |
+          chmod +x scripts/verify-packed-packages.py
+          python3 scripts/verify-packed-packages.py --dir model-releases/
+
       - name: Upload All Model Release Files Artifact
         if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
         uses: actions/upload-artifact@v4
@@ -329,6 +335,11 @@ jobs:
           name: rusto-models-dotnet-nupkg
           path: nupkg
 
+      - name: Verify .NET Model Packages
+        run: |
+          chmod +x scripts/verify-packed-packages.py
+          python3 scripts/verify-packed-packages.py --dir nupkg/
+
       - name: Publish Models to NuGet
         run: |
           find nupkg -name "*.nupkg" -type f | xargs -r -P 4 -I {} sh -c '
@@ -360,6 +371,11 @@ jobs:
         with:
           name: rusto-models-npm-packages
           path: npm-models
+
+      - name: Verify NPM Model Packages
+        run: |
+          chmod +x scripts/verify-packed-packages.py
+          python3 scripts/verify-packed-packages.py --dir npm-models/
 
       - name: Publish Models to NPM
         run: |

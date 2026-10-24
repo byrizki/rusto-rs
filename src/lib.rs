@@ -57,6 +57,13 @@ mod contours;
 #[cfg(feature = "ffi")]
 pub mod ffi;
 
+// UniFFI bindings
+#[cfg(feature = "uniffi")]
+uniffi::setup_scaffolding!();
+
+#[cfg(feature = "uniffi")]
+pub mod binding;
+
 // Public API exports
 pub use calibration::{CalibrationOptions, OptimizationOptions};
 pub use config::{ModelPreset, InitializeConfig, PPV3_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG};

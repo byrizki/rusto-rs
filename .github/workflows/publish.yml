@@ -105,7 +105,12 @@ jobs:
           gh release download "v${VERSION}" -p "RustODotnet.*.nupkg" -Dpackages/dotnet || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
+      - name: Verify NuGet packages before publishing
+        run: |
+          chmod +x scripts/verify-packed-packages.py
+          python3 scripts/verify-packed-packages.py --dir packages/dotnet/
+
       - name: Publish Core to NuGet
         working-directory: packages/dotnet
         run: |
@@ -144,7 +149,12 @@ jobs:
           gh release download "v${VERSION}" -p "rustors-*.tgz" -D npm-packages/ || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
+
+      - name: Verify NPM packages before publishing
+        run: |
+          chmod +x scripts/verify-packed-packages.py
+          python3 scripts/verify-packed-packages.py --dir npm-packages/
+
       - name: Publish Core to NPM
         run: |
           find npm-packages -name "*.tgz" -type f | while read -r pkg; do
