@@ -70,3 +70,137 @@ extension RustO {
         return path.removingPercentEncoding ?? path
     }
 }
+
+extension InitializeConfig {
+    public init(
+        template: String? = nil,
+        detection: DetectionConfig? = nil,
+        recognition: RecognitionConfig? = nil,
+        classification: ClassificationConfig? = nil,
+        orientation: OrientationConfig? = nil,
+        unwarp: UnwarpConfig? = nil
+    ) {
+        self.init(
+            template: template,
+            detection: detection,
+            recognition: recognition,
+            classification: classification,
+            orientation: orientation,
+            unwarp: unwarp
+        )
+    }
+}
+
+extension DetectionConfig {
+    public init(
+        enabled: Bool? = nil,
+        modelPath: String? = nil,
+        thresh: Float? = nil,
+        boxThresh: Float? = nil,
+        unclipRatio: Float? = nil,
+        limitSideLen: Int32? = nil,
+        limitType: String? = nil,
+        useDilation: Bool? = nil
+    ) {
+        self.init(
+            enabled: enabled,
+            modelPath: modelPath,
+            thresh: thresh,
+            boxThresh: boxThresh,
+            unclipRatio: unclipRatio,
+            limitSideLen: limitSideLen,
+            limitType: limitType,
+            useDilation: useDilation
+        )
+    }
+}
+
+extension RecognitionConfig {
+    public init(
+        enabled: Bool? = nil,
+        modelPath: String? = nil,
+        dictPath: String? = nil
+    ) {
+        self.init(
+            enabled: enabled,
+            modelPath: modelPath,
+            dictPath: dictPath
+        )
+    }
+}
+
+extension ClassificationConfig {
+    public init(
+        enabled: Bool? = nil,
+        modelPath: String? = nil,
+        thresh: Float? = nil
+    ) {
+        self.init(
+            enabled: enabled,
+            modelPath: modelPath,
+            thresh: thresh
+        )
+    }
+}
+
+extension OrientationConfig {
+    public init(
+        enabled: Bool? = nil,
+        modelPath: String? = nil,
+        thresh: Float? = nil
+    ) {
+        self.init(
+            enabled: enabled,
+            modelPath: modelPath,
+            thresh: thresh
+        )
+    }
+}
+
+extension UnwarpConfig {
+    public init(
+        enabled: Bool? = nil,
+        modelPath: String? = nil
+    ) {
+        self.init(
+            enabled: enabled,
+            modelPath: modelPath
+        )
+    }
+}
+
+extension RuntimeOptions {
+    public init(
+        output: OutputGranularity = .lines,
+        lineYThreshold: Float? = nil,
+        wordXThreshold: Float? = nil,
+        textScore: Float? = nil,
+        classification: Bool? = nil,
+        orientation: Bool? = nil,
+        minHeight: Float? = nil,
+        maxSideLen: Float? = nil,
+        minSideLen: Float? = nil,
+        widthHeightRatio: Float? = nil,
+        detection: DetectionRunOptions? = nil,
+        postprocess: PostprocessRunOptions? = nil,
+        calibration: CalibrationOptions? = nil,
+        optimization: OptimizationOptions? = nil
+    ) {
+        self.init(
+            output: output,
+            lineYThreshold: lineYThreshold,
+            wordXThreshold: wordXThreshold,
+            textScore: textScore,
+            classification: classification,
+            orientation: orientation,
+            minHeight: minHeight,
+            maxSideLen: maxSideLen,
+            minSideLen: minSideLen,
+            widthHeightRatio: widthHeightRatio,
+            detection: detection,
+            postprocess: postprocess,
+            calibration: calibration,
+            optimization: optimization
+        )
+    }
+}

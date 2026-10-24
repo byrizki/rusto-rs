@@ -21,6 +21,8 @@ ffi.DynamicLibrary _openDefaultDynamicLibrary() {
       '../target/debug/librusto.so',
       '../../target/release/librusto.so',
       '../../target/debug/librusto.so',
+      '../../../target/release/librusto.so',
+      '../../../target/debug/librusto.so',
     ];
     for (final p in candidates) {
       try {
@@ -32,9 +34,45 @@ ffi.DynamicLibrary _openDefaultDynamicLibrary() {
     try {
       return ffi.DynamicLibrary.process();
     } catch (_) {
+      final envPath = Platform.environment['RUSTO_LIB_PATH'];
+      final candidates = [
+        if (envPath != null && envPath.isNotEmpty) envPath,
+        'librusto.dylib',
+        'target/release/librusto.dylib',
+        'target/debug/librusto.dylib',
+        '../target/release/librusto.dylib',
+        '../target/debug/librusto.dylib',
+        '../../target/release/librusto.dylib',
+        '../../target/debug/librusto.dylib',
+        '../../../target/release/librusto.dylib',
+        '../../../target/debug/librusto.dylib',
+      ];
+      for (final p in candidates) {
+        try {
+          return ffi.DynamicLibrary.open(p);
+        } catch (_) {}
+      }
       return ffi.DynamicLibrary.open('librusto.dylib');
     }
   } else if (Platform.isWindows) {
+    final envPath = Platform.environment['RUSTO_LIB_PATH'];
+    final candidates = [
+      if (envPath != null && envPath.isNotEmpty) envPath,
+      'rusto.dll',
+      'target/release/rusto.dll',
+      'target/debug/rusto.dll',
+      '../target/release/rusto.dll',
+      '../target/debug/rusto.dll',
+      '../../target/release/rusto.dll',
+      '../../target/debug/rusto.dll',
+      '../../../target/release/rusto.dll',
+      '../../../target/debug/rusto.dll',
+    ];
+    for (final p in candidates) {
+      try {
+        return ffi.DynamicLibrary.open(p);
+      } catch (_) {}
+    }
     return ffi.DynamicLibrary.open('rusto.dll');
   }
   return ffi.DynamicLibrary.process();

@@ -451,6 +451,10 @@ jobs:
         with:
           channel: 'stable'
           cache: true
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build Rust library
+        run: cargo build --release --features ffi
       - name: Flutter plugin analyze
         working-directory: packages/flutter
         run: |

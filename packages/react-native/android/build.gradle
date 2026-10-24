@@ -79,14 +79,14 @@ dependencies {
   implementation 'net.java.dev.jna:jna:5.14.0@aar'
   
   def libsDir = file('libs')
-  def hasLocalLibs = libsDir.exists() && libsDir.listFiles()?.any { it.name.endsWith('.jar') }
+  def hasLocalAar = libsDir.exists() && libsDir.listFiles()?.any { it.name.endsWith('.aar') || it.name.endsWith('.jar') }
 
   if (rootProject.findProject(':rusto-android') != null) {
     // Monorepo development mode where :rusto-android is included in root project settings.gradle
     implementation project(':rusto-android')
-  } else if (hasLocalLibs) {
-    // Standalone / bundled mode using prebuilt JAR in libs/
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
+  } else if (hasLocalAar) {
+    // Standalone / bundled mode using prebuilt AAR or JAR in libs/
+    implementation fileTree(dir: 'libs', include: ['*.aar', '*.jar'])
   } else {
     // Fallback to JitPack coordinate
     def rustoAndroidVersion = safeExtGet('RustoAndroid_version', 'v0.3.1')
