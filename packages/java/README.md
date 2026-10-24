@@ -1,0 +1,66 @@
+# rusto-java
+
+Pure-Rust Optical Character Recognition (OCR) engine for JVM environments (Java, Kotlin, Scala) via JNA.
+
+## Features
+
+- **Zero JNI Boilerplate**: Clean Java Native Access (JNA) bindings directly invoking RustO C ABI.
+- **AutoCloseable**: Implements `AutoCloseable` for clean `try-with-resources` memory reclamation.
+- **Rich Document Models**: Immutable records/classes for `TextResult`, `Frame`, and bounding boxes.
+- **Spatial Formatting**: Extract structured bounding boxes or reconstructed 2D visual layouts.
+
+## Installation
+
+### Gradle (Kotlin DSL)
+
+```kotlin
+implementation("com.github.byrizki:rusto-java:0.3.1")
+```
+
+### Maven
+
+```xml
+<dependency>
+    <groupId>com.github.byrizki</groupId>
+    <artifactId>rusto-java</artifactId>
+    <version>0.3.1</version>
+</dependency>
+```
+
+Ensure `librusto` is in your `java.library.path` or `jna.library.path`.
+
+## Quick Start
+
+```java
+import com.byrizki.rusto.RustO;
+import com.byrizki.rusto.TextResult;
+import java.util.List;
+
+public class Main {
+    public static void main(String[] args) {
+        String config = """
+            {
+                "detection": { "model_path": "models/PPOCR_v6/det.rten" },
+                "recognition": { "model_path": "models/PPOCR_v6/rec.rten", "dict_path": "models/PPOCR_v6/dict.txt" }
+            }
+            """;
+
+        try (RustO engine = RustO.initialize(config)) {
+            // Structured OCR
+            List<TextResult> results = engine.detectTextFile("invoice.png", "{}");
+            for (TextResult r : results) {
+                System.out.printf("[%0.2f] %s%n", r.score(), r.text());
+            }
+
+            // Spatial OCR
+            String spatial = engine.detectTextFileSpatial("invoice.png", "{}");
+            System.out.println("--- Spatial Text ---");
+            System.out.println(spatial);
+        }
+    }
+}
+```
+
+## License
+
+MIT License

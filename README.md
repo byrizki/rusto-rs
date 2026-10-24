@@ -35,10 +35,16 @@
 | Platform | Package | Description |
 |---|---|---|
 | **Rust** | [`cargo add rusto-rs`](https://crates.io/crates/rusto-rs) | Pure Rust library and CLI |
+| **Node.js (N-API)** | [`@rustors/node`](https://www.npmjs.com/package/@rustors/node) | Native Node.js N-API addon |
+| **Python** | [`pip install rusto`](https://pypi.org/project/rusto) | UniFFI Python library & wheel |
+| **Golang** | [`packages/go`](https://pkg.go.dev/github.com/byrizki/rusto-rs/packages/go) | Cgo Go module with embedded rpath |
+| **Java (JVM)** | `com.github.byrizki:rusto-java` | Java & Kotlin JNA library |
+| **Dart** | [`rusto`](https://pub.dev/packages/rusto) | Pure Dart FFI library |
+| **Flutter** | [`rusto_flutter`](https://pub.dev/packages/rusto_flutter) | Flutter plugin with Android & iOS bridges |
 | **Web (WASM)** | [`@rustors/web`](https://www.npmjs.com/package/@rustors/web) | Browser-native WASM engine |
 | **React** | [`@rustors/react`](https://www.npmjs.com/package/@rustors/react) | React hooks and components |
 | **React Native** | [`@rustors/react-native`](https://www.npmjs.com/package/@rustors/react-native) | iOS and Android native bridge |
-| **iOS** | [`pod 'RustO'`](https://cocoapods.org/pods/RustO) | Swift library & XCFramework |
+| **iOS** | `Package.swift` / [`pod 'RustO'`](https://cocoapods.org/pods/RustO) | Swift Package Manager & CocoaPods |
 | **Android** | [`rusto-android`](https://jitpack.io/#byrizki/rusto-rs) | Kotlin library & AAR |
 | **.NET / C#** | [`RustODotnet`](https://www.nuget.org/packages/RustODotnet) | Managed .NET library |
 | **C / Native** | `librusto.so` / `.dylib` / `.dll` | C FFI shared libraries |
@@ -191,7 +197,111 @@ RustO.initialize(context).use { ocr ->
 
 ---
 
-### 8. Command Line Interface (CLI)
+---
+
+### 8. Node.js (N-API)
+
+```bash
+npm install @rustors/node
+```
+
+```javascript
+const { RustO } = require('@rustors/node');
+
+const engine = new RustO(JSON.stringify({
+  detection: { model_path: 'models/PPOCR_v6/det.rten' },
+  recognition: { model_path: 'models/PPOCR_v6/rec.rten', dict_path: 'models/PPOCR_v6/dict.txt' }
+}));
+
+const results = engine.detectTextFile('invoice.png', JSON.stringify({}));
+results.forEach(r => console.log(`${r.text} (${(r.score * 100).toFixed(1)}%)`));
+```
+
+---
+
+### 9. Python (UniFFI)
+
+```bash
+pip install rusto
+```
+
+```python
+from rusto import RustO, InitializeConfig, OcrRunOptions
+from rusto.generated.rusto import ImageSource
+
+engine = RustO.initialize(InitializeConfig.ppv6("det.rten", "rec.rten", "dict.txt"))
+result = engine.detect_text(ImageSource.PATH("invoice.png"), OcrRunOptions())
+if result.is_STRUCTURED():
+    for item in result.results:
+        print(f"{item.text} ({item.score:.2f})")
+```
+
+---
+
+### 10. Golang (Cgo)
+
+```bash
+go get github.com/byrizki/rusto-rs/packages/go
+```
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/byrizki/rusto-rs/packages/go"
+)
+
+func main() {
+    engine, err := rusto.New(`{"detection":{"model_path":"det.rten"},"recognition":{"model_path":"rec.rten","dict_path":"dict.txt"}}`)
+    if err != nil { panic(err) }
+    defer engine.Close()
+
+    results, _ := engine.DetectTextFile("invoice.png", "{}")
+    for _, r := range results {
+        fmt.Printf("[%0.2f] %s\n", r.Score, r.Text)
+    }
+}
+```
+
+---
+
+### 11. Java (JVM / JNA)
+
+```java
+import com.byrizki.rusto.RustO;
+import com.byrizki.rusto.TextResult;
+
+public class App {
+    public static void main(String[] args) {
+        String config = "{\"detection\":{\"model_path\":\"det.rten\"},\"recognition\":{\"model_path\":\"rec.rten\",\"dict_path\":\"dict.txt\"}}";
+        try (RustO engine = RustO.initialize(config)) {
+            for (TextResult r : engine.detectTextFile("invoice.png", "{}")) {
+                System.out.printf("[%0.2f] %s%n", r.score(), r.text());
+            }
+        }
+    }
+}
+```
+
+---
+
+### 12. Dart & Flutter
+
+```dart
+import 'package:rusto/rusto.dart';
+
+final engine = RustO.initialize('{"detection":{"model_path":"det.rten"},"recognition":{"model_path":"rec.rten","dict_path":"dict.txt"}}');
+final results = engine.detectTextFile('invoice.png');
+for (final line in results) {
+  print('${line.text} (${line.score})');
+}
+engine.close();
+```
+
+---
+
+### 13. Command Line Interface (CLI)
 
 ```bash
 # JSON output
