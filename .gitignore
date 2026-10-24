@@ -110,3 +110,5 @@ packages/flutter/example/.dart_tool/
 
 .codesight
 .pi-subagents
+
+releases/
