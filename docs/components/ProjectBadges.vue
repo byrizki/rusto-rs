@@ -51,9 +51,14 @@ const badges = [
     href: 'https://jitpack.io/#byrizki/rusto-rs',
   },
   {
-    alt: 'CI',
+    alt: 'Library CI',
     src: 'https://github.com/byrizki/rusto-rs/actions/workflows/ci.yml/badge.svg',
     href: 'https://github.com/byrizki/rusto-rs/actions/workflows/ci.yml',
+  },
+  {
+    alt: 'Docs CI',
+    src: 'https://github.com/byrizki/rusto-rs/actions/workflows/docs-ci.yml/badge.svg',
+    href: 'https://github.com/byrizki/rusto-rs/actions/workflows/docs-ci.yml',
   },
   {
     alt: 'Build & Release',
