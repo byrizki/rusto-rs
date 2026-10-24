@@ -72,135 +72,89 @@ extension RustO {
 }
 
 extension InitializeConfig {
-    public init(
-        template: String? = nil,
-        detection: DetectionConfig? = nil,
-        recognition: RecognitionConfig? = nil,
-        classification: ClassificationConfig? = nil,
-        orientation: OrientationConfig? = nil,
-        unwarp: UnwarpConfig? = nil
-    ) {
+    public init() {
         self.init(
-            template: template,
-            detection: detection,
-            recognition: recognition,
-            classification: classification,
-            orientation: orientation,
-            unwarp: unwarp
+            template: nil,
+            detection: nil,
+            recognition: nil,
+            classification: nil,
+            orientation: nil,
+            unwarp: nil
         )
     }
 }
 
 extension DetectionConfig {
-    public init(
-        enabled: Bool? = nil,
-        modelPath: String? = nil,
-        thresh: Float? = nil,
-        boxThresh: Float? = nil,
-        unclipRatio: Float? = nil,
-        limitSideLen: Int32? = nil,
-        limitType: String? = nil,
-        useDilation: Bool? = nil
-    ) {
+    public init() {
         self.init(
-            enabled: enabled,
-            modelPath: modelPath,
-            thresh: thresh,
-            boxThresh: boxThresh,
-            unclipRatio: unclipRatio,
-            limitSideLen: limitSideLen,
-            limitType: limitType,
-            useDilation: useDilation
+            enabled: nil,
+            modelPath: nil,
+            thresh: nil,
+            boxThresh: nil,
+            unclipRatio: nil,
+            limitSideLen: nil,
+            limitType: nil,
+            useDilation: nil
         )
     }
 }
 
 extension RecognitionConfig {
-    public init(
-        enabled: Bool? = nil,
-        modelPath: String? = nil,
-        dictPath: String? = nil
-    ) {
+    public init() {
         self.init(
-            enabled: enabled,
-            modelPath: modelPath,
-            dictPath: dictPath
+            enabled: nil,
+            modelPath: nil,
+            dictPath: nil
         )
     }
 }
 
 extension ClassificationConfig {
-    public init(
-        enabled: Bool? = nil,
-        modelPath: String? = nil,
-        thresh: Float? = nil
-    ) {
+    public init() {
         self.init(
-            enabled: enabled,
-            modelPath: modelPath,
-            thresh: thresh
+            enabled: nil,
+            modelPath: nil,
+            thresh: nil
         )
     }
 }
 
 extension OrientationConfig {
-    public init(
-        enabled: Bool? = nil,
-        modelPath: String? = nil,
-        thresh: Float? = nil
-    ) {
+    public init() {
         self.init(
-            enabled: enabled,
-            modelPath: modelPath,
-            thresh: thresh
+            enabled: nil,
+            modelPath: nil,
+            thresh: nil
         )
     }
 }
 
 extension UnwarpConfig {
-    public init(
-        enabled: Bool? = nil,
-        modelPath: String? = nil
-    ) {
+    public init() {
         self.init(
-            enabled: enabled,
-            modelPath: modelPath
+            enabled: nil,
+            modelPath: nil
         )
     }
 }
 
 extension RuntimeOptions {
-    public init(
-        output: OutputGranularity = .lines,
-        lineYThreshold: Float? = nil,
-        wordXThreshold: Float? = nil,
-        textScore: Float? = nil,
-        classification: Bool? = nil,
-        orientation: Bool? = nil,
-        minHeight: Float? = nil,
-        maxSideLen: Float? = nil,
-        minSideLen: Float? = nil,
-        widthHeightRatio: Float? = nil,
-        detection: DetectionRunOptions? = nil,
-        postprocess: PostprocessRunOptions? = nil,
-        calibration: CalibrationOptions? = nil,
-        optimization: OptimizationOptions? = nil
-    ) {
+    public init() {
         self.init(
-            output: output,
-            lineYThreshold: lineYThreshold,
-            wordXThreshold: wordXThreshold,
-            textScore: textScore,
-            classification: classification,
-            orientation: orientation,
-            minHeight: minHeight,
-            maxSideLen: maxSideLen,
-            minSideLen: minSideLen,
-            widthHeightRatio: widthHeightRatio,
-            detection: detection,
-            postprocess: postprocess,
-            calibration: calibration,
-            optimization: optimization
+            output: .lines,
+            lineYThreshold: nil,
+            wordXThreshold: nil,
+            textScore: nil,
+            classification: nil,
+            orientation: nil,
+            minHeight: nil,
+            maxSideLen: nil,
+            minSideLen: nil,
+            widthHeightRatio: nil,
+            detection: nil,
+            postprocess: nil,
+            calibration: nil,
+            optimization: nil
         )
     }
 }
