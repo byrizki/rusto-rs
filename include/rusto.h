@@ -38,6 +38,9 @@ void rocr_free_string(char *text);
 int rocr_detect_text_rgb(ROCRHandle *handle, const uint8_t *pixels, size_t image_len,
                          uint32_t width, uint32_t height, size_t stride,
                          const char *options_json, CTextResult **results, size_t *count);
+char *rocr_detect_text_rgb_spatial(ROCRHandle *handle, const uint8_t *pixels, size_t image_len,
+                                   uint32_t width, uint32_t height, size_t stride,
+                                   const char *options_json);
 #ifdef __cplusplus
 }
 #endif

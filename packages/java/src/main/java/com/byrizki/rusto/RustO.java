@@ -64,6 +64,8 @@ public class RustO implements AutoCloseable {
         Pointer rocr_detect_text_file_spatial(Pointer handle, String imagePath, String optionsJson);
         int rocr_detect_text_data(Pointer handle, byte[] data, long length, String optionsJson, PointerByReference results, long[] count);
         Pointer rocr_detect_text_data_spatial(Pointer handle, byte[] data, long length, String optionsJson);
+        int rocr_detect_text_rgb(Pointer handle, byte[] pixels, long imageLen, int width, int height, long stride, String optionsJson, PointerByReference results, long[] count);
+        Pointer rocr_detect_text_rgb_spatial(Pointer handle, byte[] pixels, long imageLen, int width, int height, long stride, String optionsJson);
         void rocr_free_string(Pointer s);
         void rocr_free_results(Pointer results, long count);
         void rocr_free(Pointer handle);
@@ -188,6 +190,52 @@ public class RustO implements AutoCloseable {
         String opts = optionsJson != null ? optionsJson : "{}";
 
         Pointer strPtr = NativeLib.INSTANCE.rocr_detect_text_data_spatial(handle, data, data.length, opts);
+        if (strPtr == null) {
+            throw new RuntimeException("Spatial text detection failed");
+        }
+        try {
+            return strPtr.getString(0, "UTF-8");
+        } finally {
+            NativeLib.INSTANCE.rocr_free_string(strPtr);
+        }
+    }
+
+    public List<TextResult> detectTextRGB(byte[] pixels, int width, int height, long stride, String optionsJson) {
+        ensureOpen();
+        if (pixels == null || pixels.length == 0) {
+            return Collections.emptyList();
+        }
+        String opts = optionsJson != null ? optionsJson : "{}";
+        PointerByReference resultsRef = new PointerByReference();
+        long[] count = new long[1];
+
+        int status = NativeLib.INSTANCE.rocr_detect_text_rgb(
+            handle, pixels, pixels.length, width, height, stride, opts, resultsRef, count
+        );
+        if (status != 0) {
+            throw new RuntimeException("Text detection failed with status: " + status);
+        }
+
+        Pointer resultsPtr = resultsRef.getValue();
+        try {
+            return convertResults(resultsPtr, count[0]);
+        } finally {
+            if (resultsPtr != null) {
+                NativeLib.INSTANCE.rocr_free_results(resultsPtr, count[0]);
+            }
+        }
+    }
+
+    public String detectTextRGBSpatial(byte[] pixels, int width, int height, long stride, String optionsJson) {
+        ensureOpen();
+        if (pixels == null || pixels.length == 0) {
+            return "";
+        }
+        String opts = optionsJson != null ? optionsJson : "{}";
+
+        Pointer strPtr = NativeLib.INSTANCE.rocr_detect_text_rgb_spatial(
+            handle, pixels, pixels.length, width, height, stride, opts
+        );
         if (strPtr == null) {
             throw new RuntimeException("Spatial text detection failed");
         }

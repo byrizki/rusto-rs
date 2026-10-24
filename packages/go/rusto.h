@@ -2,6 +2,7 @@
 #define RUSTO_GO_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,6 +32,8 @@ int rocr_detect_text_file(ROCRHandle handle, const char *image_path, const char 
 char *rocr_detect_text_file_spatial(ROCRHandle handle, const char *image_path, const char *options_json);
 int rocr_detect_text_data(ROCRHandle handle, const void *data, size_t length, const char *options_json, void **results, size_t *count);
 char *rocr_detect_text_data_spatial(ROCRHandle handle, const void *data, size_t length, const char *options_json);
+int rocr_detect_text_rgb(ROCRHandle handle, const void *pixels, size_t image_len, uint32_t width, uint32_t height, size_t stride, const char *options_json, void **results, size_t *count);
+char *rocr_detect_text_rgb_spatial(ROCRHandle handle, const void *pixels, size_t image_len, uint32_t width, uint32_t height, size_t stride, const char *options_json);
 void rocr_free_string(char *s);
 void rocr_free_results(void *results, size_t count);
 void rocr_free(ROCRHandle handle);

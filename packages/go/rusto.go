@@ -219,3 +219,72 @@ func (e *Engine) DetectTextDataSpatial(data []byte, optionsJSON string) (string,
 
 	return C.GoString(cText), nil
 }
+
+// DetectTextRGB detects text from raw decoded interleaved RGB8 pixel bytes.
+func (e *Engine) DetectTextRGB(pixels []byte, width, height uint32, stride uint, optionsJSON string) ([]TextResult, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if e.handle == nil {
+		return nil, ErrEngineClosed
+	}
+	if len(pixels) == 0 {
+		return []TextResult{}, nil
+	}
+
+	cOptions := C.CString(optionsJSON)
+	defer C.free(unsafe.Pointer(cOptions))
+
+	var results unsafe.Pointer
+	var count C.size_t
+
+	status := C.rocr_detect_text_rgb(
+		e.handle,
+		unsafe.Pointer(&pixels[0]),
+		C.size_t(len(pixels)),
+		C.uint32_t(width),
+		C.uint32_t(height),
+		C.size_t(stride),
+		cOptions,
+		&results,
+		&count,
+	)
+	if status != 0 {
+		return nil, fmt.Errorf("%w: status code %d", ErrDetectionFailed, int(status))
+	}
+	defer C.rocr_free_results(results, count)
+
+	return e.convertResults(results, count), nil
+}
+
+// DetectTextRGBSpatial exports spatial text layout from raw decoded interleaved RGB8 pixel bytes.
+func (e *Engine) DetectTextRGBSpatial(pixels []byte, width, height uint32, stride uint, optionsJSON string) (string, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if e.handle == nil {
+		return "", ErrEngineClosed
+	}
+	if len(pixels) == 0 {
+		return "", nil
+	}
+
+	cOptions := C.CString(optionsJSON)
+	defer C.free(unsafe.Pointer(cOptions))
+
+	cText := C.rocr_detect_text_rgb_spatial(
+		e.handle,
+		unsafe.Pointer(&pixels[0]),
+		C.size_t(len(pixels)),
+		C.uint32_t(width),
+		C.uint32_t(height),
+		C.size_t(stride),
+		cOptions,
+	)
+	if cText == nil {
+		return "", ErrDetectionFailed
+	}
+	defer C.rocr_free_string(cText)
+
+	return C.GoString(cText), nil
+}

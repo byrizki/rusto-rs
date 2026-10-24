@@ -246,6 +246,52 @@ pub unsafe extern "C" fn rocr_detect_text_rgb(
     0
 }
 
+/// Run OCR on decoded, interleaved RGB8 pixels and return spatial text with runtime options.
+///
+/// Returns a NUL-terminated JSON string or null on failure. Free with `rocr_free_string`.
+///
+/// # Safety
+/// - `handle` must be a valid, live pointer to a ROCRHandle.
+/// - `image_data` must point to at least `required` valid bytes as determined by `rgb_layout`.
+/// - `options_json` must be a valid null-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn rocr_detect_text_rgb_spatial(
+    handle: *mut ROCRHandle,
+    image_data: *const u8,
+    image_len: usize,
+    width: u32,
+    height: u32,
+    stride: usize,
+    options_json: *const c_char,
+) -> *mut c_char {
+    if handle.is_null() || image_data.is_null() || options_json.is_null() {
+        return std::ptr::null_mut();
+    }
+    let (_, required) = match crate::rusto_ocr::rgb_layout(width, height, stride) {
+        Ok(layout) if image_len >= layout.1 => layout,
+        _ => return std::ptr::null_mut(),
+    };
+    let mut options = match parse_run_options(options_json) {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    options.output = OutputGranularity::Spatial;
+    let detected = match (*handle).inner.detect_text_rgb(
+        slice::from_raw_parts(image_data, required),
+        width,
+        height,
+        stride,
+        &options,
+    ) {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let DetectTextResult::Spatial(text) = detected else {
+        return std::ptr::null_mut();
+    };
+    CString::new(text).map_or(std::ptr::null_mut(), CString::into_raw)
+}
+
 /// Run OCR on image data and return spatial text with runtime options.
 #[no_mangle]
 pub unsafe extern "C" fn rocr_detect_text_data_spatial(
