@@ -1,6 +1,7 @@
 import Foundation
 
 public typealias RustOError = RustoBindingError
+public typealias RuntimeOptions = OcrRunOptions
 
 extension RustO {
     public static var libraryVersion: String {
@@ -138,7 +139,7 @@ extension UnwarpConfig {
     }
 }
 
-extension RuntimeOptions {
+extension OcrRunOptions {
     public init() {
         self.init(
             output: .lines,
