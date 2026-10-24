@@ -72,7 +72,7 @@ class RustO {
     }
     final list = <TextResult>[];
     for (var i = 0; i < count; i++) {
-      final item = resultsPtr.elementAt(i).ref;
+      final item = (resultsPtr + i).ref;
       final text = item.text != ffi.nullptr ? item.text.toDartString() : '';
       list.add(
         TextResult(

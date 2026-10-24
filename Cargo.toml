@@ -59,7 +59,7 @@ required-features = ["uniffi-cli"]
 criterion = "0.5"
 
 [features]
-default = []
+default = ["ffi"]
 use-opencv = ["opencv"]
 uniffi = ["dep:uniffi"]
 uniffi-cli = ["uniffi", "uniffi/cli"]

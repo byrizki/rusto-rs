@@ -52,12 +52,17 @@ export interface TestResultItem {
   details?: string;
 }
 
+interface LogEntry {
+  id: string;
+  message: string;
+}
+
 export const App = (): React.JSX.Element => {
   const [arch] = useState<ArchitectureMode>(detectArchitecture);
   const [isRunningAll, setIsRunningAll] = useState(false);
   const [ocrText, setOcrText] = useState<string | null>(null);
   const [detectedCount, setDetectedCount] = useState<number | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
   const [testResults, setTestResults] = useState<TestResultItem[]>([
     { id: "mod", name: "Native Module Handshake", status: "idle" },
@@ -71,7 +76,8 @@ export const App = (): React.JSX.Element => {
 
   const appendLog = useCallback((msg: string) => {
     const timestamp = new Date().toLocaleTimeString();
-    setLogs((prev) => [`[${timestamp}] ${msg}`, ...prev.slice(0, 49)]);
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    setLogs((prev) => [{ id, message: `[${timestamp}] ${msg}` }, ...prev.slice(0, 49)]);
   }, []);
 
   const updateTestStatus = useCallback(
@@ -259,7 +265,7 @@ export const App = (): React.JSX.Element => {
           </Text>
         </TouchableOpacity>
 
-        {detectedCount !== null ? (
+        {detectedCount === null ? null : (
           <View style={styles.metricCard} testID="latest-ocr-card">
             <Text style={styles.metricHeader} testID="latest-ocr-header">
               OCR Verification Result
@@ -267,13 +273,13 @@ export const App = (): React.JSX.Element => {
             <Text style={styles.metricPayload} testID="latest-ocr-payload">
               Boxes Recognized: {detectedCount}
             </Text>
-            {ocrText !== null ? (
+            {ocrText === null ? null : (
               <Text style={styles.metricText}>
                 Spatial Export: {ocrText.length} characters
               </Text>
-            ) : null}
+            )}
           </View>
-        ) : null}
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Activity Logs</Text>
@@ -281,9 +287,9 @@ export const App = (): React.JSX.Element => {
             {logs.length === 0 ? (
               <Text style={styles.emptyLog}>No logs yet. Press Run to test.</Text>
             ) : (
-              logs.map((log, index) => (
-                <Text key={`${logPrefix}-${index}`} style={styles.logText}>
-                  {log}
+              logs.map((entry) => (
+                <Text key={entry.id} style={styles.logText}>
+                  {entry.message}
                 </Text>
               ))
             )}
