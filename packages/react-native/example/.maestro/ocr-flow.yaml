@@ -1,4 +1,4 @@
-appId: com.example.rusto
+appId: com.rustonewarchexample
 ---
 - launchApp:
     clearState: true

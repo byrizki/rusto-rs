@@ -169,6 +169,7 @@ data class DetectionRunOptions(
     val limitType: String? = null,
     val mean: FloatArray? = null,
     val std: FloatArray? = null,
+    val postprocess: PostprocessRunOptions? = null,
 )
 
 data class OcrRunOptions(
@@ -279,14 +280,24 @@ class RustO private constructor(
             if (cacheFile.exists() && cacheFile.length() > 0) return cacheFile.absolutePath
             cacheFile.parentFile?.mkdirs()
             val tmpFile = File(cacheFile.parent, "${cacheFile.name}.tmp")
-            try {
-                context.assets.open(assetName).use { input -> tmpFile.outputStream().use(input::copyTo) }
-                tmpFile.renameTo(cacheFile)
-            } catch (e: java.io.IOException) {
-                tmpFile.delete()
-                throw RustOException("Model asset not found or unreadable: '$assetName'. Cause: ${e.message}")
+            val candidates = mutableListOf(assetName)
+            if (assetName.endsWith(".rten")) {
+                candidates.add(assetName.removeSuffix(".rten") + ".onnx")
+            } else if (assetName.endsWith(".onnx")) {
+                candidates.add(assetName.removeSuffix(".onnx") + ".rten")
             }
-            return cacheFile.absolutePath
+            var lastEx: Exception? = null
+            for (candidate in candidates) {
+                try {
+                    context.assets.open(candidate).use { input -> tmpFile.outputStream().use(input::copyTo) }
+                    tmpFile.renameTo(cacheFile)
+                    return cacheFile.absolutePath
+                } catch (e: Exception) {
+                    lastEx = e
+                    tmpFile.delete()
+                }
+            }
+            throw RustOException("Model asset not found or unreadable: '$assetName'. Cause: ${lastEx?.message}")
         }
     }
 

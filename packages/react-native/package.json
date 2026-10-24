@@ -21,9 +21,8 @@
   "files": [
     "src",
     "lib",
-    "android/build.gradle",
-    "ios/Rusto.h",
-    "ios/Rusto.mm",
+    "android",
+    "ios",
     "Package.swift",
     "cpp",
     "react-native.config.js",
