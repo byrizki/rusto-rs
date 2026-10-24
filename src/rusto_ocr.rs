@@ -126,6 +126,45 @@ pub enum ImageSource {
     Bytes(Vec<u8>),
 }
 
+/// Validate RGB dimensions before allocating or forming an FFI slice.
+pub(crate) fn rgb_layout(width: u32, height: u32, stride: usize) -> Result<(usize, usize), EngineError> {
+    let invalid = || EngineError::ImageError("Invalid RGB dimensions or stride".into());
+    if width == 0 || height == 0 || width > i32::MAX as u32 || height > i32::MAX as u32 {
+        return Err(invalid());
+    }
+    let row_bytes = (width as usize).checked_mul(3).ok_or_else(invalid)?;
+    if stride < row_bytes {
+        return Err(invalid());
+    }
+    let required = (height as usize - 1).checked_mul(stride)
+        .and_then(|offset| offset.checked_add(row_bytes)).ok_or_else(invalid)?;
+    if required > isize::MAX as usize {
+        return Err(invalid());
+    }
+    Ok((row_bytes, required))
+}
+
+#[cfg(test)]
+mod rgb_layout_tests {
+    use super::rgb_layout;
+
+    #[test]
+    fn packed_and_padded_rows_allow_unpadded_final_row() {
+        assert_eq!(rgb_layout(2, 2, 6).unwrap(), (6, 12));
+        assert_eq!(rgb_layout(2, 2, 8).unwrap(), (6, 14));
+        assert_eq!(rgb_layout(2, 1, usize::MAX).unwrap(), (6, 6));
+    }
+
+    #[test]
+    fn rejects_invalid_dimensions_stride_and_overflow() {
+        for (w, h, stride) in [(0, 2, 6), (2, 0, 6), (2, 2, 5),
+            (u32::MAX, 1, usize::MAX), (1, u32::MAX, 3),
+            (2, 2, usize::MAX), (1, 2, isize::MAX as usize)] {
+            assert!(rgb_layout(w, h, stride).is_err());
+        }
+    }
+}
+
 /// Result returned by the canonical `RustO::detect_text` API.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DetectTextResult {
@@ -332,6 +371,53 @@ impl RustO {
             OutputGranularity::Lines | OutputGranularity::Words => Ok(
                 DetectTextResult::Structured(output.to_text_results_with_options(options)),
             ),
+        }
+    }
+
+    /// Detect text from interleaved RGB8 pixels without encoding or decoding.
+    ///
+    /// `stride` is the byte distance between row starts, including padding.
+    /// The last row needs only `width * 3` bytes. Pixels are copied into an
+    /// owned image; the input is never retained or modified. Coordinates refer
+    /// to the supplied pixels; EXIF orientation is not applied.
+    pub fn detect_text_rgb(
+        &mut self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        stride: usize,
+        options: &OcrRunOptions,
+    ) -> Result<DetectTextResult, EngineError> {
+        options.validate()?;
+        let (row_bytes, required) = rgb_layout(width, height, stride)?;
+        if pixels.len() < required {
+            return Err(EngineError::ImageError("RGB buffer is too short".into()));
+        }
+        #[cfg(not(feature = "use-opencv"))]
+        {
+            let mut packed = Vec::new();
+            packed.try_reserve_exact(row_bytes * height as usize)
+                .map_err(|error| EngineError::ImageError(error.to_string()))?;
+            for row in 0..height as usize {
+                packed.extend_from_slice(&pixels[row * stride..row * stride + row_bytes]);
+            }
+            let image = Mat::from_rgb8(width, height, packed)?;
+            let output = self.run_on_mat_with_options(&image, options)?;
+            match options.output {
+                OutputGranularity::Spatial => Ok(DetectTextResult::Spatial(
+                    output.to_spatial_text(options.line_y_threshold, options.word_x_threshold),
+                )),
+                OutputGranularity::Lines | OutputGranularity::Words => Ok(
+                    DetectTextResult::Structured(output.to_text_results_with_options(options)),
+                ),
+            }
+        }
+        #[cfg(feature = "use-opencv")]
+        {
+            let _ = row_bytes;
+            Err(EngineError::ImageError(
+                "RGB image sources require the pure Rust image backend".into(),
+            ))
         }
     }
 

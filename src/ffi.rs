@@ -188,6 +188,64 @@ pub unsafe extern "C" fn rocr_detect_text_data(
     0
 }
 
+/// Run OCR on decoded, interleaved RGB8 pixels (no alpha, no EXIF rotation).
+///
+/// `stride` includes row padding; `image_len` must cover
+/// `(height - 1) * stride + width * 3` bytes. Input is copied and never retained.
+/// Use one handle per worker; concurrent calls on a handle are not supported.
+/// Free successful results with `rocr_free_results`. Valid output slots are
+/// reset to null/zero on failure. Returns 0 on success, -1 for null pointers,
+/// -2 for invalid dimensions/stride/length, -3 for an engine/backend error,
+/// -4 for invalid options, and -5 for spatial output (use lines or words).
+///
+/// # Safety
+/// `handle` must be a live, exclusively borrowed RustO handle. `image_data`
+/// must point to one readable allocation covering the required bytes for the
+/// duration of the call. `options_json` must be a valid NUL-terminated string.
+/// Output pointers must be writable, aligned and non-overlapping with input
+/// or each other. Length validation cannot verify a caller's allocation.
+#[no_mangle]
+pub unsafe extern "C" fn rocr_detect_text_rgb(
+    handle: *mut ROCRHandle,
+    image_data: *const u8,
+    image_len: usize,
+    width: u32,
+    height: u32,
+    stride: usize,
+    options_json: *const c_char,
+    results_out: *mut *mut CTextResult,
+    count_out: *mut usize,
+) -> c_int {
+    if !results_out.is_null() { *results_out = std::ptr::null_mut(); }
+    if !count_out.is_null() { *count_out = 0; }
+    if handle.is_null() || image_data.is_null() || options_json.is_null()
+        || results_out.is_null() || count_out.is_null() {
+        return -1;
+    }
+    let (_, required) = match crate::rusto_ocr::rgb_layout(width, height, stride) {
+        Ok(layout) if image_len >= layout.1 => layout,
+        _ => return -2,
+    };
+    let options = match parse_run_options(options_json) {
+        Ok(value) => value,
+        Err(code) => return code,
+    };
+    if options.output == OutputGranularity::Spatial { return -5; }
+    let detected = match (*handle).inner.detect_text_rgb(
+        slice::from_raw_parts(image_data, required), width, height, stride, &options,
+    ) {
+        Ok(value) => value,
+        Err(_) => return -3,
+    };
+    let DetectTextResult::Structured(results) = detected else { return -5; };
+    if !results.is_empty() {
+        let c_results = text_results_to_c(&results);
+        *count_out = c_results.len();
+        *results_out = Box::into_raw(c_results) as *mut CTextResult;
+    }
+    0
+}
+
 /// Run OCR on image data and return spatial text with runtime options.
 #[no_mangle]
 pub unsafe extern "C" fn rocr_detect_text_data_spatial(
@@ -231,7 +289,7 @@ pub unsafe extern "C" fn rocr_free_string(s: *mut c_char) {
 /// Free results returned from structured text detection.
 ///
 /// # Safety
-/// - results must be a pointer returned from rocr_detect_text_file or rocr_detect_text_data
+/// - results must be a pointer returned from a structured rocr_detect_text_* call
 /// - count must match the count returned by text detection
 #[no_mangle]
 pub unsafe extern "C" fn rocr_free_results(results: *mut CTextResult, count: usize) {
