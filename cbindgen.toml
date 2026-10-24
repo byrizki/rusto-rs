@@ -27,6 +27,8 @@ exclude = [
     "INTER_CUBIC",
     "BORDER_REPLICATE",
     "ROTATE_90_CLOCKWISE",
+    "ffi_uniffi_rusto_rustbuffer_from_bytes",
+    "ffi_uniffi_rusto_rustbuffer_free",
 ]
 
 [parse]

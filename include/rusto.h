@@ -156,10 +156,6 @@ void rocr_free(ROCRHandle *handle);
  */
 const char *rocr_version(void);
 
-RustBuffer ffi_uniffi_rusto_rustbuffer_from_bytes(ForeignBytes bytes, RustCallStatus *out_status);
-
-void ffi_uniffi_rusto_rustbuffer_free(RustBuffer buf, RustCallStatus *out_status);
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
