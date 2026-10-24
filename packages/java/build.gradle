@@ -1,9 +1,18 @@
 plugins {
     id 'java-library'
+    id 'maven-publish'
 }
 
 group = 'com.byrizki.rusto'
 version = '0.3.1'
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}
 
 repositories {
     mavenCentral()

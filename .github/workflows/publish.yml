@@ -29,6 +29,21 @@ on:
         type: boolean
         required: false
         default: true
+      publish_pypi:
+        description: 'Publish Python to PyPI'
+        type: boolean
+        required: false
+        default: true
+      publish_pub_dev:
+        description: 'Publish Dart & Flutter to Pub.dev'
+        type: boolean
+        required: false
+        default: true
+      publish_java:
+        description: 'Publish Java & Android to Maven'
+        type: boolean
+        required: false
+        default: true
 
 jobs:
   # Publish to crates.io
@@ -199,4 +214,158 @@ jobs:
           pod trunk push RustO.podspec --allow-warnings || true
         env:
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
+        continue-on-error: true
+
+  # Publish Python to PyPI
+  publish-pypi:
+    name: Publish Python to PyPI
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') && !startsWith(github.event.release.tag_name, 'models-')) ||
+      github.event.inputs.publish_pypi == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download Python packages from release
+        run: |
+          VERSION="${{ github.event.inputs.version || github.event.release.tag_name || github.ref_name }}"
+          VERSION="${VERSION#v}"
+
+          mkdir -p python-dist
+          gh release download "v${VERSION}" -p "rusto-*.whl" -p "rusto-*.tar.gz" -D python-dist/ || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify Python packages before publishing
+        run: |
+          chmod +x scripts/verify-packed-packages.py
+          python3 scripts/verify-packed-packages.py --dir python-dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python-dist/
+          skip-existing: true
+          password: ${{ secrets.PYPI_API_TOKEN }}
+        continue-on-error: true
+
+  # Publish Dart & Flutter to Pub.dev
+  publish-pub-dev:
+    name: Publish to Pub.dev
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') && !startsWith(github.event.release.tag_name, 'models-')) ||
+      github.event.inputs.publish_pub_dev == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Publish Dart package to pub.dev
+        working-directory: packages/dart
+        run: |
+          dart pub get
+          if [ -n "${{ secrets.PUB_DEV_TOKEN }}" ]; then
+            dart pub publish --force || true
+          else
+            echo "PUB_DEV_TOKEN not configured; running dry-run validation"
+            dart pub publish --dry-run || true
+          fi
+        env:
+          PUB_TOKEN: ${{ secrets.PUB_DEV_TOKEN }}
+        continue-on-error: true
+
+      - name: Publish Flutter package to pub.dev
+        working-directory: packages/flutter
+        run: |
+          flutter pub get
+          if [ -n "${{ secrets.PUB_DEV_TOKEN }}" ]; then
+            flutter pub publish --force || true
+          else
+            echo "PUB_DEV_TOKEN not configured; running dry-run validation"
+            flutter pub publish --dry-run || true
+          fi
+        env:
+          PUB_TOKEN: ${{ secrets.PUB_DEV_TOKEN }}
+        continue-on-error: true
+
+  # Publish Java & Android to Maven
+  publish-java:
+    name: Publish Java & Android to Maven
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') && !startsWith(github.event.release.tag_name, 'models-')) ||
+      github.event.inputs.publish_java == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Download release packages
+        run: |
+          VERSION="${{ github.event.inputs.version || github.event.release.tag_name || github.ref_name }}"
+          VERSION="${VERSION#v}"
+
+          mkdir -p release-packages
+          gh release download "v${VERSION}" -p "*.jar" -p "*.aar" -D release-packages/ || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify release packages before publishing
+        run: |
+          if compgen -G "release-packages/*" > /dev/null; then
+            chmod +x scripts/verify-packed-packages.py
+            python3 scripts/verify-packed-packages.py --dir release-packages/
+          fi
+
+      - name: Publish Android AAR to Maven
+        working-directory: packages/android
+        run: |
+          chmod +x gradlew || true
+          if [ -n "${{ secrets.OSSRH_TOKEN }}" ]; then
+            ./gradlew publishToMavenCentral --no-daemon || ./gradlew publish || true
+          else
+            echo "OSSRH_TOKEN not configured; skipping Android Maven publish"
+          fi
+        env:
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
+          SIGNING_KEY_ID: ${{ secrets.SIGNING_KEY_ID }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          SIGNING_SECRET_KEY: ${{ secrets.SIGNING_SECRET_KEY }}
+        continue-on-error: true
+
+      - name: Publish Java JAR to Maven
+        working-directory: packages/java
+        run: |
+          chmod +x gradlew || true
+          if [ -n "${{ secrets.OSSRH_TOKEN }}" ]; then
+            ./gradlew publish --no-daemon || true
+          else
+            echo "OSSRH_TOKEN not configured; skipping Java Maven publish"
+          fi
+        env:
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
         continue-on-error: true

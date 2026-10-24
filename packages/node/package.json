@@ -7,6 +7,12 @@
   "scripts": {
     "test": "node --test test/*.test.js"
   },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "rusto.node",
+    "README.md"
+  ],
   "keywords": [
     "ocr",
     "node",

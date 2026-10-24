@@ -8,7 +8,7 @@ version = "0.3.1"
 description = "Pure Rust OCR library for Python based on RapidOCR and PaddleOCR"
 readme = "README.md"
 authors = [{ name = "RustO Contributors", email = "contact@rusto.dev" }]
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.8"
 dependencies = []
 
@@ -18,3 +18,6 @@ test = ["pytest>=7.0"]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["rusto*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.so", "*.dylib", "*.dll"]

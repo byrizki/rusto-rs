@@ -348,6 +348,52 @@ def verify_wheel_package(archive_path: Path) -> Tuple[bool, List[str], List[str]
 
     return len(errors) == 0, passed, errors
 
+def verify_sdist_package(archive_path: Path) -> Tuple[bool, List[str], List[str]]:
+    """Verifies a Python sdist package (.tar.gz)."""
+    passed: List[str] = []
+    errors: List[str] = []
+    try:
+        with tarfile.open(archive_path, "r:gz") as tar:
+            members = tar.getmembers()
+            names = [m.name for m in members]
+            for f in check_forbidden_entries(names):
+                errors.append(f)
+            if any(n.endswith("PKG-INFO") for n in names):
+                passed.append("Contains PKG-INFO manifest")
+            else:
+                errors.append("Missing PKG-INFO in Python sdist")
+            if any(n.endswith("pyproject.toml") or n.endswith("setup.py") for n in names):
+                passed.append("Contains build manifest (pyproject.toml/setup.py)")
+            else:
+                errors.append("Missing build configuration in Python sdist")
+            for m in members:
+                if m.isfile() and m.size == 0 and not m.name.endswith(".gitkeep"):
+                    errors.append(f"Empty 0-byte file found: {m.name}")
+    except Exception as e:
+        errors.append(f"Failed to open sdist archive: {e}")
+    return len(errors) == 0, passed, errors
+
+def verify_archive_bundle(archive_path: Path) -> Tuple[bool, List[str], List[str]]:
+    """Verifies a raw binary bundle or wasm archive (.tar.gz)."""
+    passed: List[str] = []
+    errors: List[str] = []
+    try:
+        with tarfile.open(archive_path, "r:gz") as tar:
+            members = tar.getmembers()
+            names = [m.name for m in members]
+            for f in check_forbidden_entries(names):
+                errors.append(f)
+            if not names:
+                errors.append("Empty archive bundle")
+            else:
+                passed.append(f"Contains {len(names)} bundle entry/ies")
+            for m in members:
+                if m.isfile() and m.size == 0 and not m.name.endswith(".gitkeep"):
+                    errors.append(f"Empty 0-byte file found: {m.name}")
+    except Exception as e:
+        errors.append(f"Failed to open archive: {e}")
+    return len(errors) == 0, passed, errors
+
 def verify_jar_package(archive_path: Path) -> Tuple[bool, List[str], List[str]]:
     """Verifies a Java archive (.jar)."""
     passed: List[str] = []
@@ -540,12 +586,18 @@ def verify_file(file_path: Path) -> bool:
         else:
             return scan_directory(file_path)
     elif name.endswith(".tgz") or name.endswith(".tar.gz"):
-        # Differentiate between NPM and Pub packages
+        # Differentiate between Pub, Python sdist, binary bundles, and NPM packages
         try:
             with tarfile.open(file_path, "r:gz") as tar:
                 names = [m.name for m in tar.getmembers()]
                 if any("pubspec.yaml" in n for n in names):
                     success, passed, errors = verify_pub_package(file_path)
+                elif any(n.endswith("PKG-INFO") for n in names):
+                    success, passed, errors = verify_sdist_package(file_path)
+                elif any("package.json" in n for n in names):
+                    success, passed, errors = verify_npm_package(file_path)
+                elif "wasm" in name.lower() or "rusto-" in name.lower():
+                    success, passed, errors = verify_archive_bundle(file_path)
                 else:
                     success, passed, errors = verify_npm_package(file_path)
         except Exception as e:

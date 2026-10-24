@@ -465,9 +465,27 @@ def _uniffi_load_indirect():
         libname = "lib{}.so"
 
     libname = libname.format("rusto")
-    path = os.path.join(os.path.dirname(__file__), libname)
-    lib = ctypes.cdll.LoadLibrary(path)
-    return lib
+    candidates = [
+        os.path.join(os.path.dirname(__file__), libname),
+        os.path.join(os.path.dirname(__file__), "..", libname),
+        os.path.join(os.path.dirname(__file__), "../../../../target/release", libname),
+        os.path.join(os.path.dirname(__file__), "../../../../target/debug", libname),
+    ]
+    env_path = os.environ.get("RUSTO_LIB_PATH")
+    if env_path:
+        candidates.insert(0, env_path)
+
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                return ctypes.cdll.LoadLibrary(p)
+            except Exception:
+                pass
+
+    try:
+        return ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), libname))
+    except Exception:
+        return ctypes.cdll.LoadLibrary(libname)
 
 def _uniffi_check_contract_api_version(lib):
     # Get the bindings contract version from our ComponentInterface

@@ -477,6 +477,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build rusto-node
+        run: cargo build --release -p rusto-node
       - name: Test Node binding
         working-directory: packages/node
         run: |
@@ -490,6 +494,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build Rust library
+        run: cargo build --release --features ffi
       - name: Test Python binding
         working-directory: packages/python
         run: |
@@ -501,6 +509,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build Rust library
+        run: cargo build --release --features ffi
       - name: Analyze & test Dart package
         working-directory: packages/dart
         run: |

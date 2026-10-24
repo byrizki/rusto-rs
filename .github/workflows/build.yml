@@ -453,9 +453,9 @@ jobs:
           name: rusto-dotnet-model-nupkgs
           path: artifacts/dotnet-models/
 
-  # package NPM packages (React Native, Web, React)
+  # Package Multi-Platform Language Packages (NPM, Python, Java, Dart, Flutter, Go)
   package-react-native:
-    name: Package NPM Packages
+    name: Package Language Bindings & Distribution Packages
     runs-on: ubuntu-22.04
 
     steps:
@@ -473,10 +473,29 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
       - name: Verify Yarn Classic
         run: yarn --version
 
-      - name: Install Rust toolchain for WebAssembly
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
@@ -491,9 +510,14 @@ jobs:
           tar czf artifacts/wasm/rusto-wasm.tar.gz -C packages/web/src/wasm .
           cp artifacts/wasm/rusto-wasm.tar.gz artifacts/wasm/rusto-wasm.tgz
 
+      - name: Build host Rust libraries and N-API addon
+        run: |
+          cargo build --release --features ffi
+          cargo build --release -p rusto-node
+
       - name: Clean stale packages
         run: |
-          rm -f packages/*.tgz packages/*.tar.gz
+          rm -f packages/*.tgz packages/*.tar.gz packages/*.zip packages/*.whl packages/node/rusto.node packages/python/rusto/generated/librusto.so
 
       - name: Build and pack @rustors/web
         working-directory: packages/web
@@ -509,16 +533,22 @@ jobs:
           npm run build
           npm pack --pack-destination ..
 
-      - name: Build and pack @rustors/node
+      - name: Build, test, and pack @rustors/node
         working-directory: packages/node
         run: |
+          cp ../../target/release/librusto_node.so rusto.node
+          npm test
           npm pack --pack-destination ..
+          rm -f rusto.node
 
-      - name: Build and pack Python package
+      - name: Build, test, and pack Python package
         working-directory: packages/python
         run: |
-          pip install build wheel
+          python3 -m unittest discover -s tests
+          cp ../../target/release/librusto.so rusto/generated/librusto.so
+          pip install --upgrade build wheel
           python3 -m build -o ../../packages/python-dist
+          rm -f rusto/generated/librusto.so
 
       - name: Install React Native package build dependencies
         working-directory: packages/react-native
@@ -558,7 +588,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rusto-python-package
-          path: packages/python-dist/*.whl
+          path: packages/python-dist/*
 
       - name: Upload rusto-wasm package
         uses: actions/upload-artifact@v4
@@ -568,9 +598,11 @@ jobs:
             artifacts/wasm/rusto-wasm.tar.gz
             artifacts/wasm/rusto-wasm.tgz
 
-      - name: Build and pack Java package
+      - name: Build, test, and pack Java package
         working-directory: packages/java
         run: |
+          chmod +x gradlew || true
+          ./gradlew test
           ./gradlew jar
           mkdir -p ../../packages/java-dist
           cp build/libs/*.jar ../../packages/java-dist/
@@ -581,9 +613,12 @@ jobs:
           name: rusto-java-package
           path: packages/java-dist/*.jar
 
-      - name: Pack Dart package
+      - name: Test and pack Dart package
         working-directory: packages/dart
         run: |
+          dart pub get
+          dart analyze
+          dart test
           tar -czf ../rusto-dart.tar.gz --exclude='.git*' --exclude='build' .
 
       - name: Upload Dart package
@@ -592,9 +627,11 @@ jobs:
           name: rusto-dart-package
           path: packages/rusto-dart.tar.gz
 
-      - name: Pack Flutter package
+      - name: Test and pack Flutter package
         working-directory: packages/flutter
         run: |
+          flutter pub get
+          flutter analyze
           tar -czf ../rusto-flutter.tar.gz --exclude='.git*' --exclude='build' --exclude='example' .
 
       - name: Upload Flutter package
@@ -603,9 +640,11 @@ jobs:
           name: rusto-flutter-package
           path: packages/rusto-flutter.tar.gz
 
-      - name: Pack Go module package
-        working-directory: packages
+      - name: Test and pack Go module package
+        working-directory: packages/go
         run: |
+          go test -v ./...
+          cd ..
           zip -r rusto-go.zip go/ -x "*/.git*" -x "*/target/*"
 
       - name: Upload Go package
