@@ -104,6 +104,9 @@ packages/flutter/.dart_tool/
 packages/python/rusto/generated/*.so
 packages/python/rusto/generated/*.dylib
 packages/python/rusto/generated/*.dll
+*.egg-info/
+packages/flutter/example/build/
+packages/flutter/example/.dart_tool/
 
 .codesight
 .pi-subagents

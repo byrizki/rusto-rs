@@ -143,7 +143,9 @@ class RustONativeBindings {
             .asFunction();
 
   static ffi.DynamicLibrary openDefault() {
-    if (Platform.isLinux) {
+    if (Platform.isAndroid) {
+      return ffi.DynamicLibrary.open('librusto.so');
+    } else if (Platform.isLinux) {
       final candidates = [
         'librusto.so',
         '../../target/debug/librusto.so',

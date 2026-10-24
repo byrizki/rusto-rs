@@ -503,6 +503,17 @@ jobs:
           npm run build
           npm pack --pack-destination ..
 
+      - name: Build and pack @rustors/node
+        working-directory: packages/node
+        run: |
+          npm pack --pack-destination ..
+
+      - name: Build and pack Python package
+        working-directory: packages/python
+        run: |
+          pip install build wheel
+          python3 -m build -o ../../packages/python-dist
+
       - name: Install React Native package build dependencies
         working-directory: packages/react-native
         run: yarn install --ignore-scripts --non-interactive
@@ -530,6 +541,18 @@ jobs:
         with:
           name: rusto-react-package
           path: packages/rustors-react-*.tgz
+
+      - name: Upload @rustors/node package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-node-package
+          path: packages/rustors-node-*.tgz
+
+      - name: Upload Python package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-python-package
+          path: packages/python-dist/*.whl
 
       - name: Upload rusto-wasm package
         uses: actions/upload-artifact@v4
@@ -590,15 +613,20 @@ jobs:
             find rusto-dotnet-core-nupkg -name 'RustODotnet.*.nupkg' -exec cp {} ../releases/ \;
           fi
 
-          for pkg_dir in rusto-react-native-package rusto-web-package rusto-react-package rusto-wasm-package; do
+          for pkg_dir in rusto-react-native-package rusto-node-package rusto-python-package rusto-web-package rusto-react-package rusto-wasm-package; do
             if [ -d "$pkg_dir" ]; then
-              find "$pkg_dir" -type f \( -name '*.tgz' -o -name '*.tar.gz' \) \
+              find "$pkg_dir" -type f \( -name '*.tgz' -o -name '*.tar.gz' -o -name '*.whl' \) \
                 ! -name '*react-rust*' \
                 ! -name '*react-native-rusto*' \
                 ! -name '*rusto-web*' \
                 -exec cp {} ../releases/ \;
             fi
           done
+
+      - name: Verify packed release packages
+        run: |
+          chmod +x scripts/verify-packed-packages.py
+          python3 scripts/verify-packed-packages.py --dir releases/
 
       - name: Generate checksums
         working-directory: releases
