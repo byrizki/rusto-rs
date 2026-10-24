@@ -256,12 +256,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c133bc6a41be0d194c306b5506d15e6feeea7b1d6604bd3f8310dfb2ca96486"
 
 [[package]]
-name = "clipper-sys"
-version = "0.8.0"
+name = "clipper2-rust"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5141c32419064aef7322f754b92fd4ea53c360c1ad984ec38b58af533eba3ac"
+checksum = "210e9ea90a5f6c731c23bf642383ad7c006d8b24803c5c33afd5aaeae5a33f66"
 dependencies = [
- "cc",
+ "num-traits",
 ]
 
 [[package]]
@@ -500,28 +500,6 @@ name = "foreign-types-shared"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
-
-[[package]]
-name = "geo-clipper"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2370335cc0c40c7bc1e5b0ead27bdbb2132d54cfbb96248a4bdd65db1a6873aa"
-dependencies = [
- "clipper-sys",
- "geo-types",
-]
-
-[[package]]
-name = "geo-types"
-version = "0.7.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "777d18aa0f12f8b285331cd867133ee14422b3f023f6d388034c47d43e28786a"
-dependencies = [
- "approx",
- "num-traits",
- "serde",
- "thiserror 2.0.21",
-]
 
 [[package]]
 name = "getrandom"
@@ -1400,8 +1378,7 @@ name = "rusto-rs"
 version = "0.3.1"
 dependencies = [
  "clap",
- "geo-clipper",
- "geo-types",
+ "clipper2-rust",
  "image",
  "nalgebra",
  "ndarray 0.16.1",
@@ -1410,7 +1387,7 @@ dependencies = [
  "rten-tensor",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror",
 ]
 
 [[package]]
@@ -1640,16 +1617,7 @@ version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
 dependencies = [
- "thiserror-impl 1.0.69",
-]
-
-[[package]]
-name = "thiserror"
-version = "2.0.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e"
-dependencies = [
- "thiserror-impl 2.0.21",
+ "thiserror-impl",
 ]
 
 [[package]]
@@ -1661,17 +1629,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "2.0.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.6",
 ]
 
 [[package]]
