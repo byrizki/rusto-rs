@@ -508,3 +508,38 @@ jobs:
           dart analyze
           dart test
 
+  go-contract:
+    name: Go Cgo binding contract test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build Rust library
+        run: cargo build --release --features ffi
+      - name: Test Go binding
+        working-directory: packages/go
+        run: |
+          go test -v ./...
+
+  java-contract:
+    name: Java JNA binding contract test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build Rust library
+        run: cargo build --release --features ffi
+      - name: Test Java binding
+        working-directory: packages/java
+        run: |
+          ./gradlew test
+

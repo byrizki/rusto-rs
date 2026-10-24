@@ -467,6 +467,12 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
       - name: Verify Yarn Classic
         run: yarn --version
 
@@ -562,6 +568,52 @@ jobs:
             artifacts/wasm/rusto-wasm.tar.gz
             artifacts/wasm/rusto-wasm.tgz
 
+      - name: Build and pack Java package
+        working-directory: packages/java
+        run: |
+          ./gradlew jar
+          mkdir -p ../../packages/java-dist
+          cp build/libs/*.jar ../../packages/java-dist/
+
+      - name: Upload Java package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-java-package
+          path: packages/java-dist/*.jar
+
+      - name: Pack Dart package
+        working-directory: packages/dart
+        run: |
+          tar -czf ../rusto-dart.tar.gz --exclude='.git*' --exclude='build' .
+
+      - name: Upload Dart package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-dart-package
+          path: packages/rusto-dart.tar.gz
+
+      - name: Pack Flutter package
+        working-directory: packages/flutter
+        run: |
+          tar -czf ../rusto-flutter.tar.gz --exclude='.git*' --exclude='build' --exclude='example' .
+
+      - name: Upload Flutter package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-flutter-package
+          path: packages/rusto-flutter.tar.gz
+
+      - name: Pack Go module package
+        working-directory: packages
+        run: |
+          zip -r rusto-go.zip go/ -x "*/.git*" -x "*/target/*"
+
+      - name: Upload Go package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusto-go-package
+          path: packages/rusto-go.zip
+
   # Create GitHub Release
   binding-examples:
     name: Validate release binding consumer apps
@@ -613,9 +665,9 @@ jobs:
             find rusto-dotnet-core-nupkg -name 'RustODotnet.*.nupkg' -exec cp {} ../releases/ \;
           fi
 
-          for pkg_dir in rusto-react-native-package rusto-node-package rusto-python-package rusto-web-package rusto-react-package rusto-wasm-package; do
+          for pkg_dir in rusto-react-native-package rusto-node-package rusto-python-package rusto-web-package rusto-react-package rusto-wasm-package rusto-java-package rusto-dart-package rusto-flutter-package rusto-go-package; do
             if [ -d "$pkg_dir" ]; then
-              find "$pkg_dir" -type f \( -name '*.tgz' -o -name '*.tar.gz' -o -name '*.whl' \) \
+              find "$pkg_dir" -type f \( -name '*.tgz' -o -name '*.tar.gz' -o -name '*.whl' -o -name '*.jar' -o -name '*.zip' \) \
                 ! -name '*react-rust*' \
                 ! -name '*react-native-rusto*' \
                 ! -name '*rusto-web*' \
@@ -672,7 +724,12 @@ jobs:
             - **Android**: AAR with all architectures (arm64-v8a, armeabi-v7a, x86, x86_64)
             - **.NET**: NuGet package with native libraries for all desktop platforms
             - **NPM / React Native**: React Native bindings (`@rustors/react-native`)
+            - **NPM / Node**: Node.js N-API bindings (`@rustors/node`)
             - **NPM / Web**: WebAssembly engine (`@rustors/web`) and React UI hooks (`@rustors/react`)
+            - **Python**: UniFFI Python wheel (`rusto`)
+            - **Java**: Java JNA library archive (`rusto-java.jar`)
+            - **Dart / Flutter**: Dart FFI and Flutter plugin packages
+            - **Go**: Cgo Go module package (`rusto-go.zip`)
 
             ### Installation
             Download the appropriate package for your platform and extract it.

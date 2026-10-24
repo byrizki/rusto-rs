@@ -124,6 +124,23 @@ def verify_npm_package(archive_path: Path) -> Tuple[bool, List[str], List[str]]:
                 else:
                     errors.append("Missing dist/ bundle in web/react package")
 
+            elif "@rustors/model" in name or "model" in name:
+                has_index = any(re.search(r"package/(dist/)?index\.(c?js|ts)$", n) for n in names)
+                has_types = any(re.search(r"package/(dist/)?index\.d\.(ts|cts)$", n) for n in names)
+                if has_index:
+                    passed.append("Contains entrypoint (index.js / dist/index.js)")
+                else:
+                    errors.append("Missing entrypoint in model package")
+                if has_types:
+                    passed.append("Contains TypeScript declaration (index.d.ts / dist/index.d.ts)")
+                else:
+                    errors.append("Missing TypeScript declaration in model package")
+
+                model_entries = [n for n in names if n.endswith(".rten") or n.endswith(".onnx") or n.endswith(".txt")]
+                if model_entries:
+                    passed.append(f"Contains {len(model_entries)} bundled model file(s): {', '.join(model_entries[:4])}")
+
+
             # Check that files have non-zero size
             for m in members:
                 if m.isfile() and m.size == 0 and not m.name.endswith(".gitkeep"):
@@ -165,10 +182,16 @@ def verify_nuget_package(archive_path: Path) -> Tuple[bool, List[str], List[str]
 
             # Check assemblies or runtimes
             dll_entries = [n for n in names if n.endswith(".dll")]
-            if not dll_entries and not any("models" in archive_path.name.lower() for _ in [1]):
-                errors.append("Missing managed .dll assemblies in lib/")
-            else:
+            if dll_entries:
                 passed.append(f"Contains {len(dll_entries)} managed assembly/ies: {', '.join(dll_entries[:3])}")
+            elif any("models" in archive_path.name.lower() for _ in [1]):
+                model_entries = [n for n in names if n.endswith(".rten") or n.endswith(".onnx") or n.endswith(".txt")]
+                if model_entries:
+                    passed.append(f"Contains {len(model_entries)} model file(s): {', '.join(model_entries[:4])}")
+                else:
+                    errors.append("Model NuGet package contains no model files (.rten, .onnx, or .txt)")
+            else:
+                errors.append("Missing managed .dll assemblies in lib/")
 
             # Verify non-zero sizes
             for info in z.infolist():
@@ -212,7 +235,13 @@ def verify_aar_package(archive_path: Path) -> Tuple[bool, List[str], List[str]]:
             so_files = [n for n in names if n.endswith(".so")]
             if so_files:
                 passed.append(f"Contains native libraries: {', '.join(so_files)}")
-            elif "model" not in archive_path.name.lower():
+            elif "model" in archive_path.name.lower():
+                asset_models = [n for n in names if ("assets/" in n) and (n.endswith(".rten") or n.endswith(".onnx") or n.endswith(".txt"))]
+                if asset_models:
+                    passed.append(f"Contains {len(asset_models)} model asset(s) in assets/: {', '.join(asset_models[:4])}")
+                else:
+                    errors.append("Model AAR contains no model assets (.rten, .onnx, or .txt) in assets/")
+            else:
                 errors.append("Core Android AAR contains no native .so libraries in jni/")
 
             for info in z.infolist():
@@ -256,6 +285,33 @@ def verify_xcframework_zip(archive_path: Path) -> Tuple[bool, List[str], List[st
 
     except Exception as e:
         errors.append(f"Failed to open/parse XCFramework zip: {e}")
+
+    return len(errors) == 0, passed, errors
+
+def verify_model_zip(archive_path: Path) -> Tuple[bool, List[str], List[str]]:
+    """Verifies a model resource bundle zip archive (e.g. iOS RustO-Models-*.zip)."""
+    passed: List[str] = []
+    errors: List[str] = []
+
+    try:
+        with zipfile.ZipFile(archive_path, "r") as z:
+            names = z.namelist()
+
+            for f in check_forbidden_entries(names):
+                errors.append(f)
+
+            model_files = [n for n in names if n.endswith(".rten") or n.endswith(".onnx") or n.endswith(".txt")]
+            if model_files:
+                passed.append(f"Contains {len(model_files)} model/dictionary file(s): {', '.join(model_files[:4])}")
+            else:
+                errors.append("No .rten, .onnx, or .txt model files found in model zip")
+
+            for info in z.infolist():
+                if not info.is_dir() and info.file_size == 0 and not info.filename.endswith(".gitkeep"):
+                    errors.append(f"Empty 0-byte file found: {info.filename}")
+
+    except Exception as e:
+        errors.append(f"Failed to open/parse model zip: {e}")
 
     return len(errors) == 0, passed, errors
 
@@ -502,10 +558,12 @@ def verify_file(file_path: Path) -> bool:
         success, passed, errors = verify_jar_package(file_path)
     elif name.endswith(".whl"):
         success, passed, errors = verify_wheel_package(file_path)
-    elif name.endswith(".zip") and ("xcframework" in name.lower() or "rusto" in name.lower()):
-        success, passed, errors = verify_xcframework_zip(file_path)
     elif name.endswith(".zip") and "go" in name.lower():
         success, passed, errors = verify_go_package(file_path)
+    elif name.endswith(".zip") and ("models" in name.lower()):
+        success, passed, errors = verify_model_zip(file_path)
+    elif name.endswith(".zip") and ("xcframework" in name.lower() or "rusto" in name.lower()):
+        success, passed, errors = verify_xcframework_zip(file_path)
     else:
         print(f"⚠️ Unrecognized archive format: {file_path}. Skipping.")
         return True
@@ -560,6 +618,7 @@ def main() -> int:
     parser.add_argument("--go", type=Path, action="append", default=[], help="Path to Go module directory or .zip to verify")
     parser.add_argument("--wheel", type=Path, action="append", default=[], help="Path to Python .whl package to verify")
     parser.add_argument("--xcframework", type=Path, action="append", default=[], help="Path to iOS .zip package to verify")
+    parser.add_argument("--model-zip", type=Path, action="append", default=[], help="Path to model resource bundle .zip to verify")
     parser.add_argument("files", nargs="*", type=Path, help="Additional files or directories to verify")
 
     args = parser.parse_args()
@@ -573,6 +632,7 @@ def main() -> int:
     targets.extend(args.go)
     targets.extend(args.wheel)
     targets.extend(args.xcframework)
+    targets.extend(args.model_zip)
     targets.extend(args.files)
 
     if args.dir:
