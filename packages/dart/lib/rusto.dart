@@ -170,7 +170,7 @@ class RustO {
     }
   }
 
-  String detectTextFileSpatial(String imagePath, [String optionsJson = '{}']) {
+  String detectTextFileSpatial(String imagePath, [String optionsJson = '{"output":"spatial"}']) {
     _ensureNotDisposed();
     final cPath = imagePath.toNativeUtf8();
     final cOpts = optionsJson.toNativeUtf8();
@@ -191,7 +191,7 @@ class RustO {
     }
   }
 
-  String detectTextDataSpatial(Uint8List bytes, [String optionsJson = '{}']) {
+  String detectTextDataSpatial(Uint8List bytes, [String optionsJson = '{"output":"spatial"}']) {
     _ensureNotDisposed();
     if (bytes.isEmpty) return '';
 

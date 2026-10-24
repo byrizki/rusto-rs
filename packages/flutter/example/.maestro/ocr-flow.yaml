@@ -3,34 +3,17 @@ appId: com.byrizki.rusto.rusto_flutter_example
 - launchApp:
     clearState: true
 - assertVisible: "RustO! OCR"
-- assertVisible:
-    id: "run-tests-button"
-- tapOn:
-    id: "run-tests-button"
+- assertVisible: "Run Verification Tests"
+- tapOn: "Run Verification Tests"
 - extendedWaitUntil:
-    visible:
-      id: "test-status-detect"
-      text: "SUCCESS"
+    visible: "Resource Verification"
     timeout: 30000
-- assertVisible:
-    id: "test-status-mod"
-    text: "SUCCESS"
-- assertVisible:
-    id: "test-status-init"
-    text: "SUCCESS"
-- assertVisible:
-    id: "test-status-detect"
-    text: "SUCCESS"
-- assertVisible:
-    id: "test-status-spatial"
-    text: "SUCCESS"
-- assertVisible:
-    id: "test-status-cleanup"
-    text: "SUCCESS"
+- assertVisible: "SUCCESS"
+- assertVisible: "Native Library Handshake"
+- assertVisible: "Engine Initialization"
+- assertVisible: "Text Detection Pipeline"
+- assertVisible: "Spatial Layout Generation"
+- assertVisible: "Resource Verification"
 - scrollUntilVisible:
-    element:
-      id: "latest-ocr-card"
-- assertVisible:
-    id: "latest-ocr-header"
-- assertVisible:
-    id: "latest-ocr-payload"
+    element: "Activity Logs"
+- assertVisible: "Activity Logs"

@@ -48,13 +48,20 @@ if [ "${DEVICE_COUNT}" -eq 0 ]; then
     exit 0
 fi
 
-# 3. Check device ABI compatibility with Flutter engine (x86_64, arm64, arm)
-DEVICE_ABIS=$(adb shell getprop ro.product.cpu.abilist)
-echo "--> Device supported ABIs: ${DEVICE_ABIS}"
+# 3. Find compatible target device supporting x86_64, arm64, or armeabi
+TARGET_DEVICE=""
+for dev in $(adb devices | awk 'NR>1 && $2=="device" {print $1}'); do
+    dev_abis=$(adb -s "${dev}" shell getprop ro.product.cpu.abilist || true)
+    if [[ "${dev_abis}" == *"x86_64"* || "${dev_abis}" == *"arm"* ]]; then
+        TARGET_DEVICE="${dev}"
+        DEVICE_ABIS="${dev_abis}"
+        break
+    fi
+done
 
-if [[ "${DEVICE_ABIS}" != *"x86_64"* && "${DEVICE_ABIS}" != *"arm"* ]]; then
-    echo "⚠️ Target emulator only supports ${DEVICE_ABIS} (32-bit x86)."
-    echo "   Modern Flutter 3.x engine requires x86_64, arm64-v8a, or armeabi-v7a."
+if [ -z "${TARGET_DEVICE}" ]; then
+    echo "⚠️ No connected emulator/device supports x86_64, arm64-v8a, or armeabi-v7a."
+    echo "   Modern Flutter 3.x engine requires a 64-bit or ARM target."
     echo "   Running Flutter test suite and validating Maestro flow specification..."
     cd "${EXAMPLE_DIR}"
     flutter test
@@ -65,6 +72,8 @@ if [[ "${DEVICE_ABIS}" != *"x86_64"* && "${DEVICE_ABIS}" != *"arm"* ]]; then
     exit 0
 fi
 
+echo "--> Target device selected: ${TARGET_DEVICE} (ABIs: ${DEVICE_ABIS})"
+
 # 4. Build / install Flutter debug APK
 APK_PATH="${EXAMPLE_DIR}/build/app/outputs/flutter-apk/app-debug.apk"
 if [ ! -f "${APK_PATH}" ]; then
@@ -74,22 +83,22 @@ if [ ! -f "${APK_PATH}" ]; then
 fi
 
 if [ -f "${APK_PATH}" ]; then
-    echo "--> Waiting for Android device to be ready..."
-    adb wait-for-device
+    echo "--> Waiting for ${TARGET_DEVICE} to be ready..."
+    adb -s "${TARGET_DEVICE}" wait-for-device
 
     echo "--> Dismissing keyguard and waking device..."
-    adb shell input keyevent 82 || true
-    adb shell input keyevent 66 || true
-    adb shell wm dismiss-keyguard || true
+    adb -s "${TARGET_DEVICE}" shell input keyevent 82 || true
+    adb -s "${TARGET_DEVICE}" shell input keyevent 66 || true
+    adb -s "${TARGET_DEVICE}" shell wm dismiss-keyguard || true
 
-    echo "--> Installing ${APK_PATH} on target device..."
-    adb install -r "${APK_PATH}"
+    echo "--> Installing ${APK_PATH} on ${TARGET_DEVICE}..."
+    adb -s "${TARGET_DEVICE}" install -r "${APK_PATH}"
 fi
 
-# 4. Execute Maestro E2E verification flow
-echo "--> Executing Maestro Flutter OCR verification flow..."
+# 5. Execute Maestro E2E verification flow
+echo "--> Executing Maestro Flutter OCR verification flow on ${TARGET_DEVICE}..."
 cd "${EXAMPLE_DIR}"
-if maestro test .maestro/ocr-flow.yaml; then
+if maestro test --device "${TARGET_DEVICE}" .maestro/ocr-flow.yaml; then
     echo "================================================================================"
     echo "✅ Maestro Flutter Android E2E OCR Test Passed Successfully!                    "
     echo "================================================================================"

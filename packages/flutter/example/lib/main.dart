@@ -83,11 +83,25 @@ class _OcrVerificationScreenState extends State<OcrVerificationScreen> {
   }
 
   Future<String> _copyAssetToFile(String assetPath, String targetFileName) async {
-    final dir = await getApplicationDocumentsDirectory();
+    // 1. Direct filesystem check (desktop / local tests)
+    final directFile = File(assetPath);
+    if (directFile.existsSync() && directFile.lengthSync() > 0) {
+      return directFile.absolute.path;
+    }
+
+    // 2. Extracted asset check
+    Directory dir;
+    try {
+      dir = await getApplicationDocumentsDirectory();
+    } catch (_) {
+      dir = Directory.systemTemp;
+    }
     final file = File('${dir.path}/$targetFileName');
-    if (await file.exists() && await file.length() > 0) {
+    if (file.existsSync() && file.lengthSync() > 0) {
       return file.path;
     }
+
+    // 3. Extract bundled asset from rootBundle (Android / iOS)
     final byteData = await rootBundle.load(assetPath);
     await file.writeAsBytes(byteData.buffer.asUint8List(), flush: true);
     return file.path;

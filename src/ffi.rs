@@ -129,13 +129,11 @@ pub unsafe extern "C" fn rocr_detect_text_file_spatial(
         Ok(value) => value,
         Err(_) => return std::ptr::null_mut(),
     };
-    let options = match parse_run_options(options_json) {
+    let mut options = match parse_run_options(options_json) {
         Ok(value) => value,
         Err(_) => return std::ptr::null_mut(),
     };
-    if options.output != OutputGranularity::Spatial {
-        return std::ptr::null_mut();
-    }
+    options.output = OutputGranularity::Spatial;
     let detected = match (*handle)
         .inner
         .detect_text(&ImageSource::Path(path.into()), &options)
@@ -201,13 +199,11 @@ pub unsafe extern "C" fn rocr_detect_text_data_spatial(
     if handle.is_null() || image_data.is_null() || options_json.is_null() {
         return std::ptr::null_mut();
     }
-    let options = match parse_run_options(options_json) {
+    let mut options = match parse_run_options(options_json) {
         Ok(value) => value,
         Err(_) => return std::ptr::null_mut(),
     };
-    if options.output != OutputGranularity::Spatial {
-        return std::ptr::null_mut();
-    }
+    options.output = OutputGranularity::Spatial;
     let detected = match (*handle).inner.detect_text(
         &ImageSource::Bytes(slice::from_raw_parts(image_data, image_len).to_vec()),
         &options,

@@ -146,10 +146,18 @@ class RustONativeBindings {
     if (Platform.isAndroid) {
       return ffi.DynamicLibrary.open('librusto.so');
     } else if (Platform.isLinux) {
+      final envPath = Platform.environment['RUSTO_LIB_PATH'];
       final candidates = [
+        if (envPath != null && envPath.isNotEmpty) envPath,
         'librusto.so',
-        '../../target/debug/librusto.so',
+        'target/release/librusto.so',
+        'target/debug/librusto.so',
+        '../target/release/librusto.so',
+        '../target/debug/librusto.so',
         '../../target/release/librusto.so',
+        '../../target/debug/librusto.so',
+        '../../../target/release/librusto.so',
+        '../../../target/debug/librusto.so',
       ];
       for (final p in candidates) {
         try {
