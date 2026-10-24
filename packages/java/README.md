@@ -14,14 +14,28 @@ Pure-Rust Optical Character Recognition (OCR) engine for JVM environments (Java,
 ### Gradle (Kotlin DSL)
 
 ```kotlin
-implementation("com.github.byrizki:rusto-java:0.3.1")
+repositories {
+    mavenCentral()
+    maven { url = uri("https://jitpack.io") }
+}
+
+dependencies {
+    implementation("com.github.byrizki.rusto-rs:rusto-java:0.3.1")
+}
 ```
 
 ### Maven
 
 ```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
 <dependency>
-    <groupId>com.github.byrizki</groupId>
+    <groupId>com.github.byrizki.rusto-rs</groupId>
     <artifactId>rusto-java</artifactId>
     <version>0.3.1</version>
 </dependency>

@@ -38,7 +38,7 @@
 | **Node.js (N-API)** | [`@rustors/node`](https://www.npmjs.com/package/@rustors/node) | Native Node.js N-API addon |
 | **Python** | [`pip install rusto`](https://pypi.org/project/rusto) | UniFFI Python library & wheel |
 | **Golang** | [`packages/go`](https://pkg.go.dev/github.com/byrizki/rusto-rs/packages/go) | Cgo Go module with embedded rpath |
-| **Java (JVM)** | `com.github.byrizki:rusto-java` | Java & Kotlin JNA library |
+| **Java (JVM)** | [`rusto-java`](https://jitpack.io/#byrizki/rusto-rs) (`com.github.byrizki.rusto-rs:rusto-java`) | Java & Kotlin JNA library via JitPack |
 | **Dart** | [`rusto`](https://pub.dev/packages/rusto) | Pure Dart FFI library |
 | **Flutter** | [`rusto_flutter`](https://pub.dev/packages/rusto_flutter) | Flutter plugin with Android & iOS bridges |
 | **Web (WASM)** | [`@rustors/web`](https://www.npmjs.com/package/@rustors/web) | Browser-native WASM engine |

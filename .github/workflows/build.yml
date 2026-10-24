@@ -718,6 +718,10 @@ jobs:
             fi
           done
 
+          if [ -f "../include/rusto.h" ]; then
+            cp ../include/rusto.h ../releases/
+          fi
+
       - name: Verify packed release packages
         run: |
           chmod +x scripts/verify-packed-packages.py

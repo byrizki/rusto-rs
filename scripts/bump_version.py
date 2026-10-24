@@ -556,7 +556,7 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
     if java_readme.exists():
         replace_in_file(
             java_readme,
-            r'(com\.github\.byrizki:rusto-java:)[0-9A-Za-z.-]+',
+            r'(com\.github\.byrizki(?:\.rusto-rs)?:rusto-java:)[0-9A-Za-z.-]+',
             rf'\g<1>{new_ver}',
             dry_run,
             staged_files
@@ -653,7 +653,7 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             )
             replace_in_file(
                 doc_file,
-                r'(com\.github\.byrizki:rusto-java:)[0-9A-Za-z.-]+',
+                r'(com\.github\.byrizki(?:\.rusto-rs)?:rusto-java:)[0-9A-Za-z.-]+',
                 rf'\g<1>{new_ver}',
                 dry_run,
                 staged_files,
@@ -679,6 +679,16 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
                 doc_file,
                 r'(com\.github\.byrizki\.rusto-rs:rusto-android:v?)[0-9A-Za-z.-]+',
                 rf'\g<1>{new_ver}',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+
+        for doc_file in docs_dir.rglob("*00.use-rust.md"):
+            replace_in_file(
+                doc_file,
+                r'(rusto-rs\s*=\s*")[^"]+(")',
+                rf'\g<1>{new_ver}\g<2>',
                 dry_run,
                 staged_files,
                 warn_if_not_found=False
@@ -721,7 +731,7 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         for doc_file in docs_dir.rglob("*12.use-java.md"):
             replace_in_file(
                 doc_file,
-                r'(com\.github\.byrizki:rusto-java:)[0-9A-Za-z.-]+',
+                r'(com\.github\.byrizki(?:\.rusto-rs)?:rusto-java:)[0-9A-Za-z.-]+',
                 rf'\g<1>{new_ver}',
                 dry_run,
                 staged_files,

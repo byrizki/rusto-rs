@@ -28,6 +28,11 @@ from .generated.rusto import (
     PostprocessRunOptions,
     Frame,
     RustoBindingError,
+    ImageSource,
+    OutputGranularity,
+    TextResult,
+    DetectTextResult,
+    OptimizationOptions,
 )
 
 __all__ = [
@@ -40,9 +45,14 @@ __all__ = [
     "OrientationConfig",
     "UnwarpConfig",
     "CalibrationOptions",
+    "OptimizationOptions",
     "OcrRunOptions",
     "DetectionRunOptions",
     "PostprocessRunOptions",
     "Frame",
     "RustoBindingError",
+    "ImageSource",
+    "OutputGranularity",
+    "TextResult",
+    "DetectTextResult",
 ]
