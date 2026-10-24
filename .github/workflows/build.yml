@@ -657,6 +657,10 @@ jobs:
             find rusto-ios-core-xcframework -name 'RustO.xcframework.zip' -exec cp {} ../releases/ \;
           fi
 
+          if [ -d "rusto-ios-model-resources" ]; then
+            find rusto-ios-model-resources -name "RustO-Models-*.zip" -exec cp {} ../releases/ \;
+          fi
+
           if [ -d "rusto-android-core-aar" ]; then
             find rusto-android-core-aar -name "*.aar" -exec cp {} ../releases/ \;
           fi
