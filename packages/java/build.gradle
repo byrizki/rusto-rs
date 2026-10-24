@@ -17,6 +17,6 @@ dependencies {
 
 test {
     useJUnitPlatform()
-    systemProperty "jna.library.path", file("${rootDir}/../../target/debug").absolutePath
-    environment "LD_LIBRARY_PATH", file("${rootDir}/../../target/debug").absolutePath
+    systemProperty "jna.library.path", "${file("${rootDir}/../../target/release").absolutePath}:${file("${rootDir}/../../target/debug").absolutePath}"
+    environment "LD_LIBRARY_PATH", "${file("${rootDir}/../../target/release").absolutePath}:${file("${rootDir}/../../target/debug").absolutePath}"
 }

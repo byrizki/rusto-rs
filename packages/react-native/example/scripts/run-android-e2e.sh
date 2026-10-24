@@ -48,7 +48,14 @@ if [ "${DEVICE_COUNT}" -eq 0 ]; then
     exit 0
 fi
 
-# 3. Build / install APK if available
+# 3. Find connected target device
+TARGET_DEVICE="${1:-}"
+if [ -z "${TARGET_DEVICE}" ]; then
+    TARGET_DEVICE=$(adb devices | awk 'NR>1 && $2=="device" {print $1; exit}')
+fi
+echo "--> Target device selected: ${TARGET_DEVICE}"
+
+# 4. Build / install APK if available
 APK_PATH="${EXAMPLE_DIR}/android/app/build/outputs/apk/debug/app-debug.apk"
 if [ ! -f "${APK_PATH}" ]; then
     echo "--> Android debug APK not found at ${APK_PATH}."
@@ -62,22 +69,22 @@ if [ ! -f "${APK_PATH}" ]; then
 fi
 
 if [ -f "${APK_PATH}" ]; then
-    echo "--> Waiting for Android device to be ready..."
-    adb wait-for-device
+    echo "--> Waiting for ${TARGET_DEVICE} to be ready..."
+    adb -s "${TARGET_DEVICE}" wait-for-device
 
     echo "--> Dismissing keyguard and waking device..."
-    adb shell input keyevent 82 || true
-    adb shell input keyevent 66 || true
-    adb shell wm dismiss-keyguard || true
+    adb -s "${TARGET_DEVICE}" shell input keyevent 82 || true
+    adb -s "${TARGET_DEVICE}" shell input keyevent 66 || true
+    adb -s "${TARGET_DEVICE}" shell wm dismiss-keyguard || true
 
-    echo "--> Installing ${APK_PATH} on target device..."
-    adb install -r "${APK_PATH}"
+    echo "--> Installing ${APK_PATH} on ${TARGET_DEVICE}..."
+    adb -s "${TARGET_DEVICE}" install -r "${APK_PATH}"
 fi
 
-# 4. Execute Maestro E2E verification flow
-echo "--> Executing Maestro OCR verification flow..."
+# 5. Execute Maestro E2E verification flow
+echo "--> Executing Maestro OCR verification flow on ${TARGET_DEVICE}..."
 cd "${EXAMPLE_DIR}"
-if maestro test .maestro/ocr-flow.yaml; then
+if maestro test --device "${TARGET_DEVICE}" .maestro/ocr-flow.yaml; then
     echo "================================================================================"
     echo "✅ Maestro Android E2E OCR Test Passed Successfully!                           "
     echo "================================================================================"

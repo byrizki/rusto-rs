@@ -292,28 +292,220 @@ def verify_wheel_package(archive_path: Path) -> Tuple[bool, List[str], List[str]
 
     return len(errors) == 0, passed, errors
 
+def verify_jar_package(archive_path: Path) -> Tuple[bool, List[str], List[str]]:
+    """Verifies a Java archive (.jar)."""
+    passed: List[str] = []
+    errors: List[str] = []
+
+    try:
+        with zipfile.ZipFile(archive_path, "r") as z:
+            names = z.namelist()
+
+            for f in check_forbidden_entries(names):
+                errors.append(f)
+
+            if "META-INF/MANIFEST.MF" in names:
+                passed.append("Contains META-INF/MANIFEST.MF")
+            else:
+                errors.append("Missing META-INF/MANIFEST.MF in JAR")
+
+            class_files = [n for n in names if n.endswith(".class")]
+            if class_files:
+                passed.append(f"Contains {len(class_files)} compiled bytecode class(es): {', '.join(class_files[:3])}")
+            else:
+                errors.append("Missing compiled .class files in JAR")
+
+            for info in z.infolist():
+                if not info.is_dir() and info.file_size == 0 and not info.filename.endswith(".gitkeep"):
+                    errors.append(f"Empty 0-byte file found: {info.filename}")
+
+    except Exception as e:
+        errors.append(f"Failed to open/parse JAR: {e}")
+
+    return len(errors) == 0, passed, errors
+
+def parse_pubspec_fields(content: str) -> Dict[str, str]:
+    fields = {}
+    for line in content.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if ":" in line and not line.startswith("-"):
+            k, v = line.split(":", 1)
+            k = k.strip()
+            v = v.strip().strip("'\"")
+            if k in ["name", "version", "description", "homepage"]:
+                fields[k] = v
+    return fields
+
+def verify_pub_package(archive_path: Path) -> Tuple[bool, List[str], List[str]]:
+    """Verifies a Dart or Flutter pub package (.tar.gz / .tgz)."""
+    passed: List[str] = []
+    errors: List[str] = []
+
+    try:
+        with tarfile.open(archive_path, "r:gz") as tar:
+            members = tar.getmembers()
+            names = [m.name for m in members]
+            name_to_member = {m.name: m for m in members}
+
+            for f in check_forbidden_entries(names):
+                errors.append(f)
+
+            pubspec_name = next((n for n in names if n == "pubspec.yaml" or n.endswith("/pubspec.yaml")), None)
+            if not pubspec_name:
+                errors.append("Missing mandatory 'pubspec.yaml'")
+                return False, passed, errors
+
+            pubspec_file = tar.extractfile(name_to_member[pubspec_name])
+            if not pubspec_file:
+                errors.append("Failed to extract pubspec.yaml")
+                return False, passed, errors
+
+            content = pubspec_file.read().decode("utf-8")
+            fields = parse_pubspec_fields(content)
+            name = fields.get("name", "")
+            version = fields.get("version", "")
+
+            if not name:
+                errors.append("pubspec.yaml missing 'name'")
+            else:
+                passed.append(f"pubspec.yaml valid: {name} v{version}")
+
+            has_license = any(re.search(r"(^|/)LICENSE", n) for n in names)
+            if has_license:
+                passed.append("Contains LICENSE file")
+            else:
+                errors.append("Missing mandatory LICENSE file in pub package")
+
+            has_readme = any(re.search(r"(^|/)README\.md", n) for n in names)
+            if has_readme:
+                passed.append("Contains README.md")
+            else:
+                errors.append("Missing README.md in pub package")
+
+            has_lib = any(re.search(r"lib/.*\.dart$", n) for n in names)
+            if has_lib:
+                passed.append("Contains Dart library code in lib/")
+            else:
+                errors.append("Missing Dart source files in lib/")
+
+            if "flutter:" in content or "rusto_flutter" in name:
+                has_android = any(n.startswith("android/") or "/android/" in n for n in names)
+                if has_android:
+                    passed.append("Contains Flutter Android plugin bridge")
+
+            for m in members:
+                if m.isfile() and m.size == 0 and not m.name.endswith(".gitkeep"):
+                    errors.append(f"Empty 0-byte file found: {m.name}")
+
+    except Exception as e:
+        errors.append(f"Failed to open/parse pub package archive: {e}")
+
+    return len(errors) == 0, passed, errors
+
+def verify_go_package(target_path: Path) -> Tuple[bool, List[str], List[str]]:
+    """Verifies a Go module directory or module archive (.zip)."""
+    passed: List[str] = []
+    errors: List[str] = []
+
+    try:
+        if target_path.is_file() and target_path.suffix == ".zip":
+            with zipfile.ZipFile(target_path, "r") as z:
+                names = z.namelist()
+                for f in check_forbidden_entries(names):
+                    errors.append(f)
+
+                go_mod = next((n for n in names if n.endswith("go.mod")), None)
+                if not go_mod:
+                    errors.append("Missing go.mod in Go archive")
+                else:
+                    passed.append(f"Found go.mod: {go_mod}")
+
+                go_files = [n for n in names if n.endswith(".go")]
+                if go_files:
+                    passed.append(f"Contains {len(go_files)} Go source file(s)")
+                else:
+                    errors.append("Missing Go source files (.go)")
+
+                for info in z.infolist():
+                    if not info.is_dir() and info.file_size == 0 and not info.filename.endswith(".gitkeep"):
+                        errors.append(f"Empty 0-byte file found: {info.filename}")
+        else:
+            names = [str(p.relative_to(target_path)) for p in target_path.rglob("*")]
+            for f in check_forbidden_entries(names):
+                errors.append(f)
+
+            go_mod_file = target_path / "go.mod"
+            if not go_mod_file.is_file():
+                errors.append("Missing go.mod in Go module directory")
+            else:
+                content = go_mod_file.read_text(encoding="utf-8")
+                module_line = next((l for l in content.splitlines() if l.startswith("module ")), None)
+                if module_line:
+                    passed.append(f"Valid go.mod ({module_line.strip()})")
+                else:
+                    errors.append("go.mod missing 'module' directive")
+
+            go_files = list(target_path.glob("*.go"))
+            if go_files:
+                passed.append(f"Contains {len(go_files)} Go source file(s)")
+            else:
+                errors.append("Missing Go source files (.go)")
+
+            h_files = list(target_path.glob("*.h"))
+            if h_files:
+                passed.append(f"Contains C header(s): {', '.join(h.name for h in h_files)}")
+
+            for p in target_path.rglob("*"):
+                if p.is_file() and p.stat().st_size == 0 and not p.name.endswith(".gitkeep"):
+                    errors.append(f"Empty 0-byte file found: {p.relative_to(target_path)}")
+
+    except Exception as e:
+        errors.append(f"Failed to verify Go package: {e}")
+
+    return len(errors) == 0, passed, errors
+
 def verify_file(file_path: Path) -> bool:
     name = file_path.name
     print(f"\n🔍 Verifying: {file_path}")
 
-    if not file_path.exists() or file_path.stat().st_size == 0:
-        print(f"❌ Error: File does not exist or is 0 bytes: {file_path}")
+    if not file_path.exists() or (file_path.is_file() and file_path.stat().st_size == 0):
+        print(f"❌ Error: Path does not exist or is 0 bytes: {file_path}")
         return False
 
     success = False
     passed: List[str] = []
     errors: List[str] = []
 
-    if name.endswith(".tgz") or (name.endswith(".tar.gz") and "npm" in str(file_path)):
-        success, passed, errors = verify_npm_package(file_path)
+    if file_path.is_dir():
+        if (file_path / "go.mod").exists():
+            success, passed, errors = verify_go_package(file_path)
+        else:
+            return scan_directory(file_path)
+    elif name.endswith(".tgz") or name.endswith(".tar.gz"):
+        # Differentiate between NPM and Pub packages
+        try:
+            with tarfile.open(file_path, "r:gz") as tar:
+                names = [m.name for m in tar.getmembers()]
+                if any("pubspec.yaml" in n for n in names):
+                    success, passed, errors = verify_pub_package(file_path)
+                else:
+                    success, passed, errors = verify_npm_package(file_path)
+        except Exception as e:
+            errors.append(f"Failed to open tarball: {e}")
     elif name.endswith(".nupkg"):
         success, passed, errors = verify_nuget_package(file_path)
     elif name.endswith(".aar"):
         success, passed, errors = verify_aar_package(file_path)
+    elif name.endswith(".jar"):
+        success, passed, errors = verify_jar_package(file_path)
     elif name.endswith(".whl"):
         success, passed, errors = verify_wheel_package(file_path)
     elif name.endswith(".zip") and ("xcframework" in name.lower() or "rusto" in name.lower()):
         success, passed, errors = verify_xcframework_zip(file_path)
+    elif name.endswith(".zip") and "go" in name.lower():
+        success, passed, errors = verify_go_package(file_path)
     else:
         print(f"⚠️ Unrecognized archive format: {file_path}. Skipping.")
         return True
@@ -335,7 +527,7 @@ def scan_directory(dir_path: Path) -> bool:
     all_success = True
     count = 0
 
-    patterns = ["*.tgz", "*.nupkg", "*.aar", "*.whl", "*xcframework*.zip", "*RustO*.zip"]
+    patterns = ["*.tgz", "*.tar.gz", "*.nupkg", "*.aar", "*.jar", "*.whl", "*xcframework*.zip", "*RustO*.zip", "*go*.zip"]
     matched_files: Set[Path] = set()
 
     for pattern in patterns:
@@ -363,6 +555,9 @@ def main() -> int:
     parser.add_argument("--npm", type=Path, action="append", default=[], help="Path to NPM .tgz package to verify")
     parser.add_argument("--nuget", type=Path, action="append", default=[], help="Path to NuGet .nupkg package to verify")
     parser.add_argument("--aar", type=Path, action="append", default=[], help="Path to Android .aar package to verify")
+    parser.add_argument("--jar", type=Path, action="append", default=[], help="Path to Java .jar package to verify")
+    parser.add_argument("--pub", type=Path, action="append", default=[], help="Path to Dart/Flutter .tar.gz package to verify")
+    parser.add_argument("--go", type=Path, action="append", default=[], help="Path to Go module directory or .zip to verify")
     parser.add_argument("--wheel", type=Path, action="append", default=[], help="Path to Python .whl package to verify")
     parser.add_argument("--xcframework", type=Path, action="append", default=[], help="Path to iOS .zip package to verify")
     parser.add_argument("files", nargs="*", type=Path, help="Additional files or directories to verify")
@@ -373,6 +568,9 @@ def main() -> int:
     targets.extend(args.npm)
     targets.extend(args.nuget)
     targets.extend(args.aar)
+    targets.extend(args.jar)
+    targets.extend(args.pub)
+    targets.extend(args.go)
     targets.extend(args.wheel)
     targets.extend(args.xcframework)
     targets.extend(args.files)
@@ -393,7 +591,10 @@ def main() -> int:
 
     all_passed = True
     for target in targets:
-        if target.is_dir():
+        if target.is_dir() and (target / "go.mod").exists():
+            if not verify_file(target):
+                all_passed = False
+        elif target.is_dir():
             if not scan_directory(target):
                 all_passed = False
         else:

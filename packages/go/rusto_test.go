@@ -2,6 +2,9 @@ package rusto
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -67,3 +70,42 @@ func TestTextResultStructure(t *testing.T) {
 		t.Fatalf("unexpected width: %f", res.Frame.Width)
 	}
 }
+
+func TestDetectExample1Image(t *testing.T) {
+	detPath := "../../models/PPOCR_v6/det.rten"
+	recPath := "../../models/PPOCR_v6/rec.rten"
+	dictPath := "../../models/PPOCR_v6/dict.txt"
+	imgPath := "../../models/test_images/example1.png"
+
+	if _, err := os.Stat(detPath); os.IsNotExist(err) {
+		t.Skip("Model files not found, skipping real OCR test")
+	}
+
+	config := fmt.Sprintf(`{
+		"detection": {"model_path": "%s"},
+		"recognition": {"model_path": "%s", "dict_path": "%s"}
+	}`, detPath, recPath, dictPath)
+
+	engine, err := New(config)
+	if err != nil {
+		t.Fatalf("Failed to initialize engine: %v", err)
+	}
+	defer engine.Close()
+
+	results, err := engine.DetectTextFile(imgPath, "{}")
+	if err != nil {
+		t.Fatalf("DetectTextFile failed: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatalf("Expected non-empty text results on example1.png")
+	}
+
+	spatial, err := engine.DetectTextFileSpatial(imgPath, "{}")
+	if err != nil {
+		t.Fatalf("DetectTextFileSpatial failed: %v", err)
+	}
+	if !strings.Contains(spatial, "INVOICE") {
+		t.Fatalf("Expected spatial text to contain 'INVOICE', got: %s", spatial)
+	}
+}
+

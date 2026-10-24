@@ -19,16 +19,16 @@ void main() {
     // Verify button goes to running / disabled
     expect(find.byKey(const Key('run-tests-button')), findsOneWidget);
 
-    // Allow real background file I/O and FFI initialization to complete
+    // Allow real background file I/O, FFI initialization, and OCR inference on example1.png to complete
     await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 3500));
+      await Future<void>.delayed(const Duration(seconds: 8));
     });
     await tester.pump();
 
     // Assert all 5 verification tests executed and succeeded
     expect(find.text('SUCCESS'), findsNWidgets(5));
     expect(find.byKey(const Key('latest-ocr-card')), findsOneWidget);
-    expect(find.textContaining('Boxes Recognized:'), findsOneWidget);
+    expect(find.textContaining('Boxes Recognized: 45'), findsOneWidget);
   });
 }
 

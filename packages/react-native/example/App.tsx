@@ -15,6 +15,7 @@ import {
   initialize,
   type TextResult,
 } from "@rustors/react-native";
+import { EXAMPLE1_PNG_BASE64 } from "./src/testImage";
 
 export type ArchitectureMode =
   | "TurboModule (New Arch)"
@@ -135,11 +136,9 @@ export const App = (): React.JSX.Element => {
     // Test 3: Text Detection Pipeline
     updateTestStatus("detect", "running");
     try {
-      // 1x1 black pixel PNG in base64 as canonical test image
-      const testPngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNiAAAABgADNjd8qAAAAABJRU5ErkJggg==";
       const results: TextResult[] = await detectText(
-        { base64: testPngBase64 },
-        { output: "lines", textScore: 0.5 }
+        { base64: EXAMPLE1_PNG_BASE64 },
+        { output: "lines", textScore: 0.3 }
       );
 
       setDetectedCount(results.length);
@@ -148,7 +147,7 @@ export const App = (): React.JSX.Element => {
         "success",
         `Detection completed: ${results.length} boxes recognized`
       );
-      appendLog(`Detection verified: ${results.length} lines`);
+      appendLog(`Detection verified: ${results.length} lines on example1.png`);
     } catch (err) {
       const errMessage = err instanceof Error ? err.message : String(err);
       updateTestStatus("detect", "failure", errMessage);
@@ -158,15 +157,14 @@ export const App = (): React.JSX.Element => {
     // Test 4: Spatial Layout Generation
     updateTestStatus("spatial", "running");
     try {
-      const testPngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNiAAAABgADNjd8qAAAAABJRU5ErkJggg==";
       const spatialText: string = await detectText(
-        { base64: testPngBase64 },
+        { base64: EXAMPLE1_PNG_BASE64 },
         { output: "spatial" }
       );
 
       setOcrText(spatialText);
       updateTestStatus("spatial", "success", "Spatial layout verified");
-      appendLog("Spatial layout verified");
+      appendLog(`Spatial layout verified (${spatialText.length} chars)`);
     } catch (err) {
       const errMessage = err instanceof Error ? err.message : String(err);
       updateTestStatus("spatial", "failure", errMessage);

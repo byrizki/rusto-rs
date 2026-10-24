@@ -11,7 +11,7 @@ pub struct JsRustO {
 impl JsRustO {
     #[napi(factory)]
     pub fn initialize(config_json: String) -> Result<Self> {
-        let config: InitializeConfig = serde_json::from_str(&config_json)
+        let config = InitializeConfig::from_json(&config_json)
             .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid config JSON: {e}")))?;
 
         let inner = RustO::initialize(config)

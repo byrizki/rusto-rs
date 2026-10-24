@@ -1,0 +1,6 @@
+.dart_tool/
+.idea/
+.vscode/
+example/
+build/
+*.log

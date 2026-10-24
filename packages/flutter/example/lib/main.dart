@@ -161,20 +161,19 @@ class _OcrVerificationScreenState extends State<OcrVerificationScreen> {
     // 3. Text Detection Pipeline
     _updateStatus('detect', 'RUNNING');
     try {
-      // 1x1 test image bytes (black PNG)
-      const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNiAAAABgADNjd8qAAAAABJRU5ErkJggg==';
-      final imageBytes = base64Decode(pngBase64);
+      final imgPath = await _copyAssetToFile('assets/images/example1.png', 'example1.png');
+      final imageBytes = File(imgPath).readAsBytesSync();
 
       final results = engine.detectTextData(
         imageBytes,
-        jsonEncode({'output': 'lines', 'textScore': 0.5}),
+        jsonEncode({'output': 'lines', 'textScore': 0.3}),
       );
 
       setState(() {
         _detectedCount = results.length;
       });
       _updateStatus('detect', 'SUCCESS', 'Detection executed: ${results.length} boxes');
-      _addLog('Detection pipeline verified (${results.length} boxes)');
+      _addLog('Detection pipeline verified (${results.length} boxes on example1.png)');
     } catch (e) {
       _updateStatus('detect', 'FAILURE', e.toString());
       _addLog('Detection failed: $e');
@@ -183,15 +182,15 @@ class _OcrVerificationScreenState extends State<OcrVerificationScreen> {
     // 4. Spatial Layout
     _updateStatus('spatial', 'RUNNING');
     try {
-      const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNiAAAABgADNjd8qAAAAABJRU5ErkJggg==';
-      final imageBytes = base64Decode(pngBase64);
+      final imgPath = await _copyAssetToFile('assets/images/example1.png', 'example1.png');
+      final imageBytes = File(imgPath).readAsBytesSync();
 
       final spatial = engine.detectTextDataSpatial(imageBytes);
       setState(() {
         _spatialText = spatial;
       });
       _updateStatus('spatial', 'SUCCESS', 'Spatial layout generated (${spatial.length} chars)');
-      _addLog('Spatial layout verified');
+      _addLog('Spatial layout verified (${spatial.length} chars)');
     } catch (e) {
       _updateStatus('spatial', 'FAILURE', e.toString());
       _addLog('Spatial failed: $e');
