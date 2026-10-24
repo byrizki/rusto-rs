@@ -1,311 +1,208 @@
+import 'dart:convert';
 import 'dart:ffi' as ffi;
+import 'dart:io' show Platform;
 import 'dart:typed_data';
-import 'package:ffi/ffi.dart';
-import 'src/ffi.dart';
 
-export 'src/ffi.dart' show RustONativeBindings;
+import 'src/generated/rusto.dart' as generated;
 
-class Frame {
-  final double width;
-  final double height;
-  final double top;
-  final double left;
+export 'src/generated/rusto.dart' hide RustO;
 
-  const Frame({
-    required this.width,
-    required this.height,
-    required this.top,
-    required this.left,
-  });
-
-  @override
-  String toString() => 'Frame(width: $width, height: $height, top: $top, left: $left)';
+ffi.DynamicLibrary _openDefaultDynamicLibrary() {
+  if (Platform.isAndroid) {
+    return ffi.DynamicLibrary.open('librusto.so');
+  } else if (Platform.isLinux) {
+    final envPath = Platform.environment['RUSTO_LIB_PATH'];
+    final candidates = [
+      if (envPath != null && envPath.isNotEmpty) envPath,
+      'librusto.so',
+      'target/release/librusto.so',
+      'target/debug/librusto.so',
+      '../target/release/librusto.so',
+      '../target/debug/librusto.so',
+      '../../target/release/librusto.so',
+      '../../target/debug/librusto.so',
+    ];
+    for (final p in candidates) {
+      try {
+        return ffi.DynamicLibrary.open(p);
+      } catch (_) {}
+    }
+    return ffi.DynamicLibrary.open('librusto.so');
+  } else if (Platform.isMacOS || Platform.isIOS) {
+    try {
+      return ffi.DynamicLibrary.process();
+    } catch (_) {
+      return ffi.DynamicLibrary.open('librusto.dylib');
+    }
+  } else if (Platform.isWindows) {
+    return ffi.DynamicLibrary.open('rusto.dll');
+  }
+  return ffi.DynamicLibrary.process();
 }
 
-class TextResult {
-  final String text;
-  final double score;
-  final List<List<double>> boxPoints;
-  final Frame frame;
-
-  const TextResult({
-    required this.text,
-    required this.score,
-    required this.boxPoints,
-    required this.frame,
-  });
-
-  @override
-  String toString() => 'TextResult(text: "$text", score: $score, frame: $frame)';
+bool _bindingsConfigured = false;
+void _initBindingsIfNeeded() {
+  if (!_bindingsConfigured) {
+    generated.configureDefaultBindings(dynamicLibrary: _openDefaultDynamicLibrary());
+    _bindingsConfigured = true;
+  }
 }
 
+/// High-level RustO OCR Engine for Dart and Flutter.
 class RustO {
-  final RustONativeBindings _bindings;
-  ffi.Pointer<ffi.Void> _handle;
-  bool _isDisposed = false;
+  final generated.RustO _inner;
 
-  RustO._(this._bindings, this._handle);
+  RustO._(this._inner);
 
-  static RustO initialize(String configJson, {RustONativeBindings? bindings}) {
-    final native = bindings ?? RustONativeBindings(RustONativeBindings.openDefault());
-    final cConfig = configJson.toNativeUtf8();
-    try {
-      final handle = native.initialize(cConfig);
-      if (handle == ffi.nullptr) {
-        throw StateError('Failed to initialize RustO OCR engine');
-      }
-      return RustO._(native, handle);
-    } finally {
-      calloc.free(cConfig);
-    }
+  static void configureBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}) {
+    generated.configureDefaultBindings(
+      dynamicLibrary: dynamicLibrary,
+      libraryPath: libraryPath,
+    );
+    _bindingsConfigured = true;
   }
 
-  void _ensureNotDisposed() {
-    if (_isDisposed || _handle == ffi.nullptr) {
-      throw StateError('RustO instance is already disposed');
-    }
-  }
-
-  List<TextResult> _convertResults(ffi.Pointer<CTextResult> resultsPtr, int count) {
-    if (resultsPtr == ffi.nullptr || count <= 0) {
-      return const [];
-    }
-    final list = <TextResult>[];
-    for (var i = 0; i < count; i++) {
-      final item = (resultsPtr + i).ref;
-      final text = item.text != ffi.nullptr ? item.text.toDartString() : '';
-      list.add(
-        TextResult(
-          text: text,
-          score: item.score,
-          boxPoints: [
-            [item.boxX1, item.boxY1],
-            [item.boxX2, item.boxY2],
-            [item.boxX3, item.boxY3],
-            [item.boxX4, item.boxY4],
-          ],
-          frame: Frame(
-            width: item.frameWidth,
-            height: item.frameHeight,
-            top: item.frameTop,
-            left: item.frameLeft,
-          ),
-        ),
-      );
-    }
-    return list;
-  }
-
-  List<TextResult> detectTextFile(String imagePath, [String optionsJson = '{}']) {
-    _ensureNotDisposed();
-    final cPath = imagePath.toNativeUtf8();
-    final cOpts = optionsJson.toNativeUtf8();
-    final resultsPtrPtr = calloc<ffi.Pointer<CTextResult>>();
-    final countPtr = calloc<ffi.Size>();
-
-    try {
-      final status = _bindings.detectTextFile(
-        _handle,
-        cPath,
-        cOpts,
-        resultsPtrPtr,
-        countPtr,
-      );
-      if (status != 0) {
-        throw StateError('Text detection failed with status: $status');
-      }
-      final results = resultsPtrPtr.value;
-      final count = countPtr.value;
+  /// Initialize engine with either JSON config string or structured InitializeConfig.
+  static RustO initialize(dynamic config, {Object? bindings}) {
+    _initBindingsIfNeeded();
+    if (config is generated.InitializeConfig) {
+      return RustO._(generated.RustO.initialize(config));
+    } else if (config is String) {
       try {
-        return _convertResults(results, count);
-      } finally {
-        if (results != ffi.nullptr) {
-          _bindings.freeResults(results.cast(), count);
-        }
+        return RustO._(generated.RustO.initializeFromJson(config));
+      } catch (e) {
+        throw StateError('Failed to initialize RustO: $e');
       }
-    } finally {
-      calloc.free(cPath);
-      calloc.free(cOpts);
-      calloc.free(resultsPtrPtr);
-      calloc.free(countPtr);
+    } else {
+      throw ArgumentError('Expected String (JSON) or InitializeConfig, got ${config.runtimeType}');
     }
   }
 
-  List<TextResult> detectTextData(Uint8List bytes, [String optionsJson = '{}']) {
-    _ensureNotDisposed();
-    if (bytes.isEmpty) return const [];
-
-    final cBytes = calloc<ffi.Uint8>(bytes.length);
-    cBytes.asTypedList(bytes.length).setAll(0, bytes);
-    final cOpts = optionsJson.toNativeUtf8();
-    final resultsPtrPtr = calloc<ffi.Pointer<CTextResult>>();
-    final countPtr = calloc<ffi.Size>();
-
-    try {
-      final status = _bindings.detectTextData(
-        _handle,
-        cBytes,
-        bytes.length,
-        cOpts,
-        resultsPtrPtr,
-        countPtr,
-      );
-      if (status != 0) {
-        throw StateError('Text detection failed with status: $status');
-      }
-      final results = resultsPtrPtr.value;
-      final count = countPtr.value;
-      try {
-        return _convertResults(results, count);
-      } finally {
-        if (results != ffi.nullptr) {
-          _bindings.freeResults(results.cast(), count);
-        }
-      }
-    } finally {
-      calloc.free(cBytes);
-      calloc.free(cOpts);
-      calloc.free(resultsPtrPtr);
-      calloc.free(countPtr);
-    }
+  /// Initialize engine from JSON configuration string.
+  static RustO initializeFromJson(String configJson) {
+    _initBindingsIfNeeded();
+    return RustO._(generated.RustO.initializeFromJson(configJson));
   }
 
-  String detectTextFileSpatial(String imagePath, [String optionsJson = '{"output":"spatial"}']) {
-    _ensureNotDisposed();
-    final cPath = imagePath.toNativeUtf8();
-    final cOpts = optionsJson.toNativeUtf8();
-
-    try {
-      final strPtr = _bindings.detectTextFileSpatial(_handle, cPath, cOpts);
-      if (strPtr == ffi.nullptr) {
-        throw StateError('Spatial text detection failed');
-      }
-      try {
-        return strPtr.toDartString();
-      } finally {
-        _bindings.freeString(strPtr);
-      }
-    } finally {
-      calloc.free(cPath);
-      calloc.free(cOpts);
+  /// Detect text from file path with structured results.
+  List<generated.TextResult> detectTextFile(String imagePath, [dynamic options]) {
+    final ocrOpts = _resolveOptions(options, spatial: false);
+    final res = _inner.detectText(generated.ImageSourcePath(path: imagePath), ocrOpts);
+    if (res is generated.DetectTextResultStructured) {
+      return res.results;
     }
+    return const [];
   }
 
-  String detectTextDataSpatial(Uint8List bytes, [String optionsJson = '{"output":"spatial"}']) {
-    _ensureNotDisposed();
-    if (bytes.isEmpty) return '';
-
-    final cBytes = calloc<ffi.Uint8>(bytes.length);
-    cBytes.asTypedList(bytes.length).setAll(0, bytes);
-    final cOpts = optionsJson.toNativeUtf8();
-
-    try {
-      final strPtr = _bindings.detectTextDataSpatial(_handle, cBytes, bytes.length, cOpts);
-      if (strPtr == ffi.nullptr) {
-        throw StateError('Spatial text detection failed');
-      }
-      try {
-        return strPtr.toDartString();
-      } finally {
-        _bindings.freeString(strPtr);
-      }
-    } finally {
-      calloc.free(cBytes);
-      calloc.free(cOpts);
+  /// Detect text from file path formatted as spatial string.
+  String detectTextFileSpatial(String imagePath, [dynamic options]) {
+    final ocrOpts = _resolveOptions(options, spatial: true);
+    final res = _inner.detectText(generated.ImageSourcePath(path: imagePath), ocrOpts);
+    if (res is generated.DetectTextResultSpatial) {
+      return res.text;
     }
+    return '';
   }
 
-  List<TextResult> detectTextRgb(
+  /// Detect text from memory bytes with structured results.
+  List<generated.TextResult> detectTextData(Uint8List bytes, [dynamic options]) {
+    final ocrOpts = _resolveOptions(options, spatial: false);
+    final res = _inner.detectText(generated.ImageSourceBytes(data: bytes), ocrOpts);
+    if (res is generated.DetectTextResultStructured) {
+      return res.results;
+    }
+    return const [];
+  }
+
+  /// Detect text from memory bytes formatted as spatial string.
+  String detectTextDataSpatial(Uint8List bytes, [dynamic options]) {
+    final ocrOpts = _resolveOptions(options, spatial: true);
+    final res = _inner.detectText(generated.ImageSourceBytes(data: bytes), ocrOpts);
+    if (res is generated.DetectTextResultSpatial) {
+      return res.text;
+    }
+    return '';
+  }
+
+  /// Detect text from raw RGB pixel buffer with structured results.
+  List<generated.TextResult> detectTextRgb(
     Uint8List pixels,
     int width,
     int height,
     int stride, [
-    String optionsJson = '{}',
+    dynamic options,
   ]) {
-    _ensureNotDisposed();
-    if (pixels.isEmpty) return const [];
-
-    final cPixels = calloc<ffi.Uint8>(pixels.length);
-    cPixels.asTypedList(pixels.length).setAll(0, pixels);
-    final cOpts = optionsJson.toNativeUtf8();
-    final resultsPtrPtr = calloc<ffi.Pointer<CTextResult>>();
-    final countPtr = calloc<ffi.Size>();
-
-    try {
-      final status = _bindings.detectTextRgb(
-        _handle,
-        cPixels,
-        pixels.length,
-        width,
-        height,
-        stride,
-        cOpts,
-        resultsPtrPtr,
-        countPtr,
-      );
-      if (status != 0) {
-        throw StateError('Text detection failed with status: $status');
-      }
-      final results = resultsPtrPtr.value;
-      final count = countPtr.value;
-      try {
-        return _convertResults(results, count);
-      } finally {
-        if (results != ffi.nullptr) {
-          _bindings.freeResults(results.cast(), count);
-        }
-      }
-    } finally {
-      calloc.free(cPixels);
-      calloc.free(cOpts);
-      calloc.free(resultsPtrPtr);
-      calloc.free(countPtr);
+    final ocrOpts = _resolveOptions(options, spatial: false);
+    final res = _inner.detectTextRgb(pixels, width, height, stride, ocrOpts);
+    if (res is generated.DetectTextResultStructured) {
+      return res.results;
     }
+    return const [];
   }
 
+  /// Detect text from raw RGB pixel buffer formatted as spatial string.
   String detectTextRgbSpatial(
     Uint8List pixels,
     int width,
     int height,
     int stride, [
-    String optionsJson = '{"output":"spatial"}',
+    dynamic options,
   ]) {
-    _ensureNotDisposed();
-    if (pixels.isEmpty) return '';
-
-    final cPixels = calloc<ffi.Uint8>(pixels.length);
-    cPixels.asTypedList(pixels.length).setAll(0, pixels);
-    final cOpts = optionsJson.toNativeUtf8();
-
-    try {
-      final strPtr = _bindings.detectTextRgbSpatial(
-        _handle,
-        cPixels,
-        pixels.length,
-        width,
-        height,
-        stride,
-        cOpts,
-      );
-      if (strPtr == ffi.nullptr) {
-        throw StateError('Spatial text detection failed');
-      }
-      try {
-        return strPtr.toDartString();
-      } finally {
-        _bindings.freeString(strPtr);
-      }
-    } finally {
-      calloc.free(cPixels);
-      calloc.free(cOpts);
+    final ocrOpts = _resolveOptions(options, spatial: true);
+    final res = _inner.detectTextRgb(pixels, width, height, stride, ocrOpts);
+    if (res is generated.DetectTextResultSpatial) {
+      return res.text;
     }
+    return '';
   }
 
-  void dispose() {
-    if (!_isDisposed && _handle != ffi.nullptr) {
-      _bindings.free(_handle);
-      _handle = ffi.nullptr;
-      _isDisposed = true;
+  /// Unified UniFFI image detection method.
+  generated.DetectTextResult detectText(generated.ImageSource source, generated.OcrRunOptions options) {
+    return _inner.detectText(source, options);
+  }
+
+  /// Engine version string.
+  String version() => _inner.version();
+
+  /// Release native resources.
+  void close() => _inner.close();
+
+  /// Alias for close() for backward compatibility.
+  void dispose() => close();
+
+  static generated.OcrRunOptions _resolveOptions(dynamic options, {required bool spatial}) {
+    generated.OcrRunOptions opts;
+    if (options is generated.OcrRunOptions) {
+      opts = options;
+    } else if (options is String && options.isNotEmpty && options != '{}') {
+      try {
+        final decoded = json.decode(options) as Map<String, dynamic>;
+        opts = generated.OcrRunOptions.fromJson(decoded);
+      } catch (_) {
+        opts = generated.defaultOcrRunOptions();
+      }
+    } else {
+      opts = generated.defaultOcrRunOptions();
     }
+
+    if (spatial && opts.output != generated.OutputGranularity.spatial) {
+      return generated.OcrRunOptions(
+        output: generated.OutputGranularity.spatial,
+        lineYThreshold: opts.lineYThreshold,
+        wordXThreshold: opts.wordXThreshold,
+        textScore: opts.textScore,
+        classification: opts.classification,
+        orientation: opts.orientation,
+        minHeight: opts.minHeight,
+        maxSideLen: opts.maxSideLen,
+        minSideLen: opts.minSideLen,
+        widthHeightRatio: opts.widthHeightRatio,
+        detection: opts.detection,
+        postprocess: opts.postprocess,
+        calibration: opts.calibration,
+        optimization: opts.optimization,
+      );
+    }
+    return opts;
   }
 }

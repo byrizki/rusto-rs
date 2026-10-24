@@ -46,7 +46,8 @@ rten = { version = "0.27.0", features = ["onnx_format", "rten_format"] }
 rten-tensor = "0.27.0"
 
 # UniFFI bindings
-uniffi = { version = "0.32.2", default-features = false, optional = true }
+uniffi = { version = "0.31.0", default-features = false, optional = true }
+cbindgen = { version = "0.28", default-features = false, optional = true }
 
 [[bin]]
 name = "rusto-rs"
@@ -57,14 +58,20 @@ name = "uniffi-bindgen"
 path = "src/bin/uniffi-bindgen.rs"
 required-features = ["uniffi-cli"]
 
+[[bin]]
+name = "generate-c-headers"
+path = "src/bin/generate-c-headers.rs"
+required-features = ["cbindgen-cli"]
+
 [dev-dependencies]
 criterion = "0.5"
 
 [features]
 default = ["ffi"]
 use-opencv = ["opencv"]
-uniffi = ["dep:uniffi"]
+uniffi = ["dep:uniffi", "uniffi/scaffolding-ffi-buffer-fns"]
 uniffi-cli = ["uniffi", "uniffi/cli"]
+cbindgen-cli = ["dep:cbindgen"]
 ffi = ["uniffi"]  # Enable C FFI and UniFFI bindings
 
 # Feature stubs for backwards compatibility

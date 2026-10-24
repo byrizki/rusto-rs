@@ -3,3 +3,8 @@ package_name = "com.byrizki.rusto.generated"
 
 [bindings.swift]
 module_name = "RustOFFI"
+
+[bindings.csharp]
+cdylib_name = "rusto"
+namespace = "RustODotnet.Generated"
+access_modifier = "public"

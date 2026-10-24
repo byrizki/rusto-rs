@@ -8,16 +8,6 @@ using System.Text.Json.Serialization;
 
 namespace RustODotnet
 {
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct CTextResult
-    {
-        public IntPtr Text;
-        public float Score;
-        public float BoxX1, BoxY1, BoxX2, BoxY2;
-        public float BoxX3, BoxY3, BoxX4, BoxY4;
-        public float FrameWidth, FrameHeight, FrameTop, FrameLeft;
-    }
-
     public struct Point2D
     {
         public float X { get; set; }
@@ -48,148 +38,79 @@ namespace RustODotnet
         public float Score { get; set; }
         public Point2D[] BoxPoints { get; set; }
         public Frame Frame { get; set; }
+    }
 
-        internal static TextResult FromNative(CTextResult native)
-        {
-            return new TextResult
-            {
-                Text = Marshal.PtrToStringUTF8(native.Text) ?? string.Empty,
-                Score = native.Score,
-                BoxPoints = new[]
-                {
-                    new Point2D(native.BoxX1, native.BoxY1),
-                    new Point2D(native.BoxX2, native.BoxY2),
-                    new Point2D(native.BoxX3, native.BoxY3),
-                    new Point2D(native.BoxX4, native.BoxY4),
-                },
-                Frame = new Frame(native.FrameWidth, native.FrameHeight, native.FrameTop, native.FrameLeft)
-            };
-        }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public enum OutputGranularity
+    {
+        Lines,
+        Words,
+        Spatial
     }
 
     public class DetectionConfig
     {
-        [JsonPropertyName("enabled")]
-        public bool? Enabled { get; set; }
-        [JsonPropertyName("modelPath")]
+        [JsonPropertyName("model_path")]
         public string ModelPath { get; set; }
-        [JsonPropertyName("thresh")]
-        public float? Thresh { get; set; }
-        [JsonPropertyName("boxThresh")]
-        public float? BoxThresh { get; set; }
-        [JsonPropertyName("unclipRatio")]
-        public float? UnclipRatio { get; set; }
-        [JsonPropertyName("limitSideLen")]
-        public int? LimitSideLen { get; set; }
-        [JsonPropertyName("limitType")]
-        public string LimitType { get; set; }
-        [JsonPropertyName("useDilation")]
-        public bool? UseDilation { get; set; }
     }
 
     public class RecognitionConfig
     {
-        [JsonPropertyName("enabled")]
-        public bool? Enabled { get; set; }
-        [JsonPropertyName("modelPath")]
+        [JsonPropertyName("model_path")]
         public string ModelPath { get; set; }
-        [JsonPropertyName("dictPath")]
+
+        [JsonPropertyName("dict_path")]
         public string DictPath { get; set; }
-        [JsonPropertyName("scoreThresh")]
-        public float? ScoreThresh { get; set; }
-        [JsonPropertyName("returnWordBox")]
-        public bool? ReturnWordBox { get; set; }
-        [JsonPropertyName("returnSingleCharBox")]
-        public bool? ReturnSingleCharBox { get; set; }
     }
 
-    /// <summary>
-    /// Line Classification Configuration (CLS)
-    /// NOTE: Text line orientation classifier (180° rotation) is ONLY available on PP-OCRv4 and PP-OCRv5.
-    /// </summary>
     public class ClassificationConfig
     {
-        [JsonPropertyName("enabled")]
-        public bool? Enabled { get; set; }
-        [JsonPropertyName("modelPath")]
+        [JsonPropertyName("model_path")]
         public string ModelPath { get; set; }
-        [JsonPropertyName("thresh")]
-        public float? Thresh { get; set; }
     }
 
     public class OrientationConfig
     {
-        [JsonPropertyName("enabled")]
-        public bool? Enabled { get; set; }
-        [JsonPropertyName("modelPath")]
+        [JsonPropertyName("model_path")]
         public string ModelPath { get; set; }
-        [JsonPropertyName("thresh")]
-        public float? Thresh { get; set; }
     }
 
     public class UnwarpConfig
     {
-        [JsonPropertyName("enabled")]
-        public bool? Enabled { get; set; }
-        [JsonPropertyName("modelPath")]
+        [JsonPropertyName("model_path")]
         public string ModelPath { get; set; }
-    }
-
-    public class LayoutConfig
-    {
-        [JsonPropertyName("yThresholdMultiplier")]
-        public float? YThresholdMultiplier { get; set; }
-        [JsonPropertyName("xThresholdMultiplier")]
-        public float? XThresholdMultiplier { get; set; }
     }
 
     public class InitializeConfig
     {
         [JsonPropertyName("template")]
         public string Template { get; set; }
+
         [JsonPropertyName("detection")]
         public DetectionConfig Detection { get; set; }
+
         [JsonPropertyName("recognition")]
         public RecognitionConfig Recognition { get; set; }
+
         [JsonPropertyName("classification")]
         public ClassificationConfig Classification { get; set; }
+
         [JsonPropertyName("orientation")]
         public OrientationConfig Orientation { get; set; }
+
         [JsonPropertyName("unwarp")]
         public UnwarpConfig Unwarp { get; set; }
-        [JsonPropertyName("layout")]
-        public LayoutConfig Layout { get; set; }
 
-        public InitializeConfig() { }
-
-        public static InitializeConfig Ppv6(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
-            new InitializeConfig { Template = "ppv6", Detection = detection, Recognition = recognition };
-
-        public static InitializeConfig Ppv5(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
-            new InitializeConfig { Template = "ppv5", Detection = detection, Recognition = recognition };
-
-        public static InitializeConfig Ppv4(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
-            new InitializeConfig { Template = "ppv4", Detection = detection, Recognition = recognition };
-
-        public static InitializeConfig Ppv3(DetectionConfig detection = null, RecognitionConfig recognition = null) =>
-            new InitializeConfig { Template = "ppv3", Detection = detection, Recognition = recognition };
-    }
-
-    /// <summary>
-    /// Per-request OCR output and pipeline options. These options do not alter
-    /// engine configuration or later requests.
-    /// </summary>
-    public enum OutputGranularity
-    {
-        Lines,
-        Words,
-        Spatial,
+        public static InitializeConfig Ppv3() => new() { Template = "ppv3" };
+        public static InitializeConfig Ppv4() => new() { Template = "ppv4" };
+        public static InitializeConfig Ppv5() => new() { Template = "ppv5" };
+        public static InitializeConfig Ppv6() => new() { Template = "ppv6" };
     }
 
     public class PostprocessRunOptions
     {
-        [JsonPropertyName("threshold")] public float? Threshold { get; set; }
-        [JsonPropertyName("boxThreshold")] public float? BoxThreshold { get; set; }
+        [JsonPropertyName("thresh")] public float? Threshold { get; set; }
+        [JsonPropertyName("boxThresh")] public float? BoxThreshold { get; set; }
         [JsonPropertyName("maxCandidates")] public int? MaxCandidates { get; set; }
         [JsonPropertyName("unclipRatio")] public float? UnclipRatio { get; set; }
         [JsonPropertyName("useDilation")] public bool? UseDilation { get; set; }
@@ -203,7 +124,6 @@ namespace RustODotnet
         [JsonPropertyName("std")] public float[] Std { get; set; }
     }
 
-    /// <summary>Per-request OCR output and pipeline options.</summary>
     public class OcrRunOptions
     {
         [JsonIgnore]
@@ -261,17 +181,50 @@ namespace RustODotnet
 
     public class RustO : IDisposable
     {
-        private IntPtr _handle;
+        private readonly RustODotnet.Generated.RustO _inner;
         private bool _disposed;
 
-        public static string Version
+        static RustO()
         {
-            get
-            {
-                IntPtr versionPtr = rocr_version();
-                return Marshal.PtrToStringUTF8(versionPtr) ?? "unknown";
-            }
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+            NativeLibrary.SetDllImportResolver(typeof(RustO).Assembly, DllImportResolver);
+#endif
         }
+
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        private static IntPtr DllImportResolver(string libraryName, System.Reflection.Assembly assembly, DllImportSearchPath? searchPath)
+        {
+            if (libraryName == "rusto")
+            {
+                var candidates = new[]
+                {
+                    "librusto.so",
+                    "target/release/librusto.so",
+                    "target/debug/librusto.so",
+                    "../target/release/librusto.so",
+                    "../target/debug/librusto.so",
+                    "../../target/release/librusto.so",
+                    "../../target/debug/librusto.so",
+                    "../../../target/release/librusto.so",
+                    "../../../target/debug/librusto.so",
+                    "runtimes/linux-x64/native/librusto.so",
+                    "runtimes/osx-arm64/native/librusto.dylib",
+                    "runtimes/win-x64/native/rusto.dll"
+                };
+                foreach (var cand in candidates)
+                {
+                    if (NativeLibrary.TryLoad(cand, out var handle))
+                        return handle;
+                    var full = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, cand));
+                    if (File.Exists(full) && NativeLibrary.TryLoad(full, out handle))
+                        return handle;
+                }
+            }
+            return IntPtr.Zero;
+        }
+#endif
+
+        public static string Version => RustODotnet.Generated.RustoMethods.RustoVersion();
 
         private RustO(InitializeConfig config)
         {
@@ -299,66 +252,17 @@ namespace RustODotnet
                 DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             };
             string json = JsonSerializer.Serialize(config, options);
-            _handle = rocr_initialize(json);
-            if (_handle == IntPtr.Zero)
+            try
             {
-                throw new RustOException("Failed to initialize RustO with config");
+                _inner = RustODotnet.Generated.RustO.InitializeFromJson(json);
+            }
+            catch (Exception ex)
+            {
+                throw new RustOException($"Failed to initialize RustO with config: {ex.Message}");
             }
         }
+
         public static RustO Initialize(InitializeConfig config = null) => new RustO(config);
-
-        private const string LibName = "rusto";
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr rocr_initialize(
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string configJson
-        );
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int rocr_detect_text_file(
-            IntPtr handle,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string imagePath,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string optionsJson,
-            out IntPtr results,
-            out nuint count
-        );
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr rocr_detect_text_file_spatial(
-            IntPtr handle,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string imagePath,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string optionsJson
-        );
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern int rocr_detect_text_data(
-            IntPtr handle,
-            byte[] imageData,
-            nuint imageLen,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string optionsJson,
-            out IntPtr results,
-            out nuint count
-        );
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr rocr_detect_text_data_spatial(
-            IntPtr handle,
-            byte[] imageData,
-            nuint imageLen,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string optionsJson
-        );
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern void rocr_free_string(IntPtr str);
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern void rocr_free_results(IntPtr results, nuint count);
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern void rocr_free(IntPtr handle);
-
-        [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr rocr_version();
 
         private static string ResolveModelPath(string path)
         {
@@ -396,65 +300,86 @@ namespace RustODotnet
         {
             ThrowIfDisposed();
             options ??= new OcrRunOptions();
-            return options.Output == OutputGranularity.Spatial
-                ? new SpatialDetectTextResult(DetectSpatialText(source, options))
-                : new StructuredDetectTextResult(DetectStructuredText(source, options));
-        }
+            ValidateOptions(options, allowSpatial: true);
 
-        private List<TextResult> DetectStructuredText(ImageSource source, OcrRunOptions options)
-        {
-            string optionsJson = SerializeStructuredOptions(options);
-            int status;
-            IntPtr resultsPtr;
-            nuint count;
-            switch (source)
+            RustODotnet.Generated.ImageSource uniffiSource = source switch
             {
-                case UriImageSource uri:
-                    status = rocr_detect_text_file(_handle, uri.Value, optionsJson, out resultsPtr, out count);
-                    break;
-                case BytesImageSource bytes when bytes.Value != null:
-                    status = rocr_detect_text_data(_handle, bytes.Value, (nuint)bytes.Value.Length, optionsJson, out resultsPtr, out count);
-                    break;
-                default:
-                    throw new ArgumentException("ImageSource must contain a URI or image bytes.", nameof(source));
-            }
-            if (status != 0) throw new RustOException($"Text detection failed with status code: {status}");
-            try { return MarshalResults(resultsPtr, checked((int)count)); }
-            finally { rocr_free_results(resultsPtr, count); }
-        }
-
-        private string DetectSpatialText(ImageSource source, OcrRunOptions options)
-        {
-            string optionsJson = SerializeSpatialOptions(options);
-            IntPtr textPtr = source switch
-            {
-                UriImageSource uri => rocr_detect_text_file_spatial(_handle, uri.Value, optionsJson),
-                BytesImageSource bytes when bytes.Value != null => rocr_detect_text_data_spatial(_handle, bytes.Value, (nuint)bytes.Value.Length, optionsJson),
-                _ => throw new ArgumentException("ImageSource must contain a URI or image bytes.", nameof(source)),
+                UriImageSource uri => new RustODotnet.Generated.ImageSource.Path(uri.Value),
+                BytesImageSource bytes when bytes.Value != null => new RustODotnet.Generated.ImageSource.Bytes(bytes.Value),
+                _ => throw new ArgumentException("ImageSource must contain a URI or image bytes.", nameof(source))
             };
-            if (textPtr == IntPtr.Zero) throw new RustOException("Text detection failed while producing spatial text.");
-            try { return Marshal.PtrToStringUTF8(textPtr) ?? string.Empty; }
-            finally { rocr_free_string(textPtr); }
+
+            var uniffiOpts = BuildUniffiOptions(options);
+
+            try
+            {
+                var result = _inner.DetectText(uniffiSource, uniffiOpts);
+                return result switch
+                {
+                    RustODotnet.Generated.DetectTextResult.Structured structured => new StructuredDetectTextResult(
+                        structured.Results.Select(r => new TextResult
+                        {
+                            Text = r.Text,
+                            Score = r.Score,
+                            BoxPoints = r.BoxPoints.Select(p => new Point2D(p.X, p.Y)).ToArray(),
+                            Frame = new Frame(r.Frame.Width, r.Frame.Height, r.Frame.Top, r.Frame.Left)
+                        }).ToArray()
+                    ),
+                    RustODotnet.Generated.DetectTextResult.Spatial spatial => new SpatialDetectTextResult(spatial.Text),
+                    _ => throw new RustOException("Unexpected detection result format")
+                };
+            }
+            catch (Exception ex)
+            {
+                throw new RustOException($"Text detection failed: {ex.Message}");
+            }
         }
 
-        private static string SerializeStructuredOptions(OcrRunOptions options)
+        public DetectTextResult DetectTextRgb(byte[] pixels, uint width, uint height, ulong stride, OcrRunOptions options = null)
         {
-            ValidateOptions(options, allowSpatial: false);
-            return SerializeOptions(options, options.Output);
-        }
-
-        private static string SerializeSpatialOptions(OcrRunOptions options)
-        {
+            ThrowIfDisposed();
             options ??= new OcrRunOptions();
             ValidateOptions(options, allowSpatial: true);
-            return SerializeOptions(options, OutputGranularity.Spatial);
+
+            var uniffiOpts = BuildUniffiOptions(options);
+
+            try
+            {
+                var result = _inner.DetectTextRgb(pixels, width, height, stride, uniffiOpts);
+                return result switch
+                {
+                    RustODotnet.Generated.DetectTextResult.Structured structured => new StructuredDetectTextResult(
+                        structured.Results.Select(r => new TextResult
+                        {
+                            Text = r.Text,
+                            Score = r.Score,
+                            BoxPoints = r.BoxPoints.Select(p => new Point2D(p.X, p.Y)).ToArray(),
+                            Frame = new Frame(r.Frame.Width, r.Frame.Height, r.Frame.Top, r.Frame.Left)
+                        }).ToArray()
+                    ),
+                    RustODotnet.Generated.DetectTextResult.Spatial spatial => new SpatialDetectTextResult(spatial.Text),
+                    _ => throw new RustOException("Unexpected detection result format")
+                };
+            }
+            catch (Exception ex)
+            {
+                throw new RustOException($"Text detection failed: {ex.Message}");
+            }
         }
 
-        private static string SerializeOptions(OcrRunOptions options, OutputGranularity output)
+        private static RustODotnet.Generated.OcrRunOptions BuildUniffiOptions(OcrRunOptions options)
         {
-            var serialized = new OcrRunOptions
+            var defaultOpts = RustODotnet.Generated.RustoMethods.DefaultOcrRunOptions();
+            var uniffiOutput = options.Output switch
             {
-                Output = output,
+                OutputGranularity.Words => RustODotnet.Generated.OutputGranularity.Words,
+                OutputGranularity.Spatial => RustODotnet.Generated.OutputGranularity.Spatial,
+                _ => RustODotnet.Generated.OutputGranularity.Lines
+            };
+
+            return defaultOpts with
+            {
+                Output = uniffiOutput,
                 LineYThreshold = options.LineYThreshold,
                 WordXThreshold = options.WordXThreshold,
                 TextScore = options.TextScore,
@@ -464,13 +389,21 @@ namespace RustODotnet
                 MaxSideLen = options.MaxSideLen,
                 MinSideLen = options.MinSideLen,
                 WidthHeightRatio = options.WidthHeightRatio,
-                Detection = options.Detection,
-                Postprocess = options.Postprocess,
+                Detection = options.Detection != null ? new RustODotnet.Generated.DetectionRunOptions(
+                    options.Detection.LimitSideLen,
+                    options.Detection.LimitType,
+                    options.Detection.Mean,
+                    options.Detection.Std,
+                    null
+                ) : defaultOpts.Detection,
+                Postprocess = options.Postprocess != null ? new RustODotnet.Generated.PostprocessRunOptions(
+                    options.Postprocess.Threshold,
+                    options.Postprocess.BoxThreshold,
+                    options.Postprocess.MaxCandidates,
+                    options.Postprocess.UnclipRatio,
+                    options.Postprocess.UseDilation
+                ) : defaultOpts.Postprocess
             };
-            return JsonSerializer.Serialize(serialized, new JsonSerializerOptions
-            {
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            });
         }
 
         private static void ValidateOptions(OcrRunOptions options, bool allowSpatial)
@@ -538,21 +471,6 @@ namespace RustODotnet
             }
         }
 
-        private List<TextResult> MarshalResults(IntPtr resultsPtr, int count)
-        {
-            var results = new List<TextResult>(count);
-            int structSize = Marshal.SizeOf<CTextResult>();
-
-            for (int i = 0; i < count; i++)
-            {
-                IntPtr itemPtr = IntPtr.Add(resultsPtr, i * structSize);
-                var nativeResult = Marshal.PtrToStructure<CTextResult>(itemPtr);
-                results.Add(TextResult.FromNative(nativeResult));
-            }
-
-            return results;
-        }
-
         private void ThrowIfDisposed()
         {
             if (_disposed)
@@ -565,11 +483,7 @@ namespace RustODotnet
         {
             if (!_disposed)
             {
-                if (_handle != IntPtr.Zero)
-                {
-                    rocr_free(_handle);
-                    _handle = IntPtr.Zero;
-                }
+                _inner?.Dispose();
                 _disposed = true;
             }
         }

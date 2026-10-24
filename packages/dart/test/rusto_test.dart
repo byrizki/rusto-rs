@@ -5,10 +5,8 @@ import 'package:rusto/rusto.dart';
 void main() {
   group('RustO Dart Binding Tests', () {
     test('Invalid JSON initialization throws StateError', () {
-      final bindings = RustONativeBindings(RustONativeBindings.openDefault());
-
       expect(
-        () => RustO.initialize('invalid-json-config', bindings: bindings),
+        () => RustO.initialize('invalid-json-config'),
         throwsA(isA<StateError>()),
       );
     });
@@ -20,14 +18,14 @@ void main() {
       expect(frame.top, equals(10));
       expect(frame.left, equals(20));
 
-      final result = TextResult(
+      const result = TextResult(
         text: 'PaddleOCR RustO',
         score: 0.99,
         boxPoints: [
-          [20, 10],
-          [140, 10],
-          [140, 34],
-          [20, 34],
+          Point2D(x: 20, y: 10),
+          Point2D(x: 140, y: 10),
+          Point2D(x: 140, y: 34),
+          Point2D(x: 20, y: 34),
         ],
         frame: frame,
       );
@@ -35,6 +33,8 @@ void main() {
       expect(result.text, equals('PaddleOCR RustO'));
       expect(result.score, equals(0.99));
       expect(result.frame, equals(frame));
+      expect(result.boxPoints[0].x, equals(20));
+      expect(result.boxPoints[0].y, equals(10));
     });
 
     test('Real OCR inference on example1.png', () {
@@ -58,6 +58,33 @@ void main() {
       expect(spatial, contains('INVOICE'));
 
       engine.dispose();
+    });
+
+    test('UniFFI typed config and options inference', () {
+      final det = File('../../models/PPOCR_v6/det.rten');
+      final rec = File('../../models/PPOCR_v6/rec.rten');
+      final dict = File('../../models/PPOCR_v6/dict.txt');
+      final img = File('../../models/test_images/example1.png');
+
+      if (!det.existsSync() || !img.existsSync()) {
+        return;
+      }
+
+      final config = createInitializeConfigPpv6(
+        det.absolute.path,
+        rec.absolute.path,
+        dict.absolute.path,
+      );
+      final engine = RustO.initialize(config);
+
+      final options = defaultOcrRunOptions();
+      final res = engine.detectText(ImageSourcePath(path: img.absolute.path), options);
+      expect(res, isA<DetectTextResultStructured>());
+      final structured = res as DetectTextResultStructured;
+      expect(structured.results, isNotEmpty);
+      expect(structured.results.any((r) => r.text.contains('INVOICE')), isTrue);
+
+      engine.close();
     });
   });
 }

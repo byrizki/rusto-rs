@@ -397,6 +397,22 @@ fn convert_result(res: crate::rusto_ocr::DetectTextResult) -> DetectTextResult {
     }
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn ffi_uniffi_rusto_rustbuffer_from_bytes(
+    bytes: uniffi::ForeignBytes,
+    out_status: &mut uniffi::RustCallStatus,
+) -> uniffi::RustBuffer {
+    uniffi::uniffi_rustbuffer_from_bytes(bytes, out_status)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ffi_uniffi_rusto_rustbuffer_free(
+    buf: uniffi::RustBuffer,
+    out_status: &mut uniffi::RustCallStatus,
+) {
+    uniffi::uniffi_rustbuffer_free(buf, out_status)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

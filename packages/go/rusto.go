@@ -1,7 +1,7 @@
 package rusto
 
 /*
-#cgo CFLAGS: -I${SRCDIR}
+#cgo CFLAGS: -I${SRCDIR}/../../include
 #cgo LDFLAGS: -L${SRCDIR}/../../target/debug -L${SRCDIR}/../../target/release -Wl,-rpath,${SRCDIR}/../../target/release -Wl,-rpath,${SRCDIR}/../../target/debug -lrusto
 #include <stdlib.h>
 #include "rusto.h"
@@ -40,7 +40,7 @@ type TextResult struct {
 // Engine wraps an active RustO OCR instance.
 type Engine struct {
 	mu     sync.RWMutex
-	handle C.ROCRHandle
+	handle *C.ROCRHandle
 }
 
 // New creates and initializes a new OCR engine instance using JSON configuration.
@@ -71,16 +71,16 @@ func (e *Engine) Close() {
 	}
 }
 
-func (e *Engine) convertResults(resultsPtr unsafe.Pointer, count C.size_t) []TextResult {
-	if resultsPtr == nil || count == 0 {
+func (e *Engine) convertResults(cResults *C.CTextResult, count C.size_t) []TextResult {
+	if cResults == nil || count == 0 {
 		return []TextResult{}
 	}
 
-	cResults := (*[1 << 28]C.CTextResult)(resultsPtr)[:count:count]
+	resultsSlice := (*[1 << 28]C.CTextResult)(unsafe.Pointer(cResults))[:count:count]
 	out := make([]TextResult, count)
 
 	for i := 0; i < int(count); i++ {
-		res := cResults[i]
+		res := resultsSlice[i]
 		text := ""
 		if res.text != nil {
 			text = C.GoString(res.text)
@@ -121,7 +121,7 @@ func (e *Engine) DetectTextFile(path string, optionsJSON string) ([]TextResult, 
 	cOptions := C.CString(optionsJSON)
 	defer C.free(unsafe.Pointer(cOptions))
 
-	var results unsafe.Pointer
+	var results *C.CTextResult
 	var count C.size_t
 
 	status := C.rocr_detect_text_file(e.handle, cPath, cOptions, &results, &count)
@@ -148,12 +148,12 @@ func (e *Engine) DetectTextData(data []byte, optionsJSON string) ([]TextResult, 
 	cOptions := C.CString(optionsJSON)
 	defer C.free(unsafe.Pointer(cOptions))
 
-	var results unsafe.Pointer
+	var results *C.CTextResult
 	var count C.size_t
 
 	status := C.rocr_detect_text_data(
 		e.handle,
-		unsafe.Pointer(&data[0]),
+		(*C.uint8_t)(unsafe.Pointer(&data[0])),
 		C.size_t(len(data)),
 		cOptions,
 		&results,
@@ -208,7 +208,7 @@ func (e *Engine) DetectTextDataSpatial(data []byte, optionsJSON string) (string,
 
 	cText := C.rocr_detect_text_data_spatial(
 		e.handle,
-		unsafe.Pointer(&data[0]),
+		(*C.uint8_t)(unsafe.Pointer(&data[0])),
 		C.size_t(len(data)),
 		cOptions,
 	)
@@ -235,12 +235,12 @@ func (e *Engine) DetectTextRGB(pixels []byte, width, height uint32, stride uint,
 	cOptions := C.CString(optionsJSON)
 	defer C.free(unsafe.Pointer(cOptions))
 
-	var results unsafe.Pointer
+	var results *C.CTextResult
 	var count C.size_t
 
 	status := C.rocr_detect_text_rgb(
 		e.handle,
-		unsafe.Pointer(&pixels[0]),
+		(*C.uint8_t)(unsafe.Pointer(&pixels[0])),
 		C.size_t(len(pixels)),
 		C.uint32_t(width),
 		C.uint32_t(height),
@@ -274,7 +274,7 @@ func (e *Engine) DetectTextRGBSpatial(pixels []byte, width, height uint32, strid
 
 	cText := C.rocr_detect_text_rgb_spatial(
 		e.handle,
-		unsafe.Pointer(&pixels[0]),
+		(*C.uint8_t)(unsafe.Pointer(&pixels[0])),
 		C.size_t(len(pixels)),
 		C.uint32_t(width),
 		C.uint32_t(height),

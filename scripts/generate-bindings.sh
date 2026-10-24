@@ -4,6 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Ensure ~/.cargo/bin is in PATH for community bindgen tools
+if [[ -d "$HOME/.cargo/bin" ]]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
+
+echo "=== Generating canonical C header with cbindgen ==="
+cargo run --features cbindgen-cli --bin generate-c-headers
+
 echo "=== Building host library with UniFFI & C FFI ==="
 cargo build --features "ffi,uniffi-cli" --lib
 
@@ -35,5 +43,29 @@ cargo run --features uniffi-cli --bin uniffi-bindgen generate \
     --library "$HOST_LIB" \
     --language python \
     --out-dir packages/python/rusto/generated
+
+if command -v uniffi-bindgen-dart >/dev/null 2>&1; then
+    echo "=== Generating Dart bindings ==="
+    mkdir -p packages/dart/lib/src/generated
+    uniffi-bindgen-dart generate "$HOST_LIB" --out-dir packages/dart/lib/src/generated
+else
+    echo "Skipping Dart generation: uniffi-bindgen-dart not found in PATH"
+fi
+
+if command -v uniffi-bindgen-cs >/dev/null 2>&1; then
+    echo "=== Generating C# (.NET) bindings ==="
+    mkdir -p packages/dotnet/generated
+    uniffi-bindgen-cs --library "$HOST_LIB" --config uniffi.toml --out-dir packages/dotnet/generated
+else
+    echo "Skipping C# generation: uniffi-bindgen-cs not found in PATH"
+fi
+
+if command -v uniffi-bindgen-go >/dev/null 2>&1; then
+    echo "=== Generating Go bindings ==="
+    mkdir -p packages/go/uniffi
+    uniffi-bindgen-go "$HOST_LIB" --out-dir packages/go/uniffi
+else
+    echo "Skipping Go generation: uniffi-bindgen-go not found in PATH"
+fi
 
 echo "=== Bindings generation complete ==="

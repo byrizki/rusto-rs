@@ -39,52 +39,6 @@ fileprivate extension ForeignBytes {
     init(bufferPointer: UnsafeBufferPointer<UInt8>) {
         self.init(len: Int32(bufferPointer.count), data: bufferPointer.baseAddress)
     }
-
-    init(rawBufferPointer: UnsafeRawBufferPointer) {
-        self.init(
-            len: Int32(rawBufferPointer.count),
-            data: rawBufferPointer.baseAddress?.assumingMemoryBound(to: UInt8.self)
-        )
-    }
-}
-
-// Converter for `&[u8]` / `[ByRef] bytes` arguments.
-//
-// Conforms to `FfiConverter` so the compiler enforces the full converter
-// method set. Only the scope-bound `lower(_:_body:)` overload is sound —
-// zero-copy byte buffers only flow foreign -> Rust, and only in argument
-// position. The four protocol-witness methods (`lift`, `lower`, `read`,
-// `write`) `fatalError` at runtime if anyone reaches them.
-//
-// The scope-bound `lower` takes a closure because the `ForeignBytes`
-// pointer is only guaranteed valid for the duration of
-// `Data.withUnsafeBytes`. Callers must run the full FFI call inside
-// the closure body.
-fileprivate enum FfiConverterByRefBytes: FfiConverter {
-    typealias SwiftType = Data
-    typealias FfiType = ForeignBytes
-
-    static func lower<R>(_ value: Data, _ body: (ForeignBytes) throws -> R) rethrows -> R {
-        return try value.withUnsafeBytes { rawBuf in
-            try body(ForeignBytes(rawBufferPointer: rawBuf))
-        }
-    }
-
-    static func lower(_ value: Data) -> ForeignBytes {
-        fatalError("ByRef bytes cannot use the plain lower: returning ForeignBytes escapes the Data.withUnsafeBytes scope. Use the scope-bound lower(_:_body:) overload instead.")
-    }
-
-    static func lift(_ value: ForeignBytes) throws -> Data {
-        fatalError("ByRef bytes cannot be lifted: zero-copy &[u8] only flows foreign->Rust")
-    }
-
-    static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
-        fatalError("ByRef bytes cannot be read from a buffer: zero-copy &[u8] is only supported in argument position, not nested in records/options/etc.")
-    }
-
-    static func write(_ value: Data, into buf: inout [UInt8]) {
-        fatalError("ByRef bytes cannot be written to a buffer: zero-copy &[u8] is only supported in argument position, not nested in records/options/etc.")
-    }
 }
 
 // For every type used in the interface, we provide helper methods for conveniently
@@ -465,6 +419,22 @@ fileprivate final class UniffiHandleMap<T>: @unchecked Sendable {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterUInt32: FfiConverterPrimitive {
+    typealias FfiType = UInt32
+    typealias SwiftType = UInt32
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt32 {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterInt32: FfiConverterPrimitive {
     typealias FfiType = Int32
     typealias SwiftType = Int32
@@ -474,6 +444,22 @@ fileprivate struct FfiConverterInt32: FfiConverterPrimitive {
     }
 
     public static func write(_ value: Int32, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterUInt64: FfiConverterPrimitive {
+    typealias FfiType = UInt64
+    typealias SwiftType = UInt64
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UInt64 {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         writeInt(&buf, lower(value))
     }
 }
@@ -589,6 +575,8 @@ public protocol RustOProtocol: AnyObject, Sendable {
     
     func detectText(source: ImageSource, options: OcrRunOptions) throws  -> DetectTextResult
     
+    func detectTextRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64, options: OcrRunOptions) throws  -> DetectTextResult
+    
     func version()  -> String
     
 }
@@ -645,18 +633,16 @@ open class RustO: RustOProtocol, @unchecked Sendable {
     
 public static func initialize(config: InitializeConfig)throws  -> RustO  {
     return try  FfiConverterTypeRustO_lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
-        uniffiCallStatus in
     uniffi_rusto_fn_constructor_rusto_initialize(
-        FfiConverterTypeInitializeConfig_lower(config),uniffiCallStatus
+        FfiConverterTypeInitializeConfig_lower(config),$0
     )
 })
 }
     
 public static func initializeFromJson(configJson: String)throws  -> RustO  {
     return try  FfiConverterTypeRustO_lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
-        uniffiCallStatus in
     uniffi_rusto_fn_constructor_rusto_initialize_from_json(
-        FfiConverterString.lower(configJson),uniffiCallStatus
+        FfiConverterString.lower(configJson),$0
     )
 })
 }
@@ -665,20 +651,31 @@ public static func initializeFromJson(configJson: String)throws  -> RustO  {
     
 open func detectText(source: ImageSource, options: OcrRunOptions)throws  -> DetectTextResult  {
     return try  FfiConverterTypeDetectTextResult_lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
-        uniffiCallStatus in
     uniffi_rusto_fn_method_rusto_detect_text(
             self.uniffiCloneHandle(),
         FfiConverterTypeImageSource_lower(source),
-        FfiConverterTypeOcrRunOptions_lower(options),uniffiCallStatus
+        FfiConverterTypeOcrRunOptions_lower(options),$0
+    )
+})
+}
+    
+open func detectTextRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64, options: OcrRunOptions)throws  -> DetectTextResult  {
+    return try  FfiConverterTypeDetectTextResult_lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
+    uniffi_rusto_fn_method_rusto_detect_text_rgb(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(pixels),
+        FfiConverterUInt32.lower(width),
+        FfiConverterUInt32.lower(height),
+        FfiConverterUInt64.lower(stride),
+        FfiConverterTypeOcrRunOptions_lower(options),$0
     )
 })
 }
     
 open func version() -> String  {
     return try!  FfiConverterString.lift(try! rustCall() {
-        uniffiCallStatus in
     uniffi_rusto_fn_method_rusto_version(
-            self.uniffiCloneHandle(),uniffiCallStatus
+            self.uniffiCloneHandle(),$0
     )
 })
 }
@@ -1622,7 +1619,8 @@ public func FfiConverterTypeUnwarpConfig_lower(_ value: UnwarpConfig) -> RustBuf
     return FfiConverterTypeUnwarpConfig.lower(value)
 }
 
-
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum DetectTextResult: Equatable, Hashable {
     
@@ -1694,7 +1692,8 @@ public func FfiConverterTypeDetectTextResult_lower(_ value: DetectTextResult) ->
 }
 
 
-
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum ImageSource: Equatable, Hashable {
     
@@ -1766,7 +1765,8 @@ public func FfiConverterTypeImageSource_lower(_ value: ImageSource) -> RustBuffe
 }
 
 
-
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum OutputGranularity: Equatable, Hashable {
     
@@ -1840,8 +1840,7 @@ public func FfiConverterTypeOutputGranularity_lower(_ value: OutputGranularity) 
 
 
 
-public 
-enum RustoBindingError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+public enum RustoBindingError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
     
     
@@ -2366,25 +2365,22 @@ fileprivate struct FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer {
 }
 public func createInitializeConfigPpv6(detModelPath: String, recModelPath: String, dictPath: String) -> InitializeConfig  {
     return try!  FfiConverterTypeInitializeConfig_lift(try! rustCall() {
-        uniffiCallStatus in
     uniffi_rusto_fn_func_create_initialize_config_ppv6(
         FfiConverterString.lower(detModelPath),
         FfiConverterString.lower(recModelPath),
-        FfiConverterString.lower(dictPath),uniffiCallStatus
+        FfiConverterString.lower(dictPath),$0
     )
 })
 }
 public func defaultOcrRunOptions() -> OcrRunOptions  {
     return try!  FfiConverterTypeOcrRunOptions_lift(try! rustCall() {
-        uniffiCallStatus in
-    uniffi_rusto_fn_func_default_ocr_run_options(uniffiCallStatus
+    uniffi_rusto_fn_func_default_ocr_run_options($0
     )
 })
 }
 public func rustoVersion() -> String  {
     return try!  FfiConverterString.lift(try! rustCall() {
-        uniffiCallStatus in
-    uniffi_rusto_fn_func_rusto_version(uniffiCallStatus
+    uniffi_rusto_fn_func_rusto_version($0
     )
 })
 }
@@ -2404,25 +2400,28 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 38048) {
+    if (uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 12132) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_func_default_ocr_run_options() != 57917) {
+    if (uniffi_rusto_checksum_func_default_ocr_run_options() != 50314) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_func_rusto_version() != 39280) {
+    if (uniffi_rusto_checksum_func_rusto_version() != 48676) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_method_rusto_detect_text() != 26689) {
+    if (uniffi_rusto_checksum_method_rusto_detect_text() != 7671) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_method_rusto_version() != 7772) {
+    if (uniffi_rusto_checksum_method_rusto_detect_text_rgb() != 14239) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_constructor_rusto_initialize() != 13675) {
+    if (uniffi_rusto_checksum_method_rusto_version() != 27087) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_constructor_rusto_initialize_from_json() != 4714) {
+    if (uniffi_rusto_checksum_constructor_rusto_initialize() != 334) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_rusto_checksum_constructor_rusto_initialize_from_json() != 23041) {
         return InitializationResult.apiChecksumMismatch
     }
 
