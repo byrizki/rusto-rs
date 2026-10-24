@@ -14,12 +14,10 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => "13.0" }
   s.source       = { :git => "https://github.com/byrizki/rusto-rs.git", :tag => "#{s.version}" }
 
-  s.source_files = "ios/**/*.{h,m,mm,swift}"
-  
-  s.swift_version = '5.0'
+  s.source_files = "ios/**/*.{h,m,mm}"
+
   pod_target_xcconfig = {
-    'DEFINES_MODULE' => 'YES',
-    'SWIFT_COMPILATION_MODE' => 'wholemodule'
+    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17'
   }
 
   s.dependency "React-Core"

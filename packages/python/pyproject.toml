@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rusto"
+version = "0.3.1"
+description = "Pure Rust OCR library for Python based on RapidOCR and PaddleOCR"
+readme = "README.md"
+authors = [{ name = "RustO Contributors", email = "contact@rusto.dev" }]
+license = { text = "MIT" }
+requires-python = ">=3.8"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rusto*"]

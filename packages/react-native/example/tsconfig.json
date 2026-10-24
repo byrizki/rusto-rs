@@ -1,0 +1,5 @@
+{
+  "extends": "@react-native/typescript-config",
+  "include": ["App.tsx", "index.js"],
+  "exclude": ["node_modules", "android", "ios"]
+}

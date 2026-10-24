@@ -1,0 +1,20 @@
+{
+  "name": "@rustors/node",
+  "version": "0.3.1",
+  "description": "Node.js N-API bindings for RustO! OCR library",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "ocr",
+    "node",
+    "n-api",
+    "napi-rs",
+    "rust",
+    "paddleocr"
+  ],
+  "author": "RustO Contributors",
+  "license": "MIT"
+}

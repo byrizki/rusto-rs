@@ -6,8 +6,9 @@ output.txt
 *.xcframework
 *.aar
 *.tar.gz
-bin
-obj
+bin/
+obj/
+!src/bin/
 
 # ONNX Runtime downloads
 onnxruntime-*/
@@ -86,6 +87,19 @@ examples/react-native-*/android/.gradle/
 examples/react-native-*/android/app/build/
 examples/dotnet/**/bin/
 examples/dotnet/**/obj/
+packages/react-native/example/android/.gradle/
+packages/react-native/example/android/app/build/
+packages/react-native/example/ios/Pods/
+packages/react-native/example/ios/build/
+
+# Language binding artifacts
+packages/java/build/
+packages/java/.gradle/
+packages/dart/.dart_tool/
+packages/flutter/.dart_tool/
+packages/python/rusto/generated/*.so
+packages/python/rusto/generated/*.dylib
+packages/python/rusto/generated/*.dll
 
 .codesight
 .pi-subagents

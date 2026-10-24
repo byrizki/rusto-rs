@@ -1,0 +1,5 @@
+[bindings.kotlin]
+package_name = "com.byrizki.rusto.generated"
+
+[bindings.swift]
+module_name = "RustOFFI"
