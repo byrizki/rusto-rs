@@ -65,9 +65,10 @@ def parse_new_version(current_ver: str, bump_arg: str) -> str:
             raise ValueError(f"Invalid version string: '{bump_arg}'. Must be semver like X.Y.Z or X.Y.Z-tag (or 'patch', 'minor', 'major').")
         return bump_arg
 
-def replace_in_file(file_path: Path, pattern: str, replacement: str, dry_run: bool = False, staged_files: Set[Path] = None) -> bool:
+def replace_in_file(file_path: Path, pattern: str, replacement: str, dry_run: bool = False, staged_files: Set[Path] = None, warn_if_not_found: bool = True) -> bool:
     if not file_path.exists():
-        print(f"  [WARN] File not found: {file_path.relative_to(REPO_ROOT)}")
+        if warn_if_not_found:
+            print(f"  [WARN] File not found: {file_path.relative_to(REPO_ROOT)}")
         return False
     
     with open(file_path, "r", encoding="utf-8") as f:
@@ -75,7 +76,8 @@ def replace_in_file(file_path: Path, pattern: str, replacement: str, dry_run: bo
         
     modified, count = re.subn(pattern, replacement, original)
     if count == 0:
-        print(f"  [WARN] Pattern not matched in {file_path.relative_to(REPO_ROOT)}")
+        if warn_if_not_found:
+            print(f"  [WARN] Pattern not matched in {file_path.relative_to(REPO_ROOT)}")
         return False
     
     if not dry_run and original != modified:
@@ -86,6 +88,34 @@ def replace_in_file(file_path: Path, pattern: str, replacement: str, dry_run: bo
         staged_files.add(file_path)
     
     print(f"  [OK] Updated {count} occurrence(s) in {file_path.relative_to(REPO_ROOT)}")
+    return True
+
+def update_pub_changelog(file_path: Path, new_ver: str, dry_run: bool = False, staged_files: Set[Path] = None) -> bool:
+    if not file_path.exists():
+        return False
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    if re.search(rf"(?m)^##\s+{re.escape(new_ver)}\b", content):
+        return True
+
+    new_section = f"## {new_ver}\n\n- Update RustO native library and bindings to {new_ver}.\n\n"
+    first_sec = re.search(r"(?m)^##\s+", content)
+    if first_sec:
+        pos = first_sec.start()
+        updated = content[:pos] + new_section + content[pos:]
+    else:
+        updated = content.rstrip() + "\n\n" + new_section
+
+    if not dry_run and content != updated:
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(updated)
+
+    if staged_files is not None:
+        staged_files.add(file_path)
+
+    print(f"  [OK] Updated changelog section ## {new_ver} in {file_path.relative_to(REPO_ROOT)}")
     return True
 
 def update_json_file(file_path: Path, new_ver: str, dry_run: bool = False, staged_files: Set[Path] = None) -> bool:
@@ -390,8 +420,19 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         dry_run,
         staged_files
     )
+
+    # 3. crates/rusto-node/Cargo.toml
+    rusto_node_cargo = REPO_ROOT / "crates" / "rusto-node" / "Cargo.toml"
+    if rusto_node_cargo.exists():
+        replace_in_file(
+            rusto_node_cargo,
+            r'(?ms)(\[package\](?:(?!\[).)*?\bversion\s*=\s*")[^"]+(")',
+            rf'\g<1>{new_ver}\g<2>',
+            dry_run,
+            staged_files
+        )
     
-    # 3. packages/android/gradle.properties (VERSION_NAME only, not MODELS_VERSION_NAME)
+    # 4. packages/android/gradle.properties (VERSION_NAME only, not MODELS_VERSION_NAME)
     replace_in_file(
         REPO_ROOT / "packages" / "android" / "gradle.properties",
         r'(?m)^(VERSION_NAME\s*=\s*).*',
@@ -400,7 +441,7 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         staged_files
     )
     
-    # 4. packages/android/build.gradle (root core library only)
+    # 5. packages/android/build.gradle (root core library only)
     root_bg = REPO_ROOT / "packages" / "android" / "build.gradle"
     replace_in_file(
         root_bg,
@@ -417,7 +458,7 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         staged_files
     )
     
-    # 5. packages/ios/RustO.podspec (core binding podspec only)
+    # 6. packages/ios/RustO.podspec (core binding podspec only)
     replace_in_file(
         REPO_ROOT / "packages" / "ios" / "RustO.podspec",
         r'(s\.version\s*=\s*\')[^\']+(\')',
@@ -426,13 +467,21 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         staged_files
     )
     
-    # 6. First-party npm library manifests only
-    for pkg_dir in [REPO_ROOT / "packages" / "web", REPO_ROOT / "packages" / "react", REPO_ROOT / "packages" / "react-native"]:
+    # 7. First-party npm library manifests and consumer examples
+    for pkg_dir in [
+        REPO_ROOT / "packages" / "web",
+        REPO_ROOT / "packages" / "react",
+        REPO_ROOT / "packages" / "react-native",
+        REPO_ROOT / "packages" / "node",
+        REPO_ROOT / "packages" / "react-native" / "example",
+        REPO_ROOT / "examples" / "react-native-legacy",
+        REPO_ROOT / "examples" / "react-native-new-arch",
+    ]:
         pkg_json = pkg_dir / "package.json"
         if pkg_json.exists():
             update_json_file(pkg_json, new_ver, dry_run, staged_files)
 
-    # 7. packages/react-native/android/build.gradle
+    # 8. packages/react-native/android/build.gradle
     replace_in_file(
         REPO_ROOT / "packages" / "react-native" / "android" / "build.gradle",
         r'(versionName\s+")[^"]+(")',
@@ -447,8 +496,80 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         dry_run,
         staged_files
     )
+
+    # 9. packages/python/pyproject.toml
+    pyproject_file = REPO_ROOT / "packages" / "python" / "pyproject.toml"
+    if pyproject_file.exists():
+        replace_in_file(
+            pyproject_file,
+            r'(?m)^(version\s*=\s*")[^"]+(")',
+            rf'\g<1>{new_ver}\g<2>',
+            dry_run,
+            staged_files
+        )
+
+    # 10. packages/dart/pubspec.yaml & CHANGELOG.md
+    dart_pubspec = REPO_ROOT / "packages" / "dart" / "pubspec.yaml"
+    if dart_pubspec.exists():
+        replace_in_file(
+            dart_pubspec,
+            r'(?m)^(version:\s*).*',
+            rf'\g<1>{new_ver}',
+            dry_run,
+            staged_files
+        )
+        update_pub_changelog(
+            REPO_ROOT / "packages" / "dart" / "CHANGELOG.md",
+            new_ver,
+            dry_run,
+            staged_files
+        )
+
+    # 11. packages/flutter/pubspec.yaml & CHANGELOG.md
+    flutter_pubspec = REPO_ROOT / "packages" / "flutter" / "pubspec.yaml"
+    if flutter_pubspec.exists():
+        replace_in_file(
+            flutter_pubspec,
+            r'(?m)^(version:\s*).*',
+            rf'\g<1>{new_ver}',
+            dry_run,
+            staged_files
+        )
+        update_pub_changelog(
+            REPO_ROOT / "packages" / "flutter" / "CHANGELOG.md",
+            new_ver,
+            dry_run,
+            staged_files
+        )
+
+    # 12. packages/java/build.gradle & packages/java/README.md
+    java_build = REPO_ROOT / "packages" / "java" / "build.gradle"
+    if java_build.exists():
+        replace_in_file(
+            java_build,
+            r'(?m)^(version\s*=\s*[\'"])[^\'"]+([\'"])',
+            rf'\g<1>{new_ver}\g<2>',
+            dry_run,
+            staged_files
+        )
+    java_readme = REPO_ROOT / "packages" / "java" / "README.md"
+    if java_readme.exists():
+        replace_in_file(
+            java_readme,
+            r'(com\.github\.byrizki:rusto-java:)[0-9A-Za-z.-]+',
+            rf'\g<1>{new_ver}',
+            dry_run,
+            staged_files
+        )
+        replace_in_file(
+            java_readme,
+            r'(<artifactId>rusto-java</artifactId>\s*<version>)[^<]+(</version>)',
+            rf'\g<1>{new_ver}\g<2>',
+            dry_run,
+            staged_files
+        )
     
-    # 8. packages/dotnet/RustODotnet.csproj (core package only)
+    # 13. packages/dotnet/RustODotnet.csproj (core package only)
     replace_in_file(
         REPO_ROOT / "packages" / "dotnet" / "RustODotnet.csproj",
         r'(<Version>)[^<]+(</Version>)',
@@ -457,7 +578,7 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         staged_files
     )
     
-    # 9. packages/dotnet/*.nuspec (core only)
+    # 14. packages/dotnet/*.nuspec (core only)
     for nuspec_file in (REPO_ROOT / "packages" / "dotnet").glob("*.nuspec"):
         replace_in_file(
             nuspec_file,
@@ -467,7 +588,7 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
 
-    # 10. Consumer examples reference RustODotnet
+    # 15. Consumer examples reference RustODotnet
     examples_dotnet_dir = REPO_ROOT / "examples" / "dotnet"
     if examples_dotnet_dir.exists():
         for csproj_file in examples_dotnet_dir.rglob("*.csproj"):
@@ -479,31 +600,37 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
                 staged_files
             )
     
-    # 11. README.md & packages/react-native/README.md
-    replace_in_file(
-        REPO_ROOT / "README.md",
-        r'(\*\*Version\*\*:\s*)[^\s]+',
-        rf'\g<1>{new_ver}  ',
-        dry_run,
-        staged_files
-    )
-    replace_in_file(
-        REPO_ROOT / "README.md",
-        r'(com\.github\.byrizki\.rusto-rs:rusto-[^:]+:v)[0-9A-Za-z.-]+',
-        rf'\g<1>{new_ver}',
-        dry_run,
-        staged_files
-    )
-    if (REPO_ROOT / "packages" / "react-native" / "README.md").exists():
+    # 16. README.md & packages/react-native/README.md
+    readme_file = REPO_ROOT / "README.md"
+    if readme_file.exists():
         replace_in_file(
-            REPO_ROOT / "packages" / "react-native" / "README.md",
+            readme_file,
+            r'(\*\*Version\*\*:\s*)[^\s]+',
+            rf'\g<1>{new_ver}  ',
+            dry_run,
+            staged_files,
+            warn_if_not_found=False
+        )
+        replace_in_file(
+            readme_file,
             r'(com\.github\.byrizki\.rusto-rs:rusto-[^:]+:v)[0-9A-Za-z.-]+',
             rf'\g<1>{new_ver}',
             dry_run,
-            staged_files
+            staged_files,
+            warn_if_not_found=False
+        )
+    rn_readme = REPO_ROOT / "packages" / "react-native" / "README.md"
+    if rn_readme.exists():
+        replace_in_file(
+            rn_readme,
+            r'(com\.github\.byrizki\.rusto-rs:rusto-[^:]+:v)[0-9A-Za-z.-]+',
+            rf'\g<1>{new_ver}',
+            dry_run,
+            staged_files,
+            warn_if_not_found=False
         )
 
-    # 12. .github/workflows/publish.yml default version
+    # 17. .github/workflows/publish.yml default version
     if (REPO_ROOT / ".github" / "workflows" / "publish.yml").exists():
         replace_in_file(
             REPO_ROOT / ".github" / "workflows" / "publish.yml",
@@ -513,17 +640,113 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
 
-    # 13. docs installation guides
-    for doc_file in (REPO_ROOT / "docs").rglob("2.installation.md"):
-        replace_in_file(
-            doc_file,
-            r'(rusto-rs\s*=\s*")[^"]+(")',
-            rf'\g<1>{new_ver}\g<2>',
-            dry_run,
-            staged_files
-        )
+    # 18. Documentation guides across all supported languages
+    docs_dir = REPO_ROOT / "docs"
+    if docs_dir.exists():
+        for doc_file in docs_dir.rglob("2.installation.md"):
+            replace_in_file(
+                doc_file,
+                r'(rusto-rs\s*=\s*")[^"]+(")',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files
+            )
+            replace_in_file(
+                doc_file,
+                r'(com\.github\.byrizki:rusto-java:)[0-9A-Za-z.-]+',
+                rf'\g<1>{new_ver}',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+            replace_in_file(
+                doc_file,
+                r'(<artifactId>rusto-java</artifactId>\s*<version>)[^<]+(</version>)',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+            replace_in_file(
+                doc_file,
+                r'(\.package\(url:\s*"https://github\.com/byrizki/rusto-rs\.git",\s*from:\s*")[^"]+(")',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+            replace_in_file(
+                doc_file,
+                r'(com\.github\.byrizki\.rusto-rs:rusto-android:v?)[0-9A-Za-z.-]+',
+                rf'\g<1>{new_ver}',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
 
-    # 14. CHANGELOG.md (auto-generated from git commits)
+        for doc_file in docs_dir.rglob("*03.use-ios-swift.md"):
+            replace_in_file(
+                doc_file,
+                r'(\.package\(url:\s*"https://github\.com/byrizki/rusto-rs\.git",\s*from:\s*")[^"]+(")',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+            replace_in_file(
+                doc_file,
+                r'(pod\s+\'RustO\',\s*\'~>\s*)[0-9A-Za-z.-]+(\')',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+            replace_in_file(
+                doc_file,
+                r'(\(e\.g\.,\s*`?)[0-9]+\.[0-9]+\.[0-9]+(`?\))',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+            replace_in_file(
+                doc_file,
+                r'(\(misalnya\s*`?)[0-9]+\.[0-9]+\.[0-9]+(`?\))',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+
+        for doc_file in docs_dir.rglob("*12.use-java.md"):
+            replace_in_file(
+                doc_file,
+                r'(com\.github\.byrizki:rusto-java:)[0-9A-Za-z.-]+',
+                rf'\g<1>{new_ver}',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+            replace_in_file(
+                doc_file,
+                r'(<artifactId>rusto-java</artifactId>\s*<version>)[^<]+(</version>)',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+
+        for doc_file in docs_dir.rglob("*04.use-android-kotlin.md"):
+            replace_in_file(
+                doc_file,
+                r'(com\.github\.byrizki\.rusto-rs:rusto-android:v?)[0-9A-Za-z.-]+',
+                rf'\g<1>{new_ver}',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+
+    # 19. CHANGELOG.md (auto-generated from git commits)
     if (REPO_ROOT / "CHANGELOG.md").exists():
         update_changelog_file(
             REPO_ROOT / "CHANGELOG.md",
@@ -556,7 +779,7 @@ def update_models_files(new_ver: str, current_ver: str = "", dry_run: bool = Fal
         staged_files
     )
 
-    # 3. packages/android/models/**/build.gradle (all 20 model submodules)
+    # 3. packages/android/models/**/build.gradle (all 20+ model submodules)
     android_models_dir = REPO_ROOT / "packages" / "android" / "models"
     if android_models_dir.exists():
         for bg_file in android_models_dir.rglob("build.gradle"):
@@ -575,7 +798,7 @@ def update_models_files(new_ver: str, current_ver: str = "", dry_run: bool = Fal
                 staged_files
             )
 
-    # 4. packages/ios/models/*.podspec (all 20 model podspecs)
+    # 4. packages/ios/models/*.podspec (all 20+ model podspecs)
     ios_models_dir = REPO_ROOT / "packages" / "ios" / "models"
     if ios_models_dir.exists():
         for podspec_file in ios_models_dir.glob("*.podspec"):
@@ -587,7 +810,7 @@ def update_models_files(new_ver: str, current_ver: str = "", dry_run: bool = Fal
                 staged_files
             )
 
-    # 5. packages/dotnet/models/**/*.csproj (all 20 model projects)
+    # 5. packages/dotnet/models/**/*.csproj (all 20+ model projects)
     dotnet_models_dir = REPO_ROOT / "packages" / "dotnet" / "models"
     if dotnet_models_dir.exists():
         for csproj_file in dotnet_models_dir.rglob("*.csproj"):
@@ -599,7 +822,18 @@ def update_models_files(new_ver: str, current_ver: str = "", dry_run: bool = Fal
                 staged_files
             )
 
-    # 6. packages/models/**/package.json & README.md (all npm model packages)
+    # 6. examples/dotnet/Directory.Build.props (RustOArtifactVersion fallback for models)
+    dotnet_props = REPO_ROOT / "examples" / "dotnet" / "Directory.Build.props"
+    if dotnet_props.exists():
+        replace_in_file(
+            dotnet_props,
+            r'(<RustOArtifactVersion Condition="\'\$\(RustOArtifactVersion\)\' == \'\'">)[^<]+(</RustOArtifactVersion>)',
+            rf'\g<1>{new_ver}\g<2>',
+            dry_run,
+            staged_files
+        )
+
+    # 7. packages/models/**/package.json & README.md (all npm model packages)
     packages_models_dir = REPO_ROOT / "packages" / "models"
     if packages_models_dir.exists():
         for package_json_file in packages_models_dir.rglob("package.json"):
@@ -617,7 +851,7 @@ def update_models_files(new_ver: str, current_ver: str = "", dry_run: bool = Fal
                 staged_files
             )
 
-    # 7. scripts/generate_npm_models.py (fallback return)
+    # 8. scripts/generate_npm_models.py (fallback return)
     if (REPO_ROOT / "scripts" / "generate_npm_models.py").exists():
         replace_in_file(
             REPO_ROOT / "scripts" / "generate_npm_models.py",
@@ -627,15 +861,110 @@ def update_models_files(new_ver: str, current_ver: str = "", dry_run: bool = Fal
             staged_files
         )
 
-    # 8. .github/workflows/publish-models.yml (default workflow_dispatch version)
-    if (REPO_ROOT / ".github" / "workflows" / "publish-models.yml").exists():
+    # 9. packages/react-native/README.md (model dependency example)
+    rn_readme = REPO_ROOT / "packages" / "react-native" / "README.md"
+    if rn_readme.exists():
         replace_in_file(
-            REPO_ROOT / ".github" / "workflows" / "publish-models.yml",
-            r'(version:\s*\n\s*description:[^\n]*\n\s*required:[^\n]*\n\s*default:\s*\')[^\']+(\')',
-            rf'\g<1>{new_ver}\g<2>',
+            rn_readme,
+            r'(com\.github\.byrizki\.rusto-rs:rusto-models-[^:]+:v?)[0-9A-Za-z.-]+',
+            rf'\g<1>{new_ver}',
             dry_run,
-            staged_files
+            staged_files,
+            warn_if_not_found=False
         )
+
+    # 10. Documentation guides for models
+    docs_dir = REPO_ROOT / "docs"
+    if docs_dir.exists():
+        # Installation docs (2.installation.md)
+        for doc_file in docs_dir.rglob("2.installation.md"):
+            replace_in_file(
+                doc_file,
+                r'(com\.github\.byrizki\.rusto-rs:rusto-models-[^:]+:v?)[0-9A-Za-z.-]+',
+                rf'\g<1>{new_ver}',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+
+        # React Native docs (02.use-react-native.md)
+        for doc_file in docs_dir.rglob("*02.use-react-native.md"):
+            replace_in_file(
+                doc_file,
+                r'(pod\s+\'RustO-Models-[^\']+\',\s*\'~>\s*)[0-9A-Za-z.-]+(\')',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+            replace_in_file(
+                doc_file,
+                r'(com\.github\.byrizki\.rusto-rs:rusto-models-[^:]+:v?)[0-9A-Za-z.-]+',
+                rf'\g<1>{new_ver}',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+
+        # iOS Swift docs (03.use-ios-swift.md)
+        for doc_file in docs_dir.rglob("*03.use-ios-swift.md"):
+            replace_in_file(
+                doc_file,
+                r'(pod\s+\'RustO-Models-[^\']+\',\s*\'~>\s*)[0-9A-Za-z.-]+(\')',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+
+        # Android docs (04.use-android-kotlin.md)
+        for doc_file in docs_dir.rglob("*04.use-android-kotlin.md"):
+            replace_in_file(
+                doc_file,
+                r'(com\.github\.byrizki\.rusto-rs:rusto-models-[^:]+:v?)[0-9A-Za-z.-]+',
+                rf'\g<1>{new_ver}',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+
+        # Models & Tiers docs (01.models-and-tiers.md)
+        for doc_file in docs_dir.rglob("*01.models-and-tiers.md"):
+            replace_in_file(
+                doc_file,
+                r'(pod\s+\'RustO-Models-[^\']+\',\s*\'~>\s*)[0-9A-Za-z.-]+(\')',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+            replace_in_file(
+                doc_file,
+                r'(com\.github\.byrizki\.rusto-rs:rusto-models-[^:]+:v?)[0-9A-Za-z.-]+',
+                rf'\g<1>{new_ver}',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+            replace_in_file(
+                doc_file,
+                r'(https://github\.com/byrizki/rusto-rs/releases/download/models-rten-v)[0-9A-Za-z.-]+(/)',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
+
+        # Multilingual OCR docs (02.multilingual-ocr.md)
+        for doc_file in docs_dir.rglob("*02.multilingual-ocr.md"):
+            replace_in_file(
+                doc_file,
+                r'(https://github\.com/byrizki/rusto-rs/releases/download/models-rten-v)[0-9A-Za-z.-]+(/)',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
 
     return staged_files
 
