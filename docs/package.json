@@ -1,5 +1,6 @@
 {
   "name": "rusto-docs",
+  "type": "module",
   "scripts": {
     "dev": "nuxt dev --extends docus",
     "build": "nuxt build --extends docus --preset github_pages",
@@ -11,9 +12,9 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
-    "docus": "5.12.3",
-    "mermaid": "^11.17.0",
-    "nuxt": "^4.3.1"
+    "docus": "5.15.0",
+    "mermaid": "^12.2.0",
+    "nuxt": "^4.6.2"
   },
   "devDependencies": {
     "oxfmt": "^0.64.0",

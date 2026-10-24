@@ -10,6 +10,12 @@ export default defineNuxtConfig({
     ),
   },
   modules: ['@nuxtjs/i18n'],
+  site: {
+    url: process.env.NUXT_PUBLIC_SITE_URL || 'https://byrizki.github.io',
+  },
+  robots: {
+    robotsTxt: baseURL === '/' || baseURL === '',
+  },
   app: {
     head: {
       title: 'RustO! - High-Performance Pure Rust OCR Engine & Multi-Platform Toolkit',
@@ -25,6 +31,7 @@ export default defineNuxtConfig({
     baseURL,
   },
   i18n: {
+    baseUrl: process.env.NUXT_PUBLIC_SITE_URL || 'https://byrizki.github.io',
     defaultLocale: 'en',
     locales: [
       {
