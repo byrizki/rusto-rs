@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  workspace-checks:
+    name: Workspace Verification & Tests
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Run Cargo Tests (Workspace)
+        run: cargo test --workspace
+
+      - name: Verify Version Consistency (Dry Run)
+        run: |
+          python3 scripts/bump_version.py --dry-run patch
+          python3 scripts/bump_version.py --dry-run patch --models
+
+      - name: Verify Docs Build
+        working-directory: docs
+        run: |
+          yarn install --immutable
+          yarn build
+
+  build:
+    name: Multi-Platform Build & Consumer Validation
+    needs: [workspace-checks]
+    uses: ./.github/workflows/build.yml
+    with:
+      run-release: false
+    secrets: inherit

@@ -51,6 +51,16 @@ const badges = [
     href: 'https://jitpack.io/#byrizki/rusto-rs',
   },
   {
+    alt: 'CI',
+    src: 'https://github.com/byrizki/rusto-rs/actions/workflows/ci.yml/badge.svg',
+    href: 'https://github.com/byrizki/rusto-rs/actions/workflows/ci.yml',
+  },
+  {
+    alt: 'Build & Release',
+    src: 'https://github.com/byrizki/rusto-rs/actions/workflows/build.yml/badge.svg',
+    href: 'https://github.com/byrizki/rusto-rs/actions/workflows/build.yml',
+  },
+  {
     alt: 'License',
     src: 'https://img.shields.io/badge/License-MIT-yellow.svg',
     href: 'https://opensource.org/licenses/MIT',

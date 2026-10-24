@@ -14,6 +14,7 @@
 [![NuGet](https://img.shields.io/nuget/v/RustODotnet.svg?logo=nuget&logoColor=white&color=004880)](https://www.nuget.org/packages/RustODotnet)
 [![CocoaPods](https://img.shields.io/cocoapods/v/RustO.svg?logo=cocoapods&logoColor=white&color=EE3322)](https://cocoapods.org/pods/RustO)
 [![JitPack](https://jitpack.io/v/byrizki/rusto-rs.svg)](https://jitpack.io/#byrizki/rusto-rs)
+[![CI](https://github.com/byrizki/rusto-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/byrizki/rusto-rs/actions/workflows/ci.yml)
 [![Build & Release](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml/badge.svg)](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Known Vulnerabilities](https://snyk.io/test/github/byrizki/rusto-rs/badge.svg)](https://snyk.io/test/github/byrizki/rusto-rs)
