@@ -240,7 +240,8 @@ jobs:
           VERSION="${VERSION#v}"
 
           mkdir -p python-dist
-          gh release download "v${VERSION}" -p "rusto-*.whl" -p "rusto-*.tar.gz" -D python-dist/ || true
+          gh release download "v${VERSION}" -p "rusto-${VERSION}*.whl" -p "rusto-${VERSION}.tar.gz" -D python-dist/ || true
+          find python-dist -type f ! -name "rusto-${VERSION}*.whl" ! -name "rusto-${VERSION}.tar.gz" -delete
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
