@@ -630,6 +630,20 @@ def update_changelog_file(file_path: Path, new_ver: str, current_ver: str = "", 
     print(f"  [OK] Updated {file_path.relative_to(REPO_ROOT)} with new section for [{new_ver}]")
     return True
 
+def extract_changelog_section(version: str, changelog_path: Path = None) -> str:
+    ver = version.lstrip("v")
+    if changelog_path is None:
+        changelog_path = REPO_ROOT / "CHANGELOG.md"
+
+    if changelog_path.exists():
+        content = changelog_path.read_text(encoding="utf-8")
+        pattern = rf"(?:^|\n)(##\s*\[{re.escape(ver)}\][^\n]*\n(?:(?!\n##\s*\[|\n---\n|\n##\s*Project\s*Status)[\s\S])*)"
+        m = re.search(pattern, content)
+        if m:
+            return m.group(1).strip()
+
+    return generate_changelog_section(ver, changelog_path=changelog_path).strip()
+
 def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False) -> Set[Path]:
     print(f"\nUpdating library version to '{new_ver}' across repository files...")
     staged_files: Set[Path] = set()
@@ -1286,8 +1300,18 @@ Examples:
         action="store_true",
         help="Create a git commit and annotated tag for the new version"
     )
+    parser.add_argument(
+        "--extract-changelog",
+        metavar="VERSION",
+        help="Extract or generate changelog section for the given version and print to stdout"
+    )
 
     args = parser.parse_args()
+
+    if args.extract_changelog:
+        section = extract_changelog_section(args.extract_changelog)
+        print(section)
+        return
 
     target = args.target
     if args.models:

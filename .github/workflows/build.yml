@@ -761,6 +761,16 @@ jobs:
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
+      - name: Extract release changelog
+        id: changelog
+        run: |
+          TAG="${{ steps.release_info.outputs.tag }}"
+          python3 scripts/bump_version.py --extract-changelog "${TAG}" > release_changelog.md
+          if [ ! -s release_changelog.md ]; then
+            echo "## RustO! Release ${TAG}" > release_changelog.md
+          fi
+          cat release_changelog.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -770,37 +780,6 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          body: |
-            ## RustO! Release ${{ steps.release_info.outputs.tag }}
-
-            ### Highlights
-            - Pure Rust OCR library powered by PaddleOCR models
-            - Uses RTen pure-Rust neural network engine for optimal inference performance
-            - Cross-platform support (Linux, macOS, Windows, iOS, Android, .NET, Web/WASM, React)
-            - OCR models are packaged and released separately under `models-rten-v*` tags
-
-            ### Platform Support
-            - **Linux**: x64, ARM64
-            - **macOS**: x64 (Intel), ARM64 (Apple Silicon)
-            - **Windows**: x64
-            - **iOS**: Universal XCFramework (device + simulator)
-            - **Android**: AAR with all architectures (arm64-v8a, armeabi-v7a, x86, x86_64)
-            - **.NET**: NuGet package with native libraries for all desktop platforms
-            - **NPM / React Native**: React Native bindings (`@rustors/react-native`)
-            - **NPM / Node**: Node.js N-API bindings (`@rustors/node`)
-            - **NPM / Web**: WebAssembly engine (`@rustors/web`) and React UI hooks (`@rustors/react`)
-            - **Python**: UniFFI Python wheel (`rusto`)
-            - **Java**: Java JNA library archive (`rusto-java.jar`)
-            - **Dart / Flutter**: Dart FFI and Flutter plugin packages
-            - **Go**: Cgo Go module package (`rusto-go.zip`)
-
-            ### Installation
-            Download the appropriate package for your platform and extract it.
-            See SHA256SUMS for file verification.
-
-            ### Inference Engine
-            - Uses RTen pure-Rust inference engine
-            - Supports PaddleOCR models in ONNX and RTen formats
-            - Supports multiple languages via included dictionary files
+          body_path: release_changelog.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
