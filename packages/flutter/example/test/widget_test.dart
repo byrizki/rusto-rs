@@ -19,14 +19,22 @@ void main() {
     // Verify button goes to running / disabled
     expect(find.byKey(const Key('run-tests-button')), findsOneWidget);
 
-    // Allow real background file I/O, FFI initialization, and OCR inference on example1.png to complete
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(seconds: 8));
-    });
-    await tester.pump();
+    // Poll until all verification steps complete (up to 60 seconds for slower CI runners)
+    final stopwatch = Stopwatch()..start();
+    while (stopwatch.elapsed < const Duration(seconds: 60)) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
+      await tester.pump();
+      if (find.text('SUCCESS').evaluate().length == 5 ||
+          find.text('FAILURE').evaluate().isNotEmpty) {
+        break;
+      }
+    }
 
     // Assert all 5 verification tests executed and succeeded
-    expect(find.text('SUCCESS'), findsNWidgets(5));
+    expect(find.text('FAILURE'), findsNothing,
+        reason: 'One or more verification steps reported FAILURE');
+    expect(find.text('SUCCESS'), findsNWidgets(5),
+        reason: 'Verification did not complete with 5 SUCCESS states within timeout');
     expect(find.byKey(const Key('latest-ocr-card')), findsOneWidget);
     expect(find.textContaining('Boxes Recognized: 45'), findsOneWidget);
   });
