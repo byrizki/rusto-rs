@@ -1624,38 +1624,38 @@ static class _UniFFILib {
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_func_rusto_version();
-            if (checksum != 48676) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_rusto_version` checksum `48676`, library returned `{checksum}`");
+            if (checksum != 3477) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_rusto_version` checksum `3477`, library returned `{checksum}`");
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_detect_text();
-            if (checksum != 7671) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text` checksum `7671`, library returned `{checksum}`");
+            if (checksum != 5963) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text` checksum `5963`, library returned `{checksum}`");
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_detect_text_rgb();
-            if (checksum != 14239) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text_rgb` checksum `14239`, library returned `{checksum}`");
+            if (checksum != 9991) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text_rgb` checksum `9991`, library returned `{checksum}`");
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_version();
-            if (checksum != 27087) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_version` checksum `27087`, library returned `{checksum}`");
+            if (checksum != 31217) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_version` checksum `31217`, library returned `{checksum}`");
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_constructor_rusto_initialize();
-            if (checksum != 334) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_constructor_rusto_initialize` checksum `334`, library returned `{checksum}`");
+            if (checksum != 41233) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_constructor_rusto_initialize` checksum `41233`, library returned `{checksum}`");
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_constructor_rusto_initialize_from_json();
-            if (checksum != 23041) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_constructor_rusto_initialize_from_json` checksum `23041`, library returned `{checksum}`");
+            if (checksum != 40384) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_constructor_rusto_initialize_from_json` checksum `40384`, library returned `{checksum}`");
             }
         }
     }
@@ -1874,13 +1874,28 @@ class FfiConverterByteArray: FfiConverterRustBuffer<byte[]> {
 
 
 
+/// <summary>
+/// High-level RustO OCR Engine for multi-platform bindings.
+/// </summary>
 public interface IRustO {
+    /// <summary>
+    /// Runs text detection and recognition on an image source.
+    /// </summary>
     /// <exception cref="RustoBindingException"></exception>
     DetectTextResult DetectText(ImageSource @source, OcrRunOptions @options);
+    /// <summary>
+    /// Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
+    /// </summary>
     /// <exception cref="RustoBindingException"></exception>
     DetectTextResult DetectTextRgb(byte[] @pixels, uint @width, uint @height, ulong @stride, OcrRunOptions @options);
+    /// <summary>
+    /// Returns the engine library version string.
+    /// </summary>
     string Version();
 }
+/// <summary>
+/// High-level RustO OCR Engine for multi-platform bindings.
+/// </summary>
 public class RustO : IRustO, IDisposable {
     protected ulong pointer;
     private int _wasDestroyed = 0;
@@ -1970,6 +1985,9 @@ public class RustO : IRustO, IDisposable {
     }
 
     
+    /// <summary>
+    /// Runs text detection and recognition on an image source.
+    /// </summary>
     /// <exception cref="RustoBindingException"></exception>
     public DetectTextResult DetectText(ImageSource @source, OcrRunOptions @options) {
         return CallWithPointer(thisPtr => FfiConverterTypeDetectTextResult.INSTANCE.Lift(
@@ -1979,6 +1997,9 @@ public class RustO : IRustO, IDisposable {
     }
     
     
+    /// <summary>
+    /// Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
+    /// </summary>
     /// <exception cref="RustoBindingException"></exception>
     public DetectTextResult DetectTextRgb(byte[] @pixels, uint @width, uint @height, ulong @stride, OcrRunOptions @options) {
         return CallWithPointer(thisPtr => FfiConverterTypeDetectTextResult.INSTANCE.Lift(
@@ -1988,6 +2009,9 @@ public class RustO : IRustO, IDisposable {
     }
     
     
+    /// <summary>
+    /// Returns the engine library version string.
+    /// </summary>
     public string Version() {
         return CallWithPointer(thisPtr => FfiConverterString.INSTANCE.Lift(
     _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>
@@ -1998,6 +2022,9 @@ public class RustO : IRustO, IDisposable {
     
 
     
+    /// <summary>
+    /// Initializes an OCR engine instance with structured InitializeConfig.
+    /// </summary>
     /// <exception cref="RustoBindingException"></exception>
     public static RustO Initialize(InitializeConfig @config) {
         return new RustO(
@@ -2006,6 +2033,9 @@ public class RustO : IRustO, IDisposable {
 ));
     }
     
+    /// <summary>
+    /// Initializes an OCR engine instance from a JSON configuration string.
+    /// </summary>
     /// <exception cref="RustoBindingException"></exception>
     public static RustO InitializeFromJson(string @configJson) {
         return new RustO(
@@ -2043,7 +2073,16 @@ class FfiConverterTypeRustO: FfiConverter<RustO, ulong> {
 
 
 
+/// <summary>
+/// Pre-OCR image calibration options for descreening patterned backgrounds.
+/// </summary>
+/// <param name="DescreenStrength">
+/// Descreen filtering strength (0.0 - 1.0).
+/// </param>
 public record CalibrationOptions (
+    /// <summary>
+    /// Descreen filtering strength (0.0 - 1.0).
+    /// </summary>
     float? DescreenStrength
 ) {
 }
@@ -2069,9 +2108,30 @@ class FfiConverterTypeCalibrationOptions: FfiConverterRustBuffer<CalibrationOpti
 
 
 
+/// <summary>
+/// Line classification configuration (180° rotation detection).
+/// </summary>
+/// <param name="Enabled">
+/// Whether classification stage is enabled.
+/// </param>
+/// <param name="ModelPath">
+/// Filesystem path to classification model.
+/// </param>
+/// <param name="Thresh">
+/// Confidence threshold.
+/// </param>
 public record ClassificationConfig (
+    /// <summary>
+    /// Whether classification stage is enabled.
+    /// </summary>
     bool? Enabled, 
+    /// <summary>
+    /// Filesystem path to classification model.
+    /// </summary>
     string? ModelPath, 
+    /// <summary>
+    /// Confidence threshold.
+    /// </summary>
     float? Thresh
 ) {
 }
@@ -2103,14 +2163,65 @@ class FfiConverterTypeClassificationConfig: FfiConverterRustBuffer<Classificatio
 
 
 
+/// <summary>
+/// Text detection model configuration.
+/// </summary>
+/// <param name="Enabled">
+/// Whether detection stage is enabled.
+/// </param>
+/// <param name="ModelPath">
+/// Filesystem path to detection model (.rten or .onnx).
+/// </param>
+/// <param name="Thresh">
+/// Segmentation binarization threshold.
+/// </param>
+/// <param name="BoxThresh">
+/// Box candidate confidence score threshold.
+/// </param>
+/// <param name="UnclipRatio">
+/// Polygon unclip expansion ratio.
+/// </param>
+/// <param name="LimitSideLen">
+/// Maximum side length resize target.
+/// </param>
+/// <param name="LimitType">
+/// Limit type: "min" or "max".
+/// </param>
+/// <param name="UseDilation">
+/// Enable morphological dilation.
+/// </param>
 public record DetectionConfig (
+    /// <summary>
+    /// Whether detection stage is enabled.
+    /// </summary>
     bool? Enabled, 
+    /// <summary>
+    /// Filesystem path to detection model (.rten or .onnx).
+    /// </summary>
     string? ModelPath, 
+    /// <summary>
+    /// Segmentation binarization threshold.
+    /// </summary>
     float? Thresh, 
+    /// <summary>
+    /// Box candidate confidence score threshold.
+    /// </summary>
     float? BoxThresh, 
+    /// <summary>
+    /// Polygon unclip expansion ratio.
+    /// </summary>
     float? UnclipRatio, 
+    /// <summary>
+    /// Maximum side length resize target.
+    /// </summary>
     int? LimitSideLen, 
+    /// <summary>
+    /// Limit type: "min" or "max".
+    /// </summary>
     string? LimitType, 
+    /// <summary>
+    /// Enable morphological dilation.
+    /// </summary>
     bool? UseDilation
 ) {
 }
@@ -2157,11 +2268,44 @@ class FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionConfig> {
 
 
 
+/// <summary>
+/// Image detection stage options.
+/// </summary>
+/// <param name="LimitSideLen">
+/// Target side length constraint for image resizing. Default: 960.
+/// </param>
+/// <param name="LimitType">
+/// Side length limit behavior: "min" or "max".
+/// </param>
+/// <param name="Mean">
+/// Mean RGB normalization values. Default: [0.485, 0.456, 0.406].
+/// </param>
+/// <param name="Std">
+/// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
+/// </param>
+/// <param name="Postprocess">
+/// Post-processing options for detection.
+/// </param>
 public record DetectionRunOptions (
+    /// <summary>
+    /// Target side length constraint for image resizing. Default: 960.
+    /// </summary>
     int? LimitSideLen, 
+    /// <summary>
+    /// Side length limit behavior: "min" or "max".
+    /// </summary>
     string? LimitType, 
+    /// <summary>
+    /// Mean RGB normalization values. Default: [0.485, 0.456, 0.406].
+    /// </summary>
     float[]? Mean, 
+    /// <summary>
+    /// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
+    /// </summary>
     float[]? Std, 
+    /// <summary>
+    /// Post-processing options for detection.
+    /// </summary>
     PostprocessRunOptions? Postprocess
 ) {
 }
@@ -2199,10 +2343,37 @@ class FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer<DetectionRunOp
 
 
 
+/// <summary>
+/// Axis-aligned bounding box frame with position and size in pixels.
+/// </summary>
+/// <param name="Width">
+/// Width of the bounding box.
+/// </param>
+/// <param name="Height">
+/// Height of the bounding box.
+/// </param>
+/// <param name="Top">
+/// Top vertical coordinate (Y).
+/// </param>
+/// <param name="Left">
+/// Left horizontal coordinate (X).
+/// </param>
 public record Frame (
+    /// <summary>
+    /// Width of the bounding box.
+    /// </summary>
     float Width, 
+    /// <summary>
+    /// Height of the bounding box.
+    /// </summary>
     float Height, 
+    /// <summary>
+    /// Top vertical coordinate (Y).
+    /// </summary>
     float Top, 
+    /// <summary>
+    /// Left horizontal coordinate (X).
+    /// </summary>
     float Left
 ) {
 }
@@ -2237,12 +2408,51 @@ class FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
 
 
 
+/// <summary>
+/// Engine initialization configuration specifying model paths and template preset.
+/// </summary>
+/// <param name="Template">
+/// Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+/// </param>
+/// <param name="Detection">
+/// Detection model configuration.
+/// </param>
+/// <param name="Recognition">
+/// Recognition model and dictionary configuration.
+/// </param>
+/// <param name="Classification">
+/// Optional classification configuration.
+/// </param>
+/// <param name="Orientation">
+/// Optional orientation configuration.
+/// </param>
+/// <param name="Unwarp">
+/// Optional unwarp configuration.
+/// </param>
 public record InitializeConfig (
+    /// <summary>
+    /// Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+    /// </summary>
     string? Template, 
+    /// <summary>
+    /// Detection model configuration.
+    /// </summary>
     DetectionConfig? Detection, 
+    /// <summary>
+    /// Recognition model and dictionary configuration.
+    /// </summary>
     RecognitionConfig? Recognition, 
+    /// <summary>
+    /// Optional classification configuration.
+    /// </summary>
     ClassificationConfig? Classification, 
+    /// <summary>
+    /// Optional orientation configuration.
+    /// </summary>
     OrientationConfig? Orientation, 
+    /// <summary>
+    /// Optional unwarp configuration.
+    /// </summary>
     UnwarpConfig? Unwarp
 ) {
 }
@@ -2283,20 +2493,107 @@ class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig>
 
 
 
+/// <summary>
+/// Per-request execution options for text detection.
+/// </summary>
+/// <param name="Output">
+/// Output format granularity: Lines (default), Words, or Spatial.
+/// </param>
+/// <param name="LineYThreshold">
+/// Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
+/// </param>
+/// <param name="WordXThreshold">
+/// Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
+/// </param>
+/// <param name="TextScore">
+/// Minimum recognition confidence score threshold [0.0 - 1.0].
+/// </param>
+/// <param name="Classification">
+/// Enable text line orientation classifier stage.
+/// </param>
+/// <param name="Orientation">
+/// Enable document orientation angle correction stage.
+/// </param>
+/// <param name="MinHeight">
+/// Request-local minimum height resize override.
+/// </param>
+/// <param name="MaxSideLen">
+/// Request-local maximum side length resize override.
+/// </param>
+/// <param name="MinSideLen">
+/// Request-local minimum side length resize override.
+/// </param>
+/// <param name="WidthHeightRatio">
+/// Width-to-height aspect ratio padding override.
+/// </param>
+/// <param name="Detection">
+/// Detection stage options.
+/// </param>
+/// <param name="Postprocess">
+/// Post-processing options.
+/// </param>
+/// <param name="Calibration">
+/// Pre-OCR background descreening calibration options.
+/// </param>
+/// <param name="Optimization">
+/// Runtime crop and resolution optimization options.
+/// </param>
 public record OcrRunOptions (
+    /// <summary>
+    /// Output format granularity: Lines (default), Words, or Spatial.
+    /// </summary>
     OutputGranularity Output, 
+    /// <summary>
+    /// Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
+    /// </summary>
     float? LineYThreshold, 
+    /// <summary>
+    /// Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
+    /// </summary>
     float? WordXThreshold, 
+    /// <summary>
+    /// Minimum recognition confidence score threshold [0.0 - 1.0].
+    /// </summary>
     float? TextScore, 
+    /// <summary>
+    /// Enable text line orientation classifier stage.
+    /// </summary>
     bool? Classification, 
+    /// <summary>
+    /// Enable document orientation angle correction stage.
+    /// </summary>
     bool? Orientation, 
+    /// <summary>
+    /// Request-local minimum height resize override.
+    /// </summary>
     float? MinHeight, 
+    /// <summary>
+    /// Request-local maximum side length resize override.
+    /// </summary>
     float? MaxSideLen, 
+    /// <summary>
+    /// Request-local minimum side length resize override.
+    /// </summary>
     float? MinSideLen, 
+    /// <summary>
+    /// Width-to-height aspect ratio padding override.
+    /// </summary>
     float? WidthHeightRatio, 
+    /// <summary>
+    /// Detection stage options.
+    /// </summary>
     DetectionRunOptions? Detection, 
+    /// <summary>
+    /// Post-processing options.
+    /// </summary>
     PostprocessRunOptions? Postprocess, 
+    /// <summary>
+    /// Pre-OCR background descreening calibration options.
+    /// </summary>
     CalibrationOptions? Calibration, 
+    /// <summary>
+    /// Runtime crop and resolution optimization options.
+    /// </summary>
     OptimizationOptions? Optimization
 ) {
 }
@@ -2361,8 +2658,23 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
 
 
 
+/// <summary>
+/// Runtime crop and resolution optimization options.
+/// </summary>
+/// <param name="CropPaddingX">
+/// Horizontal padding around bounding box crops in pixels.
+/// </param>
+/// <param name="CropPaddingY">
+/// Vertical padding around bounding box crops in pixels.
+/// </param>
 public record OptimizationOptions (
+    /// <summary>
+    /// Horizontal padding around bounding box crops in pixels.
+    /// </summary>
     float? CropPaddingX, 
+    /// <summary>
+    /// Vertical padding around bounding box crops in pixels.
+    /// </summary>
     float? CropPaddingY
 ) {
 }
@@ -2391,9 +2703,30 @@ class FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOp
 
 
 
+/// <summary>
+/// Document orientation angle configuration (0°, 90°, 180°, 270°).
+/// </summary>
+/// <param name="Enabled">
+/// Whether orientation stage is enabled.
+/// </param>
+/// <param name="ModelPath">
+/// Filesystem path to orientation model.
+/// </param>
+/// <param name="Thresh">
+/// Confidence threshold.
+/// </param>
 public record OrientationConfig (
+    /// <summary>
+    /// Whether orientation stage is enabled.
+    /// </summary>
     bool? Enabled, 
+    /// <summary>
+    /// Filesystem path to orientation model.
+    /// </summary>
     string? ModelPath, 
+    /// <summary>
+    /// Confidence threshold.
+    /// </summary>
     float? Thresh
 ) {
 }
@@ -2425,8 +2758,23 @@ class FfiConverterTypeOrientationConfig: FfiConverterRustBuffer<OrientationConfi
 
 
 
+/// <summary>
+/// 2D coordinate point representing vertex location in pixels.
+/// </summary>
+/// <param name="X">
+/// Horizontal coordinate (X).
+/// </param>
+/// <param name="Y">
+/// Vertical coordinate (Y).
+/// </param>
 public record Point2D (
+    /// <summary>
+    /// Horizontal coordinate (X).
+    /// </summary>
     float X, 
+    /// <summary>
+    /// Vertical coordinate (Y).
+    /// </summary>
     float Y
 ) {
 }
@@ -2455,11 +2803,44 @@ class FfiConverterTypePoint2D: FfiConverterRustBuffer<Point2D> {
 
 
 
+/// <summary>
+/// Post-processing options for DBNet polygon detection and binarization.
+/// </summary>
+/// <param name="Threshold">
+/// Binarization probability cutoff threshold. Default: 0.3.
+/// </param>
+/// <param name="BoxThreshold">
+/// Polygon contour score confidence threshold. Default: 0.6.
+/// </param>
+/// <param name="MaxCandidates">
+/// Maximum candidate text boxes to detect per image. Default: 1000.
+/// </param>
+/// <param name="UnclipRatio">
+/// Polygon unclip expansion ratio. Default: 1.5 - 2.0.
+/// </param>
+/// <param name="UseDilation">
+/// Enable morphological dilation to connect broken text strokes.
+/// </param>
 public record PostprocessRunOptions (
+    /// <summary>
+    /// Binarization probability cutoff threshold. Default: 0.3.
+    /// </summary>
     float? Threshold, 
+    /// <summary>
+    /// Polygon contour score confidence threshold. Default: 0.6.
+    /// </summary>
     float? BoxThreshold, 
+    /// <summary>
+    /// Maximum candidate text boxes to detect per image. Default: 1000.
+    /// </summary>
     int? MaxCandidates, 
+    /// <summary>
+    /// Polygon unclip expansion ratio. Default: 1.5 - 2.0.
+    /// </summary>
     float? UnclipRatio, 
+    /// <summary>
+    /// Enable morphological dilation to connect broken text strokes.
+    /// </summary>
     bool? UseDilation
 ) {
 }
@@ -2497,9 +2878,30 @@ class FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<PostprocessR
 
 
 
+/// <summary>
+/// Text recognition model configuration.
+/// </summary>
+/// <param name="Enabled">
+/// Whether recognition stage is enabled.
+/// </param>
+/// <param name="ModelPath">
+/// Filesystem path to recognition model (.rten or .onnx).
+/// </param>
+/// <param name="DictPath">
+/// Filesystem path to dictionary vocabulary file (.txt).
+/// </param>
 public record RecognitionConfig (
+    /// <summary>
+    /// Whether recognition stage is enabled.
+    /// </summary>
     bool? Enabled, 
+    /// <summary>
+    /// Filesystem path to recognition model (.rten or .onnx).
+    /// </summary>
     string? ModelPath, 
+    /// <summary>
+    /// Filesystem path to dictionary vocabulary file (.txt).
+    /// </summary>
     string? DictPath
 ) {
 }
@@ -2531,10 +2933,37 @@ class FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<RecognitionConfi
 
 
 
+/// <summary>
+/// Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
+/// </summary>
+/// <param name="Text">
+/// Recognized text string.
+/// </param>
+/// <param name="Score">
+/// Confidence score between 0.0 and 1.0.
+/// </param>
+/// <param name="BoxPoints">
+/// Polygon vertex coordinates [top-left, top-right, bottom-right, bottom-left].
+/// </param>
+/// <param name="Frame">
+/// Axis-aligned bounding box frame.
+/// </param>
 public record TextResult (
+    /// <summary>
+    /// Recognized text string.
+    /// </summary>
     string Text, 
+    /// <summary>
+    /// Confidence score between 0.0 and 1.0.
+    /// </summary>
     float Score, 
+    /// <summary>
+    /// Polygon vertex coordinates [top-left, top-right, bottom-right, bottom-left].
+    /// </summary>
     Point2D[] BoxPoints, 
+    /// <summary>
+    /// Axis-aligned bounding box frame.
+    /// </summary>
     Frame Frame
 ) {
 }
@@ -2569,8 +2998,23 @@ class FfiConverterTypeTextResult: FfiConverterRustBuffer<TextResult> {
 
 
 
+/// <summary>
+/// Document dewarping model configuration.
+/// </summary>
+/// <param name="Enabled">
+/// Whether unwarp stage is enabled.
+/// </param>
+/// <param name="ModelPath">
+/// Filesystem path to unwarp model.
+/// </param>
 public record UnwarpConfig (
+    /// <summary>
+    /// Whether unwarp stage is enabled.
+    /// </summary>
     bool? Enabled, 
+    /// <summary>
+    /// Filesystem path to unwarp model.
+    /// </summary>
     string? ModelPath
 ) {
 }
@@ -2601,12 +3045,21 @@ class FfiConverterTypeUnwarpConfig: FfiConverterRustBuffer<UnwarpConfig> {
 
 
 
+/// <summary>
+/// Detection result: structured text items or formatted 2D spatial text string.
+/// </summary>
 public record DetectTextResult {
     
+    /// <summary>
+    /// Structured list of recognized text lines or words.
+    /// </summary>
     public record Structured (
         TextResult[] Results
     ) : DetectTextResult {}
     
+    /// <summary>
+    /// Formatted 2D spatial layout text string.
+    /// </summary>
     public record Spatial (
         string Text
     ) : DetectTextResult {}
@@ -2669,12 +3122,21 @@ class FfiConverterTypeDetectTextResult : FfiConverterRustBuffer<DetectTextResult
 
 
 
+/// <summary>
+/// Universal image input source for OCR detection.
+/// </summary>
 public record ImageSource {
     
+    /// <summary>
+    /// Filesystem path to an image file.
+    /// </summary>
     public record Path (
         string PathValue
     ) : ImageSource {}
     
+    /// <summary>
+    /// Raw encoded image file bytes (e.g. JPEG, PNG).
+    /// </summary>
     public record Bytes (
         byte[] Data
     ) : ImageSource {}
@@ -2737,9 +3199,21 @@ class FfiConverterTypeImageSource : FfiConverterRustBuffer<ImageSource>{
 
 
 
+/// <summary>
+/// Output format granularity for text detection.
+/// </summary>
 public enum OutputGranularity: int {
+    /// <summary>
+    /// Group recognized tokens into lines (default).
+    /// </summary>
     Lines,
+    /// <summary>
+    /// Return individual word-level tokens.
+    /// </summary>
     Words,
+    /// <summary>
+    /// Reconstruct a 2D spatial text layout preserving visual arrangement.
+    /// </summary>
     Spatial
 }
 
@@ -3526,6 +4000,9 @@ public static class RustoMethods {
     }
 
 
+    /// <summary>
+    /// Returns the engine library version string.
+    /// </summary>
     public static string RustoVersion() {
         return FfiConverterString.INSTANCE.Lift(
     _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>

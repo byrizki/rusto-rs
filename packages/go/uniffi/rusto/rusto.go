@@ -391,7 +391,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_rusto_checksum_func_rusto_version()
 		})
-		if checksum != 48676 {
+		if checksum != 3477 {
 			// If this happens try cleaning and rebuilding your project
 			panic("rusto: uniffi_rusto_checksum_func_rusto_version: UniFFI API checksum mismatch")
 		}
@@ -400,7 +400,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_rusto_checksum_method_rusto_detect_text()
 		})
-		if checksum != 7671 {
+		if checksum != 5963 {
 			// If this happens try cleaning and rebuilding your project
 			panic("rusto: uniffi_rusto_checksum_method_rusto_detect_text: UniFFI API checksum mismatch")
 		}
@@ -409,7 +409,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_rusto_checksum_method_rusto_detect_text_rgb()
 		})
-		if checksum != 14239 {
+		if checksum != 9991 {
 			// If this happens try cleaning and rebuilding your project
 			panic("rusto: uniffi_rusto_checksum_method_rusto_detect_text_rgb: UniFFI API checksum mismatch")
 		}
@@ -418,7 +418,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_rusto_checksum_method_rusto_version()
 		})
-		if checksum != 27087 {
+		if checksum != 31217 {
 			// If this happens try cleaning and rebuilding your project
 			panic("rusto: uniffi_rusto_checksum_method_rusto_version: UniFFI API checksum mismatch")
 		}
@@ -427,7 +427,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_rusto_checksum_constructor_rusto_initialize()
 		})
-		if checksum != 334 {
+		if checksum != 41233 {
 			// If this happens try cleaning and rebuilding your project
 			panic("rusto: uniffi_rusto_checksum_constructor_rusto_initialize: UniFFI API checksum mismatch")
 		}
@@ -436,7 +436,7 @@ func uniffiCheckChecksums() {
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_rusto_checksum_constructor_rusto_initialize_from_json()
 		})
-		if checksum != 23041 {
+		if checksum != 40384 {
 			// If this happens try cleaning and rebuilding your project
 			panic("rusto: uniffi_rusto_checksum_constructor_rusto_initialize_from_json: UniFFI API checksum mismatch")
 		}
@@ -738,15 +738,22 @@ func (ffiObject *FfiObject) freeRustArcPtr() {
 	})
 }
 
+// High-level RustO OCR Engine for multi-platform bindings.
 type RustOInterface interface {
+	// Runs text detection and recognition on an image source.
 	DetectText(source ImageSource, options OcrRunOptions) (DetectTextResult, error)
+	// Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
 	DetectTextRgb(pixels []byte, width uint32, height uint32, stride uint64, options OcrRunOptions) (DetectTextResult, error)
+	// Returns the engine library version string.
 	Version() string
 }
+
+// High-level RustO OCR Engine for multi-platform bindings.
 type RustO struct {
 	ffiObject FfiObject
 }
 
+// Initializes an OCR engine instance with structured InitializeConfig.
 func RustOInitialize(config InitializeConfig) (*RustO, error) {
 	_uniffiRV, _uniffiErr := rustCallWithError[*RustoBindingError](FfiConverterRustoBindingError{}, func(_uniffiStatus *C.RustCallStatus) C.uint64_t {
 		return C.uniffi_rusto_fn_constructor_rusto_initialize(FfiConverterInitializeConfigINSTANCE.Lower(config), _uniffiStatus)
@@ -759,6 +766,7 @@ func RustOInitialize(config InitializeConfig) (*RustO, error) {
 	}
 }
 
+// Initializes an OCR engine instance from a JSON configuration string.
 func RustOInitializeFromJson(configJson string) (*RustO, error) {
 	_uniffiRV, _uniffiErr := rustCallWithError[*RustoBindingError](FfiConverterRustoBindingError{}, func(_uniffiStatus *C.RustCallStatus) C.uint64_t {
 		return C.uniffi_rusto_fn_constructor_rusto_initialize_from_json(FfiConverterStringINSTANCE.Lower(configJson), _uniffiStatus)
@@ -771,6 +779,7 @@ func RustOInitializeFromJson(configJson string) (*RustO, error) {
 	}
 }
 
+// Runs text detection and recognition on an image source.
 func (_self *RustO) DetectText(source ImageSource, options OcrRunOptions) (DetectTextResult, error) {
 	_pointer := _self.ffiObject.incrementPointer("*RustO")
 	defer _self.ffiObject.decrementPointer()
@@ -788,6 +797,7 @@ func (_self *RustO) DetectText(source ImageSource, options OcrRunOptions) (Detec
 	}
 }
 
+// Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
 func (_self *RustO) DetectTextRgb(pixels []byte, width uint32, height uint32, stride uint64, options OcrRunOptions) (DetectTextResult, error) {
 	_pointer := _self.ffiObject.incrementPointer("*RustO")
 	defer _self.ffiObject.decrementPointer()
@@ -805,6 +815,7 @@ func (_self *RustO) DetectTextRgb(pixels []byte, width uint32, height uint32, st
 	}
 }
 
+// Returns the engine library version string.
 func (_self *RustO) Version() string {
 	_pointer := _self.ffiObject.incrementPointer("*RustO")
 	defer _self.ffiObject.decrementPointer()
@@ -871,7 +882,9 @@ func (_ FfiDestroyerRustO) Destroy(value *RustO) {
 	value.Destroy()
 }
 
+// Pre-OCR image calibration options for descreening patterned backgrounds.
 type CalibrationOptions struct {
+	// Descreen filtering strength (0.0 - 1.0).
 	DescreenStrength *float32
 }
 
@@ -911,10 +924,14 @@ func (_ FfiDestroyerCalibrationOptions) Destroy(value CalibrationOptions) {
 	value.Destroy()
 }
 
+// Line classification configuration (180° rotation detection).
 type ClassificationConfig struct {
-	Enabled   *bool
+	// Whether classification stage is enabled.
+	Enabled *bool
+	// Filesystem path to classification model.
 	ModelPath *string
-	Thresh    *float32
+	// Confidence threshold.
+	Thresh *float32
 }
 
 func (r *ClassificationConfig) Destroy() {
@@ -959,15 +976,24 @@ func (_ FfiDestroyerClassificationConfig) Destroy(value ClassificationConfig) {
 	value.Destroy()
 }
 
+// Text detection model configuration.
 type DetectionConfig struct {
-	Enabled      *bool
-	ModelPath    *string
-	Thresh       *float32
-	BoxThresh    *float32
-	UnclipRatio  *float32
+	// Whether detection stage is enabled.
+	Enabled *bool
+	// Filesystem path to detection model (.rten or .onnx).
+	ModelPath *string
+	// Segmentation binarization threshold.
+	Thresh *float32
+	// Box candidate confidence score threshold.
+	BoxThresh *float32
+	// Polygon unclip expansion ratio.
+	UnclipRatio *float32
+	// Maximum side length resize target.
 	LimitSideLen *int32
-	LimitType    *string
-	UseDilation  *bool
+	// Limit type: "min" or "max".
+	LimitType *string
+	// Enable morphological dilation.
+	UseDilation *bool
 }
 
 func (r *DetectionConfig) Destroy() {
@@ -1027,12 +1053,18 @@ func (_ FfiDestroyerDetectionConfig) Destroy(value DetectionConfig) {
 	value.Destroy()
 }
 
+// Image detection stage options.
 type DetectionRunOptions struct {
+	// Target side length constraint for image resizing. Default: 960.
 	LimitSideLen *int32
-	LimitType    *string
-	Mean         *[]float32
-	Std          *[]float32
-	Postprocess  *PostprocessRunOptions
+	// Side length limit behavior: "min" or "max".
+	LimitType *string
+	// Mean RGB normalization values. Default: [0.485, 0.456, 0.406].
+	Mean *[]float32
+	// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
+	Std *[]float32
+	// Post-processing options for detection.
+	Postprocess *PostprocessRunOptions
 }
 
 func (r *DetectionRunOptions) Destroy() {
@@ -1083,11 +1115,16 @@ func (_ FfiDestroyerDetectionRunOptions) Destroy(value DetectionRunOptions) {
 	value.Destroy()
 }
 
+// Axis-aligned bounding box frame with position and size in pixels.
 type Frame struct {
-	Width  float32
+	// Width of the bounding box.
+	Width float32
+	// Height of the bounding box.
 	Height float32
-	Top    float32
-	Left   float32
+	// Top vertical coordinate (Y).
+	Top float32
+	// Left horizontal coordinate (X).
+	Left float32
 }
 
 func (r *Frame) Destroy() {
@@ -1135,13 +1172,20 @@ func (_ FfiDestroyerFrame) Destroy(value Frame) {
 	value.Destroy()
 }
 
+// Engine initialization configuration specifying model paths and template preset.
 type InitializeConfig struct {
-	Template       *string
-	Detection      *DetectionConfig
-	Recognition    *RecognitionConfig
+	// Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+	Template *string
+	// Detection model configuration.
+	Detection *DetectionConfig
+	// Recognition model and dictionary configuration.
+	Recognition *RecognitionConfig
+	// Optional classification configuration.
 	Classification *ClassificationConfig
-	Orientation    *OrientationConfig
-	Unwarp         *UnwarpConfig
+	// Optional orientation configuration.
+	Orientation *OrientationConfig
+	// Optional unwarp configuration.
+	Unwarp *UnwarpConfig
 }
 
 func (r *InitializeConfig) Destroy() {
@@ -1195,21 +1239,36 @@ func (_ FfiDestroyerInitializeConfig) Destroy(value InitializeConfig) {
 	value.Destroy()
 }
 
+// Per-request execution options for text detection.
 type OcrRunOptions struct {
-	Output           OutputGranularity
-	LineYThreshold   *float32
-	WordXThreshold   *float32
-	TextScore        *float32
-	Classification   *bool
-	Orientation      *bool
-	MinHeight        *float32
-	MaxSideLen       *float32
-	MinSideLen       *float32
+	// Output format granularity: Lines (default), Words, or Spatial.
+	Output OutputGranularity
+	// Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
+	LineYThreshold *float32
+	// Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
+	WordXThreshold *float32
+	// Minimum recognition confidence score threshold [0.0 - 1.0].
+	TextScore *float32
+	// Enable text line orientation classifier stage.
+	Classification *bool
+	// Enable document orientation angle correction stage.
+	Orientation *bool
+	// Request-local minimum height resize override.
+	MinHeight *float32
+	// Request-local maximum side length resize override.
+	MaxSideLen *float32
+	// Request-local minimum side length resize override.
+	MinSideLen *float32
+	// Width-to-height aspect ratio padding override.
 	WidthHeightRatio *float32
-	Detection        *DetectionRunOptions
-	Postprocess      *PostprocessRunOptions
-	Calibration      *CalibrationOptions
-	Optimization     *OptimizationOptions
+	// Detection stage options.
+	Detection *DetectionRunOptions
+	// Post-processing options.
+	Postprocess *PostprocessRunOptions
+	// Pre-OCR background descreening calibration options.
+	Calibration *CalibrationOptions
+	// Runtime crop and resolution optimization options.
+	Optimization *OptimizationOptions
 }
 
 func (r *OcrRunOptions) Destroy() {
@@ -1287,8 +1346,11 @@ func (_ FfiDestroyerOcrRunOptions) Destroy(value OcrRunOptions) {
 	value.Destroy()
 }
 
+// Runtime crop and resolution optimization options.
 type OptimizationOptions struct {
+	// Horizontal padding around bounding box crops in pixels.
 	CropPaddingX *float32
+	// Vertical padding around bounding box crops in pixels.
 	CropPaddingY *float32
 }
 
@@ -1331,10 +1393,14 @@ func (_ FfiDestroyerOptimizationOptions) Destroy(value OptimizationOptions) {
 	value.Destroy()
 }
 
+// Document orientation angle configuration (0°, 90°, 180°, 270°).
 type OrientationConfig struct {
-	Enabled   *bool
+	// Whether orientation stage is enabled.
+	Enabled *bool
+	// Filesystem path to orientation model.
 	ModelPath *string
-	Thresh    *float32
+	// Confidence threshold.
+	Thresh *float32
 }
 
 func (r *OrientationConfig) Destroy() {
@@ -1379,8 +1445,11 @@ func (_ FfiDestroyerOrientationConfig) Destroy(value OrientationConfig) {
 	value.Destroy()
 }
 
+// 2D coordinate point representing vertex location in pixels.
 type Point2D struct {
+	// Horizontal coordinate (X).
 	X float32
+	// Vertical coordinate (Y).
 	Y float32
 }
 
@@ -1423,12 +1492,18 @@ func (_ FfiDestroyerPoint2D) Destroy(value Point2D) {
 	value.Destroy()
 }
 
+// Post-processing options for DBNet polygon detection and binarization.
 type PostprocessRunOptions struct {
-	Threshold     *float32
-	BoxThreshold  *float32
+	// Binarization probability cutoff threshold. Default: 0.3.
+	Threshold *float32
+	// Polygon contour score confidence threshold. Default: 0.6.
+	BoxThreshold *float32
+	// Maximum candidate text boxes to detect per image. Default: 1000.
 	MaxCandidates *int32
-	UnclipRatio   *float32
-	UseDilation   *bool
+	// Polygon unclip expansion ratio. Default: 1.5 - 2.0.
+	UnclipRatio *float32
+	// Enable morphological dilation to connect broken text strokes.
+	UseDilation *bool
 }
 
 func (r *PostprocessRunOptions) Destroy() {
@@ -1479,10 +1554,14 @@ func (_ FfiDestroyerPostprocessRunOptions) Destroy(value PostprocessRunOptions) 
 	value.Destroy()
 }
 
+// Text recognition model configuration.
 type RecognitionConfig struct {
-	Enabled   *bool
+	// Whether recognition stage is enabled.
+	Enabled *bool
+	// Filesystem path to recognition model (.rten or .onnx).
 	ModelPath *string
-	DictPath  *string
+	// Filesystem path to dictionary vocabulary file (.txt).
+	DictPath *string
 }
 
 func (r *RecognitionConfig) Destroy() {
@@ -1527,11 +1606,16 @@ func (_ FfiDestroyerRecognitionConfig) Destroy(value RecognitionConfig) {
 	value.Destroy()
 }
 
+// Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
 type TextResult struct {
-	Text      string
-	Score     float32
+	// Recognized text string.
+	Text string
+	// Confidence score between 0.0 and 1.0.
+	Score float32
+	// Polygon vertex coordinates [top-left, top-right, bottom-right, bottom-left].
 	BoxPoints []Point2D
-	Frame     Frame
+	// Axis-aligned bounding box frame.
+	Frame Frame
 }
 
 func (r *TextResult) Destroy() {
@@ -1579,8 +1663,11 @@ func (_ FfiDestroyerTextResult) Destroy(value TextResult) {
 	value.Destroy()
 }
 
+// Document dewarping model configuration.
 type UnwarpConfig struct {
-	Enabled   *bool
+	// Whether unwarp stage is enabled.
+	Enabled *bool
+	// Filesystem path to unwarp model.
 	ModelPath *string
 }
 
@@ -1623,9 +1710,12 @@ func (_ FfiDestroyerUnwarpConfig) Destroy(value UnwarpConfig) {
 	value.Destroy()
 }
 
+// Detection result: structured text items or formatted 2D spatial text string.
 type DetectTextResult interface {
 	Destroy()
 }
+
+// Structured list of recognized text lines or words.
 type DetectTextResultStructured struct {
 	Results []TextResult
 }
@@ -1634,6 +1724,7 @@ func (e DetectTextResultStructured) Destroy() {
 	FfiDestroyerSequenceTextResult{}.Destroy(e.Results)
 }
 
+// Formatted 2D spatial layout text string.
 type DetectTextResultSpatial struct {
 	Text string
 }
@@ -1693,9 +1784,12 @@ func (_ FfiDestroyerDetectTextResult) Destroy(value DetectTextResult) {
 	value.Destroy()
 }
 
+// Universal image input source for OCR detection.
 type ImageSource interface {
 	Destroy()
 }
+
+// Filesystem path to an image file.
 type ImageSourcePath struct {
 	Path string
 }
@@ -1704,6 +1798,7 @@ func (e ImageSourcePath) Destroy() {
 	FfiDestroyerString{}.Destroy(e.Path)
 }
 
+// Raw encoded image file bytes (e.g. JPEG, PNG).
 type ImageSourceBytes struct {
 	Data []byte
 }
@@ -1763,11 +1858,15 @@ func (_ FfiDestroyerImageSource) Destroy(value ImageSource) {
 	value.Destroy()
 }
 
+// Output format granularity for text detection.
 type OutputGranularity uint
 
 const (
-	OutputGranularityLines   OutputGranularity = 1
-	OutputGranularityWords   OutputGranularity = 2
+	// Group recognized tokens into lines (default).
+	OutputGranularityLines OutputGranularity = 1
+	// Return individual word-level tokens.
+	OutputGranularityWords OutputGranularity = 2
+	// Reconstruct a 2D spatial text layout preserving visual arrangement.
 	OutputGranularitySpatial OutputGranularity = 3
 )
 
@@ -2789,6 +2888,7 @@ func DefaultOcrRunOptions() OcrRunOptions {
 	}))
 }
 
+// Returns the engine library version string.
 func RustoVersion() string {
 	return FfiConverterStringINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
 		return GoRustBuffer{

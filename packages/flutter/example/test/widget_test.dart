@@ -30,11 +30,23 @@ void main() {
       }
     }
 
+    final failureTexts = <String>[];
+    for (final element in find.byType(Text).evaluate()) {
+      final widget = element.widget as Text;
+      if (widget.key != null &&
+          widget.key.toString().contains('test-details-') &&
+          widget.data != null) {
+        failureTexts.add('${widget.key}: ${widget.data}');
+      }
+    }
+
     // Assert all 5 verification tests executed and succeeded
     expect(find.text('FAILURE'), findsNothing,
-        reason: 'One or more verification steps reported FAILURE');
+        reason:
+            'One or more verification steps reported FAILURE:\n${failureTexts.join('\n')}');
     expect(find.text('SUCCESS'), findsNWidgets(5),
-        reason: 'Verification did not complete with 5 SUCCESS states within timeout');
+        reason:
+            'Verification did not complete with 5 SUCCESS states within timeout');
     expect(find.byKey(const Key('latest-ocr-card')), findsOneWidget);
     expect(find.textContaining('Boxes Recognized: 45'), findsOneWidget);
   });

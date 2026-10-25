@@ -815,22 +815,22 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_rusto_checksum_func_default_ocr_run_options() != 50314) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_rusto_checksum_func_rusto_version() != 48676) {
+    if (lib.uniffi_rusto_checksum_func_rusto_version() != 3477) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_rusto_checksum_method_rusto_detect_text() != 7671) {
+    if (lib.uniffi_rusto_checksum_method_rusto_detect_text() != 5963) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_rusto_checksum_method_rusto_detect_text_rgb() != 14239) {
+    if (lib.uniffi_rusto_checksum_method_rusto_detect_text_rgb() != 9991) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_rusto_checksum_method_rusto_version() != 27087) {
+    if (lib.uniffi_rusto_checksum_method_rusto_version() != 31217) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_rusto_checksum_constructor_rusto_initialize() != 334) {
+    if (lib.uniffi_rusto_checksum_constructor_rusto_initialize() != 41233) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_rusto_checksum_constructor_rusto_initialize_from_json() != 23041) {
+    if (lib.uniffi_rusto_checksum_constructor_rusto_initialize_from_json() != 40384) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -1277,17 +1277,32 @@ public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
 //
 
 
+/**
+ * High-level RustO OCR Engine for multi-platform bindings.
+ */
 public interface RustOInterface {
     
+    /**
+     * Runs text detection and recognition on an image source.
+     */
     fun `detectText`(`source`: ImageSource, `options`: OcrRunOptions): DetectTextResult
     
+    /**
+     * Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
+     */
     fun `detectTextRgb`(`pixels`: kotlin.ByteArray, `width`: kotlin.UInt, `height`: kotlin.UInt, `stride`: kotlin.ULong, `options`: OcrRunOptions): DetectTextResult
     
+    /**
+     * Returns the engine library version string.
+     */
     fun `version`(): kotlin.String
     
     companion object
 }
 
+/**
+ * High-level RustO OCR Engine for multi-platform bindings.
+ */
 open class RustO: Disposable, AutoCloseable, RustOInterface
 {
 
@@ -1385,6 +1400,9 @@ open class RustO: Disposable, AutoCloseable, RustOInterface
     }
 
     
+    /**
+     * Runs text detection and recognition on an image source.
+     */
     @Throws(RustoBindingException::class)override fun `detectText`(`source`: ImageSource, `options`: OcrRunOptions): DetectTextResult {
             return FfiConverterTypeDetectTextResult.lift(
     callWithHandle {
@@ -1399,6 +1417,9 @@ open class RustO: Disposable, AutoCloseable, RustOInterface
     
 
     
+    /**
+     * Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
+     */
     @Throws(RustoBindingException::class)override fun `detectTextRgb`(`pixels`: kotlin.ByteArray, `width`: kotlin.UInt, `height`: kotlin.UInt, `stride`: kotlin.ULong, `options`: OcrRunOptions): DetectTextResult {
             return FfiConverterTypeDetectTextResult.lift(
     callWithHandle {
@@ -1412,7 +1433,10 @@ open class RustO: Disposable, AutoCloseable, RustOInterface
     }
     
 
-    override fun `version`(): kotlin.String {
+    
+    /**
+     * Returns the engine library version string.
+     */override fun `version`(): kotlin.String {
             return FfiConverterString.lift(
     callWithHandle {
     uniffiRustCall() { _status ->
@@ -1433,6 +1457,9 @@ open class RustO: Disposable, AutoCloseable, RustOInterface
     
     companion object {
         
+    /**
+     * Initializes an OCR engine instance with structured InitializeConfig.
+     */
     @Throws(RustoBindingException::class) fun `initialize`(`config`: InitializeConfig): RustO {
             return FfiConverterTypeRustO.lift(
     uniffiRustCallWithError(RustoBindingException) { _status ->
@@ -1445,6 +1472,9 @@ open class RustO: Disposable, AutoCloseable, RustOInterface
     
 
         
+    /**
+     * Initializes an OCR engine instance from a JSON configuration string.
+     */
     @Throws(RustoBindingException::class) fun `initializeFromJson`(`configJson`: kotlin.String): RustO {
             return FfiConverterTypeRustO.lift(
     uniffiRustCallWithError(RustoBindingException) { _status ->
@@ -1487,7 +1517,13 @@ public object FfiConverterTypeRustO: FfiConverter<RustO, Long> {
 
 
 
+/**
+ * Pre-OCR image calibration options for descreening patterned backgrounds.
+ */
 data class CalibrationOptions (
+    /**
+     * Descreen filtering strength (0.0 - 1.0).
+     */
     var `descreenStrength`: kotlin.Float?
     
 ){
@@ -1520,11 +1556,23 @@ public object FfiConverterTypeCalibrationOptions: FfiConverterRustBuffer<Calibra
 
 
 
+/**
+ * Line classification configuration (180° rotation detection).
+ */
 data class ClassificationConfig (
+    /**
+     * Whether classification stage is enabled.
+     */
     var `enabled`: kotlin.Boolean?
     , 
+    /**
+     * Filesystem path to classification model.
+     */
     var `modelPath`: kotlin.String?
     , 
+    /**
+     * Confidence threshold.
+     */
     var `thresh`: kotlin.Float?
     
 ){
@@ -1563,21 +1611,48 @@ public object FfiConverterTypeClassificationConfig: FfiConverterRustBuffer<Class
 
 
 
+/**
+ * Text detection model configuration.
+ */
 data class DetectionConfig (
+    /**
+     * Whether detection stage is enabled.
+     */
     var `enabled`: kotlin.Boolean?
     , 
+    /**
+     * Filesystem path to detection model (.rten or .onnx).
+     */
     var `modelPath`: kotlin.String?
     , 
+    /**
+     * Segmentation binarization threshold.
+     */
     var `thresh`: kotlin.Float?
     , 
+    /**
+     * Box candidate confidence score threshold.
+     */
     var `boxThresh`: kotlin.Float?
     , 
+    /**
+     * Polygon unclip expansion ratio.
+     */
     var `unclipRatio`: kotlin.Float?
     , 
+    /**
+     * Maximum side length resize target.
+     */
     var `limitSideLen`: kotlin.Int?
     , 
+    /**
+     * Limit type: "min" or "max".
+     */
     var `limitType`: kotlin.String?
     , 
+    /**
+     * Enable morphological dilation.
+     */
     var `useDilation`: kotlin.Boolean?
     
 ){
@@ -1631,15 +1706,33 @@ public object FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionC
 
 
 
+/**
+ * Image detection stage options.
+ */
 data class DetectionRunOptions (
+    /**
+     * Target side length constraint for image resizing. Default: 960.
+     */
     var `limitSideLen`: kotlin.Int?
     , 
+    /**
+     * Side length limit behavior: "min" or "max".
+     */
     var `limitType`: kotlin.String?
     , 
+    /**
+     * Mean RGB normalization values. Default: [0.485, 0.456, 0.406].
+     */
     var `mean`: List<kotlin.Float>?
     , 
+    /**
+     * Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
+     */
     var `std`: List<kotlin.Float>?
     , 
+    /**
+     * Post-processing options for detection.
+     */
     var `postprocess`: PostprocessRunOptions?
     
 ){
@@ -1684,13 +1777,28 @@ public object FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer<Detect
 
 
 
+/**
+ * Axis-aligned bounding box frame with position and size in pixels.
+ */
 data class Frame (
+    /**
+     * Width of the bounding box.
+     */
     var `width`: kotlin.Float
     , 
+    /**
+     * Height of the bounding box.
+     */
     var `height`: kotlin.Float
     , 
+    /**
+     * Top vertical coordinate (Y).
+     */
     var `top`: kotlin.Float
     , 
+    /**
+     * Left horizontal coordinate (X).
+     */
     var `left`: kotlin.Float
     
 ){
@@ -1732,17 +1840,38 @@ public object FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
 
 
 
+/**
+ * Engine initialization configuration specifying model paths and template preset.
+ */
 data class InitializeConfig (
+    /**
+     * Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+     */
     var `template`: kotlin.String?
     , 
+    /**
+     * Detection model configuration.
+     */
     var `detection`: DetectionConfig?
     , 
+    /**
+     * Recognition model and dictionary configuration.
+     */
     var `recognition`: RecognitionConfig?
     , 
+    /**
+     * Optional classification configuration.
+     */
     var `classification`: ClassificationConfig?
     , 
+    /**
+     * Optional orientation configuration.
+     */
     var `orientation`: OrientationConfig?
     , 
+    /**
+     * Optional unwarp configuration.
+     */
     var `unwarp`: UnwarpConfig?
     
 ){
@@ -1790,33 +1919,78 @@ public object FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<Initializ
 
 
 
+/**
+ * Per-request execution options for text detection.
+ */
 data class OcrRunOptions (
+    /**
+     * Output format granularity: Lines (default), Words, or Spatial.
+     */
     var `output`: OutputGranularity
     , 
+    /**
+     * Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
+     */
     var `lineYThreshold`: kotlin.Float?
     , 
+    /**
+     * Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
+     */
     var `wordXThreshold`: kotlin.Float?
     , 
+    /**
+     * Minimum recognition confidence score threshold [0.0 - 1.0].
+     */
     var `textScore`: kotlin.Float?
     , 
+    /**
+     * Enable text line orientation classifier stage.
+     */
     var `classification`: kotlin.Boolean?
     , 
+    /**
+     * Enable document orientation angle correction stage.
+     */
     var `orientation`: kotlin.Boolean?
     , 
+    /**
+     * Request-local minimum height resize override.
+     */
     var `minHeight`: kotlin.Float?
     , 
+    /**
+     * Request-local maximum side length resize override.
+     */
     var `maxSideLen`: kotlin.Float?
     , 
+    /**
+     * Request-local minimum side length resize override.
+     */
     var `minSideLen`: kotlin.Float?
     , 
+    /**
+     * Width-to-height aspect ratio padding override.
+     */
     var `widthHeightRatio`: kotlin.Float?
     , 
+    /**
+     * Detection stage options.
+     */
     var `detection`: DetectionRunOptions?
     , 
+    /**
+     * Post-processing options.
+     */
     var `postprocess`: PostprocessRunOptions?
     , 
+    /**
+     * Pre-OCR background descreening calibration options.
+     */
     var `calibration`: CalibrationOptions?
     , 
+    /**
+     * Runtime crop and resolution optimization options.
+     */
     var `optimization`: OptimizationOptions?
     
 ){
@@ -1888,9 +2062,18 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
 
 
 
+/**
+ * Runtime crop and resolution optimization options.
+ */
 data class OptimizationOptions (
+    /**
+     * Horizontal padding around bounding box crops in pixels.
+     */
     var `cropPaddingX`: kotlin.Float?
     , 
+    /**
+     * Vertical padding around bounding box crops in pixels.
+     */
     var `cropPaddingY`: kotlin.Float?
     
 ){
@@ -1926,11 +2109,23 @@ public object FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer<Optimi
 
 
 
+/**
+ * Document orientation angle configuration (0°, 90°, 180°, 270°).
+ */
 data class OrientationConfig (
+    /**
+     * Whether orientation stage is enabled.
+     */
     var `enabled`: kotlin.Boolean?
     , 
+    /**
+     * Filesystem path to orientation model.
+     */
     var `modelPath`: kotlin.String?
     , 
+    /**
+     * Confidence threshold.
+     */
     var `thresh`: kotlin.Float?
     
 ){
@@ -1969,9 +2164,18 @@ public object FfiConverterTypeOrientationConfig: FfiConverterRustBuffer<Orientat
 
 
 
+/**
+ * 2D coordinate point representing vertex location in pixels.
+ */
 data class Point2D (
+    /**
+     * Horizontal coordinate (X).
+     */
     var `x`: kotlin.Float
     , 
+    /**
+     * Vertical coordinate (Y).
+     */
     var `y`: kotlin.Float
     
 ){
@@ -2007,15 +2211,33 @@ public object FfiConverterTypePoint2D: FfiConverterRustBuffer<Point2D> {
 
 
 
+/**
+ * Post-processing options for DBNet polygon detection and binarization.
+ */
 data class PostprocessRunOptions (
+    /**
+     * Binarization probability cutoff threshold. Default: 0.3.
+     */
     var `threshold`: kotlin.Float?
     , 
+    /**
+     * Polygon contour score confidence threshold. Default: 0.6.
+     */
     var `boxThreshold`: kotlin.Float?
     , 
+    /**
+     * Maximum candidate text boxes to detect per image. Default: 1000.
+     */
     var `maxCandidates`: kotlin.Int?
     , 
+    /**
+     * Polygon unclip expansion ratio. Default: 1.5 - 2.0.
+     */
     var `unclipRatio`: kotlin.Float?
     , 
+    /**
+     * Enable morphological dilation to connect broken text strokes.
+     */
     var `useDilation`: kotlin.Boolean?
     
 ){
@@ -2060,11 +2282,23 @@ public object FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<Post
 
 
 
+/**
+ * Text recognition model configuration.
+ */
 data class RecognitionConfig (
+    /**
+     * Whether recognition stage is enabled.
+     */
     var `enabled`: kotlin.Boolean?
     , 
+    /**
+     * Filesystem path to recognition model (.rten or .onnx).
+     */
     var `modelPath`: kotlin.String?
     , 
+    /**
+     * Filesystem path to dictionary vocabulary file (.txt).
+     */
     var `dictPath`: kotlin.String?
     
 ){
@@ -2103,13 +2337,28 @@ public object FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<Recognit
 
 
 
+/**
+ * Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
+ */
 data class TextResult (
+    /**
+     * Recognized text string.
+     */
     var `text`: kotlin.String
     , 
+    /**
+     * Confidence score between 0.0 and 1.0.
+     */
     var `score`: kotlin.Float
     , 
+    /**
+     * Polygon vertex coordinates [top-left, top-right, bottom-right, bottom-left].
+     */
     var `boxPoints`: List<Point2D>
     , 
+    /**
+     * Axis-aligned bounding box frame.
+     */
     var `frame`: Frame
     
 ){
@@ -2151,9 +2400,18 @@ public object FfiConverterTypeTextResult: FfiConverterRustBuffer<TextResult> {
 
 
 
+/**
+ * Document dewarping model configuration.
+ */
 data class UnwarpConfig (
+    /**
+     * Whether unwarp stage is enabled.
+     */
     var `enabled`: kotlin.Boolean?
     , 
+    /**
+     * Filesystem path to unwarp model.
+     */
     var `modelPath`: kotlin.String?
     
 ){
@@ -2189,8 +2447,14 @@ public object FfiConverterTypeUnwarpConfig: FfiConverterRustBuffer<UnwarpConfig>
 
 
 
+/**
+ * Detection result: structured text items or formatted 2D spatial text string.
+ */
 sealed class DetectTextResult {
     
+    /**
+     * Structured list of recognized text lines or words.
+     */
     data class Structured(
         val `results`: List<uniffi.rusto.TextResult>) : DetectTextResult()
         
@@ -2200,6 +2464,9 @@ sealed class DetectTextResult {
         companion object
     }
     
+    /**
+     * Formatted 2D spatial layout text string.
+     */
     data class Spatial(
         val `text`: kotlin.String) : DetectTextResult()
         
@@ -2272,8 +2539,14 @@ public object FfiConverterTypeDetectTextResult : FfiConverterRustBuffer<DetectTe
 
 
 
+/**
+ * Universal image input source for OCR detection.
+ */
 sealed class ImageSource {
     
+    /**
+     * Filesystem path to an image file.
+     */
     data class Path(
         val `path`: kotlin.String) : ImageSource()
         
@@ -2283,6 +2556,9 @@ sealed class ImageSource {
         companion object
     }
     
+    /**
+     * Raw encoded image file bytes (e.g. JPEG, PNG).
+     */
     data class Bytes(
         val `data`: kotlin.ByteArray) : ImageSource()
         
@@ -2355,11 +2631,23 @@ public object FfiConverterTypeImageSource : FfiConverterRustBuffer<ImageSource>{
 
 
 
+/**
+ * Output format granularity for text detection.
+ */
 
 enum class OutputGranularity {
     
+    /**
+     * Group recognized tokens into lines (default).
+     */
     LINES,
+    /**
+     * Return individual word-level tokens.
+     */
     WORDS,
+    /**
+     * Reconstruct a 2D spatial text layout preserving visual arrangement.
+     */
     SPATIAL;
 
     
@@ -3084,7 +3372,10 @@ public object FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer<List<Te
     )
     }
     
- fun `rustoVersion`(): kotlin.String {
+
+        /**
+         * Returns the engine library version string.
+         */ fun `rustoVersion`(): kotlin.String {
             return FfiConverterString.lift(
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_rusto_fn_func_rusto_version(

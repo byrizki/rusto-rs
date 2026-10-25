@@ -571,15 +571,30 @@ fileprivate struct FfiConverterData: FfiConverterRustBuffer {
 
 
 
+/**
+ * High-level RustO OCR Engine for multi-platform bindings.
+ */
 public protocol RustOProtocol: AnyObject, Sendable {
     
+    /**
+     * Runs text detection and recognition on an image source.
+     */
     func detectText(source: ImageSource, options: OcrRunOptions) throws  -> DetectTextResult
     
+    /**
+     * Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
+     */
     func detectTextRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64, options: OcrRunOptions) throws  -> DetectTextResult
     
+    /**
+     * Returns the engine library version string.
+     */
     func version()  -> String
     
 }
+/**
+ * High-level RustO OCR Engine for multi-platform bindings.
+ */
 open class RustO: RustOProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
 
@@ -631,6 +646,9 @@ open class RustO: RustOProtocol, @unchecked Sendable {
     }
 
     
+    /**
+     * Initializes an OCR engine instance with structured InitializeConfig.
+     */
 public static func initialize(config: InitializeConfig)throws  -> RustO  {
     return try  FfiConverterTypeRustO_lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
     uniffi_rusto_fn_constructor_rusto_initialize(
@@ -639,6 +657,9 @@ public static func initialize(config: InitializeConfig)throws  -> RustO  {
 })
 }
     
+    /**
+     * Initializes an OCR engine instance from a JSON configuration string.
+     */
 public static func initializeFromJson(configJson: String)throws  -> RustO  {
     return try  FfiConverterTypeRustO_lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
     uniffi_rusto_fn_constructor_rusto_initialize_from_json(
@@ -649,6 +670,9 @@ public static func initializeFromJson(configJson: String)throws  -> RustO  {
     
 
     
+    /**
+     * Runs text detection and recognition on an image source.
+     */
 open func detectText(source: ImageSource, options: OcrRunOptions)throws  -> DetectTextResult  {
     return try  FfiConverterTypeDetectTextResult_lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
     uniffi_rusto_fn_method_rusto_detect_text(
@@ -659,6 +683,9 @@ open func detectText(source: ImageSource, options: OcrRunOptions)throws  -> Dete
 })
 }
     
+    /**
+     * Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
+     */
 open func detectTextRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64, options: OcrRunOptions)throws  -> DetectTextResult  {
     return try  FfiConverterTypeDetectTextResult_lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
     uniffi_rusto_fn_method_rusto_detect_text_rgb(
@@ -672,6 +699,9 @@ open func detectTextRgb(pixels: Data, width: UInt32, height: UInt32, stride: UIn
 })
 }
     
+    /**
+     * Returns the engine library version string.
+     */
 open func version() -> String  {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_rusto_fn_method_rusto_version(
@@ -728,12 +758,21 @@ public func FfiConverterTypeRustO_lower(_ value: RustO) -> UInt64 {
 
 
 
+/**
+ * Pre-OCR image calibration options for descreening patterned backgrounds.
+ */
 public struct CalibrationOptions: Equatable, Hashable {
+    /**
+     * Descreen filtering strength (0.0 - 1.0).
+     */
     public var descreenStrength: Float?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(descreenStrength: Float?) {
+    public init(
+        /**
+         * Descreen filtering strength (0.0 - 1.0).
+         */descreenStrength: Float?) {
         self.descreenStrength = descreenStrength
     }
 
@@ -778,14 +817,35 @@ public func FfiConverterTypeCalibrationOptions_lower(_ value: CalibrationOptions
 }
 
 
+/**
+ * Line classification configuration (180° rotation detection).
+ */
 public struct ClassificationConfig: Equatable, Hashable {
+    /**
+     * Whether classification stage is enabled.
+     */
     public var enabled: Bool?
+    /**
+     * Filesystem path to classification model.
+     */
     public var modelPath: String?
+    /**
+     * Confidence threshold.
+     */
     public var thresh: Float?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(enabled: Bool?, modelPath: String?, thresh: Float?) {
+    public init(
+        /**
+         * Whether classification stage is enabled.
+         */enabled: Bool?, 
+        /**
+         * Filesystem path to classification model.
+         */modelPath: String?, 
+        /**
+         * Confidence threshold.
+         */thresh: Float?) {
         self.enabled = enabled
         self.modelPath = modelPath
         self.thresh = thresh
@@ -836,19 +896,70 @@ public func FfiConverterTypeClassificationConfig_lower(_ value: ClassificationCo
 }
 
 
+/**
+ * Text detection model configuration.
+ */
 public struct DetectionConfig: Equatable, Hashable {
+    /**
+     * Whether detection stage is enabled.
+     */
     public var enabled: Bool?
+    /**
+     * Filesystem path to detection model (.rten or .onnx).
+     */
     public var modelPath: String?
+    /**
+     * Segmentation binarization threshold.
+     */
     public var thresh: Float?
+    /**
+     * Box candidate confidence score threshold.
+     */
     public var boxThresh: Float?
+    /**
+     * Polygon unclip expansion ratio.
+     */
     public var unclipRatio: Float?
+    /**
+     * Maximum side length resize target.
+     */
     public var limitSideLen: Int32?
+    /**
+     * Limit type: "min" or "max".
+     */
     public var limitType: String?
+    /**
+     * Enable morphological dilation.
+     */
     public var useDilation: Bool?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(enabled: Bool?, modelPath: String?, thresh: Float?, boxThresh: Float?, unclipRatio: Float?, limitSideLen: Int32?, limitType: String?, useDilation: Bool?) {
+    public init(
+        /**
+         * Whether detection stage is enabled.
+         */enabled: Bool?, 
+        /**
+         * Filesystem path to detection model (.rten or .onnx).
+         */modelPath: String?, 
+        /**
+         * Segmentation binarization threshold.
+         */thresh: Float?, 
+        /**
+         * Box candidate confidence score threshold.
+         */boxThresh: Float?, 
+        /**
+         * Polygon unclip expansion ratio.
+         */unclipRatio: Float?, 
+        /**
+         * Maximum side length resize target.
+         */limitSideLen: Int32?, 
+        /**
+         * Limit type: "min" or "max".
+         */limitType: String?, 
+        /**
+         * Enable morphological dilation.
+         */useDilation: Bool?) {
         self.enabled = enabled
         self.modelPath = modelPath
         self.thresh = thresh
@@ -914,16 +1025,49 @@ public func FfiConverterTypeDetectionConfig_lower(_ value: DetectionConfig) -> R
 }
 
 
+/**
+ * Image detection stage options.
+ */
 public struct DetectionRunOptions: Equatable, Hashable {
+    /**
+     * Target side length constraint for image resizing. Default: 960.
+     */
     public var limitSideLen: Int32?
+    /**
+     * Side length limit behavior: "min" or "max".
+     */
     public var limitType: String?
+    /**
+     * Mean RGB normalization values. Default: [0.485, 0.456, 0.406].
+     */
     public var mean: [Float]?
+    /**
+     * Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
+     */
     public var std: [Float]?
+    /**
+     * Post-processing options for detection.
+     */
     public var postprocess: PostprocessRunOptions?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(limitSideLen: Int32?, limitType: String?, mean: [Float]?, std: [Float]?, postprocess: PostprocessRunOptions?) {
+    public init(
+        /**
+         * Target side length constraint for image resizing. Default: 960.
+         */limitSideLen: Int32?, 
+        /**
+         * Side length limit behavior: "min" or "max".
+         */limitType: String?, 
+        /**
+         * Mean RGB normalization values. Default: [0.485, 0.456, 0.406].
+         */mean: [Float]?, 
+        /**
+         * Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
+         */std: [Float]?, 
+        /**
+         * Post-processing options for detection.
+         */postprocess: PostprocessRunOptions?) {
         self.limitSideLen = limitSideLen
         self.limitType = limitType
         self.mean = mean
@@ -980,15 +1124,42 @@ public func FfiConverterTypeDetectionRunOptions_lower(_ value: DetectionRunOptio
 }
 
 
+/**
+ * Axis-aligned bounding box frame with position and size in pixels.
+ */
 public struct Frame: Equatable, Hashable {
+    /**
+     * Width of the bounding box.
+     */
     public var width: Float
+    /**
+     * Height of the bounding box.
+     */
     public var height: Float
+    /**
+     * Top vertical coordinate (Y).
+     */
     public var top: Float
+    /**
+     * Left horizontal coordinate (X).
+     */
     public var left: Float
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(width: Float, height: Float, top: Float, left: Float) {
+    public init(
+        /**
+         * Width of the bounding box.
+         */width: Float, 
+        /**
+         * Height of the bounding box.
+         */height: Float, 
+        /**
+         * Top vertical coordinate (Y).
+         */top: Float, 
+        /**
+         * Left horizontal coordinate (X).
+         */left: Float) {
         self.width = width
         self.height = height
         self.top = top
@@ -1042,17 +1213,56 @@ public func FfiConverterTypeFrame_lower(_ value: Frame) -> RustBuffer {
 }
 
 
+/**
+ * Engine initialization configuration specifying model paths and template preset.
+ */
 public struct InitializeConfig: Equatable, Hashable {
+    /**
+     * Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+     */
     public var template: String?
+    /**
+     * Detection model configuration.
+     */
     public var detection: DetectionConfig?
+    /**
+     * Recognition model and dictionary configuration.
+     */
     public var recognition: RecognitionConfig?
+    /**
+     * Optional classification configuration.
+     */
     public var classification: ClassificationConfig?
+    /**
+     * Optional orientation configuration.
+     */
     public var orientation: OrientationConfig?
+    /**
+     * Optional unwarp configuration.
+     */
     public var unwarp: UnwarpConfig?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(template: String?, detection: DetectionConfig?, recognition: RecognitionConfig?, classification: ClassificationConfig?, orientation: OrientationConfig?, unwarp: UnwarpConfig?) {
+    public init(
+        /**
+         * Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+         */template: String?, 
+        /**
+         * Detection model configuration.
+         */detection: DetectionConfig?, 
+        /**
+         * Recognition model and dictionary configuration.
+         */recognition: RecognitionConfig?, 
+        /**
+         * Optional classification configuration.
+         */classification: ClassificationConfig?, 
+        /**
+         * Optional orientation configuration.
+         */orientation: OrientationConfig?, 
+        /**
+         * Optional unwarp configuration.
+         */unwarp: UnwarpConfig?) {
         self.template = template
         self.detection = detection
         self.recognition = recognition
@@ -1112,25 +1322,112 @@ public func FfiConverterTypeInitializeConfig_lower(_ value: InitializeConfig) ->
 }
 
 
+/**
+ * Per-request execution options for text detection.
+ */
 public struct OcrRunOptions: Equatable, Hashable {
+    /**
+     * Output format granularity: Lines (default), Words, or Spatial.
+     */
     public var output: OutputGranularity
+    /**
+     * Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
+     */
     public var lineYThreshold: Float?
+    /**
+     * Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
+     */
     public var wordXThreshold: Float?
+    /**
+     * Minimum recognition confidence score threshold [0.0 - 1.0].
+     */
     public var textScore: Float?
+    /**
+     * Enable text line orientation classifier stage.
+     */
     public var classification: Bool?
+    /**
+     * Enable document orientation angle correction stage.
+     */
     public var orientation: Bool?
+    /**
+     * Request-local minimum height resize override.
+     */
     public var minHeight: Float?
+    /**
+     * Request-local maximum side length resize override.
+     */
     public var maxSideLen: Float?
+    /**
+     * Request-local minimum side length resize override.
+     */
     public var minSideLen: Float?
+    /**
+     * Width-to-height aspect ratio padding override.
+     */
     public var widthHeightRatio: Float?
+    /**
+     * Detection stage options.
+     */
     public var detection: DetectionRunOptions?
+    /**
+     * Post-processing options.
+     */
     public var postprocess: PostprocessRunOptions?
+    /**
+     * Pre-OCR background descreening calibration options.
+     */
     public var calibration: CalibrationOptions?
+    /**
+     * Runtime crop and resolution optimization options.
+     */
     public var optimization: OptimizationOptions?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(output: OutputGranularity, lineYThreshold: Float?, wordXThreshold: Float?, textScore: Float?, classification: Bool?, orientation: Bool?, minHeight: Float?, maxSideLen: Float?, minSideLen: Float?, widthHeightRatio: Float?, detection: DetectionRunOptions?, postprocess: PostprocessRunOptions?, calibration: CalibrationOptions?, optimization: OptimizationOptions?) {
+    public init(
+        /**
+         * Output format granularity: Lines (default), Words, or Spatial.
+         */output: OutputGranularity, 
+        /**
+         * Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
+         */lineYThreshold: Float?, 
+        /**
+         * Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
+         */wordXThreshold: Float?, 
+        /**
+         * Minimum recognition confidence score threshold [0.0 - 1.0].
+         */textScore: Float?, 
+        /**
+         * Enable text line orientation classifier stage.
+         */classification: Bool?, 
+        /**
+         * Enable document orientation angle correction stage.
+         */orientation: Bool?, 
+        /**
+         * Request-local minimum height resize override.
+         */minHeight: Float?, 
+        /**
+         * Request-local maximum side length resize override.
+         */maxSideLen: Float?, 
+        /**
+         * Request-local minimum side length resize override.
+         */minSideLen: Float?, 
+        /**
+         * Width-to-height aspect ratio padding override.
+         */widthHeightRatio: Float?, 
+        /**
+         * Detection stage options.
+         */detection: DetectionRunOptions?, 
+        /**
+         * Post-processing options.
+         */postprocess: PostprocessRunOptions?, 
+        /**
+         * Pre-OCR background descreening calibration options.
+         */calibration: CalibrationOptions?, 
+        /**
+         * Runtime crop and resolution optimization options.
+         */optimization: OptimizationOptions?) {
         self.output = output
         self.lineYThreshold = lineYThreshold
         self.wordXThreshold = wordXThreshold
@@ -1214,13 +1511,28 @@ public func FfiConverterTypeOcrRunOptions_lower(_ value: OcrRunOptions) -> RustB
 }
 
 
+/**
+ * Runtime crop and resolution optimization options.
+ */
 public struct OptimizationOptions: Equatable, Hashable {
+    /**
+     * Horizontal padding around bounding box crops in pixels.
+     */
     public var cropPaddingX: Float?
+    /**
+     * Vertical padding around bounding box crops in pixels.
+     */
     public var cropPaddingY: Float?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(cropPaddingX: Float?, cropPaddingY: Float?) {
+    public init(
+        /**
+         * Horizontal padding around bounding box crops in pixels.
+         */cropPaddingX: Float?, 
+        /**
+         * Vertical padding around bounding box crops in pixels.
+         */cropPaddingY: Float?) {
         self.cropPaddingX = cropPaddingX
         self.cropPaddingY = cropPaddingY
     }
@@ -1268,14 +1580,35 @@ public func FfiConverterTypeOptimizationOptions_lower(_ value: OptimizationOptio
 }
 
 
+/**
+ * Document orientation angle configuration (0°, 90°, 180°, 270°).
+ */
 public struct OrientationConfig: Equatable, Hashable {
+    /**
+     * Whether orientation stage is enabled.
+     */
     public var enabled: Bool?
+    /**
+     * Filesystem path to orientation model.
+     */
     public var modelPath: String?
+    /**
+     * Confidence threshold.
+     */
     public var thresh: Float?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(enabled: Bool?, modelPath: String?, thresh: Float?) {
+    public init(
+        /**
+         * Whether orientation stage is enabled.
+         */enabled: Bool?, 
+        /**
+         * Filesystem path to orientation model.
+         */modelPath: String?, 
+        /**
+         * Confidence threshold.
+         */thresh: Float?) {
         self.enabled = enabled
         self.modelPath = modelPath
         self.thresh = thresh
@@ -1326,13 +1659,28 @@ public func FfiConverterTypeOrientationConfig_lower(_ value: OrientationConfig) 
 }
 
 
+/**
+ * 2D coordinate point representing vertex location in pixels.
+ */
 public struct Point2D: Equatable, Hashable {
+    /**
+     * Horizontal coordinate (X).
+     */
     public var x: Float
+    /**
+     * Vertical coordinate (Y).
+     */
     public var y: Float
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(x: Float, y: Float) {
+    public init(
+        /**
+         * Horizontal coordinate (X).
+         */x: Float, 
+        /**
+         * Vertical coordinate (Y).
+         */y: Float) {
         self.x = x
         self.y = y
     }
@@ -1380,16 +1728,49 @@ public func FfiConverterTypePoint2D_lower(_ value: Point2D) -> RustBuffer {
 }
 
 
+/**
+ * Post-processing options for DBNet polygon detection and binarization.
+ */
 public struct PostprocessRunOptions: Equatable, Hashable {
+    /**
+     * Binarization probability cutoff threshold. Default: 0.3.
+     */
     public var threshold: Float?
+    /**
+     * Polygon contour score confidence threshold. Default: 0.6.
+     */
     public var boxThreshold: Float?
+    /**
+     * Maximum candidate text boxes to detect per image. Default: 1000.
+     */
     public var maxCandidates: Int32?
+    /**
+     * Polygon unclip expansion ratio. Default: 1.5 - 2.0.
+     */
     public var unclipRatio: Float?
+    /**
+     * Enable morphological dilation to connect broken text strokes.
+     */
     public var useDilation: Bool?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(threshold: Float?, boxThreshold: Float?, maxCandidates: Int32?, unclipRatio: Float?, useDilation: Bool?) {
+    public init(
+        /**
+         * Binarization probability cutoff threshold. Default: 0.3.
+         */threshold: Float?, 
+        /**
+         * Polygon contour score confidence threshold. Default: 0.6.
+         */boxThreshold: Float?, 
+        /**
+         * Maximum candidate text boxes to detect per image. Default: 1000.
+         */maxCandidates: Int32?, 
+        /**
+         * Polygon unclip expansion ratio. Default: 1.5 - 2.0.
+         */unclipRatio: Float?, 
+        /**
+         * Enable morphological dilation to connect broken text strokes.
+         */useDilation: Bool?) {
         self.threshold = threshold
         self.boxThreshold = boxThreshold
         self.maxCandidates = maxCandidates
@@ -1446,14 +1827,35 @@ public func FfiConverterTypePostprocessRunOptions_lower(_ value: PostprocessRunO
 }
 
 
+/**
+ * Text recognition model configuration.
+ */
 public struct RecognitionConfig: Equatable, Hashable {
+    /**
+     * Whether recognition stage is enabled.
+     */
     public var enabled: Bool?
+    /**
+     * Filesystem path to recognition model (.rten or .onnx).
+     */
     public var modelPath: String?
+    /**
+     * Filesystem path to dictionary vocabulary file (.txt).
+     */
     public var dictPath: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(enabled: Bool?, modelPath: String?, dictPath: String?) {
+    public init(
+        /**
+         * Whether recognition stage is enabled.
+         */enabled: Bool?, 
+        /**
+         * Filesystem path to recognition model (.rten or .onnx).
+         */modelPath: String?, 
+        /**
+         * Filesystem path to dictionary vocabulary file (.txt).
+         */dictPath: String?) {
         self.enabled = enabled
         self.modelPath = modelPath
         self.dictPath = dictPath
@@ -1504,15 +1906,42 @@ public func FfiConverterTypeRecognitionConfig_lower(_ value: RecognitionConfig) 
 }
 
 
+/**
+ * Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
+ */
 public struct TextResult: Equatable, Hashable {
+    /**
+     * Recognized text string.
+     */
     public var text: String
+    /**
+     * Confidence score between 0.0 and 1.0.
+     */
     public var score: Float
+    /**
+     * Polygon vertex coordinates [top-left, top-right, bottom-right, bottom-left].
+     */
     public var boxPoints: [Point2D]
+    /**
+     * Axis-aligned bounding box frame.
+     */
     public var frame: Frame
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(text: String, score: Float, boxPoints: [Point2D], frame: Frame) {
+    public init(
+        /**
+         * Recognized text string.
+         */text: String, 
+        /**
+         * Confidence score between 0.0 and 1.0.
+         */score: Float, 
+        /**
+         * Polygon vertex coordinates [top-left, top-right, bottom-right, bottom-left].
+         */boxPoints: [Point2D], 
+        /**
+         * Axis-aligned bounding box frame.
+         */frame: Frame) {
         self.text = text
         self.score = score
         self.boxPoints = boxPoints
@@ -1566,13 +1995,28 @@ public func FfiConverterTypeTextResult_lower(_ value: TextResult) -> RustBuffer 
 }
 
 
+/**
+ * Document dewarping model configuration.
+ */
 public struct UnwarpConfig: Equatable, Hashable {
+    /**
+     * Whether unwarp stage is enabled.
+     */
     public var enabled: Bool?
+    /**
+     * Filesystem path to unwarp model.
+     */
     public var modelPath: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(enabled: Bool?, modelPath: String?) {
+    public init(
+        /**
+         * Whether unwarp stage is enabled.
+         */enabled: Bool?, 
+        /**
+         * Filesystem path to unwarp model.
+         */modelPath: String?) {
         self.enabled = enabled
         self.modelPath = modelPath
     }
@@ -1621,11 +2065,20 @@ public func FfiConverterTypeUnwarpConfig_lower(_ value: UnwarpConfig) -> RustBuf
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Detection result: structured text items or formatted 2D spatial text string.
+ */
 
 public enum DetectTextResult: Equatable, Hashable {
     
+    /**
+     * Structured list of recognized text lines or words.
+     */
     case structured(results: [TextResult]
     )
+    /**
+     * Formatted 2D spatial layout text string.
+     */
     case spatial(text: String
     )
 
@@ -1694,11 +2147,20 @@ public func FfiConverterTypeDetectTextResult_lower(_ value: DetectTextResult) ->
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Universal image input source for OCR detection.
+ */
 
 public enum ImageSource: Equatable, Hashable {
     
+    /**
+     * Filesystem path to an image file.
+     */
     case path(path: String
     )
+    /**
+     * Raw encoded image file bytes (e.g. JPEG, PNG).
+     */
     case bytes(data: Data
     )
 
@@ -1767,11 +2229,23 @@ public func FfiConverterTypeImageSource_lower(_ value: ImageSource) -> RustBuffe
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Output format granularity for text detection.
+ */
 
 public enum OutputGranularity: Equatable, Hashable {
     
+    /**
+     * Group recognized tokens into lines (default).
+     */
     case lines
+    /**
+     * Return individual word-level tokens.
+     */
     case words
+    /**
+     * Reconstruct a 2D spatial text layout preserving visual arrangement.
+     */
     case spatial
 
 
@@ -2378,6 +2852,9 @@ public func defaultOcrRunOptions() -> OcrRunOptions  {
     )
 })
 }
+/**
+ * Returns the engine library version string.
+ */
 public func rustoVersion() -> String  {
     return try!  FfiConverterString.lift(try! rustCall() {
     uniffi_rusto_fn_func_rusto_version($0
@@ -2406,22 +2883,22 @@ private let initializationResult: InitializationResult = {
     if (uniffi_rusto_checksum_func_default_ocr_run_options() != 50314) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_func_rusto_version() != 48676) {
+    if (uniffi_rusto_checksum_func_rusto_version() != 3477) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_method_rusto_detect_text() != 7671) {
+    if (uniffi_rusto_checksum_method_rusto_detect_text() != 5963) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_method_rusto_detect_text_rgb() != 14239) {
+    if (uniffi_rusto_checksum_method_rusto_detect_text_rgb() != 9991) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_method_rusto_version() != 27087) {
+    if (uniffi_rusto_checksum_method_rusto_version() != 31217) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_constructor_rusto_initialize() != 334) {
+    if (uniffi_rusto_checksum_constructor_rusto_initialize() != 41233) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_constructor_rusto_initialize_from_json() != 23041) {
+    if (uniffi_rusto_checksum_constructor_rusto_initialize_from_json() != 40384) {
         return InitializationResult.apiChecksumMismatch
     }
 

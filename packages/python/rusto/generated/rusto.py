@@ -500,17 +500,17 @@ def _uniffi_check_api_checksums(lib):
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     if lib.uniffi_rusto_checksum_func_default_ocr_run_options() != 50314:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    if lib.uniffi_rusto_checksum_func_rusto_version() != 48676:
+    if lib.uniffi_rusto_checksum_func_rusto_version() != 3477:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    if lib.uniffi_rusto_checksum_constructor_rusto_initialize() != 334:
+    if lib.uniffi_rusto_checksum_constructor_rusto_initialize() != 41233:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    if lib.uniffi_rusto_checksum_constructor_rusto_initialize_from_json() != 23041:
+    if lib.uniffi_rusto_checksum_constructor_rusto_initialize_from_json() != 40384:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    if lib.uniffi_rusto_checksum_method_rusto_detect_text() != 7671:
+    if lib.uniffi_rusto_checksum_method_rusto_detect_text() != 5963:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    if lib.uniffi_rusto_checksum_method_rusto_detect_text_rgb() != 14239:
+    if lib.uniffi_rusto_checksum_method_rusto_detect_text_rgb() != 9991:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    if lib.uniffi_rusto_checksum_method_rusto_version() != 27087:
+    if lib.uniffi_rusto_checksum_method_rusto_version() != 31217:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
 
 # A ctypes library to expose the extern-C FFI definitions.
@@ -904,6 +904,9 @@ class _UniffiFfiConverterOptionalFloat32(_UniffiConverterRustBuffer):
 
 @dataclass
 class CalibrationOptions:
+    """
+    Pre-OCR image calibration options for descreening patterned backgrounds.
+"""
     def __init__(self, *, descreen_strength:typing.Optional[float]):
         self.descreen_strength = descreen_strength
         
@@ -1037,6 +1040,9 @@ class _UniffiFfiConverterOptionalString(_UniffiConverterRustBuffer):
 
 @dataclass
 class ClassificationConfig:
+    """
+    Line classification configuration (180° rotation detection).
+"""
     def __init__(self, *, enabled:typing.Optional[bool], model_path:typing.Optional[str], thresh:typing.Optional[float]):
         self.enabled = enabled
         self.model_path = model_path
@@ -1117,6 +1123,9 @@ class _UniffiFfiConverterOptionalInt32(_UniffiConverterRustBuffer):
 
 @dataclass
 class DetectionConfig:
+    """
+    Text detection model configuration.
+"""
     def __init__(self, *, enabled:typing.Optional[bool], model_path:typing.Optional[str], thresh:typing.Optional[float], box_thresh:typing.Optional[float], unclip_ratio:typing.Optional[float], limit_side_len:typing.Optional[int], limit_type:typing.Optional[str], use_dilation:typing.Optional[bool]):
         self.enabled = enabled
         self.model_path = model_path
@@ -1237,6 +1246,9 @@ class _UniffiFfiConverterOptionalSequenceFloat32(_UniffiConverterRustBuffer):
 
 @dataclass
 class PostprocessRunOptions:
+    """
+    Post-processing options for DBNet polygon detection and binarization.
+"""
     def __init__(self, *, threshold:typing.Optional[float], box_threshold:typing.Optional[float], max_candidates:typing.Optional[int], unclip_ratio:typing.Optional[float], use_dilation:typing.Optional[bool]):
         self.threshold = threshold
         self.box_threshold = box_threshold
@@ -1316,6 +1328,9 @@ class _UniffiFfiConverterOptionalTypePostprocessRunOptions(_UniffiConverterRustB
 
 @dataclass
 class DetectionRunOptions:
+    """
+    Image detection stage options.
+"""
     def __init__(self, *, limit_side_len:typing.Optional[int], limit_type:typing.Optional[str], mean:typing.Optional[typing.List[float]], std:typing.Optional[typing.List[float]], postprocess:typing.Optional[PostprocessRunOptions]):
         self.limit_side_len = limit_side_len
         self.limit_type = limit_type
@@ -1370,6 +1385,9 @@ class _UniffiFfiConverterTypeDetectionRunOptions(_UniffiConverterRustBuffer):
 
 @dataclass
 class Frame:
+    """
+    Axis-aligned bounding box frame with position and size in pixels.
+"""
     def __init__(self, *, width:float, height:float, top:float, left:float):
         self.width = width
         self.height = height
@@ -1443,6 +1461,9 @@ class _UniffiFfiConverterOptionalTypeDetectionConfig(_UniffiConverterRustBuffer)
 
 @dataclass
 class RecognitionConfig:
+    """
+    Text recognition model configuration.
+"""
     def __init__(self, *, enabled:typing.Optional[bool], model_path:typing.Optional[str], dict_path:typing.Optional[str]):
         self.enabled = enabled
         self.model_path = model_path
@@ -1535,6 +1556,9 @@ class _UniffiFfiConverterOptionalTypeClassificationConfig(_UniffiConverterRustBu
 
 @dataclass
 class OrientationConfig:
+    """
+    Document orientation angle configuration (0°, 90°, 180°, 270°).
+"""
     def __init__(self, *, enabled:typing.Optional[bool], model_path:typing.Optional[str], thresh:typing.Optional[float]):
         self.enabled = enabled
         self.model_path = model_path
@@ -1602,6 +1626,9 @@ class _UniffiFfiConverterOptionalTypeOrientationConfig(_UniffiConverterRustBuffe
 
 @dataclass
 class UnwarpConfig:
+    """
+    Document dewarping model configuration.
+"""
     def __init__(self, *, enabled:typing.Optional[bool], model_path:typing.Optional[str]):
         self.enabled = enabled
         self.model_path = model_path
@@ -1663,6 +1690,9 @@ class _UniffiFfiConverterOptionalTypeUnwarpConfig(_UniffiConverterRustBuffer):
 
 @dataclass
 class InitializeConfig:
+    """
+    Engine initialization configuration specifying model paths and template preset.
+"""
     def __init__(self, *, template:typing.Optional[str], detection:typing.Optional[DetectionConfig], recognition:typing.Optional[RecognitionConfig], classification:typing.Optional[ClassificationConfig], orientation:typing.Optional[OrientationConfig], unwarp:typing.Optional[UnwarpConfig]):
         self.template = template
         self.detection = detection
@@ -1727,12 +1757,24 @@ class _UniffiFfiConverterTypeInitializeConfig(_UniffiConverterRustBuffer):
 
 
 class OutputGranularity(enum.Enum):
+    """
+    Output format granularity for text detection.
+"""
     
     LINES = 0
+    """
+    Group recognized tokens into lines (default).
+"""
     
     WORDS = 1
+    """
+    Return individual word-level tokens.
+"""
     
     SPATIAL = 2
+    """
+    Reconstruct a 2D spatial text layout preserving visual arrangement.
+"""
     
 
 
@@ -1821,6 +1863,9 @@ class _UniffiFfiConverterOptionalTypeCalibrationOptions(_UniffiConverterRustBuff
 
 @dataclass
 class OptimizationOptions:
+    """
+    Runtime crop and resolution optimization options.
+"""
     def __init__(self, *, crop_padding_x:typing.Optional[float], crop_padding_y:typing.Optional[float]):
         self.crop_padding_x = crop_padding_x
         self.crop_padding_y = crop_padding_y
@@ -1882,6 +1927,9 @@ class _UniffiFfiConverterOptionalTypeOptimizationOptions(_UniffiConverterRustBuf
 
 @dataclass
 class OcrRunOptions:
+    """
+    Per-request execution options for text detection.
+"""
     def __init__(self, *, output:OutputGranularity, line_y_threshold:typing.Optional[float], word_x_threshold:typing.Optional[float], text_score:typing.Optional[float], classification:typing.Optional[bool], orientation:typing.Optional[bool], min_height:typing.Optional[float], max_side_len:typing.Optional[float], min_side_len:typing.Optional[float], width_height_ratio:typing.Optional[float], detection:typing.Optional[DetectionRunOptions], postprocess:typing.Optional[PostprocessRunOptions], calibration:typing.Optional[CalibrationOptions], optimization:typing.Optional[OptimizationOptions]):
         self.output = output
         self.line_y_threshold = line_y_threshold
@@ -1990,6 +2038,9 @@ class _UniffiFfiConverterTypeOcrRunOptions(_UniffiConverterRustBuffer):
 
 @dataclass
 class Point2D:
+    """
+    2D coordinate point representing vertex location in pixels.
+"""
     def __init__(self, *, x:float, y:float):
         self.x = x
         self.y = y
@@ -2049,6 +2100,9 @@ class _UniffiFfiConverterSequenceTypePoint2D(_UniffiConverterRustBuffer):
 
 @dataclass
 class TextResult:
+    """
+    Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
+"""
     def __init__(self, *, text:str, score:float, box_points:typing.List[Point2D], frame:Frame):
         self.text = text
         self.score = score
@@ -2124,12 +2178,18 @@ class _UniffiFfiConverterSequenceTypeTextResult(_UniffiConverterRustBuffer):
 
 
 class DetectTextResult:
+    """
+    Detection result: structured text items or formatted 2D spatial text string.
+"""
     def __init__(self):
         raise RuntimeError("DetectTextResult cannot be instantiated directly")
 
     # Each enum variant is a nested class of the enum itself.
     @dataclass
     class STRUCTURED:
+        """
+        Structured list of recognized text lines or words.
+"""
         
         def __init__(self, results:typing.List[TextResult]):
             self.results = results
@@ -2154,6 +2214,9 @@ class DetectTextResult:
 
     @dataclass
     class SPATIAL:
+        """
+        Formatted 2D spatial layout text string.
+"""
         
         def __init__(self, text:str):
             self.text = text
@@ -2260,12 +2323,18 @@ class _UniffiFfiConverterBytes(_UniffiConverterRustBuffer):
 
 
 class ImageSource:
+    """
+    Universal image input source for OCR detection.
+"""
     def __init__(self):
         raise RuntimeError("ImageSource cannot be instantiated directly")
 
     # Each enum variant is a nested class of the enum itself.
     @dataclass
     class PATH:
+        """
+        Filesystem path to an image file.
+"""
         
         def __init__(self, path:str):
             self.path = path
@@ -2290,6 +2359,9 @@ class ImageSource:
 
     @dataclass
     class BYTES:
+        """
+        Raw encoded image file bytes (e.g. JPEG, PNG).
+"""
         
         def __init__(self, data:bytes):
             self.data = data
@@ -2535,19 +2607,37 @@ class _UniffiFfiConverterUInt64(_UniffiConverterPrimitiveInt):
 
 
 class RustOProtocol(typing.Protocol):
+    """
+    High-level RustO OCR Engine for multi-platform bindings.
+"""
     
     def detect_text(self, source: ImageSource,options: OcrRunOptions) -> DetectTextResult:
+        """
+        Runs text detection and recognition on an image source.
+"""
         raise NotImplementedError
     def detect_text_rgb(self, pixels: bytes,width: int,height: int,stride: int,options: OcrRunOptions) -> DetectTextResult:
+        """
+        Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
+"""
         raise NotImplementedError
     def version(self, ) -> str:
+        """
+        Returns the engine library version string.
+"""
         raise NotImplementedError
 
 class RustO(RustOProtocol):
+    """
+    High-level RustO OCR Engine for multi-platform bindings.
+"""
     
     _handle: ctypes.c_uint64
     @classmethod
     def initialize(cls, config: InitializeConfig) -> RustO:
+        """
+        Initializes an OCR engine instance with structured InitializeConfig.
+"""
         
         _UniffiFfiConverterTypeInitializeConfig.check_lower(config)
         _uniffi_lowered_args = (
@@ -2563,6 +2653,9 @@ class RustO(RustOProtocol):
         return cls._uniffi_make_instance(_uniffi_ffi_result)
     @classmethod
     def initialize_from_json(cls, config_json: str) -> RustO:
+        """
+        Initializes an OCR engine instance from a JSON configuration string.
+"""
         
         _UniffiFfiConverterString.check_lower(config_json)
         _uniffi_lowered_args = (
@@ -2598,6 +2691,9 @@ class RustO(RustOProtocol):
         inst._handle = handle
         return inst
     def detect_text(self, source: ImageSource,options: OcrRunOptions) -> DetectTextResult:
+        """
+        Runs text detection and recognition on an image source.
+"""
         
         _UniffiFfiConverterTypeImageSource.check_lower(source)
 
@@ -2616,6 +2712,9 @@ class RustO(RustOProtocol):
         )
         return _uniffi_lift_return(_uniffi_ffi_result)
     def detect_text_rgb(self, pixels: bytes,width: int,height: int,stride: int,options: OcrRunOptions) -> DetectTextResult:
+        """
+        Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
+"""
         
         _UniffiFfiConverterBytes.check_lower(pixels)
 
@@ -2643,6 +2742,9 @@ class RustO(RustOProtocol):
         )
         return _uniffi_lift_return(_uniffi_ffi_result)
     def version(self, ) -> str:
+        """
+        Returns the engine library version string.
+"""
         _uniffi_lowered_args = (
             self._uniffi_clone_handle(),
         )
@@ -2728,6 +2830,9 @@ def default_ocr_run_options() -> OcrRunOptions:
     )
     return _uniffi_lift_return(_uniffi_ffi_result)
 def rusto_version() -> str:
+    """
+    Returns the engine library version string.
+"""
     _uniffi_lowered_args = (
     )
     _uniffi_lift_return = _UniffiFfiConverterString.lift
