@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2
+
+- Update RustO native library and bindings to 0.3.2.
+
 ## 0.3.1
 
 - Initial release of RustO Flutter plugin.

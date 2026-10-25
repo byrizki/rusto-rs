@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rusto"
-version = "0.3.1"
+version = "0.3.2"
 description = "Pure Rust OCR library for Python based on RapidOCR and PaddleOCR"
 readme = "README.md"
 authors = [{ name = "RustO Contributors", email = "contact@rusto.dev" }]

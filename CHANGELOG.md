@@ -5,6 +5,56 @@ All notable changes to RustO! will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-10-25
+
+### Added
+- **scripts**: Tag committer github user in changelog entries (@byrizki)
+- **scripts**: Update bump_version.py to cover all bindings, packages, examples, and docs (@byrizki)
+- **bindings**: Unify generate-bindings pipeline across all targets (@byrizki)
+- **dotnet**: Migrate to auto-generated uniffi-bindgen-cs bindings (@byrizki)
+- **dart**: Migrate to auto-generated uniffi-bindgen-dart bindings (@byrizki)
+- **core**: Pin uniffi 0.31 and automate C header generation with cbindgen (@byrizki)
+- **core**: Add contiguous copy fast path, spatial C FFI, bindings, and docs for decoded RGB input (@byrizki)
+- Add validated decoded RGB input for Rust and C callers (@tacman)
+- **ci**: Add model package verifications and binding contract tests (@byrizki)
+- **verify**: Add go/flutter/dart/java package verification and verify actual image across all bindings (@byrizki)
+- **flutter**: Verify real Flutter APK, FFI spatial pipeline, and live Maestro E2E test (@byrizki)
+- Add packed packages content verifier, CI improvements, and Flutter example app with Maestro (@byrizki)
+- **rn-android**: Enable end-to-end APK build and Maestro verification without mocks (@byrizki)
+- **bindings**: Add Obj-C/SPM iOS, unified RN Maestro test suite, and multi-language bindings (Node, Python, Go, Java, Dart/Flutter) (@byrizki)
+
+### Changed
+- Read release body from changelog in build workflow (@byrizki)
+- **flutter**: Setup Java 17 for Maestro CLI execution in flutter-example job (@byrizki)
+- Fix wasm loading in docs ci, model check in wasm test, and sequential docs deployment (@byrizki)
+- Separate CI workflows for docs and library (@byrizki)
+- Add CI workflow for PRs and push using reusable build workflow (@byrizki)
+- Update package badges and align model package versions to 0.3.2 (@byrizki)
+- Update documentation, quick-start guides, and code snippets across bindings (@byrizki)
+- Replace Maven publishing with JitPack build trigger for Android and Java (@byrizki)
+- Update build and publish workflows for multi-platform language bindings (@byrizki)
+- **docs**: Upgrade nuxt, docus, and mermaid to latest versions (@byrizki)
+- **docs**: Consolidate Snyk dependency upgrades for nuxt, docus, and mermaid (@byrizki)
+- Humanize models guide, correct multilingual language scope, and fix diagrams (@byrizki)
+- Add model zip download releases and consumer decision guide (@byrizki)
+- Improve iOS, React Native iOS, and Models & Tiers guides (@byrizki)
+- Add website guides and installation for node, python, go, java, and flutter (@byrizki)
+- Add ecosystem packages documentation and quickstarts for node, python, go, java, and flutter (@byrizki)
+- Format RGB integration test (@tacman)
+- Update locks (@byrizki)
+- Enable default ffi features, fix Dart FFI deprecation, and clean linting in Flutter and React Native example (@byrizki)
+- Snyk security integration, planning documents, and documentation updates (@byrizki)
+
+### Fixed
+- **ios**: Add RuntimeOptions typealias for OcrRunOptions and implement parameterless init (@byrizki)
+- **ios**: Use zero-argument init() for UniFFI structs to prevent redeclaration collisions (@byrizki)
+- **bindings**: Resolve iOS Swift config inits, RN android local AARs, and flutter test FFI library resolution (@byrizki)
+- **ffi**: Exclude internal uniffi rustbuffer symbols from canonical C header (@byrizki)
+- Replace geo-clipper with clipper2-rust (@byrizki)
+- Upgrade better-sqlite3 from 12.6.2 to 12.11.1 (@snyk-bot)
+- FFI memory safety issues and update OCR pipeline coordinate mapping and detection logic (@byrizki)
+- Fix bugs and optimize core image processing & contour detection (@google-labs-jules[bot])
+
 ## [0.3.1] - 2026-10-10
 
 ### Changed
@@ -210,7 +260,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Project Status
 
-**Version**: 0.3.1  
+**Version**: 0.3.2  
 **Status**: Production Ready  
 **Accuracy**: 99.3% OpenCV parity  
-**Last Updated**: October 10, 2026
+**Last Updated**: October 25, 2026

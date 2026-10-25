@@ -1,6 +1,6 @@
 name: rusto
 description: Pure Rust OCR library bindings for Dart and Flutter based on RapidOCR and PaddleOCR.
-version: 0.3.1
+version: 0.3.2
 homepage: https://github.com/byrizki/rusto-rs
 
 environment:
