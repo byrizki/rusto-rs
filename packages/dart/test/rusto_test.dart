@@ -47,7 +47,8 @@ void main() {
         return;
       }
 
-      final config = '{"detection":{"model_path":"${det.absolute.path}"},"recognition":{"model_path":"${rec.absolute.path}","dict_path":"${dict.absolute.path}"}}';
+      final config =
+          '{"detection":{"model_path":"${det.absolute.path}"},"recognition":{"model_path":"${rec.absolute.path}","dict_path":"${dict.absolute.path}"}}';
       final engine = RustO.initialize(config);
 
       final results = engine.detectTextFile(img.absolute.path);
@@ -78,7 +79,8 @@ void main() {
       final engine = RustO.initialize(config);
 
       final options = defaultOcrRunOptions();
-      final res = engine.detectText(ImageSourcePath(path: img.absolute.path), options);
+      final res =
+          engine.detectText(ImageSourcePath(path: img.absolute.path), options);
       expect(res, isA<DetectTextResultStructured>());
       final structured = res as DetectTextResultStructured;
       expect(structured.results, isNotEmpty);

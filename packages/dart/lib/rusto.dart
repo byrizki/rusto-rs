@@ -1,3 +1,6 @@
+/// Pure Rust OCR library bindings for Dart and Flutter based on RapidOCR and PaddleOCR.
+library rusto;
+
 import 'dart:convert';
 import 'dart:ffi' as ffi;
 import 'dart:io' show Platform;
@@ -5,7 +8,21 @@ import 'dart:typed_data';
 
 import 'src/generated/rusto.dart' as generated;
 
-export 'src/generated/rusto.dart' hide RustO;
+export 'src/generated/rusto.dart'
+    hide
+        RustO,
+        RustoFfi,
+        RustOFfiCodec,
+        DetectTextResultFfiCodec,
+        ImageSourceFfiCodec,
+        OutputGranularityFfiCodec,
+        RustoBindingErrorFfiCodec,
+        RustoBindingErrorExceptionFfiCodec,
+        RustoBindingErrorExceptionInitialization,
+        RustoBindingErrorExceptionPreprocess,
+        RustoBindingErrorExceptionInference,
+        RustoBindingErrorExceptionPostprocess,
+        RustoBindingErrorExceptionInvalidInput;
 
 ffi.DynamicLibrary _openDefaultDynamicLibrary() {
   if (Platform.isAndroid) {
@@ -81,7 +98,8 @@ ffi.DynamicLibrary _openDefaultDynamicLibrary() {
 bool _bindingsConfigured = false;
 void _initBindingsIfNeeded() {
   if (!_bindingsConfigured) {
-    generated.configureDefaultBindings(dynamicLibrary: _openDefaultDynamicLibrary());
+    generated.configureDefaultBindings(
+        dynamicLibrary: _openDefaultDynamicLibrary());
     _bindingsConfigured = true;
   }
 }
@@ -92,7 +110,9 @@ class RustO {
 
   RustO._(this._inner);
 
-  static void configureBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}) {
+  /// Configure custom native library path or pre-opened DynamicLibrary.
+  static void configureBindings(
+      {ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}) {
     generated.configureDefaultBindings(
       dynamicLibrary: dynamicLibrary,
       libraryPath: libraryPath,
@@ -112,7 +132,8 @@ class RustO {
         throw StateError('Failed to initialize RustO: $e');
       }
     } else {
-      throw ArgumentError('Expected String (JSON) or InitializeConfig, got ${config.runtimeType}');
+      throw ArgumentError(
+          'Expected String (JSON) or InitializeConfig, got ${config.runtimeType}');
     }
   }
 
@@ -123,9 +144,11 @@ class RustO {
   }
 
   /// Detect text from file path with structured results.
-  List<generated.TextResult> detectTextFile(String imagePath, [dynamic options]) {
+  List<generated.TextResult> detectTextFile(String imagePath,
+      [dynamic options]) {
     final ocrOpts = _resolveOptions(options, spatial: false);
-    final res = _inner.detectText(generated.ImageSourcePath(path: imagePath), ocrOpts);
+    final res =
+        _inner.detectText(generated.ImageSourcePath(path: imagePath), ocrOpts);
     if (res is generated.DetectTextResultStructured) {
       return res.results;
     }
@@ -135,7 +158,8 @@ class RustO {
   /// Detect text from file path formatted as spatial string.
   String detectTextFileSpatial(String imagePath, [dynamic options]) {
     final ocrOpts = _resolveOptions(options, spatial: true);
-    final res = _inner.detectText(generated.ImageSourcePath(path: imagePath), ocrOpts);
+    final res =
+        _inner.detectText(generated.ImageSourcePath(path: imagePath), ocrOpts);
     if (res is generated.DetectTextResultSpatial) {
       return res.text;
     }
@@ -143,9 +167,11 @@ class RustO {
   }
 
   /// Detect text from memory bytes with structured results.
-  List<generated.TextResult> detectTextData(Uint8List bytes, [dynamic options]) {
+  List<generated.TextResult> detectTextData(Uint8List bytes,
+      [dynamic options]) {
     final ocrOpts = _resolveOptions(options, spatial: false);
-    final res = _inner.detectText(generated.ImageSourceBytes(data: bytes), ocrOpts);
+    final res =
+        _inner.detectText(generated.ImageSourceBytes(data: bytes), ocrOpts);
     if (res is generated.DetectTextResultStructured) {
       return res.results;
     }
@@ -155,7 +181,8 @@ class RustO {
   /// Detect text from memory bytes formatted as spatial string.
   String detectTextDataSpatial(Uint8List bytes, [dynamic options]) {
     final ocrOpts = _resolveOptions(options, spatial: true);
-    final res = _inner.detectText(generated.ImageSourceBytes(data: bytes), ocrOpts);
+    final res =
+        _inner.detectText(generated.ImageSourceBytes(data: bytes), ocrOpts);
     if (res is generated.DetectTextResultSpatial) {
       return res.text;
     }
@@ -195,7 +222,8 @@ class RustO {
   }
 
   /// Unified UniFFI image detection method.
-  generated.DetectTextResult detectText(generated.ImageSource source, generated.OcrRunOptions options) {
+  generated.DetectTextResult detectText(
+      generated.ImageSource source, generated.OcrRunOptions options) {
     return _inner.detectText(source, options);
   }
 
@@ -208,7 +236,8 @@ class RustO {
   /// Alias for close() for backward compatibility.
   void dispose() => close();
 
-  static generated.OcrRunOptions _resolveOptions(dynamic options, {required bool spatial}) {
+  static generated.OcrRunOptions _resolveOptions(dynamic options,
+      {required bool spatial}) {
     generated.OcrRunOptions opts;
     if (options is generated.OcrRunOptions) {
       opts = options;
