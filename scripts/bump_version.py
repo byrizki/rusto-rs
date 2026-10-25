@@ -780,6 +780,14 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             dry_run,
             staged_files
         )
+        replace_in_file(
+            flutter_pubspec,
+            r'(?m)^(\s*rusto:\s*)\^[0-9A-Za-z.-]+',
+            rf'\g<1>^{new_ver}',
+            dry_run,
+            staged_files,
+            warn_if_not_found=False
+        )
         update_pub_changelog(
             REPO_ROOT / "packages" / "flutter" / "CHANGELOG.md",
             new_ver,

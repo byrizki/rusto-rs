@@ -283,28 +283,48 @@ jobs:
         run: |
           dart pub get
           if [ -n "${{ secrets.PUB_DEV_TOKEN }}" ]; then
-            dart pub publish --force || true
-          else
-            echo "PUB_DEV_TOKEN not configured; running dry-run validation"
-            dart pub publish --dry-run || true
+            dart pub token add https://pub.dev --env-var PUB_DEV_TOKEN
           fi
+
+          output=$(dart pub publish --force 2>&1) && {
+            echo "$output"
+            echo "Successfully published rusto to pub.dev"
+            exit 0
+          }
+
+          echo "$output"
+          if echo "$output" | grep -qi "already exists"; then
+            echo "Package rusto is already published on pub.dev, skipping."
+            exit 0
+          fi
+
+          exit 1
         env:
-          PUB_TOKEN: ${{ secrets.PUB_DEV_TOKEN }}
-        continue-on-error: true
+          PUB_DEV_TOKEN: ${{ secrets.PUB_DEV_TOKEN }}
 
       - name: Publish Flutter package to pub.dev
         working-directory: packages/flutter
         run: |
           flutter pub get
           if [ -n "${{ secrets.PUB_DEV_TOKEN }}" ]; then
-            flutter pub publish --force || true
-          else
-            echo "PUB_DEV_TOKEN not configured; running dry-run validation"
-            flutter pub publish --dry-run || true
+            dart pub token add https://pub.dev --env-var PUB_DEV_TOKEN
           fi
+
+          output=$(flutter pub publish --force 2>&1) && {
+            echo "$output"
+            echo "Successfully published rusto_flutter to pub.dev"
+            exit 0
+          }
+
+          echo "$output"
+          if echo "$output" | grep -qi "already exists"; then
+            echo "Package rusto_flutter is already published on pub.dev, skipping."
+            exit 0
+          fi
+
+          exit 1
         env:
-          PUB_TOKEN: ${{ secrets.PUB_DEV_TOKEN }}
-        continue-on-error: true
+          PUB_DEV_TOKEN: ${{ secrets.PUB_DEV_TOKEN }}
 
   # Trigger JitPack build for Android & Java
   publish-jitpack:

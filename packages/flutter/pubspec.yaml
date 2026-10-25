@@ -10,8 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  rusto:
-    path: ../dart
+  rusto: ^0.3.2
 
 flutter:
   plugin:
