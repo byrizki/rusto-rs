@@ -8,6 +8,12 @@ import { RustoContext } from '../context/RustoContext.js';
 import { defaultOcrService } from '../services/ocrService.js';
 import type { UseOcrOptions, UseOcrReturn } from '../types/index.js';
 
+/**
+ * Hook to execute OCR text recognition and track results, progress, and errors.
+ *
+ * @param options - Default options and lifecycle callbacks (onSuccess, onError).
+ * @returns State and actions for triggering OCR and consuming results.
+ */
 export function useOcr(options: UseOcrOptions = {}): UseOcrReturn {
   const context = useContext(RustoContext);
   const service = context?.service || defaultOcrService;

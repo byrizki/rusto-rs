@@ -3,7 +3,12 @@ package com.byrizki.rusto;
 import java.util.Arrays;
 
 /**
- * Recognized text result with confidence score and bounding coordinates.
+ * Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
+ *
+ * @param text Recognized text string.
+ * @param score Recognition confidence score between 0.0 and 1.0.
+ * @param boxPoints Quad vertex coordinates [[x1, y1], [x2, y2], [x3, y3], [x4, y4]].
+ * @param frame Axis-aligned bounding box frame.
  */
 public record TextResult(
     String text,

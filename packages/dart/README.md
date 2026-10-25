@@ -1,9 +1,12 @@
 # rusto
 
 [![pub.dev](https://img.shields.io/pub/v/rusto.svg?logo=dart&logoColor=white&color=0175C2)](https://pub.dev/packages/rusto)
+[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Pure Rust OCR library bindings for Dart and Flutter based on RapidOCR and PaddleOCR.
+
+> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
 
 ## Features
 
@@ -24,3 +27,10 @@ for (final line in results) {
 }
 engine.close();
 ```
+
+## 📖 Documentation
+
+For detailed guides, model configuration, and API reference:
+- [Dart & Flutter Guide](https://byrizki.com/rusto-rs/how-to/use-flutter)
+- [Full Documentation](https://byrizki.com/rusto-rs/)
+

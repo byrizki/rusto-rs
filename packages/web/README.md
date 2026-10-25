@@ -1,9 +1,12 @@
 # @rustors/web
 
 [![npm](https://img.shields.io/npm/v/@rustors/web.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/@rustors/web)
+[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > Pure Web and Browser OCR library for [RustO!](https://github.com/byrizki/rusto-rs) powered by PaddleOCR models.
+
+> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
 
 ## Features
 
@@ -55,6 +58,13 @@ const spatialText = await detectText('https://example.com/receipt.jpg', {
 console.log(spatialText);
 ```
 
+## 📖 Documentation
+
+For full documentation, guides, and API reference:
+- [Web (WASM) Guide](https://byrizki.com/rusto-rs/how-to/use-web)
+- [Full Documentation](https://byrizki.com/rusto-rs/)
+
 ## License
 
 MIT License
+

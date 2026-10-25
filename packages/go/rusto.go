@@ -1,3 +1,4 @@
+// Package rusto provides high-performance, pure-Rust OCR engine bindings for Golang via Cgo.
 package rusto
 
 /*
@@ -16,28 +17,39 @@ import (
 )
 
 var (
-	ErrInitFailed       = errors.New("rusto: failed to initialize OCR engine")
-	ErrDetectionFailed  = errors.New("rusto: text detection failed")
-	ErrEngineClosed     = errors.New("rusto: engine handle is closed")
+	// ErrInitFailed indicates that native engine initialization failed.
+	ErrInitFailed = errors.New("rusto: failed to initialize OCR engine")
+	// ErrDetectionFailed indicates that native text detection failed.
+	ErrDetectionFailed = errors.New("rusto: text detection failed")
+	// ErrEngineClosed indicates an operation was attempted on a closed engine instance.
+	ErrEngineClosed = errors.New("rusto: engine handle is closed")
 )
 
-// Frame represents bounding frame dimensions.
+// Frame represents an axis-aligned bounding box frame with position and dimensions in pixels.
 type Frame struct {
-	Width  float32 `json:"width"`
+	// Width of the bounding box in pixels.
+	Width float32 `json:"width"`
+	// Height of the bounding box in pixels.
 	Height float32 `json:"height"`
-	Top    float32 `json:"top"`
-	Left   float32 `json:"left"`
+	// Top vertical coordinate (Y) of the bounding box.
+	Top float32 `json:"top"`
+	// Left horizontal coordinate (X) of the bounding box.
+	Left float32 `json:"left"`
 }
 
-// TextResult contains recognized text, confidence score, and bounding coordinates.
+// TextResult contains recognized text, confidence score, bounding polygon coordinates, and axis-aligned frame.
 type TextResult struct {
-	Text      string       `json:"text"`
-	Score     float32      `json:"score"`
+	// Text is the recognized text string.
+	Text string `json:"text"`
+	// Score is the recognition confidence score between 0.0 and 1.0.
+	Score float32 `json:"score"`
+	// BoxPoints contains 4 vertex coordinates [top-left, top-right, bottom-right, bottom-left].
 	BoxPoints [4][2]float32 `json:"box_points"`
-	Frame     Frame        `json:"frame"`
+	// Frame is the axis-aligned bounding box enclosing the text.
+	Frame Frame `json:"frame"`
 }
 
-// Engine wraps an active RustO OCR instance.
+// Engine wraps an active RustO OCR instance with thread-safe synchronization.
 type Engine struct {
 	mu     sync.RWMutex
 	handle *C.ROCRHandle

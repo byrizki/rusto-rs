@@ -17,61 +17,138 @@ const Rusto = NativeModules.Rusto
       }
     );
 
+/**
+ * Binary image payload represented as Uint8Array or ArrayBuffer.
+ */
 export type BinaryImageData = Uint8Array | ArrayBuffer;
+
+/**
+ * Universal image source specification for React Native:
+ * - `{ uri: string }`: Local `file://` URI or app asset path.
+ * - `{ base64: string }`: Base64-encoded image string.
+ * - `{ bytes: BinaryImageData }`: Raw binary byte array or buffer.
+ */
 export type ImageSource = { uri: string } | { base64: string } | { bytes: BinaryImageData };
+
+/**
+ * Output format granularity:
+ * - 'lines': Group tokens into coherent text lines (default).
+ * - 'words': Return individual word-level tokens.
+ * - 'spatial': Return a formatted 2D text layout preserving spatial arrangement.
+ */
 export type OutputGranularity = 'lines' | 'words' | 'spatial';
+
+/**
+ * Model architecture preset: 'ppv6', 'ppv5', 'ppv4', or 'ppv3'.
+ */
 export type ModelPreset = 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3';
 
+/**
+ * Post-processing options for DBNet polygon detection and binarization.
+ */
 export interface PostprocessOptions {
+  /** Binarization probability cutoff threshold for segmentation map. Default: 0.3. */
   threshold?: number;
+  /** Box score confidence threshold for candidate contour filtering. Default: 0.6. */
   boxThreshold?: number;
+  /** Maximum candidate text boxes to detect per image. Default: 1000. */
   maxCandidates?: number;
+  /** Polygon unclip expansion ratio. Default: 1.5 - 2.0. */
   unclipRatio?: number;
+  /** Enable morphological dilation to connect broken text strokes. */
   useDilation?: boolean;
 }
+
+/**
+ * Image detection stage options.
+ */
 export interface DetectionOptions {
+  /** Target side length constraint for image resizing. Default: 960. */
   limitSideLen?: number;
+  /** Side length limit behavior: 'min' ensures short side meets threshold, 'max' caps long side. */
   limitType?: 'min' | 'max';
+  /** Mean RGB normalization values. Default: [0.485, 0.456, 0.406]. */
   mean?: [number, number, number];
+  /** Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225]. */
   std?: [number, number, number];
 }
+
+/**
+ * Configuration options for initializing the RustO engine session in React Native.
+ */
 export interface InitializeConfig {
+  /** Model architecture template preset. Defaults to 'ppv6'. */
   preset?: ModelPreset;
+  /** Custom model asset file paths (bundled in app or downloaded). */
   models?: {
+    /** Detection model path (.rten or .onnx). */
     detection?: string;
+    /** Recognition model path (.rten or .onnx). */
     recognition?: string;
+    /** Character dictionary vocabulary file path (.txt). */
     dictionary?: string;
+    /** Optional text-line orientation classifier model path. */
     classification?: string;
+    /** Optional document orientation angle classifier model path. */
     orientation?: string;
   };
 }
+
+/**
+ * Request-local OCR runtime execution options.
+ */
 export interface DetectTextOptions {
+  /** Output granularity: 'lines' (default), 'words', or 'spatial'. */
   output?: OutputGranularity;
+  /** Same-row vertical center tolerance multiplier. Default: 0.5. */
   lineYThreshold?: number;
+  /** Same-word horizontal gap tolerance multiplier. Default: 0.4. */
   wordXThreshold?: number;
+  /** Minimum recognition confidence score threshold [0.0 - 1.0]. */
   textScore?: number;
+  /** Enable 180° text line orientation classifier stage. */
   classification?: boolean;
+  /** Enable 0°/90°/180°/270° document orientation rotation stage. */
   orientation?: boolean;
-  /** Request-local resize/padding overrides. */
+  /** Request-local minimum height resize override. */
   minHeight?: number;
+  /** Request-local maximum side length resize override. */
   maxSideLen?: number;
+  /** Request-local minimum side length resize override. */
   minSideLen?: number;
+  /** Width-to-height aspect ratio padding override. */
   widthHeightRatio?: number;
   /** Request-local detector input overrides. */
   detection?: DetectionOptions;
   /** Request-local detector postprocess overrides. */
   postprocess?: PostprocessOptions;
 }
+
+/**
+ * Axis-aligned bounding box frame with position and size in image pixels.
+ */
 export interface Frame {
+  /** Width of the bounding box in pixels. */
   width: number;
+  /** Height of the bounding box in pixels. */
   height: number;
+  /** Top vertical coordinate (Y) of the bounding box. */
   top: number;
+  /** Left horizontal coordinate (X) of the bounding box. */
   left: number;
 }
+
+/**
+ * Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
+ */
 export interface TextResult {
+  /** Recognized text string. */
   text: string;
+  /** Confidence score between 0.0 and 1.0. */
   score: number;
+  /** Four polygon vertex coordinates [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]. */
   box_points: [[number, number], [number, number], [number, number], [number, number]];
+  /** Axis-aligned bounding box frame. */
   frame: Frame;
 }
 
@@ -284,17 +361,52 @@ function normalizeInitializeConfig(config: InitializeConfig | undefined): Initia
   return config;
 }
 
+/**
+ * Initializes the native RustO OCR engine in React Native.
+ *
+ * @param config - Optional configuration with preset ('ppv6', etc.) and custom model paths.
+ * @returns Promise that resolves when the native model sessions are loaded.
+ */
 export function initialize(config: InitializeConfig = {}): Promise<void> {
   return Rusto.initialize(normalizeInitializeConfig(config));
 }
+
+/**
+ * Runs OCR text recognition on an image source with reconstructed 2D spatial text output.
+ *
+ * @param source - Image source object ({ uri }, { base64 }, or { bytes }).
+ * @param options - Execution options with `output: 'spatial'`.
+ * @returns Formatted 2D multi-line text layout.
+ */
 export function detectText(
   source: ImageSource,
   options: DetectTextOptions & { output: 'spatial' }
 ): Promise<string>;
+
+/**
+ * Runs OCR text recognition on an image source with structured line or word candidates.
+ *
+ * @param source - Image source object ({ uri }, { base64 }, or { bytes }).
+ * @param options - Execution options with `output: 'lines'` or `output: 'words'`.
+ * @returns Array of structured TextResult objects.
+ */
 export function detectText(
   source: ImageSource,
   options?: DetectTextOptions & { output?: 'lines' | 'words' }
 ): Promise<TextResult[]>;
+
+/**
+ * Runs OCR text recognition on an image source.
+ *
+ * @param source - Image source object ({ uri }, { base64 }, or { bytes }).
+ * @param options - Optional execution options.
+ * @returns Structured TextResult array or spatial string depending on output option.
+ */
+export function detectText(
+  source: ImageSource,
+  options?: DetectTextOptions
+): Promise<TextResult[] | string>;
+
 export function detectText(
   source: ImageSource,
   options: DetectTextOptions = {}

@@ -1,9 +1,12 @@
 # @rustors/react
 
 [![npm](https://img.shields.io/npm/v/@rustors/react.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/@rustors/react)
+[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > Official React hooks, provider, and UI components for [RustO!](https://github.com/byrizki/rusto-rs)
+
+> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
 
 ## Features
 
@@ -84,6 +87,13 @@ export function OcrScanner() {
 }
 ```
 
+## 📖 Documentation
+
+For full documentation, guides, and API reference:
+- [React Guide](https://byrizki.com/rusto-rs/how-to/use-react)
+- [Full Documentation](https://byrizki.com/rusto-rs/)
+
 ## License
 
 MIT License
+

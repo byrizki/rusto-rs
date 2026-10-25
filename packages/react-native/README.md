@@ -1,7 +1,10 @@
 # React Native RustO
 
 [![npm](https://img.shields.io/npm/v/@rustors/react-native.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/@rustors/react-native)
+[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
 
 React Native OCR binding for RustO. Public API intentionally small:
 
@@ -241,6 +244,13 @@ interface TextResult {
 
 See [BUNDLING.md](./BUNDLING.md) for custom model packaging, on-demand resources, and app-size tradeoffs.
 
+## 📖 Documentation
+
+For full documentation, guides, and API reference:
+- [React Native Guide](https://byrizki.com/rusto-rs/how-to/use-react-native)
+- [Full Documentation](https://byrizki.com/rusto-rs/)
+
 ## License
 
 MIT
+

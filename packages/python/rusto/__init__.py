@@ -1,4 +1,28 @@
-"""RustO - High performance OCR engine powered by Rust."""
+"""RustO - High performance, pure-Rust OCR engine for Python.
+
+RustO provides fast, memory-safe text extraction based on PaddleOCR architectures
+and the pure-Rust RTen deep learning inference engine.
+
+Quick Start:
+    >>> from rusto import RustO, InitializeConfig, OcrRunOptions, ImageSource
+    >>> config = InitializeConfig.ppv6("models/det.rten", "models/rec.rten", "models/dict.txt")
+    >>> engine = RustO.initialize(config)
+    >>> result = engine.detect_text(ImageSource.PATH("receipt.jpg"), OcrRunOptions())
+    >>> if result.is_STRUCTURED():
+    ...     for item in result.results:
+    ...         print(f"[{item.score:.2f}] {item.text}")
+    >>> engine.close()
+
+Exported Classes & Types:
+    - RustO: Main OCR engine class with initialize(), detect_text(), detect_text_rgb(), and close().
+    - InitializeConfig: Initial session configuration (presets, model paths, execution threads).
+    - OcrRunOptions: Per-request execution options (output shape, thresholds, resize limits).
+    - TextResult: Recognized text string with confidence score, quad vertices, and bounding frame.
+    - Frame: Axis-aligned bounding box frame (width, height, top, left).
+    - ImageSource: Input image specification (PATH, BYTES).
+    - OutputGranularity: LINES, WORDS, or SPATIAL.
+    - DetectTextResult: STRUCTURED (results: list[TextResult]) or SPATIAL (text: str).
+"""
 
 from __future__ import annotations
 import os

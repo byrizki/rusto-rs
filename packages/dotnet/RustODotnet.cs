@@ -8,21 +8,35 @@ using System.Text.Json.Serialization;
 
 namespace RustODotnet
 {
+    /// <summary>
+    /// Represents a 2D coordinate point with single-precision floating-point values in image pixels.
+    /// </summary>
     public struct Point2D
     {
+        /// <summary>Horizontal coordinate (X).</summary>
         public float X { get; set; }
+        /// <summary>Vertical coordinate (Y).</summary>
         public float Y { get; set; }
         
+        /// <summary>Initializes a new instance of Point2D.</summary>
         public Point2D(float x, float y) { X = x; Y = y; }
     }
 
+    /// <summary>
+    /// Represents an axis-aligned bounding box frame with position and dimensions in image pixels.
+    /// </summary>
     public struct Frame
     {
+        /// <summary>Width of the bounding box.</summary>
         public float Width { get; set; }
+        /// <summary>Height of the bounding box.</summary>
         public float Height { get; set; }
+        /// <summary>Top coordinate (Y) of the bounding box.</summary>
         public float Top { get; set; }
+        /// <summary>Left coordinate (X) of the bounding box.</summary>
         public float Left { get; set; }
 
+        /// <summary>Initializes a new instance of Frame.</summary>
         public Frame(float width, float height, float top, float left)
         {
             Width = width;
@@ -32,19 +46,32 @@ namespace RustODotnet
         }
     }
 
+    /// <summary>
+    /// Represents a recognized text result with text content, confidence score, bounding polygon, and axis-aligned frame.
+    /// </summary>
     public class TextResult
     {
+        /// <summary>Recognized text string.</summary>
         public string Text { get; set; }
+        /// <summary>Confidence score between 0.0 and 1.0.</summary>
         public float Score { get; set; }
+        /// <summary>Four vertex quad points [top-left, top-right, bottom-right, bottom-left].</summary>
         public Point2D[] BoxPoints { get; set; }
+        /// <summary>Axis-aligned bounding box frame.</summary>
         public Frame Frame { get; set; }
     }
 
+    /// <summary>
+    /// Output format granularity for text detection.
+    /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum OutputGranularity
     {
+        /// <summary>Group tokens into lines (default).</summary>
         Lines,
+        /// <summary>Return individual word tokens.</summary>
         Words,
+        /// <summary>Return a reconstructed 2D spatial text layout.</summary>
         Spatial
     }
 
@@ -81,29 +108,42 @@ namespace RustODotnet
         public string ModelPath { get; set; }
     }
 
+    /// <summary>
+    /// Configuration for engine initialization and model paths.
+    /// </summary>
     public class InitializeConfig
     {
+        /// <summary>Template preset name (e.g. "ppv6", "ppv5", "ppv4", "ppv3").</summary>
         [JsonPropertyName("template")]
         public string Template { get; set; }
 
+        /// <summary>Detection model configuration.</summary>
         [JsonPropertyName("detection")]
         public DetectionConfig Detection { get; set; }
 
+        /// <summary>Recognition model and dictionary configuration.</summary>
         [JsonPropertyName("recognition")]
         public RecognitionConfig Recognition { get; set; }
 
+        /// <summary>Optional classification model configuration.</summary>
         [JsonPropertyName("classification")]
         public ClassificationConfig Classification { get; set; }
 
+        /// <summary>Optional document orientation model configuration.</summary>
         [JsonPropertyName("orientation")]
         public OrientationConfig Orientation { get; set; }
 
+        /// <summary>Optional document dewarping model configuration.</summary>
         [JsonPropertyName("unwarp")]
         public UnwarpConfig Unwarp { get; set; }
 
+        /// <summary>Creates a preset configuration for PP-OCRv3.</summary>
         public static InitializeConfig Ppv3() => new() { Template = "ppv3" };
+        /// <summary>Creates a preset configuration for PP-OCRv4.</summary>
         public static InitializeConfig Ppv4() => new() { Template = "ppv4" };
+        /// <summary>Creates a preset configuration for PP-OCRv5.</summary>
         public static InitializeConfig Ppv5() => new() { Template = "ppv5" };
+        /// <summary>Creates a preset configuration for PP-OCRv6 (50+ languages unified).</summary>
         public static InitializeConfig Ppv6() => new() { Template = "ppv6" };
     }
 
@@ -150,35 +190,72 @@ namespace RustODotnet
         [JsonPropertyName("postprocess")] public PostprocessRunOptions Postprocess { get; set; }
     }
 
+    /// <summary>
+    /// Base class for image input sources.
+    /// </summary>
     public abstract class ImageSource { }
+
+    /// <summary>
+    /// File path or file: URI image source.
+    /// </summary>
     public sealed class UriImageSource : ImageSource
     {
+        /// <summary>Filesystem path or URI.</summary>
         public string Value { get; }
+        /// <summary>Initializes a new instance of UriImageSource.</summary>
         public UriImageSource(string value) => Value = value ?? throw new ArgumentNullException(nameof(value));
     }
+
+    /// <summary>
+    /// In-memory encoded image byte buffer source.
+    /// </summary>
     public sealed class BytesImageSource : ImageSource
     {
+        /// <summary>Encoded image bytes.</summary>
         public byte[] Value { get; }
+        /// <summary>Initializes a new instance of BytesImageSource.</summary>
         public BytesImageSource(byte[] value) => Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
+    /// <summary>
+    /// Base class for OCR text detection results.
+    /// </summary>
     public abstract class DetectTextResult { }
+
+    /// <summary>
+    /// Structured OCR detection result containing a list of recognized items.
+    /// </summary>
     public sealed class StructuredDetectTextResult : DetectTextResult
     {
+        /// <summary>List of recognized TextResult items.</summary>
         public IReadOnlyList<TextResult> Items { get; }
+        /// <summary>Initializes a new instance of StructuredDetectTextResult.</summary>
         public StructuredDetectTextResult(IReadOnlyList<TextResult> items) => Items = items;
     }
+
+    /// <summary>
+    /// Reconstructed 2D spatial text detection result preserving document layout.
+    /// </summary>
     public sealed class SpatialDetectTextResult : DetectTextResult
     {
+        /// <summary>Reconstructed 2D spatial text string.</summary>
         public string Text { get; }
+        /// <summary>Initializes a new instance of SpatialDetectTextResult.</summary>
         public SpatialDetectTextResult(string text) => Text = text;
     }
 
+    /// <summary>
+    /// Exception thrown when native OCR operations fail.
+    /// </summary>
     public class RustOException : Exception
     {
+        /// <summary>Initializes a new instance of RustOException.</summary>
         public RustOException(string message) : base(message) { }
     }
 
+    /// <summary>
+    /// High-performance, pure-Rust OCR engine wrapper for .NET.
+    /// </summary>
     public class RustO : IDisposable
     {
         private readonly RustODotnet.Generated.RustO _inner;
@@ -224,6 +301,9 @@ namespace RustODotnet
         }
 #endif
 
+        /// <summary>
+        /// Underlying native engine version string.
+        /// </summary>
         public static string Version => RustODotnet.Generated.RustoMethods.RustoVersion();
 
         private RustO(InitializeConfig config)
@@ -262,6 +342,11 @@ namespace RustODotnet
             }
         }
 
+        /// <summary>
+        /// Initializes a new RustO OCR engine instance with model session configuration.
+        /// </summary>
+        /// <param name="config">Initialization configuration or preset. Defaults to PP-OCRv6.</param>
+        /// <returns>Initialized RustO engine instance.</returns>
         public static RustO Initialize(InitializeConfig config = null) => new RustO(config);
 
         private static string ResolveModelPath(string path)
@@ -296,6 +381,12 @@ namespace RustODotnet
             return path;
         }
 
+        /// <summary>
+        /// Detects text in an image source (file path/URI or byte array) with the specified runtime options.
+        /// </summary>
+        /// <param name="source">ImageSource specifying image path or in-memory byte buffer.</param>
+        /// <param name="options">Optional runtime execution options.</param>
+        /// <returns>StructuredDetectTextResult or SpatialDetectTextResult depending on output option.</returns>
         public DetectTextResult DetectText(ImageSource source, OcrRunOptions options = null)
         {
             ThrowIfDisposed();
@@ -335,6 +426,15 @@ namespace RustODotnet
             }
         }
 
+        /// <summary>
+        /// Detects text from raw decoded interleaved 24-bit RGB pixel buffer.
+        /// </summary>
+        /// <param name="pixels">Interleaved RGB pixel bytes.</param>
+        /// <param name="width">Image width in pixels.</param>
+        /// <param name="height">Image height in pixels.</param>
+        /// <param name="stride">Row stride in bytes.</param>
+        /// <param name="options">Optional runtime execution options.</param>
+        /// <returns>StructuredDetectTextResult or SpatialDetectTextResult.</returns>
         public DetectTextResult DetectTextRgb(byte[] pixels, uint width, uint height, ulong stride, OcrRunOptions options = null)
         {
             ThrowIfDisposed();
@@ -479,6 +579,9 @@ namespace RustODotnet
             }
         }
 
+        /// <summary>
+        /// Releases native engine resources.
+        /// </summary>
         public void Dispose()
         {
             if (!_disposed)

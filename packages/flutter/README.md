@@ -1,9 +1,12 @@
 # rusto_flutter
 
 [![pub.dev](https://img.shields.io/pub/v/rusto_flutter.svg?logo=flutter&logoColor=white&color=02569B)](https://pub.dev/packages/rusto_flutter)
+[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Flutter plugin for RustO, a high-performance pure Rust OCR engine based on RapidOCR and PaddleOCR.
+
+> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
 
 ## Features
 
@@ -25,3 +28,10 @@ for (final line in results) {
 }
 engine.dispose();
 ```
+
+## 📖 Documentation
+
+For detailed guides, model setup, and API reference:
+- [Flutter Guide](https://byrizki.com/rusto-rs/how-to/use-flutter)
+- [Full Documentation](https://byrizki.com/rusto-rs/)
+

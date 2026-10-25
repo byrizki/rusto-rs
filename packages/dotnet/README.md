@@ -1,9 +1,12 @@
 # RustODotnet
 
 [![NuGet](https://img.shields.io/nuget/v/RustODotnet.svg?logo=nuget&logoColor=white&color=004880)](https://www.nuget.org/packages/RustODotnet)
+[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 `RustODotnet` exposes canonical RustO OCR API for .NET. Initialize model session once, run many request-local detections, then dispose engine.
+
+> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
 
 ```bash
 dotnet add package RustODotnet
@@ -167,3 +170,9 @@ if (spatial is SpatialDetectTextResult layout)
 - Constructors reject null source payloads. Validate input file/resource availability before detection.
 - Always dispose `RustO`; `using var` handles success and failure paths.
 - Invalid request options do not require reinitialization. Correct options and call `DetectText` again.
+
+## 📖 Documentation
+
+For full documentation, guides, and API reference:
+- [C# / .NET Guide](https://byrizki.com/rusto-rs/how-to/use-csharp)
+- [Full Documentation](https://byrizki.com/rusto-rs/)

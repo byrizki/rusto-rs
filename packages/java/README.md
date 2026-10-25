@@ -1,9 +1,12 @@
 # rusto-java
 
 [![JitPack](https://jitpack.io/v/byrizki/rusto-rs.svg)](https://jitpack.io/#byrizki/rusto-rs)
+[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Pure-Rust Optical Character Recognition (OCR) engine for JVM environments (Java, Kotlin, Scala) via JNA.
+
+> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
 
 ## Features
 
@@ -77,6 +80,12 @@ public class Main {
     }
 }
 ```
+
+## 📖 Documentation
+
+For full documentation, guides, and API reference:
+- [Java Guide](https://byrizki.com/rusto-rs/how-to/use-java)
+- [Full Documentation](https://byrizki.com/rusto-rs/)
 
 ## License
 

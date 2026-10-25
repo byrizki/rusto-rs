@@ -1,9 +1,13 @@
 import Foundation
 
+/// Underlying native RustO binding error.
 public typealias RustOError = RustoBindingError
+
+/// Runtime OCR options alias.
 public typealias RuntimeOptions = OcrRunOptions
 
 extension RustO {
+    /// Library version string of the underlying RustO engine.
     public static var libraryVersion: String {
         rustoVersion()
     }
@@ -39,6 +43,10 @@ extension RustO {
         return try RustO.initialize(config: resolvedConfig)
     }
 
+    /// Resolves model file path from the app main bundle, model resource bundles, or documents directory.
+    ///
+    /// - Parameter filename: File name or partial path of model asset.
+    /// - Returns: Absolute file path if found, or nil.
     public static func resolveModelPath(_ filename: String) -> String? {
         if FileManager.default.fileExists(atPath: filename) { return filename }
         let ext = (filename as NSString).pathExtension
@@ -64,6 +72,10 @@ extension RustO {
         return FileManager.default.fileExists(atPath: file) ? file : nil
     }
 
+    /// Resolves a file URI or path into a standard POSIX filesystem path.
+    ///
+    /// - Parameter value: File path or `file://` URI string.
+    /// - Returns: Clean absolute POSIX path.
     public static func resolveFilePath(_ value: String) -> String {
         var path = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if path.hasPrefix("file://"), let url = URL(string: path) { path = url.path }

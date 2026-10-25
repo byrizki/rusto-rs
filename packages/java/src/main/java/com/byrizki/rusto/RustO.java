@@ -77,6 +77,14 @@ public class RustO implements AutoCloseable {
         this.handle = handle;
     }
 
+    /**
+     * Initializes the RustO OCR engine instance with a JSON configuration string.
+     *
+     * @param configJson JSON string containing model paths and runtime configuration.
+     * @return Initialized RustO engine instance.
+     * @throws IllegalArgumentException if configJson is null.
+     * @throws RuntimeException if native engine initialization fails.
+     */
     public static RustO initialize(String configJson) {
         if (configJson == null) {
             throw new IllegalArgumentException("configJson cannot be null");
@@ -118,6 +126,15 @@ public class RustO implements AutoCloseable {
         return list;
     }
 
+    /**
+     * Detects text in an image file at the specified filesystem path.
+     *
+     * @param imagePath Filesystem path to the image file.
+     * @param optionsJson Optional JSON string of OcrRunOptions (null or "{}" for defaults).
+     * @return List of structured TextResult objects.
+     * @throws IllegalArgumentException if imagePath is null.
+     * @throws RuntimeException if detection fails or engine is closed.
+     */
     public List<TextResult> detectTextFile(String imagePath, String optionsJson) {
         ensureOpen();
         if (imagePath == null) throw new IllegalArgumentException("imagePath cannot be null");
@@ -141,6 +158,14 @@ public class RustO implements AutoCloseable {
         }
     }
 
+    /**
+     * Detects text from an in-memory encoded image byte array (e.g. JPEG, PNG).
+     *
+     * @param data Raw encoded image file bytes.
+     * @param optionsJson Optional JSON string of OcrRunOptions (null or "{}" for defaults).
+     * @return List of structured TextResult objects.
+     * @throws RuntimeException if detection fails or engine is closed.
+     */
     public List<TextResult> detectTextData(byte[] data, String optionsJson) {
         ensureOpen();
         if (data == null || data.length == 0) {
@@ -166,6 +191,15 @@ public class RustO implements AutoCloseable {
         }
     }
 
+    /**
+     * Detects text in an image file and returns a reconstructed 2D spatial text layout.
+     *
+     * @param imagePath Filesystem path to the image file.
+     * @param optionsJson Optional JSON string of OcrRunOptions.
+     * @return Multi-line string preserving the visual layout and tabular spacing.
+     * @throws IllegalArgumentException if imagePath is null.
+     * @throws RuntimeException if detection fails or engine is closed.
+     */
     public String detectTextFileSpatial(String imagePath, String optionsJson) {
         ensureOpen();
         if (imagePath == null) throw new IllegalArgumentException("imagePath cannot be null");
@@ -182,6 +216,14 @@ public class RustO implements AutoCloseable {
         }
     }
 
+    /**
+     * Detects text from an in-memory encoded image byte array and returns a 2D spatial text layout.
+     *
+     * @param data Raw encoded image file bytes.
+     * @param optionsJson Optional JSON string of OcrRunOptions.
+     * @return Multi-line string preserving the visual layout and tabular spacing.
+     * @throws RuntimeException if detection fails or engine is closed.
+     */
     public String detectTextDataSpatial(byte[] data, String optionsJson) {
         ensureOpen();
         if (data == null || data.length == 0) {
@@ -200,6 +242,17 @@ public class RustO implements AutoCloseable {
         }
     }
 
+    /**
+     * Detects text from raw decoded interleaved RGB8 pixel bytes.
+     *
+     * @param pixels Interleaved 24-bit RGB pixel buffer (R, G, B, R, G, B...).
+     * @param width Image width in pixels.
+     * @param height Image height in pixels.
+     * @param stride Row stride in bytes (typically width * 3).
+     * @param optionsJson Optional JSON string of OcrRunOptions.
+     * @return List of structured TextResult objects.
+     * @throws RuntimeException if detection fails or engine is closed.
+     */
     public List<TextResult> detectTextRGB(byte[] pixels, int width, int height, long stride, String optionsJson) {
         ensureOpen();
         if (pixels == null || pixels.length == 0) {
@@ -226,6 +279,17 @@ public class RustO implements AutoCloseable {
         }
     }
 
+    /**
+     * Detects text from raw decoded interleaved RGB8 pixel bytes and returns a 2D spatial text layout.
+     *
+     * @param pixels Interleaved 24-bit RGB pixel buffer (R, G, B, R, G, B...).
+     * @param width Image width in pixels.
+     * @param height Image height in pixels.
+     * @param stride Row stride in bytes (typically width * 3).
+     * @param optionsJson Optional JSON string of OcrRunOptions.
+     * @return Multi-line string preserving the visual layout and tabular spacing.
+     * @throws RuntimeException if detection fails or engine is closed.
+     */
     public String detectTextRGBSpatial(byte[] pixels, int width, int height, long stride, String optionsJson) {
         ensureOpen();
         if (pixels == null || pixels.length == 0) {
@@ -246,6 +310,9 @@ public class RustO implements AutoCloseable {
         }
     }
 
+    /**
+     * Releases the native RustO OCR engine handle and associated model memory.
+     */
     @Override
     public synchronized void close() {
         if (handle != null) {

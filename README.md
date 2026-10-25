@@ -14,6 +14,7 @@
 [![NuGet](https://img.shields.io/nuget/v/RustODotnet.svg?logo=nuget&logoColor=white&color=004880)](https://www.nuget.org/packages/RustODotnet)
 [![CocoaPods](https://img.shields.io/cocoapods/v/RustO.svg?logo=cocoapods&logoColor=white&color=EE3322)](https://cocoapods.org/pods/RustO)
 [![JitPack](https://jitpack.io/v/byrizki/rusto-rs.svg)](https://jitpack.io/#byrizki/rusto-rs)
+[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
 [![Library CI](https://github.com/byrizki/rusto-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/byrizki/rusto-rs/actions/workflows/ci.yml)
 [![Docs CI](https://github.com/byrizki/rusto-rs/actions/workflows/docs-ci.yml/badge.svg)](https://github.com/byrizki/rusto-rs/actions/workflows/docs-ci.yml)
 [![Build & Release](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml/badge.svg)](https://github.com/byrizki/rusto-rs/actions/workflows/build.yml)
@@ -69,7 +70,7 @@ Upgrading from **v0.2.x** to **v0.3.0** transitions the core engine to pure Rust
 | **Configuration** | Nested `preprocessing` block | Decoupled **`InitializeConfig`** & **`OcrRunOptions`** |
 | **NPM Scope** | Standalone names (`react-rusto`, etc.) | Unified **`@rustors/*`** scope |
 
-👉 **[Read the Complete v0.2 → v0.3 Migration Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/migration-guide)** for code comparisons, API changes, and step-by-step instructions.
+👉 **[Read the Complete v0.2 → v0.3 Migration Guide](https://byrizki.com/rusto-rs/en/advance-guide/migration-guide)** for code comparisons, API changes, and step-by-step instructions.
 
 ---
 
@@ -332,7 +333,7 @@ RustO! supports PP-OCRv6 (recognizing 50+ languages simultaneously with a unifie
 
 Prepackaged models are available on [npm](https://www.npmjs.com/search?q=%40rustors%2Fmodel-ppocrv6) (`@rustors/model-ppocrv6-*`) and [NuGet](https://www.nuget.org/packages?q=RustODotnet.Models.PPOCRv6) (`RustODotnet.Models.PPOCRv6.*`).
 
-👉 **[View Complete Multilingual OCR Guide & Model Matrix](https://byrizki.github.io/rusto-rs/en/advance-guide/multilingual-ocr)**
+👉 **[View Complete Multilingual OCR Guide & Model Matrix](https://byrizki.com/rusto-rs/en/advance-guide/multilingual-ocr)**
 
 ---
 
@@ -365,25 +366,25 @@ let result = ocr.detect_text(
 )?;
 ```
 
-👉 **[Read the Full API Reference & Option Specifications](https://byrizki.github.io/rusto-rs/en/api-reference/ocr-run-options)**
+👉 **[Read the Full API Reference & Option Specifications](https://byrizki.com/rusto-rs/en/api-reference/ocr-run-options)**
 
 ---
 
 ## 📖 Documentation & Advanced Guides
 
-Explore deep-dive guides and comprehensive references on the [RustO! Documentation Site](https://byrizki.github.io/rusto-rs/):
+Explore deep-dive guides and comprehensive references on the [RustO! Documentation Site](https://byrizki.com/rusto-rs/):
 
 | Topic | Description | Link |
 |---|---|---|
-| **Models & Tiers Architecture** | Model formats (`.rten`, `.onnx`), INT8 quantization, and pluggable `InferenceSession` engines | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/models-and-tiers) |
-| **Multilingual OCR** | 50+ languages support, scripts matrix, and dedicated PP-OCRv5/v4 language packages | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/multilingual-ocr) |
-| **Spatial Layout Reconstruction** | 2D XY spatial layout reconstruction for invoices, receipts, and multi-column tables | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/spatial-layout-reconstruction) |
-| **Image Preprocessing & Tuning** | DBNet binarization thresholds, polygon unclipping, morphological dilation, and dimension limits | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/image-preprocessing-and-tuning) |
-| **Orientation & Classification** | 180° line direction classifier and 0°/90°/180°/270° document page rotation | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/classification-and-orientation) |
-| **Performance & Benchmarks** | Latency, memory footprint, and parity benchmarks across x86-64, ARM64, and mobile | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/performance-and-benchmarks) |
-| **Troubleshooting Guide** | Resolving model paths, Android JNI linking, React Native pods, and high-resolution camera OOM | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/troubleshooting) |
-| **v0.2 → v0.3 Migration Guide** | Upgrading to pure-Rust RTen, .rten model formats, EngineSession, and @rustors scope | [Read Guide](https://byrizki.github.io/rusto-rs/en/advance-guide/migration-guide) |
-| **API Reference** | Specifications for `InitializeConfig`, `OcrRunOptions`, and `TextResult` across all platforms | [API Reference](https://byrizki.github.io/rusto-rs/en/api-reference/initialize-config) |
+| **Models & Tiers Architecture** | Model formats (`.rten`, `.onnx`), INT8 quantization, and pluggable `InferenceSession` engines | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/models-and-tiers) |
+| **Multilingual OCR** | 50+ languages support, scripts matrix, and dedicated PP-OCRv5/v4 language packages | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/multilingual-ocr) |
+| **Spatial Layout Reconstruction** | 2D XY spatial layout reconstruction for invoices, receipts, and multi-column tables | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/spatial-layout-reconstruction) |
+| **Image Preprocessing & Tuning** | DBNet binarization thresholds, polygon unclipping, morphological dilation, and dimension limits | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/image-preprocessing-and-tuning) |
+| **Orientation & Classification** | 180° line direction classifier and 0°/90°/180°/270° document page rotation | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/classification-and-orientation) |
+| **Performance & Benchmarks** | Latency, memory footprint, and parity benchmarks across x86-64, ARM64, and mobile | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/performance-and-benchmarks) |
+| **Troubleshooting Guide** | Resolving model paths, Android JNI linking, React Native pods, and high-resolution camera OOM | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/troubleshooting) |
+| **v0.2 → v0.3 Migration Guide** | Upgrading to pure-Rust RTen, .rten model formats, EngineSession, and @rustors scope | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/migration-guide) |
+| **API Reference** | Specifications for `InitializeConfig`, `OcrRunOptions`, and `TextResult` across all platforms | [API Reference](https://byrizki.com/rusto-rs/en/api-reference/initialize-config) |
 
 ---
 

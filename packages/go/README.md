@@ -1,6 +1,12 @@
 # rusto (Go Binding)
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/byrizki/rusto-rs/packages/go.svg)](https://pkg.go.dev/github.com/byrizki/rusto-rs/packages/go)
+[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 High-performance, pure-Rust OCR engine bindings for Golang via Cgo.
+
+> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
 
 ## Features
 
@@ -67,6 +73,13 @@ func main() {
 }
 ```
 
+## 📖 Documentation
+
+For full documentation, guides, and API reference:
+- [Golang Guide](https://byrizki.com/rusto-rs/how-to/use-golang)
+- [Full Documentation](https://byrizki.com/rusto-rs/)
+
 ## License
 
 MIT License
+

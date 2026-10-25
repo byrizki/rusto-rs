@@ -6,8 +6,14 @@ import org.json.JSONObject
 import java.io.File
 import java.net.URLDecoder
 
+/**
+ * 2D coordinate point representing vertex location in pixels.
+ */
 data class Point2D(val x: Float, val y: Float)
 
+/**
+ * Axis-aligned bounding box frame with position and size in pixels.
+ */
 data class Frame(
     val width: Float,
     val height: Float,
@@ -15,6 +21,9 @@ data class Frame(
     val left: Float
 )
 
+/**
+ * Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
+ */
 data class TextResult(
     val text: String,
     val score: Float,
@@ -28,6 +37,9 @@ data class TextResult(
     }
 )
 
+/**
+ * Text detection model configuration.
+ */
 data class DetectionConfig(
     val enabled: Boolean? = null,
     val modelPath: String? = null,
@@ -39,6 +51,9 @@ data class DetectionConfig(
     val useDilation: Boolean? = null
 )
 
+/**
+ * Text recognition model configuration.
+ */
 data class RecognitionConfig(
     val enabled: Boolean? = null,
     val modelPath: String? = null,
@@ -58,22 +73,34 @@ data class ClassificationConfig(
     val thresh: Float? = null
 )
 
+/**
+ * Document orientation angle classifier configuration (0°, 90°, 180°, 270°).
+ */
 data class OrientationConfig(
     val enabled: Boolean? = null,
     val modelPath: String? = null,
     val thresh: Float? = null
 )
 
+/**
+ * Document unwarping / dewarping model configuration.
+ */
 data class UnwarpConfig(
     val enabled: Boolean? = null,
     val modelPath: String? = null
 )
 
+/**
+ * Spatial layout reconstruction thresholds.
+ */
 data class LayoutConfig(
     val yThresholdMultiplier: Float? = null,
     val xThresholdMultiplier: Float? = null
 )
 
+/**
+ * Configuration options for initializing the RustO engine on Android.
+ */
 data class InitializeConfig(
     val template: String? = null,
     val detection: DetectionConfig? = null,
@@ -152,10 +179,19 @@ data class InitializeConfig(
 
 class RustOException(message: String) : Exception(message)
 
+/**
+ * Output format granularity:
+ * - LINES: Group recognized tokens into lines.
+ * - WORDS: Return individual word-level tokens.
+ * - SPATIAL: Return a formatted 2D text layout preserving spatial arrangement.
+ */
 enum class OutputGranularity(val wireValue: String) {
     LINES("lines"), WORDS("words"), SPATIAL("spatial");
 }
 
+/**
+ * Post-processing options for DBNet polygon detection and binarization.
+ */
 data class PostprocessRunOptions(
     val threshold: Float? = null,
     val boxThreshold: Float? = null,
@@ -164,6 +200,9 @@ data class PostprocessRunOptions(
     val useDilation: Boolean? = null,
 )
 
+/**
+ * Image detection stage options.
+ */
 data class DetectionRunOptions(
     val limitSideLen: Int? = null,
     val limitType: String? = null,
@@ -172,6 +211,9 @@ data class DetectionRunOptions(
     val postprocess: PostprocessRunOptions? = null,
 )
 
+/**
+ * Request-local OCR runtime execution options.
+ */
 data class OcrRunOptions(
     val output: OutputGranularity = OutputGranularity.LINES,
     val lineYThreshold: Float? = null,
@@ -249,22 +291,42 @@ data class OcrRunOptions(
     }
 }
 
+/**
+ * Universal image source for OCR detection on Android.
+ */
 sealed interface ImageSource {
+    /** File path, file:// URI, or content:// URI. */
     data class Uri(val value: String) : ImageSource
+    /** Raw encoded image bytes (JPEG, PNG, etc.). */
     data class Bytes(val value: ByteArray) : ImageSource
 }
 
+/**
+ * Result of OCR text recognition: structured items or formatted spatial string.
+ */
 sealed interface DetectTextResult {
+    /** Structured list of recognized text lines or words. */
     data class Structured(val items: List<TextResult>) : DetectTextResult
+    /** Formatted 2D spatial text layout. */
     data class Spatial(val text: String) : DetectTextResult
 }
 
+/**
+ * High-performance, pure-Rust OCR engine wrapper for Android.
+ */
 class RustO private constructor(
     private val context: Context,
     private var engine: uniffi.rusto.RustO?,
 ) : AutoCloseable {
 
     companion object {
+        /**
+         * Initializes the RustO OCR engine with Android context and optional model configuration.
+         *
+         * @param context Android context for asset resolution.
+         * @param config Model configuration specifying template preset and custom asset paths.
+         * @return Initialized RustO engine instance.
+         */
         fun initialize(context: Context, config: InitializeConfig = InitializeConfig()): RustO {
             val json = config.toJson(context)
             val engine = try {
@@ -301,6 +363,13 @@ class RustO private constructor(
         }
     }
 
+    /**
+     * Runs text detection and recognition on the specified image source.
+     *
+     * @param source ImageSource (Uri or Bytes).
+     * @param options Per-request OCR execution options.
+     * @return DetectTextResult (Structured or Spatial).
+     */
     fun detectText(source: ImageSource, options: OcrRunOptions = OcrRunOptions()): DetectTextResult {
         val activeEngine = engine ?: throw IllegalStateException("RustO is closed.")
         val uniffiSource = when (source) {
@@ -394,6 +463,9 @@ class RustO private constructor(
         return action(path, null)
     }
 
+    /**
+     * Releases the native RustO engine handle and frees memory.
+     */
     override fun close() {
         engine?.close()
         engine = null
