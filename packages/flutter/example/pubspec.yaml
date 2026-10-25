@@ -32,10 +32,12 @@ dependencies:
     sdk: flutter
   rusto_flutter:
     path: ../
-  rusto:
-    path: ../../dart
   path_provider: ^2.1.2
   cupertino_icons: ^1.0.8
+
+dependency_overrides:
+  rusto:
+    path: ../../dart
 
 dev_dependencies:
   flutter_test:
