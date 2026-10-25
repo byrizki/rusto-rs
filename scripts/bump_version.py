@@ -20,7 +20,7 @@ import json
 import argparse
 import subprocess
 from pathlib import Path
-from typing import List, Set
+from typing import List, Set, Dict, Tuple, NamedTuple, Optional
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -149,12 +149,13 @@ def normalize_changelog_text(text: str) -> str:
     """
     Normalizes a changelog entry or commit message for deduplication comparison.
     Strips leading markdown list tokens, link syntax, bold/italic, scope prefixes,
-    conventional commit prefixes, trailing issue/PR refs, whitespace, and punctuation.
+    conventional commit prefixes, trailing committer/user tags, issue/PR refs, whitespace, and punctuation.
     """
     text = re.sub(r"^[\s\-\*\+]+", "", text)
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
     text = re.sub(r"[\*_]{1,3}", "", text)
-    text = re.sub(r"\s*\([#\d\w\s,-]+\)$", "", text)
+    text = re.sub(r"\s+by\s+@[\w-]+(?:\[bot\])?$", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*\([#@\d\w\s,-]+(?:\[bot\])?\)$", "", text)
     text = re.sub(r"^(feat|feature|fix|bug|patch|hotfix|chore|docs|refactor|style|test|perf|build|ci)(\([^)]+\))?:\s*", "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text).strip().lower()
     return text.rstrip(".,;!?:")
@@ -244,21 +245,241 @@ def find_base_commit_for_changelog(current_ver: str) -> str:
 
     return ""
 
-def get_commits_since_last_version(current_ver: str = "") -> List[str]:
+class CommitInfo(NamedTuple):
+    hash: str
+    subject: str
+    committer_name: str
+    committer_email: str
+    author_name: str
+    author_email: str
+    github_user: str = ""
+
+    def __str__(self) -> str:
+        return self.subject
+
+def get_github_repo_slug() -> str:
+    try:
+        proc = subprocess.run(
+            ["git", "config", "--get", "remote.origin.url"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        url = proc.stdout.strip()
+        m = re.search(r"github\.com[:/]([^/]+)/([^/.]+?)(?:\.git)?$", url)
+        if m:
+            return f"{m.group(1)}/{m.group(2)}"
+    except Exception:
+        pass
+    return "byrizki/rusto-rs"
+
+def resolve_commit_github_users(commits: List[CommitInfo]) -> List[CommitInfo]:
+    if not commits:
+        return []
+
+    repo_slug = get_github_repo_slug()
+    sha_map: Dict[str, str] = {}
+    email_map: Dict[str, str] = {}
+    name_map: Dict[str, str] = {}
+
+    # Seed current authenticated gh user & local git config
+    try:
+        gh_user_proc = subprocess.run(
+            ["gh", "api", "user", "--jq", ".login"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=3,
+        )
+        current_gh_user = gh_user_proc.stdout.strip()
+        if current_gh_user:
+            git_email_proc = subprocess.run(
+                ["git", "config", "user.email"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            local_email = git_email_proc.stdout.strip().lower()
+            if local_email:
+                email_map[local_email] = current_gh_user
+            git_name_proc = subprocess.run(
+                ["git", "config", "user.name"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            local_name = git_name_proc.stdout.strip().lower()
+            if local_name:
+                name_map[local_name] = current_gh_user
+    except Exception:
+        pass
+
+    # Batch query GitHub API for recent commits in repo
+    try:
+        proc = subprocess.run(
+            ["gh", "api", f"repos/{repo_slug}/commits?per_page=100"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            data = json.loads(proc.stdout)
+            for item in data:
+                sha = item.get("sha")
+                author = item.get("author") or {}
+                committer = item.get("committer") or {}
+                a_login = author.get("login")
+                c_login = committer.get("login")
+
+                # Prefer committer login; when web-flow/github merge bot is committer, fallback to author login
+                login = c_login if c_login and c_login not in ("web-flow", "github") else a_login
+                if sha and login:
+                    sha_map[sha] = login
+
+                commit_meta = item.get("commit") or {}
+                c_email = (commit_meta.get("committer") or {}).get("email")
+                c_name = (commit_meta.get("committer") or {}).get("name")
+                a_email = (commit_meta.get("author") or {}).get("email")
+                a_name = (commit_meta.get("author") or {}).get("name")
+
+                if c_email and c_login and c_login not in ("web-flow", "github"):
+                    email_map[c_email.lower()] = c_login
+                if a_email and a_login:
+                    email_map[a_email.lower()] = a_login
+                if c_name and c_login and c_login not in ("web-flow", "github"):
+                    name_map[c_name.lower()] = c_login
+                if a_name and a_login:
+                    name_map[a_name.lower()] = a_login
+    except Exception:
+        pass
+
+    resolved: List[CommitInfo] = []
+    for c in commits:
+        user = ""
+        # 1. Exact SHA
+        if c.hash and c.hash in sha_map:
+            user = sha_map[c.hash]
+
+        # 2. Committer email
+        if not user and c.committer_email and c.committer_email.lower() in email_map:
+            user = email_map[c.committer_email.lower()]
+
+        # 3. Author email
+        if not user and c.author_email and c.author_email.lower() in email_map:
+            user = email_map[c.author_email.lower()]
+
+        # 4. GitHub noreply email regex
+        if not user:
+            for email in (c.committer_email, c.author_email):
+                if email:
+                    m = re.match(r"^(?:[0-9]+\+)?([^@]+)@users\.noreply\.github\.com$", email)
+                    if m:
+                        matched_user = m.group(1)
+                        if matched_user not in ("web-flow", "github"):
+                            user = matched_user
+                            break
+
+        # 5. Committer / Author name in mapping
+        if not user and c.committer_name and c.committer_name.lower() in name_map:
+            user = name_map[c.committer_name.lower()]
+        if not user and c.author_name and c.author_name.lower() in name_map:
+            user = name_map[c.author_name.lower()]
+
+        # 6. Fallback single commit API if SHA exists and not found yet
+        if not user and c.hash:
+            try:
+                single_proc = subprocess.run(
+                    ["gh", "api", f"repos/{repo_slug}/commits/{c.hash}"],
+                    cwd=REPO_ROOT,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=5,
+                )
+                if single_proc.returncode == 0 and single_proc.stdout.strip():
+                    single_data = json.loads(single_proc.stdout)
+                    c_login = (single_data.get("committer") or {}).get("login")
+                    a_login = (single_data.get("author") or {}).get("login")
+                    login = c_login if c_login and c_login not in ("web-flow", "github") else a_login
+                    if login:
+                        user = login
+                        sha_map[c.hash] = login
+            except Exception:
+                pass
+
+        # 7. Fallback if name is a valid single-word GitHub username
+        if not user:
+            for name in (c.committer_name, c.author_name):
+                if name and re.match(r"^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$", name):
+                    user = name
+                    break
+
+        resolved.append(CommitInfo(
+            hash=c.hash,
+            subject=c.subject,
+            committer_name=c.committer_name,
+            committer_email=c.committer_email,
+            author_name=c.author_name,
+            author_email=c.author_email,
+            github_user=user,
+        ))
+
+    return resolved
+
+def get_commits_since_last_version(current_ver: str = "") -> List[CommitInfo]:
     base_ref = find_base_commit_for_changelog(current_ver)
     git_range = f"{base_ref}..HEAD" if base_ref else "HEAD"
 
     try:
         log_proc = subprocess.run(
-            ["git", "log", git_range, "--no-merges", "--pretty=format:%s"],
+            ["git", "log", git_range, "--no-merges", "--pretty=format:%H%x09%s%x09%cn%x09%ce%x09%an%x09%ae"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
             check=True
         )
-        return [l.strip() for l in log_proc.stdout.splitlines() if l.strip()]
+        raw_lines = [l.strip() for l in log_proc.stdout.splitlines() if l.strip()]
     except Exception:
         return []
+
+    commits: List[CommitInfo] = []
+    for line in raw_lines:
+        parts = line.split("\t")
+        if len(parts) >= 6:
+            commits.append(CommitInfo(
+                hash=parts[0].strip(),
+                subject=parts[1].strip(),
+                committer_name=parts[2].strip(),
+                committer_email=parts[3].strip(),
+                author_name=parts[4].strip(),
+                author_email=parts[5].strip(),
+            ))
+        elif len(parts) >= 2:
+            commits.append(CommitInfo(
+                hash=parts[0].strip(),
+                subject=parts[1].strip(),
+                committer_name="",
+                committer_email="",
+                author_name="",
+                author_email="",
+            ))
+        elif parts:
+            commits.append(CommitInfo(
+                hash="",
+                subject=parts[0].strip(),
+                committer_name="",
+                committer_email="",
+                author_name="",
+                author_email="",
+            ))
+
+    return resolve_commit_github_users(commits)
 
 def generate_changelog_section(new_ver: str, current_ver: str = "", changelog_path: Path = None) -> str:
     import datetime
@@ -293,20 +514,28 @@ def generate_changelog_section(new_ver: str, current_ver: str = "", changelog_pa
         if item not in target_list:
             target_list.append(item)
 
-    for msg in commits:
+    for commit in commits:
+        msg = commit.subject if isinstance(commit, CommitInfo) else str(commit)
+        user = commit.github_user if isinstance(commit, CommitInfo) else ""
+
         if re.match(r"^(chore(\([^)]+\))?:\s*)?(release\s+)?v?\d+\.\d+\.\d+", msg, re.IGNORECASE):
             continue
         if re.match(r"^v?\d+\.\d+\.\d+$", msg):
             continue
+
+        clean_user_pattern = rf"\s*(?:\(@{re.escape(user)}\)|by\s+@{re.escape(user)})\s*$" if user else None
+        user_tag = f" (@{user})" if user else ""
 
         conv_match = re.match(r"^(\w+)(?:\(([^)]+)\))?:\s*(.+)$", msg, re.IGNORECASE)
         if conv_match:
             c_type = conv_match.group(1).lower()
             scope = conv_match.group(2)
             text = conv_match.group(3).strip()
+            if clean_user_pattern:
+                text = re.sub(clean_user_pattern, "", text, flags=re.IGNORECASE).strip()
             if text:
                 text = text[0].upper() + text[1:]
-            item = f"- **{scope}**: {text}" if scope else f"- {text}"
+            item = f"- **{scope}**: {text}{user_tag}" if scope else f"- {text}{user_tag}"
 
             if c_type in ("feat", "feature", "add"):
                 add_item(added, item, msg)
@@ -316,15 +545,17 @@ def generate_changelog_section(new_ver: str, current_ver: str = "", changelog_pa
                 add_item(changed, item, msg)
         else:
             clean_msg = msg.strip()
+            if clean_user_pattern:
+                clean_msg = re.sub(clean_user_pattern, "", clean_msg, flags=re.IGNORECASE).strip()
             if clean_msg:
                 clean_msg = clean_msg[0].upper() + clean_msg[1:]
             lower = clean_msg.lower()
             if lower.startswith("add") or lower.startswith("feat"):
-                add_item(added, f"- {clean_msg}", msg)
+                add_item(added, f"- {clean_msg}{user_tag}", msg)
             elif lower.startswith("fix"):
-                add_item(fixed, f"- {clean_msg}", msg)
+                add_item(fixed, f"- {clean_msg}{user_tag}", msg)
             else:
-                add_item(changed, f"- {clean_msg}", msg)
+                add_item(changed, f"- {clean_msg}{user_tag}", msg)
 
     section_lines = [f"## [{new_ver}] - {today}\n"]
 
