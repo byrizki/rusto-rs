@@ -387,6 +387,19 @@ def verify_archive_bundle(archive_path: Path) -> Tuple[bool, List[str], List[str
                 errors.append("Empty archive bundle")
             else:
                 passed.append(f"Contains {len(names)} bundle entry/ies")
+
+            if "wasm" in archive_path.name.lower():
+                has_wasm = any(n.endswith(".wasm") for n in names)
+                has_js = any(n.endswith(".js") for n in names)
+                if has_wasm:
+                    passed.append("Contains compiled WebAssembly binary (.wasm)")
+                else:
+                    errors.append("Missing .wasm binary in wasm archive")
+                if has_js:
+                    passed.append("Contains JavaScript bindings loader (.js)")
+                else:
+                    errors.append("Missing JavaScript bindings loader (.js) in wasm archive")
+
             for m in members:
                 if m.isfile() and m.size == 0 and not m.name.endswith(".gitkeep"):
                     errors.append(f"Empty 0-byte file found: {m.name}")
@@ -594,9 +607,11 @@ def verify_file(file_path: Path) -> bool:
                     success, passed, errors = verify_pub_package(file_path)
                 elif any(n.endswith("PKG-INFO") for n in names):
                     success, passed, errors = verify_sdist_package(file_path)
-                elif any("package.json" in n for n in names):
+                elif "wasm" in name.lower() and not ("@rustors" in name.lower() or "rustors-web" in name.lower() or "rustors-react" in name.lower()):
+                    success, passed, errors = verify_archive_bundle(file_path)
+                elif any(n == "package/package.json" or (n.endswith("package.json") and n.split("/")[0] == "package") for n in names):
                     success, passed, errors = verify_npm_package(file_path)
-                elif "wasm" in name.lower() or "rusto-" in name.lower():
+                elif "rusto-" in name.lower():
                     success, passed, errors = verify_archive_bundle(file_path)
                 else:
                     success, passed, errors = verify_npm_package(file_path)
