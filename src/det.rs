@@ -51,8 +51,21 @@ impl TextDetector {
         let configured_limit_side_len = options.limit_side_len.unwrap_or(self.cfg.limit_side_len);
         let mean = options.mean.unwrap_or(self.cfg.mean);
         let std = options.std.unwrap_or(self.cfg.std);
-        // Same merge rule for postprocessing. Never mutate `self.cfg`.
-        let postprocess_options = postprocess.cloned().unwrap_or_default();
+        // Merge postprocessing options: top-level postprocess overrides nested detection.postprocess,
+        // which overrides detector defaults. Never mutate `self.cfg`.
+        let postprocess_options = match (postprocess, options.postprocess.as_ref()) {
+            (Some(root), Some(nested)) => PostprocessRunOptions {
+                threshold: root.threshold.or(nested.threshold),
+                box_threshold: root.box_threshold.or(nested.box_threshold),
+                max_candidates: root.max_candidates.or(nested.max_candidates),
+                unclip_ratio: root.unclip_ratio.or(nested.unclip_ratio),
+                use_dilation: root.use_dilation.or(nested.use_dilation),
+                score_mode: root.score_mode.clone().or_else(|| nested.score_mode.clone()),
+            },
+            (Some(root), None) => root.clone(),
+            (None, Some(nested)) => nested.clone(),
+            (None, None) => PostprocessRunOptions::default(),
+        };
 
         let ori_h = img.rows();
         let ori_w = img.cols();
@@ -83,6 +96,7 @@ impl TextDetector {
             postprocess_options.max_candidates.unwrap_or(self.cfg.max_candidates),
             postprocess_options.unclip_ratio.unwrap_or(self.cfg.unclip_ratio),
             postprocess_options.use_dilation.unwrap_or(self.cfg.use_dilation),
+            postprocess_options.score_mode.as_deref().unwrap_or(&self.cfg.score_mode),
         );
         let (mut boxes, scores) = postprocess.process(&preds, ori_h, ori_w)?;
         if boxes.is_empty() {

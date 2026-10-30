@@ -12,6 +12,7 @@ pub struct ModelPreset {
     pub det_box_thresh: f32,
     pub det_unclip_ratio: f32,
     pub det_use_dilation: bool,
+    pub det_score_mode: &'static str,
     pub rec_img_shape: [i32; 3],
     pub rec_batch_num: i32,
     pub text_score: f32,
@@ -25,6 +26,7 @@ pub const PPV6_MODEL_CONFIG: ModelPreset = ModelPreset {
     det_box_thresh: 0.6,
     det_unclip_ratio: 2.0,
     det_use_dilation: true,
+    det_score_mode: "slow",
     rec_img_shape: [3, 48, 320],
     rec_batch_num: 6,
     text_score: 0.5,
@@ -38,6 +40,7 @@ pub const PPV5_MODEL_CONFIG: ModelPreset = ModelPreset {
     det_box_thresh: 0.5,
     det_unclip_ratio: 2.0,
     det_use_dilation: true,
+    det_score_mode: "slow",
     rec_img_shape: [3, 48, 320],
     rec_batch_num: 6,
     text_score: 0.5,
@@ -51,6 +54,7 @@ pub const PPV4_MODEL_CONFIG: ModelPreset = ModelPreset {
     det_box_thresh: 0.6,
     det_unclip_ratio: 1.5,
     det_use_dilation: false,
+    det_score_mode: "slow",
     rec_img_shape: [3, 48, 320],
     rec_batch_num: 6,
     text_score: 0.5,
@@ -64,6 +68,7 @@ pub const PPV3_MODEL_CONFIG: ModelPreset = ModelPreset {
     det_box_thresh: 0.6,
     det_unclip_ratio: 1.5,
     det_use_dilation: false,
+    det_score_mode: "slow",
     rec_img_shape: [3, 48, 320],
     rec_batch_num: 6,
     text_score: 0.5,
@@ -115,6 +120,8 @@ struct DetectionConfigJson {
     limit_type: Option<String>,
     #[serde(alias = "useDilation", alias = "use_dilation")]
     use_dilation: Option<bool>,
+    #[serde(alias = "scoreMode", alias = "score_mode", alias = "detScoreMode", alias = "det_score_mode")]
+    score_mode: Option<String>,
 }
 
 #[derive(Deserialize, Default, Clone, Debug)]
@@ -211,6 +218,7 @@ impl InitializeConfig {
         det.box_thresh = preset.det_box_thresh;
         det.unclip_ratio = preset.det_unclip_ratio;
         det.use_dilation = preset.det_use_dilation;
+        det.score_mode = preset.det_score_mode.to_string();
 
         let mut rec = RecConfig::default(rec_path);
         rec.rec_keys_path = Some(dict);
@@ -338,6 +346,9 @@ impl InitializeConfig {
         }
         if let Some(dilation) = flat.detection.as_ref().and_then(|d| d.use_dilation) {
             config.det.use_dilation = dilation;
+        }
+        if let Some(score_mode) = flat.detection.as_ref().and_then(|d| d.score_mode.clone()) {
+            config.det.score_mode = score_mode;
         }
         if let Some(use_det) = flat.detection.as_ref().and_then(|d| d.enabled) {
             config.global.use_det = use_det;

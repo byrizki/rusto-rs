@@ -288,7 +288,7 @@ static NSError *makeValidationError(NSString *message) {
         return nil;
     }
     NSDictionary *postprocess = (NSDictionary *)raw;
-    NSSet *allowed = [NSSet setWithObjects:@"threshold", @"boxThreshold", @"maxCandidates", @"unclipRatio", @"useDilation", nil];
+    NSSet *allowed = [NSSet setWithObjects:@"threshold", @"boxThreshold", @"maxCandidates", @"unclipRatio", @"useDilation", @"scoreMode", nil];
     NSSet *keys = [NSSet setWithArray:postprocess.allKeys];
     if (![keys isSubsetOfSet:allowed]) {
         if (error) *error = makeValidationError(@"postprocess contains an unknown key");
@@ -343,6 +343,14 @@ static NSError *makeValidationError(NSString *message) {
             return nil;
         }
         result[@"useDilation"] = val;
+    }
+    if (postprocess[@"scoreMode"] != nil) {
+        id val = postprocess[@"scoreMode"];
+        if (![val isKindOfClass:[NSString class]] || (![val isEqualToString:@"fast"] && ![val isEqualToString:@"slow"])) {
+            if (error) *error = makeValidationError(@"scoreMode is invalid");
+            return nil;
+        }
+        result[@"scoreMode"] = val;
     }
     return result;
 }

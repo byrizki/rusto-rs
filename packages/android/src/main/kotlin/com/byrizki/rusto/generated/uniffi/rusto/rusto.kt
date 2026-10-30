@@ -1654,6 +1654,11 @@ data class DetectionConfig (
      * Enable morphological dilation.
      */
     var `useDilation`: kotlin.Boolean?
+    , 
+    /**
+     * DB score calculation mode: "fast" or "slow".
+     */
+    var `scoreMode`: kotlin.String?
     
 ){
     
@@ -1678,6 +1683,7 @@ public object FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionC
             FfiConverterOptionalInt.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -1689,7 +1695,8 @@ public object FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionC
             FfiConverterOptionalFloat.allocationSize(value.`unclipRatio`) +
             FfiConverterOptionalInt.allocationSize(value.`limitSideLen`) +
             FfiConverterOptionalString.allocationSize(value.`limitType`) +
-            FfiConverterOptionalBoolean.allocationSize(value.`useDilation`)
+            FfiConverterOptionalBoolean.allocationSize(value.`useDilation`) +
+            FfiConverterOptionalString.allocationSize(value.`scoreMode`)
     )
 
     override fun write(value: DetectionConfig, buf: ByteBuffer) {
@@ -1701,6 +1708,7 @@ public object FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionC
             FfiConverterOptionalInt.write(value.`limitSideLen`, buf)
             FfiConverterOptionalString.write(value.`limitType`, buf)
             FfiConverterOptionalBoolean.write(value.`useDilation`, buf)
+            FfiConverterOptionalString.write(value.`scoreMode`, buf)
     }
 }
 
@@ -2239,6 +2247,11 @@ data class PostprocessRunOptions (
      * Enable morphological dilation to connect broken text strokes.
      */
     var `useDilation`: kotlin.Boolean?
+    , 
+    /**
+     * DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
+     */
+    var `scoreMode`: kotlin.String?
     
 ){
     
@@ -2260,6 +2273,7 @@ public object FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<Post
             FfiConverterOptionalInt.read(buf),
             FfiConverterOptionalFloat.read(buf),
             FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
@@ -2268,7 +2282,8 @@ public object FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<Post
             FfiConverterOptionalFloat.allocationSize(value.`boxThreshold`) +
             FfiConverterOptionalInt.allocationSize(value.`maxCandidates`) +
             FfiConverterOptionalFloat.allocationSize(value.`unclipRatio`) +
-            FfiConverterOptionalBoolean.allocationSize(value.`useDilation`)
+            FfiConverterOptionalBoolean.allocationSize(value.`useDilation`) +
+            FfiConverterOptionalString.allocationSize(value.`scoreMode`)
     )
 
     override fun write(value: PostprocessRunOptions, buf: ByteBuffer) {
@@ -2277,6 +2292,7 @@ public object FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<Post
             FfiConverterOptionalInt.write(value.`maxCandidates`, buf)
             FfiConverterOptionalFloat.write(value.`unclipRatio`, buf)
             FfiConverterOptionalBoolean.write(value.`useDilation`, buf)
+            FfiConverterOptionalString.write(value.`scoreMode`, buf)
     }
 }
 

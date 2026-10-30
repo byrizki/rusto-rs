@@ -14,6 +14,7 @@ struct ImageDims {
 pub struct Contour {
     pub points: Vec<(i32, i32)>,
     pub area: usize,
+    pub score: f32,
 }
 
 impl Contour {
@@ -21,6 +22,7 @@ impl Contour {
         Self {
             points: Vec::new(),
             area: 0,
+            score: 0.0,
         }
     }
 
@@ -43,6 +45,14 @@ impl Default for Contour {
 /// Find contours in a binary image
 /// Extracts boundary pixels and component area in pure Rust
 pub fn find_contours(binary_img: &GrayImage) -> Vec<Contour> {
+    find_contours_with_pred(binary_img, None)
+}
+
+/// Find contours in a binary image, optionally calculating mean probability score from prediction map
+pub fn find_contours_with_pred(
+    binary_img: &GrayImage,
+    pred: Option<&ndarray::Array4<f32>>,
+) -> Vec<Contour> {
     let (width, height) = binary_img.dimensions();
     let w_usize = width as usize;
     let h_usize = height as usize;
@@ -83,14 +93,20 @@ pub fn find_contours(binary_img: &GrayImage) -> Vec<Contour> {
         return Vec::new();
     }
 
-    // Second pass: single O(W x H) pass collecting boundary pixels for each label
+    // Second pass: single O(W x H) pass collecting boundary pixels and score sums for each label
     let mut boundary_buckets = vec![Vec::with_capacity(64); num_labels];
+    let mut score_sums = vec![0.0f32; num_labels];
     for y in 0..dims.height {
         for x in 0..dims.width {
             let idx = (y as usize) * dims.stride + (x as usize);
             let lbl = label_map[idx];
-            if lbl > 0 && is_boundary_pixel_label(&label_map, x, y, lbl, dims) {
-                boundary_buckets[(lbl - 1) as usize].push((x, y));
+            if lbl > 0 {
+                if let Some(p) = pred {
+                    score_sums[(lbl - 1) as usize] += p[[0, 0, y as usize, x as usize]];
+                }
+                if is_boundary_pixel_label(&label_map, x, y, lbl, dims) {
+                    boundary_buckets[(lbl - 1) as usize].push((x, y));
+                }
             }
         }
     }
@@ -98,9 +114,16 @@ pub fn find_contours(binary_img: &GrayImage) -> Vec<Contour> {
     let mut contours = Vec::with_capacity(num_labels);
     for (lbl_idx, boundary_pixels) in boundary_buckets.into_iter().enumerate() {
         if boundary_pixels.len() >= 3 {
+            let area = component_areas[lbl_idx];
+            let score = if area > 0 && pred.is_some() {
+                score_sums[lbl_idx] / area as f32
+            } else {
+                0.0
+            };
             contours.push(Contour {
                 points: boundary_pixels,
-                area: component_areas[lbl_idx],
+                area,
+                score,
             });
         }
     }

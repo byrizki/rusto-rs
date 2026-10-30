@@ -165,6 +165,7 @@ fn test_rusto_config_templates_and_presets() {
         PPV6_MODEL_CONFIG.det_limit_side_len
     );
     assert_eq!(default_config.det.box_thresh, 0.6);
+    assert_eq!(default_config.det.score_mode, "slow");
 
     let v6_config = InitializeConfig::ppv6("det6.rten", "rec6.rten", "dict.txt");
     assert_eq!(
@@ -174,6 +175,7 @@ fn test_rusto_config_templates_and_presets() {
     assert_eq!(v6_config.det.limit_type, "min");
     assert_eq!(v6_config.det.box_thresh, 0.6);
     assert_eq!(v6_config.det.unclip_ratio, 2.0);
+    assert_eq!(v6_config.det.score_mode, "slow");
 
     let v5_config = InitializeConfig::ppv5("det5.rten", "rec5.rten", "dict.txt");
     assert_eq!(
@@ -182,6 +184,7 @@ fn test_rusto_config_templates_and_presets() {
     );
     assert_eq!(v5_config.det.limit_type, "min");
     assert_eq!(v5_config.det.unclip_ratio, 2.0);
+    assert_eq!(v5_config.det.score_mode, "slow");
 
     let v4_config = InitializeConfig::ppv4("det4.rten", "rec4.rten", "dict.txt");
     assert_eq!(
@@ -190,6 +193,7 @@ fn test_rusto_config_templates_and_presets() {
     );
     assert_eq!(v4_config.det.limit_type, "max");
     assert_eq!(v4_config.det.unclip_ratio, 1.5);
+    assert_eq!(v4_config.det.score_mode, "slow");
 
     let v3_config = InitializeConfig::ppv3("det3.rten", "rec3.rten", "dict.txt");
     assert_eq!(
@@ -197,6 +201,7 @@ fn test_rusto_config_templates_and_presets() {
         PPV3_MODEL_CONFIG.det_limit_side_len
     );
     assert_eq!(v3_config.det.limit_type, "max");
+    assert_eq!(v3_config.det.score_mode, "slow");
 
     // Test JSON with template selection
     let json_str_v6 = r#"{

@@ -557,8 +557,8 @@ jobs:
       - name: Build, test, and pack Python package
         working-directory: packages/python
         run: |
-          python3 -m unittest discover -s tests
           cp ../../target/release/librusto.so rusto/generated/librusto.so
+          python3 -m unittest discover -s tests
           pip install --upgrade build wheel
           python3 -m build -o ../../packages/python-dist
           rm -f rusto/generated/librusto.so

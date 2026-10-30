@@ -932,6 +932,10 @@ public struct DetectionConfig: Equatable, Hashable {
      * Enable morphological dilation.
      */
     public var useDilation: Bool?
+    /**
+     * DB score calculation mode: "fast" or "slow".
+     */
+    public var scoreMode: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -959,7 +963,10 @@ public struct DetectionConfig: Equatable, Hashable {
          */limitType: String?, 
         /**
          * Enable morphological dilation.
-         */useDilation: Bool?) {
+         */useDilation: Bool?, 
+        /**
+         * DB score calculation mode: "fast" or "slow".
+         */scoreMode: String?) {
         self.enabled = enabled
         self.modelPath = modelPath
         self.thresh = thresh
@@ -968,6 +975,7 @@ public struct DetectionConfig: Equatable, Hashable {
         self.limitSideLen = limitSideLen
         self.limitType = limitType
         self.useDilation = useDilation
+        self.scoreMode = scoreMode
     }
 
     
@@ -993,7 +1001,8 @@ public struct FfiConverterTypeDetectionConfig: FfiConverterRustBuffer {
                 unclipRatio: FfiConverterOptionFloat.read(from: &buf), 
                 limitSideLen: FfiConverterOptionInt32.read(from: &buf), 
                 limitType: FfiConverterOptionString.read(from: &buf), 
-                useDilation: FfiConverterOptionBool.read(from: &buf)
+                useDilation: FfiConverterOptionBool.read(from: &buf), 
+                scoreMode: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -1006,6 +1015,7 @@ public struct FfiConverterTypeDetectionConfig: FfiConverterRustBuffer {
         FfiConverterOptionInt32.write(value.limitSideLen, into: &buf)
         FfiConverterOptionString.write(value.limitType, into: &buf)
         FfiConverterOptionBool.write(value.useDilation, into: &buf)
+        FfiConverterOptionString.write(value.scoreMode, into: &buf)
     }
 }
 
@@ -1752,6 +1762,10 @@ public struct PostprocessRunOptions: Equatable, Hashable {
      * Enable morphological dilation to connect broken text strokes.
      */
     public var useDilation: Bool?
+    /**
+     * DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
+     */
+    public var scoreMode: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1770,12 +1784,16 @@ public struct PostprocessRunOptions: Equatable, Hashable {
          */unclipRatio: Float?, 
         /**
          * Enable morphological dilation to connect broken text strokes.
-         */useDilation: Bool?) {
+         */useDilation: Bool?, 
+        /**
+         * DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
+         */scoreMode: String?) {
         self.threshold = threshold
         self.boxThreshold = boxThreshold
         self.maxCandidates = maxCandidates
         self.unclipRatio = unclipRatio
         self.useDilation = useDilation
+        self.scoreMode = scoreMode
     }
 
     
@@ -1798,7 +1816,8 @@ public struct FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer {
                 boxThreshold: FfiConverterOptionFloat.read(from: &buf), 
                 maxCandidates: FfiConverterOptionInt32.read(from: &buf), 
                 unclipRatio: FfiConverterOptionFloat.read(from: &buf), 
-                useDilation: FfiConverterOptionBool.read(from: &buf)
+                useDilation: FfiConverterOptionBool.read(from: &buf), 
+                scoreMode: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -1808,6 +1827,7 @@ public struct FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer {
         FfiConverterOptionInt32.write(value.maxCandidates, into: &buf)
         FfiConverterOptionFloat.write(value.unclipRatio, into: &buf)
         FfiConverterOptionBool.write(value.useDilation, into: &buf)
+        FfiConverterOptionString.write(value.scoreMode, into: &buf)
     }
 }
 

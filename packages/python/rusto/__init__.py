@@ -37,6 +37,30 @@ for _candidate in [_current_dir, _repo_target_debug, _repo_target_release]:
     if os.path.isdir(_candidate) and _candidate not in sys.path:
         sys.path.insert(0, _candidate)
 
+# If library is not present in generated directory, link from target build directories if available
+_generated_dir = os.path.join(_current_dir, "generated")
+_libname = (
+    "librusto.dylib"
+    if sys.platform == "darwin"
+    else ("rusto.dll" if sys.platform in ("win32", "cygwin") else "librusto.so")
+)
+_target_lib = os.path.join(_generated_dir, _libname)
+
+if not os.path.isfile(_target_lib):
+    for _candidate_dir in [_repo_target_release, _repo_target_debug]:
+        _candidate_file = os.path.join(_candidate_dir, _libname)
+        if os.path.isfile(_candidate_file):
+            try:
+                os.symlink(_candidate_file, _target_lib)
+                break
+            except OSError:
+                try:
+                    import shutil
+                    shutil.copy2(_candidate_file, _target_lib)
+                    break
+                except OSError:
+                    pass
+
 from .generated.rusto import (
     RustO,
     RustOProtocol,

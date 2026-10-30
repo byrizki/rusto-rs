@@ -2190,6 +2190,9 @@ class FfiConverterTypeClassificationConfig: FfiConverterRustBuffer<Classificatio
 /// <param name="UseDilation">
 /// Enable morphological dilation.
 /// </param>
+/// <param name="ScoreMode">
+/// DB score calculation mode: "fast" or "slow".
+/// </param>
 public record DetectionConfig (
     /// <summary>
     /// Whether detection stage is enabled.
@@ -2222,7 +2225,11 @@ public record DetectionConfig (
     /// <summary>
     /// Enable morphological dilation.
     /// </summary>
-    bool? UseDilation
+    bool? UseDilation, 
+    /// <summary>
+    /// DB score calculation mode: "fast" or "slow".
+    /// </summary>
+    string? ScoreMode
 ) {
 }
 
@@ -2238,7 +2245,8 @@ class FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionConfig> {
             UnclipRatio: FfiConverterOptionalFloat.INSTANCE.Read(stream),
             LimitSideLen: FfiConverterOptionalInt32.INSTANCE.Read(stream),
             LimitType: FfiConverterOptionalString.INSTANCE.Read(stream),
-            UseDilation: FfiConverterOptionalBoolean.INSTANCE.Read(stream)
+            UseDilation: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
+            ScoreMode: FfiConverterOptionalString.INSTANCE.Read(stream)
         );
     }
 
@@ -2251,7 +2259,8 @@ class FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionConfig> {
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.UnclipRatio)
             + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.LimitSideLen)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.LimitType)
-            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.UseDilation);
+            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.UseDilation)
+            + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ScoreMode);
     }
 
     public override void Write(DetectionConfig value, BigEndianStream stream) {
@@ -2263,6 +2272,7 @@ class FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionConfig> {
             FfiConverterOptionalInt32.INSTANCE.Write(value.LimitSideLen, stream);
             FfiConverterOptionalString.INSTANCE.Write(value.LimitType, stream);
             FfiConverterOptionalBoolean.INSTANCE.Write(value.UseDilation, stream);
+            FfiConverterOptionalString.INSTANCE.Write(value.ScoreMode, stream);
     }
 }
 
@@ -2821,6 +2831,9 @@ class FfiConverterTypePoint2D: FfiConverterRustBuffer<Point2D> {
 /// <param name="UseDilation">
 /// Enable morphological dilation to connect broken text strokes.
 /// </param>
+/// <param name="ScoreMode">
+/// DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
+/// </param>
 public record PostprocessRunOptions (
     /// <summary>
     /// Binarization probability cutoff threshold. Default: 0.3.
@@ -2841,7 +2854,11 @@ public record PostprocessRunOptions (
     /// <summary>
     /// Enable morphological dilation to connect broken text strokes.
     /// </summary>
-    bool? UseDilation
+    bool? UseDilation, 
+    /// <summary>
+    /// DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
+    /// </summary>
+    string? ScoreMode
 ) {
 }
 
@@ -2854,7 +2871,8 @@ class FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<PostprocessR
             BoxThreshold: FfiConverterOptionalFloat.INSTANCE.Read(stream),
             MaxCandidates: FfiConverterOptionalInt32.INSTANCE.Read(stream),
             UnclipRatio: FfiConverterOptionalFloat.INSTANCE.Read(stream),
-            UseDilation: FfiConverterOptionalBoolean.INSTANCE.Read(stream)
+            UseDilation: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
+            ScoreMode: FfiConverterOptionalString.INSTANCE.Read(stream)
         );
     }
 
@@ -2864,7 +2882,8 @@ class FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<PostprocessR
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.BoxThreshold)
             + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.MaxCandidates)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.UnclipRatio)
-            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.UseDilation);
+            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.UseDilation)
+            + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ScoreMode);
     }
 
     public override void Write(PostprocessRunOptions value, BigEndianStream stream) {
@@ -2873,6 +2892,7 @@ class FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<PostprocessR
             FfiConverterOptionalInt32.INSTANCE.Write(value.MaxCandidates, stream);
             FfiConverterOptionalFloat.INSTANCE.Write(value.UnclipRatio, stream);
             FfiConverterOptionalBoolean.INSTANCE.Write(value.UseDilation, stream);
+            FfiConverterOptionalString.INSTANCE.Write(value.ScoreMode, stream);
     }
 }
 
