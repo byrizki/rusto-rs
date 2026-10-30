@@ -107,7 +107,8 @@ extension DetectionConfig {
             unclipRatio: nil,
             limitSideLen: nil,
             limitType: nil,
-            useDilation: nil
+            useDilation: nil,
+            scoreMode: nil
         )
     }
 }
@@ -147,6 +148,48 @@ extension UnwarpConfig {
         self.init(
             enabled: nil,
             modelPath: nil
+        )
+    }
+}
+
+extension PostprocessRunOptions {
+    public init() {
+        self.init(
+            threshold: nil,
+            boxThreshold: nil,
+            maxCandidates: nil,
+            unclipRatio: nil,
+            useDilation: nil,
+            scoreMode: nil
+        )
+    }
+}
+
+extension DetectionRunOptions {
+    public init() {
+        self.init(
+            limitSideLen: nil,
+            limitType: nil,
+            mean: nil,
+            std: nil,
+            postprocess: nil
+        )
+    }
+}
+
+extension CalibrationOptions {
+    public init() {
+        self.init(
+            descreenStrength: nil
+        )
+    }
+}
+
+extension OptimizationOptions {
+    public init() {
+        self.init(
+            cropPaddingX: nil,
+            cropPaddingY: nil
         )
     }
 }
