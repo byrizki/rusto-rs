@@ -57,6 +57,8 @@ export interface PostprocessOptions {
   unclipRatio?: number;
   /** Enable morphological dilation to connect broken text strokes. */
   useDilation?: boolean;
+  /** DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean). */
+  scoreMode?: 'fast' | 'slow';
 }
 
 /**
@@ -181,6 +183,7 @@ const POSTPROCESS_KEYS = [
   'maxCandidates',
   'unclipRatio',
   'useDilation',
+  'scoreMode',
 ] as const;
 const PRESETS = ['ppv6', 'ppv5', 'ppv4', 'ppv3'] as const;
 
@@ -301,6 +304,12 @@ function normalizePostprocessOptions(postprocess: unknown): void {
     throw new TypeError('DetectTextOptions.postprocess.unclipRatio must be > 0.');
   if (postprocess.useDilation !== undefined && typeof postprocess.useDilation !== 'boolean')
     throw new TypeError('DetectTextOptions.postprocess.useDilation must be a boolean.');
+  if (
+    postprocess.scoreMode !== undefined &&
+    postprocess.scoreMode !== 'fast' &&
+    postprocess.scoreMode !== 'slow'
+  )
+    throw new TypeError('DetectTextOptions.postprocess.scoreMode must be "fast" or "slow".');
 }
 function normalizeOptions(options: DetectTextOptions | undefined): DetectTextOptions {
   if (options === undefined) return {};

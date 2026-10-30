@@ -48,7 +48,8 @@ data class DetectionConfig(
     val unclipRatio: Float? = null,
     val limitSideLen: Int? = null,
     val limitType: String? = null,
-    val useDilation: Boolean? = null
+    val useDilation: Boolean? = null,
+    val scoreMode: String? = null
 )
 
 /**
@@ -198,6 +199,7 @@ data class PostprocessRunOptions(
     val maxCandidates: Int? = null,
     val unclipRatio: Float? = null,
     val useDilation: Boolean? = null,
+    val scoreMode: String? = null,
 )
 
 /**
@@ -407,6 +409,7 @@ class RustO private constructor(
                             maxCandidates = p.maxCandidates,
                             unclipRatio = p.unclipRatio,
                             useDilation = p.useDilation,
+                            scoreMode = p.scoreMode,
                         )
                     }
                 )
@@ -418,6 +421,7 @@ class RustO private constructor(
                     maxCandidates = p.maxCandidates,
                     unclipRatio = p.unclipRatio,
                     useDilation = p.useDilation,
+                    scoreMode = p.scoreMode,
                 )
             },
             calibration = null,

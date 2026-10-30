@@ -77,6 +77,7 @@ pub struct DBPostProcess {
     pub unclip_ratio: f64,
     pub min_size: f32,
     pub use_dilation: bool,
+    pub score_mode: String,
 }
 
 #[cfg(feature = "use-opencv")]
@@ -87,6 +88,7 @@ impl DBPostProcess {
         max_candidates: i32,
         unclip_ratio: f32,
         use_dilation: bool,
+        score_mode: impl Into<String>,
     ) -> Self {
         Self {
             thresh,
@@ -95,6 +97,7 @@ impl DBPostProcess {
             unclip_ratio: unclip_ratio as f64,
             min_size: 3.0,
             use_dilation,
+            score_mode: score_mode.into(),
         }
     }
 
@@ -184,7 +187,11 @@ impl DBPostProcess {
                 continue;
             }
 
-            let score = self.box_score_fast(pred, &box_pts, height, width)?;
+            let score = if self.score_mode == "slow" {
+                self.box_score_slow(pred, &contour, height, width)?
+            } else {
+                self.box_score_fast(pred, &box_pts, height, width)?
+            };
             if score < self.box_thresh {
                 continue;
             }
@@ -352,6 +359,79 @@ impl DBPostProcess {
         }
     }
 
+    fn box_score_slow(
+        &self,
+        pred: &Array4<f32>,
+        contour: &core::Vector<core::Point>,
+        h: usize,
+        w: usize,
+    ) -> Result<f32, EngineError> {
+        if contour.is_empty() {
+            return Ok(0.0);
+        }
+        let mut min_x = i32::MAX;
+        let mut max_x = i32::MIN;
+        let mut min_y = i32::MAX;
+        let mut max_y = i32::MIN;
+
+        for i in 0..contour.len() {
+            let pt = contour.get(i)?;
+            min_x = min_x.min(pt.x);
+            max_x = max_x.max(pt.x);
+            min_y = min_y.min(pt.y);
+            max_y = max_y.max(pt.y);
+        }
+
+        let xmin = min_x.clamp(0, (w - 1) as i32);
+        let xmax = max_x.clamp(0, (w - 1) as i32);
+        let ymin = min_y.clamp(0, (h - 1) as i32);
+        let ymax = max_y.clamp(0, (h - 1) as i32);
+
+        if xmax <= xmin || ymax <= ymin {
+            return Ok(0.0);
+        }
+
+        let mask_h = ymax - ymin + 1;
+        let mask_w = xmax - xmin + 1;
+
+        let mut mask = Mat::zeros(mask_h, mask_w, core::CV_8UC1)?.to_mat()?;
+
+        let mut contour_adjusted = Vec::with_capacity(contour.len());
+        for i in 0..contour.len() {
+            let pt = contour.get(i)?;
+            contour_adjusted.push(core::Point::new(pt.x - xmin, pt.y - ymin));
+        }
+        let pts = core::Vector::<core::Point>::from(contour_adjusted);
+        let pts_vec = core::Vector::<core::Vector<core::Point>>::from(vec![pts]);
+
+        imgproc::fill_poly(
+            &mut mask,
+            &pts_vec,
+            core::Scalar::all(1.0),
+            imgproc::LINE_8,
+            0,
+            core::Point::new(0, 0),
+        )?;
+
+        let mut sum = 0.0f32;
+        let mut count = 0usize;
+        for yy in ymin..=ymax {
+            for xx in xmin..=xmax {
+                let mask_val = mask.at_2d::<u8>(yy - ymin, xx - xmin)?;
+                if *mask_val > 0 {
+                    sum += pred[[0, 0, yy as usize, xx as usize]];
+                    count += 1;
+                }
+            }
+        }
+
+        if count == 0 {
+            Ok(0.0)
+        } else {
+            Ok(sum / count as f32)
+        }
+    }
+
     fn unclip(&self, box_pts: &[core::Point2f; 4]) -> Result<Vec<core::Point2f>, EngineError> {
         // Compute polygon area and perimeter (shoelace formula + edge lengths), as in Python.
         let mut area = 0.0f64;
@@ -481,6 +561,7 @@ impl DBPostProcess {
         max_candidates: i32,
         unclip_ratio: f32,
         use_dilation: bool,
+        score_mode: impl Into<String>,
     ) -> Self {
         Self {
             thresh,
@@ -489,6 +570,7 @@ impl DBPostProcess {
             unclip_ratio: unclip_ratio as f64,
             min_size: 3.0,
             use_dilation,
+            score_mode: score_mode.into(),
         }
     }
 
@@ -498,7 +580,7 @@ impl DBPostProcess {
         ori_h: i32,
         ori_w: i32,
     ) -> Result<(Vec<[crate::image_impl::Point2f; 4]>, Vec<f32>), EngineError> {
-        use crate::contours::find_contours;
+        use crate::contours::{find_contours, find_contours_with_pred};
         use crate::image_impl::{Point2f, min_area_rect, box_points};
         use image::{GrayImage, Luma};
         
@@ -527,8 +609,12 @@ impl DBPostProcess {
             binary_img.clone()
         };
 
-        // Find contours
-        let mut contours = find_contours(&img_for_contours);
+        // Find contours (optionally computing contour polygon probability score)
+        let mut contours = if self.score_mode == "slow" {
+            find_contours_with_pred(&img_for_contours, Some(pred))
+        } else {
+            find_contours(&img_for_contours)
+        };
         
         // Sort contours by area (descending) - largest first
         contours.sort_by(|a, b| {
@@ -562,7 +648,11 @@ impl DBPostProcess {
             }
 
             // Calculate score for this box
-            let score = self.box_score_fast_pure(pred, &rect_points, h, w)?;
+            let score = if self.score_mode == "slow" {
+                contour.score
+            } else {
+                self.box_score_fast_pure(pred, &rect_points, h, w)?
+            };
             if score < self.box_thresh {
                 continue;
             }
@@ -782,7 +872,7 @@ fn dilate_2x2(img: &image::GrayImage) -> image::GrayImage {
 }
 
 #[cfg(not(feature = "use-opencv"))]
-fn point_in_polygon(x: f32, y: f32, polygon: &[crate::image_impl::Point2f; 4]) -> bool {
+fn point_in_polygon(x: f32, y: f32, polygon: &[crate::image_impl::Point2f]) -> bool {
     let mut inside = false;
     let mut j = polygon.len() - 1;
 

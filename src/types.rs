@@ -130,7 +130,7 @@ impl DetConfig {
             max_candidates: 1000,
             unclip_ratio: 2.0,
             use_dilation: true,
-            score_mode: "fast".to_string(),
+            score_mode: "slow".to_string(),
             engine_cfg: EngineConfig::default(),
         }
     }
@@ -152,7 +152,7 @@ impl DetConfig {
             max_candidates: 1000,
             unclip_ratio: 2.0,
             use_dilation: true,
-            score_mode: "fast".to_string(),
+            score_mode: "slow".to_string(),
             engine_cfg: EngineConfig::default(),
         }
     }
@@ -174,7 +174,7 @@ impl DetConfig {
             max_candidates: 1000,
             unclip_ratio: 1.5,
             use_dilation: false,
-            score_mode: "fast".to_string(),
+            score_mode: "slow".to_string(),
             engine_cfg: EngineConfig::default(),
         }
     }
@@ -196,7 +196,7 @@ impl DetConfig {
             max_candidates: 1000,
             unclip_ratio: 1.5,
             use_dilation: false,
-            score_mode: "fast".to_string(),
+            score_mode: "slow".to_string(),
             engine_cfg: EngineConfig::default(),
         }
     }

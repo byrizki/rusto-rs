@@ -40,6 +40,7 @@ pub struct PostprocessRunOptions {
     pub max_candidates: Option<i32>,
     pub unclip_ratio: Option<f32>,
     pub use_dilation: Option<bool>,
+    pub score_mode: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -101,12 +102,28 @@ impl OcrRunOptions {
                     }
                 }
             }
+            if let Some(postprocess) = &detection.postprocess {
+                finite("detection.postprocess.threshold", postprocess.threshold, |value| (0.0..=1.0).contains(&value))?;
+                finite("detection.postprocess.boxThreshold", postprocess.box_threshold, |value| (0.0..=1.0).contains(&value))?;
+                finite("detection.postprocess.unclipRatio", postprocess.unclip_ratio, |value| value > 0.0)?;
+                if postprocess.max_candidates.is_some_and(|value| value < 1) { return Err(EngineError::Preprocess("detection.postprocess.maxCandidates must be >= 1".into())); }
+                if let Some(mode) = &postprocess.score_mode {
+                    if mode != "fast" && mode != "slow" {
+                        return Err(EngineError::Preprocess("detection.postprocess.scoreMode must be 'fast' or 'slow'".into()));
+                    }
+                }
+            }
         }
         if let Some(postprocess) = &self.postprocess {
             finite("postprocess.threshold", postprocess.threshold, |value| (0.0..=1.0).contains(&value))?;
             finite("postprocess.boxThreshold", postprocess.box_threshold, |value| (0.0..=1.0).contains(&value))?;
             finite("postprocess.unclipRatio", postprocess.unclip_ratio, |value| value > 0.0)?;
             if postprocess.max_candidates.is_some_and(|value| value < 1) { return Err(EngineError::Preprocess("postprocess.maxCandidates must be >= 1".into())); }
+            if let Some(mode) = &postprocess.score_mode {
+                if mode != "fast" && mode != "slow" {
+                    return Err(EngineError::Preprocess("postprocess.scoreMode must be 'fast' or 'slow'".into()));
+                }
+            }
         }
         if let Some(calib) = &self.calibration {
             finite("calibration.descreenStrength", calib.descreen_strength, |value| value >= 0.0)?;

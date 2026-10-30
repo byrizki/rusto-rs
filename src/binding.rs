@@ -111,6 +111,8 @@ pub struct PostprocessRunOptions {
     pub unclip_ratio: Option<f32>,
     /// Enable morphological dilation to connect broken text strokes.
     pub use_dilation: Option<bool>,
+    /// DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
+    pub score_mode: Option<String>,
 }
 
 /// Image detection stage options.
@@ -201,6 +203,8 @@ pub struct DetectionConfig {
     pub limit_type: Option<String>,
     /// Enable morphological dilation.
     pub use_dilation: Option<bool>,
+    /// DB score calculation mode: "fast" or "slow".
+    pub score_mode: Option<String>,
 }
 
 /// Text recognition model configuration.
@@ -416,6 +420,7 @@ fn convert_options(opts: &OcrRunOptions) -> Result<crate::rusto_ocr::OcrRunOptio
             max_candidates: p.max_candidates,
             unclip_ratio: p.unclip_ratio,
             use_dilation: p.use_dilation,
+            score_mode: p.score_mode.clone(),
         });
         crate::rusto_ocr::DetectionRunOptions {
             limit_side_len: d.limit_side_len,
@@ -431,6 +436,7 @@ fn convert_options(opts: &OcrRunOptions) -> Result<crate::rusto_ocr::OcrRunOptio
         max_candidates: p.max_candidates,
         unclip_ratio: p.unclip_ratio,
         use_dilation: p.use_dilation,
+        score_mode: p.score_mode.clone(),
     });
     let calibration = opts.calibration.as_ref().map(|c| crate::calibration::CalibrationOptions {
         descreen_strength: c.descreen_strength,

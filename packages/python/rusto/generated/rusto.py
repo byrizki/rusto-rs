@@ -465,27 +465,9 @@ def _uniffi_load_indirect():
         libname = "lib{}.so"
 
     libname = libname.format("rusto")
-    candidates = [
-        os.path.join(os.path.dirname(__file__), libname),
-        os.path.join(os.path.dirname(__file__), "..", libname),
-        os.path.join(os.path.dirname(__file__), "../../../../target/release", libname),
-        os.path.join(os.path.dirname(__file__), "../../../../target/debug", libname),
-    ]
-    env_path = os.environ.get("RUSTO_LIB_PATH")
-    if env_path:
-        candidates.insert(0, env_path)
-
-    for p in candidates:
-        if os.path.exists(p):
-            try:
-                return ctypes.cdll.LoadLibrary(p)
-            except Exception:
-                pass
-
-    try:
-        return ctypes.cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), libname))
-    except Exception:
-        return ctypes.cdll.LoadLibrary(libname)
+    path = os.path.join(os.path.dirname(__file__), libname)
+    lib = ctypes.cdll.LoadLibrary(path)
+    return lib
 
 def _uniffi_check_contract_api_version(lib):
     # Get the bindings contract version from our ComponentInterface
@@ -1126,7 +1108,7 @@ class DetectionConfig:
     """
     Text detection model configuration.
 """
-    def __init__(self, *, enabled:typing.Optional[bool], model_path:typing.Optional[str], thresh:typing.Optional[float], box_thresh:typing.Optional[float], unclip_ratio:typing.Optional[float], limit_side_len:typing.Optional[int], limit_type:typing.Optional[str], use_dilation:typing.Optional[bool]):
+    def __init__(self, *, enabled:typing.Optional[bool], model_path:typing.Optional[str], thresh:typing.Optional[float], box_thresh:typing.Optional[float], unclip_ratio:typing.Optional[float], limit_side_len:typing.Optional[int], limit_type:typing.Optional[str], use_dilation:typing.Optional[bool], score_mode:typing.Optional[str]):
         self.enabled = enabled
         self.model_path = model_path
         self.thresh = thresh
@@ -1135,12 +1117,13 @@ class DetectionConfig:
         self.limit_side_len = limit_side_len
         self.limit_type = limit_type
         self.use_dilation = use_dilation
+        self.score_mode = score_mode
         
         
 
     
     def __str__(self):
-        return "DetectionConfig(enabled={}, model_path={}, thresh={}, box_thresh={}, unclip_ratio={}, limit_side_len={}, limit_type={}, use_dilation={})".format(self.enabled, self.model_path, self.thresh, self.box_thresh, self.unclip_ratio, self.limit_side_len, self.limit_type, self.use_dilation)
+        return "DetectionConfig(enabled={}, model_path={}, thresh={}, box_thresh={}, unclip_ratio={}, limit_side_len={}, limit_type={}, use_dilation={}, score_mode={})".format(self.enabled, self.model_path, self.thresh, self.box_thresh, self.unclip_ratio, self.limit_side_len, self.limit_type, self.use_dilation, self.score_mode)
     def __eq__(self, other):
         if self.enabled != other.enabled:
             return False
@@ -1158,6 +1141,8 @@ class DetectionConfig:
             return False
         if self.use_dilation != other.use_dilation:
             return False
+        if self.score_mode != other.score_mode:
+            return False
         return True
 
 class _UniffiFfiConverterTypeDetectionConfig(_UniffiConverterRustBuffer):
@@ -1172,6 +1157,7 @@ class _UniffiFfiConverterTypeDetectionConfig(_UniffiConverterRustBuffer):
             limit_side_len=_UniffiFfiConverterOptionalInt32.read(buf),
             limit_type=_UniffiFfiConverterOptionalString.read(buf),
             use_dilation=_UniffiFfiConverterOptionalBoolean.read(buf),
+            score_mode=_UniffiFfiConverterOptionalString.read(buf),
         )
 
     @staticmethod
@@ -1184,6 +1170,7 @@ class _UniffiFfiConverterTypeDetectionConfig(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalInt32.check_lower(value.limit_side_len)
         _UniffiFfiConverterOptionalString.check_lower(value.limit_type)
         _UniffiFfiConverterOptionalBoolean.check_lower(value.use_dilation)
+        _UniffiFfiConverterOptionalString.check_lower(value.score_mode)
 
     @staticmethod
     def write(value, buf):
@@ -1195,6 +1182,7 @@ class _UniffiFfiConverterTypeDetectionConfig(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalInt32.write(value.limit_side_len, buf)
         _UniffiFfiConverterOptionalString.write(value.limit_type, buf)
         _UniffiFfiConverterOptionalBoolean.write(value.use_dilation, buf)
+        _UniffiFfiConverterOptionalString.write(value.score_mode, buf)
 
 class _UniffiFfiConverterSequenceFloat32(_UniffiConverterRustBuffer):
     @classmethod
@@ -1249,18 +1237,19 @@ class PostprocessRunOptions:
     """
     Post-processing options for DBNet polygon detection and binarization.
 """
-    def __init__(self, *, threshold:typing.Optional[float], box_threshold:typing.Optional[float], max_candidates:typing.Optional[int], unclip_ratio:typing.Optional[float], use_dilation:typing.Optional[bool]):
+    def __init__(self, *, threshold:typing.Optional[float], box_threshold:typing.Optional[float], max_candidates:typing.Optional[int], unclip_ratio:typing.Optional[float], use_dilation:typing.Optional[bool], score_mode:typing.Optional[str]):
         self.threshold = threshold
         self.box_threshold = box_threshold
         self.max_candidates = max_candidates
         self.unclip_ratio = unclip_ratio
         self.use_dilation = use_dilation
+        self.score_mode = score_mode
         
         
 
     
     def __str__(self):
-        return "PostprocessRunOptions(threshold={}, box_threshold={}, max_candidates={}, unclip_ratio={}, use_dilation={})".format(self.threshold, self.box_threshold, self.max_candidates, self.unclip_ratio, self.use_dilation)
+        return "PostprocessRunOptions(threshold={}, box_threshold={}, max_candidates={}, unclip_ratio={}, use_dilation={}, score_mode={})".format(self.threshold, self.box_threshold, self.max_candidates, self.unclip_ratio, self.use_dilation, self.score_mode)
     def __eq__(self, other):
         if self.threshold != other.threshold:
             return False
@@ -1271,6 +1260,8 @@ class PostprocessRunOptions:
         if self.unclip_ratio != other.unclip_ratio:
             return False
         if self.use_dilation != other.use_dilation:
+            return False
+        if self.score_mode != other.score_mode:
             return False
         return True
 
@@ -1283,6 +1274,7 @@ class _UniffiFfiConverterTypePostprocessRunOptions(_UniffiConverterRustBuffer):
             max_candidates=_UniffiFfiConverterOptionalInt32.read(buf),
             unclip_ratio=_UniffiFfiConverterOptionalFloat32.read(buf),
             use_dilation=_UniffiFfiConverterOptionalBoolean.read(buf),
+            score_mode=_UniffiFfiConverterOptionalString.read(buf),
         )
 
     @staticmethod
@@ -1292,6 +1284,7 @@ class _UniffiFfiConverterTypePostprocessRunOptions(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalInt32.check_lower(value.max_candidates)
         _UniffiFfiConverterOptionalFloat32.check_lower(value.unclip_ratio)
         _UniffiFfiConverterOptionalBoolean.check_lower(value.use_dilation)
+        _UniffiFfiConverterOptionalString.check_lower(value.score_mode)
 
     @staticmethod
     def write(value, buf):
@@ -1300,6 +1293,7 @@ class _UniffiFfiConverterTypePostprocessRunOptions(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalInt32.write(value.max_candidates, buf)
         _UniffiFfiConverterOptionalFloat32.write(value.unclip_ratio, buf)
         _UniffiFfiConverterOptionalBoolean.write(value.use_dilation, buf)
+        _UniffiFfiConverterOptionalString.write(value.score_mode, buf)
 
 class _UniffiFfiConverterOptionalTypePostprocessRunOptions(_UniffiConverterRustBuffer):
     @classmethod

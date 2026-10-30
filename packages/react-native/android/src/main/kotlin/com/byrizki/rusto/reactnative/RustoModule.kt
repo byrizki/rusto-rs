@@ -149,12 +149,13 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
     }
 
     private fun parseRuntimePostprocess(p: ReadableMap): PostprocessRunOptions {
-        requireOnlyKeys(p, setOf("threshold", "boxThreshold", "maxCandidates", "unclipRatio", "useDilation"), "DetectTextOptions.postprocess contains an unknown key.")
+        requireOnlyKeys(p, setOf("threshold", "boxThreshold", "maxCandidates", "unclipRatio", "useDilation", "scoreMode"), "DetectTextOptions.postprocess contains an unknown key.")
         fun score(n: String): Float? = if (!p.hasKey(n) || p.isNull(n)) null else p.getDouble(n).also { require(it.isFinite() && it in 0.0..1.0) { "$n is invalid." } }.toFloat()
         val max = if (!p.hasKey("maxCandidates") || p.isNull("maxCandidates")) null else p.getDouble("maxCandidates").also { require(it.isFinite() && it >= 1 && it % 1 == 0.0) { "maxCandidates is invalid." } }.toInt()
         val unclip = if (!p.hasKey("unclipRatio") || p.isNull("unclipRatio")) null else p.getDouble("unclipRatio").also { require(it.isFinite() && it > 0) { "unclipRatio is invalid." } }.toFloat()
         val dilation = if (!p.hasKey("useDilation") || p.isNull("useDilation")) null else { require(p.getType("useDilation") == ReadableType.Boolean) { "useDilation must be boolean." }; p.getBoolean("useDilation") }
-        return PostprocessRunOptions(score("threshold"), score("boxThreshold"), max, unclip, dilation)
+        val mode = if (!p.hasKey("scoreMode") || p.isNull("scoreMode")) null else p.getString("scoreMode")!!.also { require(it == "fast" || it == "slow") { "scoreMode is invalid." } }
+        return PostprocessRunOptions(score("threshold"), score("boxThreshold"), max, unclip, dilation, mode)
     }
 
     private fun decodeBase64(value: String): ByteArray = try {

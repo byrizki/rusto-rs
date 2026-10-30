@@ -79,6 +79,9 @@ namespace RustODotnet
     {
         [JsonPropertyName("model_path")]
         public string ModelPath { get; set; }
+
+        [JsonPropertyName("score_mode")]
+        public string ScoreMode { get; set; }
     }
 
     public class RecognitionConfig
@@ -154,6 +157,7 @@ namespace RustODotnet
         [JsonPropertyName("maxCandidates")] public int? MaxCandidates { get; set; }
         [JsonPropertyName("unclipRatio")] public float? UnclipRatio { get; set; }
         [JsonPropertyName("useDilation")] public bool? UseDilation { get; set; }
+        [JsonPropertyName("scoreMode")] public string ScoreMode { get; set; }
     }
 
     public class DetectionRunOptions
@@ -162,6 +166,7 @@ namespace RustODotnet
         [JsonPropertyName("limitType")] public string LimitType { get; set; }
         [JsonPropertyName("mean")] public float[] Mean { get; set; }
         [JsonPropertyName("std")] public float[] Std { get; set; }
+        [JsonPropertyName("postprocess")] public PostprocessRunOptions Postprocess { get; set; }
     }
 
     public class OcrRunOptions
@@ -494,14 +499,22 @@ namespace RustODotnet
                     options.Detection.LimitType,
                     options.Detection.Mean,
                     options.Detection.Std,
-                    null
+                    options.Detection.Postprocess != null ? new RustODotnet.Generated.PostprocessRunOptions(
+                        options.Detection.Postprocess.Threshold,
+                        options.Detection.Postprocess.BoxThreshold,
+                        options.Detection.Postprocess.MaxCandidates,
+                        options.Detection.Postprocess.UnclipRatio,
+                        options.Detection.Postprocess.UseDilation,
+                        options.Detection.Postprocess.ScoreMode
+                    ) : null
                 ) : defaultOpts.Detection,
                 Postprocess = options.Postprocess != null ? new RustODotnet.Generated.PostprocessRunOptions(
                     options.Postprocess.Threshold,
                     options.Postprocess.BoxThreshold,
                     options.Postprocess.MaxCandidates,
                     options.Postprocess.UnclipRatio,
-                    options.Postprocess.UseDilation
+                    options.Postprocess.UseDilation,
+                    options.Postprocess.ScoreMode
                 ) : defaultOpts.Postprocess
             };
         }
@@ -530,11 +543,14 @@ namespace RustODotnet
             if (options.WidthHeightRatio.HasValue && (!float.IsFinite(options.WidthHeightRatio.Value) || (options.WidthHeightRatio.Value <= 0 && options.WidthHeightRatio.Value != -1))) throw new RustOException("WidthHeightRatio must be positive or -1.");
             if (options.MinSideLen.HasValue && options.MaxSideLen.HasValue && options.MinSideLen.Value > options.MaxSideLen.Value) throw new RustOException("MinSideLen must not exceed MaxSideLen.");
             var detection = options.Detection;
-            if (detection == null) { ValidatePostprocess(options.Postprocess); return; }
-            if (detection.LimitSideLen.HasValue && (detection.LimitSideLen.Value < 1 || detection.LimitSideLen.Value > 32767)) throw new RustOException("LimitSideLen must be between 1 and 32767.");
-            if (detection.LimitType != null && detection.LimitType != "min" && detection.LimitType != "max") throw new RustOException("LimitType must be min or max.");
-            ValidateVector(detection.Mean, false, "Mean");
-            ValidateVector(detection.Std, true, "Std");
+            if (detection != null)
+            {
+                if (detection.LimitSideLen.HasValue && (detection.LimitSideLen.Value < 1 || detection.LimitSideLen.Value > 32767)) throw new RustOException("LimitSideLen must be between 1 and 32767.");
+                if (detection.LimitType != null && detection.LimitType != "min" && detection.LimitType != "max") throw new RustOException("LimitType must be min or max.");
+                ValidateVector(detection.Mean, false, "Mean");
+                ValidateVector(detection.Std, true, "Std");
+                ValidatePostprocess(detection.Postprocess);
+            }
             ValidatePostprocess(options.Postprocess);
         }
 
@@ -545,6 +561,7 @@ namespace RustODotnet
             ValidateProbability(postprocess.BoxThreshold, "BoxThreshold");
             if (postprocess.MaxCandidates.HasValue && postprocess.MaxCandidates.Value < 1) throw new RustOException("MaxCandidates must be at least one.");
             ValidatePositive(postprocess.UnclipRatio, "UnclipRatio");
+            if (postprocess.ScoreMode != null && postprocess.ScoreMode != "fast" && postprocess.ScoreMode != "slow") throw new RustOException("ScoreMode must be fast or slow.");
         }
 
         private static void ValidateVector(float[] values, bool nonZero, string name)

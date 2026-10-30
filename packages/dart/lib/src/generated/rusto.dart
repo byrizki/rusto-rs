@@ -97,9 +97,7 @@ class CalibrationOptions {
 
   factory CalibrationOptions.fromJson(Map<String, dynamic> json) {
     return CalibrationOptions(
-      descreenStrength: json['descreenStrength'] == null
-          ? null
-          : (json['descreenStrength'] as num).toDouble(),
+      descreenStrength: json['descreenStrength'] == null ? null : (json['descreenStrength'] as num).toDouble(),
     );
   }
 
@@ -107,9 +105,7 @@ class CalibrationOptions {
     Object? descreenStrength = _sentinel,
   }) {
     return CalibrationOptions(
-      descreenStrength: descreenStrength == _sentinel
-          ? this.descreenStrength
-          : descreenStrength as double?,
+      descreenStrength: descreenStrength == _sentinel ? this.descreenStrength : descreenStrength as double?,
     );
   }
 
@@ -132,20 +128,16 @@ class ClassificationConfig {
   const ClassificationConfig({
     /// Whether classification stage is enabled.
     required this.enabled,
-
     /// Filesystem path to classification model.
     required this.modelPath,
-
     /// Confidence threshold.
     required this.thresh,
   });
 
   /// Whether classification stage is enabled.
   final bool? enabled;
-
   /// Filesystem path to classification model.
   final String? modelPath;
-
   /// Confidence threshold.
   final double? thresh;
 
@@ -161,8 +153,7 @@ class ClassificationConfig {
     return ClassificationConfig(
       enabled: json['enabled'] == null ? null : json['enabled'] as bool,
       modelPath: json['modelPath'] == null ? null : json['modelPath'] as String,
-      thresh:
-          json['thresh'] == null ? null : (json['thresh'] as num).toDouble(),
+      thresh: json['thresh'] == null ? null : (json['thresh'] as num).toDouble(),
     );
   }
 
@@ -186,10 +177,7 @@ class ClassificationConfig {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ClassificationConfig &&
-          enabled == other.enabled &&
-          modelPath == other.modelPath &&
-          thresh == other.thresh;
+      other is ClassificationConfig && enabled == other.enabled && modelPath == other.modelPath && thresh == other.thresh;
 
   @override
   int get hashCode => Object.hash(enabled, modelPath, thresh);
@@ -200,52 +188,42 @@ class DetectionConfig {
   const DetectionConfig({
     /// Whether detection stage is enabled.
     required this.enabled,
-
     /// Filesystem path to detection model (.rten or .onnx).
     required this.modelPath,
-
     /// Segmentation binarization threshold.
     required this.thresh,
-
     /// Box candidate confidence score threshold.
     required this.boxThresh,
-
     /// Polygon unclip expansion ratio.
     required this.unclipRatio,
-
     /// Maximum side length resize target.
     required this.limitSideLen,
-
     /// Limit type: "min" or "max".
     required this.limitType,
-
     /// Enable morphological dilation.
     required this.useDilation,
+    /// DB score calculation mode: "fast" or "slow".
+    required this.scoreMode,
   });
 
   /// Whether detection stage is enabled.
   final bool? enabled;
-
   /// Filesystem path to detection model (.rten or .onnx).
   final String? modelPath;
-
   /// Segmentation binarization threshold.
   final double? thresh;
-
   /// Box candidate confidence score threshold.
   final double? boxThresh;
-
   /// Polygon unclip expansion ratio.
   final double? unclipRatio;
-
   /// Maximum side length resize target.
   final int? limitSideLen;
-
   /// Limit type: "min" or "max".
   final String? limitType;
-
   /// Enable morphological dilation.
   final bool? useDilation;
+  /// DB score calculation mode: "fast" or "slow".
+  final String? scoreMode;
 
   Map<String, dynamic> toJson() {
     return {
@@ -257,6 +235,7 @@ class DetectionConfig {
       'limitSideLen': this.limitSideLen,
       'limitType': this.limitType,
       'useDilation': this.useDilation,
+      'scoreMode': this.scoreMode,
     };
   }
 
@@ -264,20 +243,13 @@ class DetectionConfig {
     return DetectionConfig(
       enabled: json['enabled'] == null ? null : json['enabled'] as bool,
       modelPath: json['modelPath'] == null ? null : json['modelPath'] as String,
-      thresh:
-          json['thresh'] == null ? null : (json['thresh'] as num).toDouble(),
-      boxThresh: json['boxThresh'] == null
-          ? null
-          : (json['boxThresh'] as num).toDouble(),
-      unclipRatio: json['unclipRatio'] == null
-          ? null
-          : (json['unclipRatio'] as num).toDouble(),
-      limitSideLen: json['limitSideLen'] == null
-          ? null
-          : (json['limitSideLen'] as num).toInt(),
+      thresh: json['thresh'] == null ? null : (json['thresh'] as num).toDouble(),
+      boxThresh: json['boxThresh'] == null ? null : (json['boxThresh'] as num).toDouble(),
+      unclipRatio: json['unclipRatio'] == null ? null : (json['unclipRatio'] as num).toDouble(),
+      limitSideLen: json['limitSideLen'] == null ? null : (json['limitSideLen'] as num).toInt(),
       limitType: json['limitType'] == null ? null : json['limitType'] as String,
-      useDilation:
-          json['useDilation'] == null ? null : json['useDilation'] as bool,
+      useDilation: json['useDilation'] == null ? null : json['useDilation'] as bool,
+      scoreMode: json['scoreMode'] == null ? null : json['scoreMode'] as String,
     );
   }
 
@@ -290,43 +262,33 @@ class DetectionConfig {
     Object? limitSideLen = _sentinel,
     Object? limitType = _sentinel,
     Object? useDilation = _sentinel,
+    Object? scoreMode = _sentinel,
   }) {
     return DetectionConfig(
       enabled: enabled == _sentinel ? this.enabled : enabled as bool?,
       modelPath: modelPath == _sentinel ? this.modelPath : modelPath as String?,
       thresh: thresh == _sentinel ? this.thresh : thresh as double?,
       boxThresh: boxThresh == _sentinel ? this.boxThresh : boxThresh as double?,
-      unclipRatio:
-          unclipRatio == _sentinel ? this.unclipRatio : unclipRatio as double?,
-      limitSideLen:
-          limitSideLen == _sentinel ? this.limitSideLen : limitSideLen as int?,
+      unclipRatio: unclipRatio == _sentinel ? this.unclipRatio : unclipRatio as double?,
+      limitSideLen: limitSideLen == _sentinel ? this.limitSideLen : limitSideLen as int?,
       limitType: limitType == _sentinel ? this.limitType : limitType as String?,
-      useDilation:
-          useDilation == _sentinel ? this.useDilation : useDilation as bool?,
+      useDilation: useDilation == _sentinel ? this.useDilation : useDilation as bool?,
+      scoreMode: scoreMode == _sentinel ? this.scoreMode : scoreMode as String?,
     );
   }
 
   @override
   String toString() {
-    return 'DetectionConfig(enabled: $enabled, modelPath: $modelPath, thresh: $thresh, boxThresh: $boxThresh, unclipRatio: $unclipRatio, limitSideLen: $limitSideLen, limitType: $limitType, useDilation: $useDilation)';
+    return 'DetectionConfig(enabled: $enabled, modelPath: $modelPath, thresh: $thresh, boxThresh: $boxThresh, unclipRatio: $unclipRatio, limitSideLen: $limitSideLen, limitType: $limitType, useDilation: $useDilation, scoreMode: $scoreMode)';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is DetectionConfig &&
-          enabled == other.enabled &&
-          modelPath == other.modelPath &&
-          thresh == other.thresh &&
-          boxThresh == other.boxThresh &&
-          unclipRatio == other.unclipRatio &&
-          limitSideLen == other.limitSideLen &&
-          limitType == other.limitType &&
-          useDilation == other.useDilation;
+      other is DetectionConfig && enabled == other.enabled && modelPath == other.modelPath && thresh == other.thresh && boxThresh == other.boxThresh && unclipRatio == other.unclipRatio && limitSideLen == other.limitSideLen && limitType == other.limitType && useDilation == other.useDilation && scoreMode == other.scoreMode;
 
   @override
-  int get hashCode => Object.hash(enabled, modelPath, thresh, boxThresh,
-      unclipRatio, limitSideLen, limitType, useDilation);
+  int get hashCode => Object.hash(enabled, modelPath, thresh, boxThresh, unclipRatio, limitSideLen, limitType, useDilation, scoreMode);
 }
 
 /// Image detection stage options.
@@ -334,32 +296,24 @@ class DetectionRunOptions {
   const DetectionRunOptions({
     /// Target side length constraint for image resizing. Default: 960.
     required this.limitSideLen,
-
     /// Side length limit behavior: "min" or "max".
     required this.limitType,
-
     /// Mean RGB normalization values. Default: [0.485, 0.456, 0.406].
     required this.mean,
-
     /// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
     required this.std,
-
     /// Post-processing options for detection.
     required this.postprocess,
   });
 
   /// Target side length constraint for image resizing. Default: 960.
   final int? limitSideLen;
-
   /// Side length limit behavior: "min" or "max".
   final String? limitType;
-
   /// Mean RGB normalization values. Default: [0.485, 0.456, 0.406].
   final List<double>? mean;
-
   /// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
   final List<double>? std;
-
   /// Post-processing options for detection.
   final PostprocessRunOptions? postprocess;
 
@@ -367,56 +321,19 @@ class DetectionRunOptions {
     return {
       'limitSideLen': this.limitSideLen,
       'limitType': this.limitType,
-      'mean': this.mean == null
-          ? null
-          : (() {
-              final __tmp = this.mean!;
-              return __tmp;
-            })(),
-      'std': this.std == null
-          ? null
-          : (() {
-              final __tmp = this.std!;
-              return __tmp;
-            })(),
-      'postprocess': this.postprocess == null
-          ? null
-          : (() {
-              final __tmp = this.postprocess!;
-              return __tmp.toJson();
-            })(),
+      'mean': this.mean == null ? null : (() { final __tmp = this.mean!; return __tmp; })(),
+      'std': this.std == null ? null : (() { final __tmp = this.std!; return __tmp; })(),
+      'postprocess': this.postprocess == null ? null : (() { final __tmp = this.postprocess!; return __tmp.toJson(); })(),
     };
   }
 
   factory DetectionRunOptions.fromJson(Map<String, dynamic> json) {
     return DetectionRunOptions(
-      limitSideLen: json['limitSideLen'] == null
-          ? null
-          : (json['limitSideLen'] as num).toInt(),
+      limitSideLen: json['limitSideLen'] == null ? null : (json['limitSideLen'] as num).toInt(),
       limitType: json['limitType'] == null ? null : json['limitType'] as String,
-      mean: json['mean'] == null
-          ? null
-          : (() {
-              final __tmp = json['mean'];
-              return (__tmp as List)
-                  .map((item) => (item as num).toDouble())
-                  .toList();
-            })(),
-      std: json['std'] == null
-          ? null
-          : (() {
-              final __tmp = json['std'];
-              return (__tmp as List)
-                  .map((item) => (item as num).toDouble())
-                  .toList();
-            })(),
-      postprocess: json['postprocess'] == null
-          ? null
-          : (() {
-              final __tmp = json['postprocess'];
-              return PostprocessRunOptions.fromJson(
-                  __tmp as Map<String, dynamic>);
-            })(),
+      mean: json['mean'] == null ? null : (() { final __tmp = json['mean']; return (__tmp as List).map((item) => (item as num).toDouble()).toList(); })(),
+      std: json['std'] == null ? null : (() { final __tmp = json['std']; return (__tmp as List).map((item) => (item as num).toDouble()).toList(); })(),
+      postprocess: json['postprocess'] == null ? null : (() { final __tmp = json['postprocess']; return PostprocessRunOptions.fromJson(__tmp as Map<String, dynamic>); })(),
     );
   }
 
@@ -428,14 +345,11 @@ class DetectionRunOptions {
     Object? postprocess = _sentinel,
   }) {
     return DetectionRunOptions(
-      limitSideLen:
-          limitSideLen == _sentinel ? this.limitSideLen : limitSideLen as int?,
+      limitSideLen: limitSideLen == _sentinel ? this.limitSideLen : limitSideLen as int?,
       limitType: limitType == _sentinel ? this.limitType : limitType as String?,
       mean: mean == _sentinel ? this.mean : mean as List<double>?,
       std: std == _sentinel ? this.std : std as List<double>?,
-      postprocess: postprocess == _sentinel
-          ? this.postprocess
-          : postprocess as PostprocessRunOptions?,
+      postprocess: postprocess == _sentinel ? this.postprocess : postprocess as PostprocessRunOptions?,
     );
   }
 
@@ -447,16 +361,10 @@ class DetectionRunOptions {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is DetectionRunOptions &&
-          limitSideLen == other.limitSideLen &&
-          limitType == other.limitType &&
-          mean == other.mean &&
-          std == other.std &&
-          postprocess == other.postprocess;
+      other is DetectionRunOptions && limitSideLen == other.limitSideLen && limitType == other.limitType && mean == other.mean && std == other.std && postprocess == other.postprocess;
 
   @override
-  int get hashCode =>
-      Object.hash(limitSideLen, limitType, mean, std, postprocess);
+  int get hashCode => Object.hash(limitSideLen, limitType, mean, std, postprocess);
 }
 
 /// Axis-aligned bounding box frame with position and size in pixels.
@@ -464,26 +372,20 @@ class Frame {
   const Frame({
     /// Width of the bounding box.
     required this.width,
-
     /// Height of the bounding box.
     required this.height,
-
     /// Top vertical coordinate (Y).
     required this.top,
-
     /// Left horizontal coordinate (X).
     required this.left,
   });
 
   /// Width of the bounding box.
   final double width;
-
   /// Height of the bounding box.
   final double height;
-
   /// Top vertical coordinate (Y).
   final double top;
-
   /// Left horizontal coordinate (X).
   final double left;
 
@@ -527,11 +429,7 @@ class Frame {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Frame &&
-          width == other.width &&
-          height == other.height &&
-          top == other.top &&
-          left == other.left;
+      other is Frame && width == other.width && height == other.height && top == other.top && left == other.left;
 
   @override
   int get hashCode => Object.hash(width, height, top, left);
@@ -542,111 +440,50 @@ class InitializeConfig {
   const InitializeConfig({
     /// Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
     required this.template,
-
     /// Detection model configuration.
     required this.detection,
-
     /// Recognition model and dictionary configuration.
     required this.recognition,
-
     /// Optional classification configuration.
     required this.classification,
-
     /// Optional orientation configuration.
     required this.orientation,
-
     /// Optional unwarp configuration.
     required this.unwarp,
   });
 
   /// Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
   final String? template;
-
   /// Detection model configuration.
   final DetectionConfig? detection;
-
   /// Recognition model and dictionary configuration.
   final RecognitionConfig? recognition;
-
   /// Optional classification configuration.
   final ClassificationConfig? classification;
-
   /// Optional orientation configuration.
   final OrientationConfig? orientation;
-
   /// Optional unwarp configuration.
   final UnwarpConfig? unwarp;
 
   Map<String, dynamic> toJson() {
     return {
       'template': this.template,
-      'detection': this.detection == null
-          ? null
-          : (() {
-              final __tmp = this.detection!;
-              return __tmp.toJson();
-            })(),
-      'recognition': this.recognition == null
-          ? null
-          : (() {
-              final __tmp = this.recognition!;
-              return __tmp.toJson();
-            })(),
-      'classification': this.classification == null
-          ? null
-          : (() {
-              final __tmp = this.classification!;
-              return __tmp.toJson();
-            })(),
-      'orientation': this.orientation == null
-          ? null
-          : (() {
-              final __tmp = this.orientation!;
-              return __tmp.toJson();
-            })(),
-      'unwarp': this.unwarp == null
-          ? null
-          : (() {
-              final __tmp = this.unwarp!;
-              return __tmp.toJson();
-            })(),
+      'detection': this.detection == null ? null : (() { final __tmp = this.detection!; return __tmp.toJson(); })(),
+      'recognition': this.recognition == null ? null : (() { final __tmp = this.recognition!; return __tmp.toJson(); })(),
+      'classification': this.classification == null ? null : (() { final __tmp = this.classification!; return __tmp.toJson(); })(),
+      'orientation': this.orientation == null ? null : (() { final __tmp = this.orientation!; return __tmp.toJson(); })(),
+      'unwarp': this.unwarp == null ? null : (() { final __tmp = this.unwarp!; return __tmp.toJson(); })(),
     };
   }
 
   factory InitializeConfig.fromJson(Map<String, dynamic> json) {
     return InitializeConfig(
       template: json['template'] == null ? null : json['template'] as String,
-      detection: json['detection'] == null
-          ? null
-          : (() {
-              final __tmp = json['detection'];
-              return DetectionConfig.fromJson(__tmp as Map<String, dynamic>);
-            })(),
-      recognition: json['recognition'] == null
-          ? null
-          : (() {
-              final __tmp = json['recognition'];
-              return RecognitionConfig.fromJson(__tmp as Map<String, dynamic>);
-            })(),
-      classification: json['classification'] == null
-          ? null
-          : (() {
-              final __tmp = json['classification'];
-              return ClassificationConfig.fromJson(
-                  __tmp as Map<String, dynamic>);
-            })(),
-      orientation: json['orientation'] == null
-          ? null
-          : (() {
-              final __tmp = json['orientation'];
-              return OrientationConfig.fromJson(__tmp as Map<String, dynamic>);
-            })(),
-      unwarp: json['unwarp'] == null
-          ? null
-          : (() {
-              final __tmp = json['unwarp'];
-              return UnwarpConfig.fromJson(__tmp as Map<String, dynamic>);
-            })(),
+      detection: json['detection'] == null ? null : (() { final __tmp = json['detection']; return DetectionConfig.fromJson(__tmp as Map<String, dynamic>); })(),
+      recognition: json['recognition'] == null ? null : (() { final __tmp = json['recognition']; return RecognitionConfig.fromJson(__tmp as Map<String, dynamic>); })(),
+      classification: json['classification'] == null ? null : (() { final __tmp = json['classification']; return ClassificationConfig.fromJson(__tmp as Map<String, dynamic>); })(),
+      orientation: json['orientation'] == null ? null : (() { final __tmp = json['orientation']; return OrientationConfig.fromJson(__tmp as Map<String, dynamic>); })(),
+      unwarp: json['unwarp'] == null ? null : (() { final __tmp = json['unwarp']; return UnwarpConfig.fromJson(__tmp as Map<String, dynamic>); })(),
     );
   }
 
@@ -660,18 +497,10 @@ class InitializeConfig {
   }) {
     return InitializeConfig(
       template: template == _sentinel ? this.template : template as String?,
-      detection: detection == _sentinel
-          ? this.detection
-          : detection as DetectionConfig?,
-      recognition: recognition == _sentinel
-          ? this.recognition
-          : recognition as RecognitionConfig?,
-      classification: classification == _sentinel
-          ? this.classification
-          : classification as ClassificationConfig?,
-      orientation: orientation == _sentinel
-          ? this.orientation
-          : orientation as OrientationConfig?,
+      detection: detection == _sentinel ? this.detection : detection as DetectionConfig?,
+      recognition: recognition == _sentinel ? this.recognition : recognition as RecognitionConfig?,
+      classification: classification == _sentinel ? this.classification : classification as ClassificationConfig?,
+      orientation: orientation == _sentinel ? this.orientation : orientation as OrientationConfig?,
       unwarp: unwarp == _sentinel ? this.unwarp : unwarp as UnwarpConfig?,
     );
   }
@@ -684,17 +513,10 @@ class InitializeConfig {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is InitializeConfig &&
-          template == other.template &&
-          detection == other.detection &&
-          recognition == other.recognition &&
-          classification == other.classification &&
-          orientation == other.orientation &&
-          unwarp == other.unwarp;
+      other is InitializeConfig && template == other.template && detection == other.detection && recognition == other.recognition && classification == other.classification && orientation == other.orientation && unwarp == other.unwarp;
 
   @override
-  int get hashCode => Object.hash(
-      template, detection, recognition, classification, orientation, unwarp);
+  int get hashCode => Object.hash(template, detection, recognition, classification, orientation, unwarp);
 }
 
 /// Per-request execution options for text detection.
@@ -702,86 +524,60 @@ class OcrRunOptions {
   const OcrRunOptions({
     /// Output format granularity: Lines (default), Words, or Spatial.
     required this.output,
-
     /// Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
     required this.lineYThreshold,
-
     /// Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
     required this.wordXThreshold,
-
     /// Minimum recognition confidence score threshold [0.0 - 1.0].
     required this.textScore,
-
     /// Enable text line orientation classifier stage.
     required this.classification,
-
     /// Enable document orientation angle correction stage.
     required this.orientation,
-
     /// Request-local minimum height resize override.
     required this.minHeight,
-
     /// Request-local maximum side length resize override.
     required this.maxSideLen,
-
     /// Request-local minimum side length resize override.
     required this.minSideLen,
-
     /// Width-to-height aspect ratio padding override.
     required this.widthHeightRatio,
-
     /// Detection stage options.
     required this.detection,
-
     /// Post-processing options.
     required this.postprocess,
-
     /// Pre-OCR background descreening calibration options.
     required this.calibration,
-
     /// Runtime crop and resolution optimization options.
     required this.optimization,
   });
 
   /// Output format granularity: Lines (default), Words, or Spatial.
   final OutputGranularity output;
-
   /// Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
   final double? lineYThreshold;
-
   /// Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
   final double? wordXThreshold;
-
   /// Minimum recognition confidence score threshold [0.0 - 1.0].
   final double? textScore;
-
   /// Enable text line orientation classifier stage.
   final bool? classification;
-
   /// Enable document orientation angle correction stage.
   final bool? orientation;
-
   /// Request-local minimum height resize override.
   final double? minHeight;
-
   /// Request-local maximum side length resize override.
   final double? maxSideLen;
-
   /// Request-local minimum side length resize override.
   final double? minSideLen;
-
   /// Width-to-height aspect ratio padding override.
   final double? widthHeightRatio;
-
   /// Detection stage options.
   final DetectionRunOptions? detection;
-
   /// Post-processing options.
   final PostprocessRunOptions? postprocess;
-
   /// Pre-OCR background descreening calibration options.
   final CalibrationOptions? calibration;
-
   /// Runtime crop and resolution optimization options.
   final OptimizationOptions? optimization;
 
@@ -797,89 +593,29 @@ class OcrRunOptions {
       'maxSideLen': this.maxSideLen,
       'minSideLen': this.minSideLen,
       'widthHeightRatio': this.widthHeightRatio,
-      'detection': this.detection == null
-          ? null
-          : (() {
-              final __tmp = this.detection!;
-              return __tmp.toJson();
-            })(),
-      'postprocess': this.postprocess == null
-          ? null
-          : (() {
-              final __tmp = this.postprocess!;
-              return __tmp.toJson();
-            })(),
-      'calibration': this.calibration == null
-          ? null
-          : (() {
-              final __tmp = this.calibration!;
-              return __tmp.toJson();
-            })(),
-      'optimization': this.optimization == null
-          ? null
-          : (() {
-              final __tmp = this.optimization!;
-              return __tmp.toJson();
-            })(),
+      'detection': this.detection == null ? null : (() { final __tmp = this.detection!; return __tmp.toJson(); })(),
+      'postprocess': this.postprocess == null ? null : (() { final __tmp = this.postprocess!; return __tmp.toJson(); })(),
+      'calibration': this.calibration == null ? null : (() { final __tmp = this.calibration!; return __tmp.toJson(); })(),
+      'optimization': this.optimization == null ? null : (() { final __tmp = this.optimization!; return __tmp.toJson(); })(),
     };
   }
 
   factory OcrRunOptions.fromJson(Map<String, dynamic> json) {
     return OcrRunOptions(
       output: OutputGranularityFfiCodec.decode(json['output'] as String),
-      lineYThreshold: json['lineYThreshold'] == null
-          ? null
-          : (json['lineYThreshold'] as num).toDouble(),
-      wordXThreshold: json['wordXThreshold'] == null
-          ? null
-          : (json['wordXThreshold'] as num).toDouble(),
-      textScore: json['textScore'] == null
-          ? null
-          : (json['textScore'] as num).toDouble(),
-      classification: json['classification'] == null
-          ? null
-          : json['classification'] as bool,
-      orientation:
-          json['orientation'] == null ? null : json['orientation'] as bool,
-      minHeight: json['minHeight'] == null
-          ? null
-          : (json['minHeight'] as num).toDouble(),
-      maxSideLen: json['maxSideLen'] == null
-          ? null
-          : (json['maxSideLen'] as num).toDouble(),
-      minSideLen: json['minSideLen'] == null
-          ? null
-          : (json['minSideLen'] as num).toDouble(),
-      widthHeightRatio: json['widthHeightRatio'] == null
-          ? null
-          : (json['widthHeightRatio'] as num).toDouble(),
-      detection: json['detection'] == null
-          ? null
-          : (() {
-              final __tmp = json['detection'];
-              return DetectionRunOptions.fromJson(
-                  __tmp as Map<String, dynamic>);
-            })(),
-      postprocess: json['postprocess'] == null
-          ? null
-          : (() {
-              final __tmp = json['postprocess'];
-              return PostprocessRunOptions.fromJson(
-                  __tmp as Map<String, dynamic>);
-            })(),
-      calibration: json['calibration'] == null
-          ? null
-          : (() {
-              final __tmp = json['calibration'];
-              return CalibrationOptions.fromJson(__tmp as Map<String, dynamic>);
-            })(),
-      optimization: json['optimization'] == null
-          ? null
-          : (() {
-              final __tmp = json['optimization'];
-              return OptimizationOptions.fromJson(
-                  __tmp as Map<String, dynamic>);
-            })(),
+      lineYThreshold: json['lineYThreshold'] == null ? null : (json['lineYThreshold'] as num).toDouble(),
+      wordXThreshold: json['wordXThreshold'] == null ? null : (json['wordXThreshold'] as num).toDouble(),
+      textScore: json['textScore'] == null ? null : (json['textScore'] as num).toDouble(),
+      classification: json['classification'] == null ? null : json['classification'] as bool,
+      orientation: json['orientation'] == null ? null : json['orientation'] as bool,
+      minHeight: json['minHeight'] == null ? null : (json['minHeight'] as num).toDouble(),
+      maxSideLen: json['maxSideLen'] == null ? null : (json['maxSideLen'] as num).toDouble(),
+      minSideLen: json['minSideLen'] == null ? null : (json['minSideLen'] as num).toDouble(),
+      widthHeightRatio: json['widthHeightRatio'] == null ? null : (json['widthHeightRatio'] as num).toDouble(),
+      detection: json['detection'] == null ? null : (() { final __tmp = json['detection']; return DetectionRunOptions.fromJson(__tmp as Map<String, dynamic>); })(),
+      postprocess: json['postprocess'] == null ? null : (() { final __tmp = json['postprocess']; return PostprocessRunOptions.fromJson(__tmp as Map<String, dynamic>); })(),
+      calibration: json['calibration'] == null ? null : (() { final __tmp = json['calibration']; return CalibrationOptions.fromJson(__tmp as Map<String, dynamic>); })(),
+      optimization: json['optimization'] == null ? null : (() { final __tmp = json['optimization']; return OptimizationOptions.fromJson(__tmp as Map<String, dynamic>); })(),
     );
   }
 
@@ -901,38 +637,19 @@ class OcrRunOptions {
   }) {
     return OcrRunOptions(
       output: output ?? this.output,
-      lineYThreshold: lineYThreshold == _sentinel
-          ? this.lineYThreshold
-          : lineYThreshold as double?,
-      wordXThreshold: wordXThreshold == _sentinel
-          ? this.wordXThreshold
-          : wordXThreshold as double?,
+      lineYThreshold: lineYThreshold == _sentinel ? this.lineYThreshold : lineYThreshold as double?,
+      wordXThreshold: wordXThreshold == _sentinel ? this.wordXThreshold : wordXThreshold as double?,
       textScore: textScore == _sentinel ? this.textScore : textScore as double?,
-      classification: classification == _sentinel
-          ? this.classification
-          : classification as bool?,
-      orientation:
-          orientation == _sentinel ? this.orientation : orientation as bool?,
+      classification: classification == _sentinel ? this.classification : classification as bool?,
+      orientation: orientation == _sentinel ? this.orientation : orientation as bool?,
       minHeight: minHeight == _sentinel ? this.minHeight : minHeight as double?,
-      maxSideLen:
-          maxSideLen == _sentinel ? this.maxSideLen : maxSideLen as double?,
-      minSideLen:
-          minSideLen == _sentinel ? this.minSideLen : minSideLen as double?,
-      widthHeightRatio: widthHeightRatio == _sentinel
-          ? this.widthHeightRatio
-          : widthHeightRatio as double?,
-      detection: detection == _sentinel
-          ? this.detection
-          : detection as DetectionRunOptions?,
-      postprocess: postprocess == _sentinel
-          ? this.postprocess
-          : postprocess as PostprocessRunOptions?,
-      calibration: calibration == _sentinel
-          ? this.calibration
-          : calibration as CalibrationOptions?,
-      optimization: optimization == _sentinel
-          ? this.optimization
-          : optimization as OptimizationOptions?,
+      maxSideLen: maxSideLen == _sentinel ? this.maxSideLen : maxSideLen as double?,
+      minSideLen: minSideLen == _sentinel ? this.minSideLen : minSideLen as double?,
+      widthHeightRatio: widthHeightRatio == _sentinel ? this.widthHeightRatio : widthHeightRatio as double?,
+      detection: detection == _sentinel ? this.detection : detection as DetectionRunOptions?,
+      postprocess: postprocess == _sentinel ? this.postprocess : postprocess as PostprocessRunOptions?,
+      calibration: calibration == _sentinel ? this.calibration : calibration as CalibrationOptions?,
+      optimization: optimization == _sentinel ? this.optimization : optimization as OptimizationOptions?,
     );
   }
 
@@ -944,38 +661,10 @@ class OcrRunOptions {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is OcrRunOptions &&
-          output == other.output &&
-          lineYThreshold == other.lineYThreshold &&
-          wordXThreshold == other.wordXThreshold &&
-          textScore == other.textScore &&
-          classification == other.classification &&
-          orientation == other.orientation &&
-          minHeight == other.minHeight &&
-          maxSideLen == other.maxSideLen &&
-          minSideLen == other.minSideLen &&
-          widthHeightRatio == other.widthHeightRatio &&
-          detection == other.detection &&
-          postprocess == other.postprocess &&
-          calibration == other.calibration &&
-          optimization == other.optimization;
+      other is OcrRunOptions && output == other.output && lineYThreshold == other.lineYThreshold && wordXThreshold == other.wordXThreshold && textScore == other.textScore && classification == other.classification && orientation == other.orientation && minHeight == other.minHeight && maxSideLen == other.maxSideLen && minSideLen == other.minSideLen && widthHeightRatio == other.widthHeightRatio && detection == other.detection && postprocess == other.postprocess && calibration == other.calibration && optimization == other.optimization;
 
   @override
-  int get hashCode => Object.hash(
-      output,
-      lineYThreshold,
-      wordXThreshold,
-      textScore,
-      classification,
-      orientation,
-      minHeight,
-      maxSideLen,
-      minSideLen,
-      widthHeightRatio,
-      detection,
-      postprocess,
-      calibration,
-      optimization);
+  int get hashCode => Object.hash(output, lineYThreshold, wordXThreshold, textScore, classification, orientation, minHeight, maxSideLen, minSideLen, widthHeightRatio, detection, postprocess, calibration, optimization);
 }
 
 /// Runtime crop and resolution optimization options.
@@ -983,14 +672,12 @@ class OptimizationOptions {
   const OptimizationOptions({
     /// Horizontal padding around bounding box crops in pixels.
     required this.cropPaddingX,
-
     /// Vertical padding around bounding box crops in pixels.
     required this.cropPaddingY,
   });
 
   /// Horizontal padding around bounding box crops in pixels.
   final double? cropPaddingX;
-
   /// Vertical padding around bounding box crops in pixels.
   final double? cropPaddingY;
 
@@ -1003,12 +690,8 @@ class OptimizationOptions {
 
   factory OptimizationOptions.fromJson(Map<String, dynamic> json) {
     return OptimizationOptions(
-      cropPaddingX: json['cropPaddingX'] == null
-          ? null
-          : (json['cropPaddingX'] as num).toDouble(),
-      cropPaddingY: json['cropPaddingY'] == null
-          ? null
-          : (json['cropPaddingY'] as num).toDouble(),
+      cropPaddingX: json['cropPaddingX'] == null ? null : (json['cropPaddingX'] as num).toDouble(),
+      cropPaddingY: json['cropPaddingY'] == null ? null : (json['cropPaddingY'] as num).toDouble(),
     );
   }
 
@@ -1017,12 +700,8 @@ class OptimizationOptions {
     Object? cropPaddingY = _sentinel,
   }) {
     return OptimizationOptions(
-      cropPaddingX: cropPaddingX == _sentinel
-          ? this.cropPaddingX
-          : cropPaddingX as double?,
-      cropPaddingY: cropPaddingY == _sentinel
-          ? this.cropPaddingY
-          : cropPaddingY as double?,
+      cropPaddingX: cropPaddingX == _sentinel ? this.cropPaddingX : cropPaddingX as double?,
+      cropPaddingY: cropPaddingY == _sentinel ? this.cropPaddingY : cropPaddingY as double?,
     );
   }
 
@@ -1034,9 +713,7 @@ class OptimizationOptions {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is OptimizationOptions &&
-          cropPaddingX == other.cropPaddingX &&
-          cropPaddingY == other.cropPaddingY;
+      other is OptimizationOptions && cropPaddingX == other.cropPaddingX && cropPaddingY == other.cropPaddingY;
 
   @override
   int get hashCode => Object.hash(cropPaddingX, cropPaddingY);
@@ -1047,20 +724,16 @@ class OrientationConfig {
   const OrientationConfig({
     /// Whether orientation stage is enabled.
     required this.enabled,
-
     /// Filesystem path to orientation model.
     required this.modelPath,
-
     /// Confidence threshold.
     required this.thresh,
   });
 
   /// Whether orientation stage is enabled.
   final bool? enabled;
-
   /// Filesystem path to orientation model.
   final String? modelPath;
-
   /// Confidence threshold.
   final double? thresh;
 
@@ -1076,8 +749,7 @@ class OrientationConfig {
     return OrientationConfig(
       enabled: json['enabled'] == null ? null : json['enabled'] as bool,
       modelPath: json['modelPath'] == null ? null : json['modelPath'] as String,
-      thresh:
-          json['thresh'] == null ? null : (json['thresh'] as num).toDouble(),
+      thresh: json['thresh'] == null ? null : (json['thresh'] as num).toDouble(),
     );
   }
 
@@ -1101,10 +773,7 @@ class OrientationConfig {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is OrientationConfig &&
-          enabled == other.enabled &&
-          modelPath == other.modelPath &&
-          thresh == other.thresh;
+      other is OrientationConfig && enabled == other.enabled && modelPath == other.modelPath && thresh == other.thresh;
 
   @override
   int get hashCode => Object.hash(enabled, modelPath, thresh);
@@ -1115,14 +784,12 @@ class Point2D {
   const Point2D({
     /// Horizontal coordinate (X).
     required this.x,
-
     /// Vertical coordinate (Y).
     required this.y,
   });
 
   /// Horizontal coordinate (X).
   final double x;
-
   /// Vertical coordinate (Y).
   final double y;
 
@@ -1169,34 +836,30 @@ class PostprocessRunOptions {
   const PostprocessRunOptions({
     /// Binarization probability cutoff threshold. Default: 0.3.
     required this.threshold,
-
     /// Polygon contour score confidence threshold. Default: 0.6.
     required this.boxThreshold,
-
     /// Maximum candidate text boxes to detect per image. Default: 1000.
     required this.maxCandidates,
-
     /// Polygon unclip expansion ratio. Default: 1.5 - 2.0.
     required this.unclipRatio,
-
     /// Enable morphological dilation to connect broken text strokes.
     required this.useDilation,
+    /// DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
+    required this.scoreMode,
   });
 
   /// Binarization probability cutoff threshold. Default: 0.3.
   final double? threshold;
-
   /// Polygon contour score confidence threshold. Default: 0.6.
   final double? boxThreshold;
-
   /// Maximum candidate text boxes to detect per image. Default: 1000.
   final int? maxCandidates;
-
   /// Polygon unclip expansion ratio. Default: 1.5 - 2.0.
   final double? unclipRatio;
-
   /// Enable morphological dilation to connect broken text strokes.
   final bool? useDilation;
+  /// DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
+  final String? scoreMode;
 
   Map<String, dynamic> toJson() {
     return {
@@ -1205,25 +868,18 @@ class PostprocessRunOptions {
       'maxCandidates': this.maxCandidates,
       'unclipRatio': this.unclipRatio,
       'useDilation': this.useDilation,
+      'scoreMode': this.scoreMode,
     };
   }
 
   factory PostprocessRunOptions.fromJson(Map<String, dynamic> json) {
     return PostprocessRunOptions(
-      threshold: json['threshold'] == null
-          ? null
-          : (json['threshold'] as num).toDouble(),
-      boxThreshold: json['boxThreshold'] == null
-          ? null
-          : (json['boxThreshold'] as num).toDouble(),
-      maxCandidates: json['maxCandidates'] == null
-          ? null
-          : (json['maxCandidates'] as num).toInt(),
-      unclipRatio: json['unclipRatio'] == null
-          ? null
-          : (json['unclipRatio'] as num).toDouble(),
-      useDilation:
-          json['useDilation'] == null ? null : json['useDilation'] as bool,
+      threshold: json['threshold'] == null ? null : (json['threshold'] as num).toDouble(),
+      boxThreshold: json['boxThreshold'] == null ? null : (json['boxThreshold'] as num).toDouble(),
+      maxCandidates: json['maxCandidates'] == null ? null : (json['maxCandidates'] as num).toInt(),
+      unclipRatio: json['unclipRatio'] == null ? null : (json['unclipRatio'] as num).toDouble(),
+      useDilation: json['useDilation'] == null ? null : json['useDilation'] as bool,
+      scoreMode: json['scoreMode'] == null ? null : json['scoreMode'] as String,
     );
   }
 
@@ -1233,40 +889,30 @@ class PostprocessRunOptions {
     Object? maxCandidates = _sentinel,
     Object? unclipRatio = _sentinel,
     Object? useDilation = _sentinel,
+    Object? scoreMode = _sentinel,
   }) {
     return PostprocessRunOptions(
       threshold: threshold == _sentinel ? this.threshold : threshold as double?,
-      boxThreshold: boxThreshold == _sentinel
-          ? this.boxThreshold
-          : boxThreshold as double?,
-      maxCandidates: maxCandidates == _sentinel
-          ? this.maxCandidates
-          : maxCandidates as int?,
-      unclipRatio:
-          unclipRatio == _sentinel ? this.unclipRatio : unclipRatio as double?,
-      useDilation:
-          useDilation == _sentinel ? this.useDilation : useDilation as bool?,
+      boxThreshold: boxThreshold == _sentinel ? this.boxThreshold : boxThreshold as double?,
+      maxCandidates: maxCandidates == _sentinel ? this.maxCandidates : maxCandidates as int?,
+      unclipRatio: unclipRatio == _sentinel ? this.unclipRatio : unclipRatio as double?,
+      useDilation: useDilation == _sentinel ? this.useDilation : useDilation as bool?,
+      scoreMode: scoreMode == _sentinel ? this.scoreMode : scoreMode as String?,
     );
   }
 
   @override
   String toString() {
-    return 'PostprocessRunOptions(threshold: $threshold, boxThreshold: $boxThreshold, maxCandidates: $maxCandidates, unclipRatio: $unclipRatio, useDilation: $useDilation)';
+    return 'PostprocessRunOptions(threshold: $threshold, boxThreshold: $boxThreshold, maxCandidates: $maxCandidates, unclipRatio: $unclipRatio, useDilation: $useDilation, scoreMode: $scoreMode)';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is PostprocessRunOptions &&
-          threshold == other.threshold &&
-          boxThreshold == other.boxThreshold &&
-          maxCandidates == other.maxCandidates &&
-          unclipRatio == other.unclipRatio &&
-          useDilation == other.useDilation;
+      other is PostprocessRunOptions && threshold == other.threshold && boxThreshold == other.boxThreshold && maxCandidates == other.maxCandidates && unclipRatio == other.unclipRatio && useDilation == other.useDilation && scoreMode == other.scoreMode;
 
   @override
-  int get hashCode => Object.hash(
-      threshold, boxThreshold, maxCandidates, unclipRatio, useDilation);
+  int get hashCode => Object.hash(threshold, boxThreshold, maxCandidates, unclipRatio, useDilation, scoreMode);
 }
 
 /// Text recognition model configuration.
@@ -1274,20 +920,16 @@ class RecognitionConfig {
   const RecognitionConfig({
     /// Whether recognition stage is enabled.
     required this.enabled,
-
     /// Filesystem path to recognition model (.rten or .onnx).
     required this.modelPath,
-
     /// Filesystem path to dictionary vocabulary file (.txt).
     required this.dictPath,
   });
 
   /// Whether recognition stage is enabled.
   final bool? enabled;
-
   /// Filesystem path to recognition model (.rten or .onnx).
   final String? modelPath;
-
   /// Filesystem path to dictionary vocabulary file (.txt).
   final String? dictPath;
 
@@ -1327,10 +969,7 @@ class RecognitionConfig {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is RecognitionConfig &&
-          enabled == other.enabled &&
-          modelPath == other.modelPath &&
-          dictPath == other.dictPath;
+      other is RecognitionConfig && enabled == other.enabled && modelPath == other.modelPath && dictPath == other.dictPath;
 
   @override
   int get hashCode => Object.hash(enabled, modelPath, dictPath);
@@ -1341,26 +980,20 @@ class TextResult {
   const TextResult({
     /// Recognized text string.
     required this.text,
-
     /// Confidence score between 0.0 and 1.0.
     required this.score,
-
     /// Polygon vertex coordinates [top-left, top-right, bottom-right, bottom-left].
     required this.boxPoints,
-
     /// Axis-aligned bounding box frame.
     required this.frame,
   });
 
   /// Recognized text string.
   final String text;
-
   /// Confidence score between 0.0 and 1.0.
   final double score;
-
   /// Polygon vertex coordinates [top-left, top-right, bottom-right, bottom-left].
   final List<Point2D> boxPoints;
-
   /// Axis-aligned bounding box frame.
   final Frame frame;
 
@@ -1377,9 +1010,7 @@ class TextResult {
     return TextResult(
       text: json['text'] as String,
       score: (json['score'] as num).toDouble(),
-      boxPoints: (json['boxPoints'] as List)
-          .map((item) => Point2D.fromJson(item as Map<String, dynamic>))
-          .toList(),
+      boxPoints: (json['boxPoints'] as List).map((item) => Point2D.fromJson(item as Map<String, dynamic>)).toList(),
       frame: Frame.fromJson(json['frame'] as Map<String, dynamic>),
     );
   }
@@ -1406,11 +1037,7 @@ class TextResult {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is TextResult &&
-          text == other.text &&
-          score == other.score &&
-          boxPoints == other.boxPoints &&
-          frame == other.frame;
+      other is TextResult && text == other.text && score == other.score && boxPoints == other.boxPoints && frame == other.frame;
 
   @override
   int get hashCode => Object.hash(text, score, boxPoints, frame);
@@ -1421,14 +1048,12 @@ class UnwarpConfig {
   const UnwarpConfig({
     /// Whether unwarp stage is enabled.
     required this.enabled,
-
     /// Filesystem path to unwarp model.
     required this.modelPath,
   });
 
   /// Whether unwarp stage is enabled.
   final bool? enabled;
-
   /// Filesystem path to unwarp model.
   final String? modelPath;
 
@@ -1464,9 +1089,7 @@ class UnwarpConfig {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is UnwarpConfig &&
-          enabled == other.enabled &&
-          modelPath == other.modelPath;
+      other is UnwarpConfig && enabled == other.enabled && modelPath == other.modelPath;
 
   @override
   int get hashCode => Object.hash(enabled, modelPath);
@@ -1538,7 +1161,8 @@ final class ImageSourcePath extends ImageSource {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is ImageSourcePath && path == other.path;
+      identical(this, other) ||
+      other is ImageSourcePath && path == other.path;
 
   @override
   int get hashCode => path.hashCode;
@@ -1558,7 +1182,8 @@ final class ImageSourceBytes extends ImageSource {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is ImageSourceBytes && data == other.data;
+      identical(this, other) ||
+      other is ImageSourceBytes && data == other.data;
 
   @override
   int get hashCode => data.hashCode;
@@ -1568,10 +1193,8 @@ final class ImageSourceBytes extends ImageSource {
 enum OutputGranularity {
   /// Group recognized tokens into lines (default).
   lines,
-
   /// Return individual word-level tokens.
   words,
-
   /// Reconstruct a 2D spatial text layout preserving visual arrangement.
   spatial,
 }
@@ -1684,8 +1307,7 @@ sealed class RustoBindingErrorException implements Exception {
   const RustoBindingErrorException();
 }
 
-final class RustoBindingErrorExceptionInitialization
-    extends RustoBindingErrorException {
+final class RustoBindingErrorExceptionInitialization extends RustoBindingErrorException {
   const RustoBindingErrorExceptionInitialization({
     required this.msg,
   });
@@ -1697,8 +1319,7 @@ final class RustoBindingErrorExceptionInitialization
   }
 }
 
-final class RustoBindingErrorExceptionPreprocess
-    extends RustoBindingErrorException {
+final class RustoBindingErrorExceptionPreprocess extends RustoBindingErrorException {
   const RustoBindingErrorExceptionPreprocess({
     required this.msg,
   });
@@ -1710,8 +1331,7 @@ final class RustoBindingErrorExceptionPreprocess
   }
 }
 
-final class RustoBindingErrorExceptionInference
-    extends RustoBindingErrorException {
+final class RustoBindingErrorExceptionInference extends RustoBindingErrorException {
   const RustoBindingErrorExceptionInference({
     required this.msg,
   });
@@ -1723,8 +1343,7 @@ final class RustoBindingErrorExceptionInference
   }
 }
 
-final class RustoBindingErrorExceptionPostprocess
-    extends RustoBindingErrorException {
+final class RustoBindingErrorExceptionPostprocess extends RustoBindingErrorException {
   const RustoBindingErrorExceptionPostprocess({
     required this.msg,
   });
@@ -1736,8 +1355,7 @@ final class RustoBindingErrorExceptionPostprocess
   }
 }
 
-final class RustoBindingErrorExceptionInvalidInput
-    extends RustoBindingErrorException {
+final class RustoBindingErrorExceptionInvalidInput extends RustoBindingErrorException {
   const RustoBindingErrorExceptionInvalidInput({
     required this.msg,
   });
@@ -1749,8 +1367,7 @@ final class RustoBindingErrorExceptionInvalidInput
   }
 }
 
-RustoBindingErrorException _uniffiLiftRustoBindingErrorException(
-    Uint8List bytes) {
+RustoBindingErrorException _uniffiLiftRustoBindingErrorException(Uint8List bytes) {
   final RustoBindingError value = _uniffiDecodeRustoBindingError(bytes);
   if (value is RustoBindingErrorInitialization) {
     return RustoBindingErrorExceptionInitialization(
@@ -1777,8 +1394,7 @@ RustoBindingErrorException _uniffiLiftRustoBindingErrorException(
       msg: value.msg,
     );
   }
-  throw StateError(
-      'Unknown RustoBindingError error variant while lifting exception: $value');
+  throw StateError('Unknown RustoBindingError error variant while lifting exception: $value');
 }
 
 String _encodeDetectTextResult(DetectTextResult value) {
@@ -1803,9 +1419,7 @@ DetectTextResult _decodeDetectTextResult(String raw) {
   switch (tag) {
     case 'structured':
       return DetectTextResultStructured(
-        results: (map['results'] as List)
-            .map((item) => TextResult.fromJson(item as Map<String, dynamic>))
-            .toList(),
+        results: (map['results'] as List).map((item) => TextResult.fromJson(item as Map<String, dynamic>)).toList(),
       );
     case 'spatial':
       return DetectTextResultSpatial(
@@ -1960,14 +1574,11 @@ String _encodeRustoBindingErrorException(RustoBindingErrorException value) {
       'msg': value.msg,
     });
   }
-  throw StateError(
-      'Unknown RustoBindingErrorException exception instance: $value');
+  throw StateError('Unknown RustoBindingErrorException exception instance: $value');
 }
 
 RustoBindingErrorException _decodeRustoBindingErrorException(Object? raw) {
-  final Map<String, dynamic> map = raw is String
-      ? (jsonDecode(raw) as Map<String, dynamic>)
-      : (raw as Map<String, dynamic>);
+  final Map<String, dynamic> map = raw is String ? (jsonDecode(raw) as Map<String, dynamic>) : (raw as Map<String, dynamic>);
   final String? tag = map['tag'] as String?;
   switch (tag) {
     case 'initialization':
@@ -1991,16 +1602,14 @@ RustoBindingErrorException _decodeRustoBindingErrorException(Object? raw) {
         msg: map['msg'] as String,
       );
     default:
-      throw StateError(
-          'Unknown RustoBindingErrorException exception tag: $tag');
+      throw StateError('Unknown RustoBindingErrorException exception tag: $tag');
   }
 }
 
 final class DetectTextResultFfiCodec {
   const DetectTextResultFfiCodec._();
 
-  static String encode(DetectTextResult value) =>
-      _encodeDetectTextResult(value);
+  static String encode(DetectTextResult value) => _encodeDetectTextResult(value);
 
   static DetectTextResult decode(String raw) => _decodeDetectTextResult(raw);
 }
@@ -2016,8 +1625,7 @@ final class ImageSourceFfiCodec {
 final class OutputGranularityFfiCodec {
   const OutputGranularityFfiCodec._();
 
-  static String encode(OutputGranularity value) =>
-      _encodeOutputGranularity(value);
+  static String encode(OutputGranularity value) => _encodeOutputGranularity(value);
 
   static OutputGranularity decode(String raw) => _decodeOutputGranularity(raw);
 }
@@ -2025,8 +1633,7 @@ final class OutputGranularityFfiCodec {
 final class RustoBindingErrorFfiCodec {
   const RustoBindingErrorFfiCodec._();
 
-  static String encode(RustoBindingError value) =>
-      _encodeRustoBindingError(value);
+  static String encode(RustoBindingError value) => _encodeRustoBindingError(value);
 
   static RustoBindingError decode(String raw) => _decodeRustoBindingError(raw);
 }
@@ -2034,11 +1641,9 @@ final class RustoBindingErrorFfiCodec {
 final class RustoBindingErrorExceptionFfiCodec {
   const RustoBindingErrorExceptionFfiCodec._();
 
-  static String encode(RustoBindingErrorException value) =>
-      _encodeRustoBindingErrorException(value);
+  static String encode(RustoBindingErrorException value) => _encodeRustoBindingErrorException(value);
 
-  static RustoBindingErrorException decode(Object? raw) =>
-      _decodeRustoBindingErrorException(raw);
+  static RustoBindingErrorException decode(Object? raw) => _decodeRustoBindingErrorException(raw);
 }
 
 final class _UniFfiBinaryWriter {
@@ -2050,42 +1655,34 @@ final class _UniFfiBinaryWriter {
     final data = ByteData(2)..setUint16(0, value, Endian.big);
     _builder.add(data.buffer.asUint8List());
   }
-
   void writeI16(int value) {
     final data = ByteData(2)..setInt16(0, value, Endian.big);
     _builder.add(data.buffer.asUint8List());
   }
-
   void writeU32(int value) {
     final data = ByteData(4)..setUint32(0, value, Endian.big);
     _builder.add(data.buffer.asUint8List());
   }
-
   void writeI32(int value) {
     final data = ByteData(4)..setInt32(0, value, Endian.big);
     _builder.add(data.buffer.asUint8List());
   }
-
   void writeU64(int value) {
     final data = ByteData(8)..setUint64(0, value, Endian.big);
     _builder.add(data.buffer.asUint8List());
   }
-
   void writeI64(int value) {
     final data = ByteData(8)..setInt64(0, value, Endian.big);
     _builder.add(data.buffer.asUint8List());
   }
-
   void writeF32(double value) {
     final data = ByteData(4)..setFloat32(0, value, Endian.big);
     _builder.add(data.buffer.asUint8List());
   }
-
   void writeF64(double value) {
     final data = ByteData(8)..setFloat64(0, value, Endian.big);
     _builder.add(data.buffer.asUint8List());
   }
-
   void writeBool(bool value) => writeI8(value ? 1 : 0);
   void writeBytes(Uint8List bytes) => _builder.add(bytes);
   void writeString(String value) {
@@ -2129,7 +1726,6 @@ final class _UniFfiBinaryReader {
     if (value == 1) return true;
     throw StateError('invalid boolean payload value: $value');
   }
-
   Uint8List readBytes(int len) {
     if (_offset + len > _bytes.length) {
       throw StateError('buffer underflow while decoding UniFFI payload bytes');
@@ -2138,7 +1734,6 @@ final class _UniFfiBinaryReader {
     _offset += len;
     return out;
   }
-
   String readString() {
     final len = readI32();
     if (len < 0) {
@@ -2148,8 +1743,7 @@ final class _UniFfiBinaryReader {
   }
 }
 
-void _uniffiWriteCalibrationOptions(
-    CalibrationOptions value, _UniFfiBinaryWriter writer) {
+void _uniffiWriteCalibrationOptions(CalibrationOptions value, _UniFfiBinaryWriter writer) {
   if (value.descreenStrength == null) {
     writer.writeI8(0);
   } else {
@@ -2166,12 +1760,7 @@ Uint8List _uniffiEncodeCalibrationOptions(CalibrationOptions value) {
 
 CalibrationOptions _uniffiReadCalibrationOptions(_UniFfiBinaryReader reader) {
   return CalibrationOptions(
-    descreenStrength: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
+    descreenStrength: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
   );
 }
 
@@ -2184,8 +1773,7 @@ CalibrationOptions _uniffiDecodeCalibrationOptions(Uint8List bytes) {
   return value;
 }
 
-void _uniffiWriteClassificationConfig(
-    ClassificationConfig value, _UniFfiBinaryWriter writer) {
+void _uniffiWriteClassificationConfig(ClassificationConfig value, _UniFfiBinaryWriter writer) {
   if (value.enabled == null) {
     writer.writeI8(0);
   } else {
@@ -2212,27 +1800,11 @@ Uint8List _uniffiEncodeClassificationConfig(ClassificationConfig value) {
   return writer.toBytes();
 }
 
-ClassificationConfig _uniffiReadClassificationConfig(
-    _UniFfiBinaryReader reader) {
+ClassificationConfig _uniffiReadClassificationConfig(_UniFfiBinaryReader reader) {
   return ClassificationConfig(
-    enabled: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readBool();
-    })(),
-    modelPath: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readString();
-    })(),
-    thresh: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
+    enabled: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    modelPath: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
+    thresh: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
   );
 }
 
@@ -2240,14 +1812,12 @@ ClassificationConfig _uniffiDecodeClassificationConfig(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
   final value = _uniffiReadClassificationConfig(reader);
   if (!reader.isDone) {
-    throw StateError(
-        'extra bytes remaining while decoding ClassificationConfig');
+    throw StateError('extra bytes remaining while decoding ClassificationConfig');
   }
   return value;
 }
 
-void _uniffiWriteDetectionConfig(
-    DetectionConfig value, _UniFfiBinaryWriter writer) {
+void _uniffiWriteDetectionConfig(DetectionConfig value, _UniFfiBinaryWriter writer) {
   if (value.enabled == null) {
     writer.writeI8(0);
   } else {
@@ -2296,6 +1866,12 @@ void _uniffiWriteDetectionConfig(
     writer.writeI8(1);
     writer.writeBool(value.useDilation!);
   }
+  if (value.scoreMode == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeString(value.scoreMode!);
+  }
 }
 
 Uint8List _uniffiEncodeDetectionConfig(DetectionConfig value) {
@@ -2306,54 +1882,15 @@ Uint8List _uniffiEncodeDetectionConfig(DetectionConfig value) {
 
 DetectionConfig _uniffiReadDetectionConfig(_UniFfiBinaryReader reader) {
   return DetectionConfig(
-    enabled: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readBool();
-    })(),
-    modelPath: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readString();
-    })(),
-    thresh: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    boxThresh: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    unclipRatio: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    limitSideLen: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readI32();
-    })(),
-    limitType: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readString();
-    })(),
-    useDilation: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readBool();
-    })(),
+    enabled: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    modelPath: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
+    thresh: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    boxThresh: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    unclipRatio: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    limitSideLen: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readI32(); })(),
+    limitType: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
+    useDilation: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    scoreMode: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
   );
 }
 
@@ -2366,8 +1903,7 @@ DetectionConfig _uniffiDecodeDetectionConfig(Uint8List bytes) {
   return value;
 }
 
-void _uniffiWriteDetectionRunOptions(
-    DetectionRunOptions value, _UniFfiBinaryWriter writer) {
+void _uniffiWriteDetectionRunOptions(DetectionRunOptions value, _UniFfiBinaryWriter writer) {
   if (value.limitSideLen == null) {
     writer.writeI8(0);
   } else {
@@ -2414,50 +1950,11 @@ Uint8List _uniffiEncodeDetectionRunOptions(DetectionRunOptions value) {
 
 DetectionRunOptions _uniffiReadDetectionRunOptions(_UniFfiBinaryReader reader) {
   return DetectionRunOptions(
-    limitSideLen: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readI32();
-    })(),
-    limitType: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readString();
-    })(),
-    mean: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return (() {
-        final int __len = reader.readI32();
-        final out = <double>[];
-        for (var i = 0; i < __len; i++) {
-          out.add(reader.readF32());
-        }
-        return out;
-      })();
-    })(),
-    std: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return (() {
-        final int __len = reader.readI32();
-        final out = <double>[];
-        for (var i = 0; i < __len; i++) {
-          out.add(reader.readF32());
-        }
-        return out;
-      })();
-    })(),
-    postprocess: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return _uniffiReadPostprocessRunOptions(reader);
-    })(),
+    limitSideLen: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readI32(); })(),
+    limitType: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
+    mean: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return (() { final int __len = reader.readI32(); final out = <double>[]; for (var i = 0; i < __len; i++) { out.add(reader.readF32()); } return out; })(); })(),
+    std: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return (() { final int __len = reader.readI32(); final out = <double>[]; for (var i = 0; i < __len; i++) { out.add(reader.readF32()); } return out; })(); })(),
+    postprocess: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadPostprocessRunOptions(reader); })(),
   );
 }
 
@@ -2465,8 +1962,7 @@ DetectionRunOptions _uniffiDecodeDetectionRunOptions(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
   final value = _uniffiReadDetectionRunOptions(reader);
   if (!reader.isDone) {
-    throw StateError(
-        'extra bytes remaining while decoding DetectionRunOptions');
+    throw StateError('extra bytes remaining while decoding DetectionRunOptions');
   }
   return value;
 }
@@ -2502,8 +1998,7 @@ Frame _uniffiDecodeFrame(Uint8List bytes) {
   return value;
 }
 
-void _uniffiWriteInitializeConfig(
-    InitializeConfig value, _UniFfiBinaryWriter writer) {
+void _uniffiWriteInitializeConfig(InitializeConfig value, _UniFfiBinaryWriter writer) {
   if (value.template == null) {
     writer.writeI8(0);
   } else {
@@ -2550,42 +2045,12 @@ Uint8List _uniffiEncodeInitializeConfig(InitializeConfig value) {
 
 InitializeConfig _uniffiReadInitializeConfig(_UniFfiBinaryReader reader) {
   return InitializeConfig(
-    template: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readString();
-    })(),
-    detection: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return _uniffiReadDetectionConfig(reader);
-    })(),
-    recognition: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return _uniffiReadRecognitionConfig(reader);
-    })(),
-    classification: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return _uniffiReadClassificationConfig(reader);
-    })(),
-    orientation: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return _uniffiReadOrientationConfig(reader);
-    })(),
-    unwarp: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return _uniffiReadUnwarpConfig(reader);
-    })(),
+    template: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
+    detection: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadDetectionConfig(reader); })(),
+    recognition: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadRecognitionConfig(reader); })(),
+    classification: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadClassificationConfig(reader); })(),
+    orientation: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadOrientationConfig(reader); })(),
+    unwarp: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadUnwarpConfig(reader); })(),
   );
 }
 
@@ -2598,8 +2063,7 @@ InitializeConfig _uniffiDecodeInitializeConfig(Uint8List bytes) {
   return value;
 }
 
-void _uniffiWriteOcrRunOptions(
-    OcrRunOptions value, _UniFfiBinaryWriter writer) {
+void _uniffiWriteOcrRunOptions(OcrRunOptions value, _UniFfiBinaryWriter writer) {
   _uniffiWriteOutputGranularity(value.output, writer);
   if (value.lineYThreshold == null) {
     writer.writeI8(0);
@@ -2690,84 +2154,19 @@ Uint8List _uniffiEncodeOcrRunOptions(OcrRunOptions value) {
 OcrRunOptions _uniffiReadOcrRunOptions(_UniFfiBinaryReader reader) {
   return OcrRunOptions(
     output: _uniffiReadOutputGranularity(reader),
-    lineYThreshold: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    wordXThreshold: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    textScore: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    classification: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readBool();
-    })(),
-    orientation: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readBool();
-    })(),
-    minHeight: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    maxSideLen: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    minSideLen: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    widthHeightRatio: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    detection: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return _uniffiReadDetectionRunOptions(reader);
-    })(),
-    postprocess: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return _uniffiReadPostprocessRunOptions(reader);
-    })(),
-    calibration: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return _uniffiReadCalibrationOptions(reader);
-    })(),
-    optimization: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return _uniffiReadOptimizationOptions(reader);
-    })(),
+    lineYThreshold: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    wordXThreshold: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    textScore: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    classification: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    orientation: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    minHeight: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    maxSideLen: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    minSideLen: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    widthHeightRatio: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    detection: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadDetectionRunOptions(reader); })(),
+    postprocess: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadPostprocessRunOptions(reader); })(),
+    calibration: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadCalibrationOptions(reader); })(),
+    optimization: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadOptimizationOptions(reader); })(),
   );
 }
 
@@ -2780,8 +2179,7 @@ OcrRunOptions _uniffiDecodeOcrRunOptions(Uint8List bytes) {
   return value;
 }
 
-void _uniffiWriteOptimizationOptions(
-    OptimizationOptions value, _UniFfiBinaryWriter writer) {
+void _uniffiWriteOptimizationOptions(OptimizationOptions value, _UniFfiBinaryWriter writer) {
   if (value.cropPaddingX == null) {
     writer.writeI8(0);
   } else {
@@ -2804,18 +2202,8 @@ Uint8List _uniffiEncodeOptimizationOptions(OptimizationOptions value) {
 
 OptimizationOptions _uniffiReadOptimizationOptions(_UniFfiBinaryReader reader) {
   return OptimizationOptions(
-    cropPaddingX: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    cropPaddingY: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
+    cropPaddingX: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    cropPaddingY: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
   );
 }
 
@@ -2823,14 +2211,12 @@ OptimizationOptions _uniffiDecodeOptimizationOptions(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
   final value = _uniffiReadOptimizationOptions(reader);
   if (!reader.isDone) {
-    throw StateError(
-        'extra bytes remaining while decoding OptimizationOptions');
+    throw StateError('extra bytes remaining while decoding OptimizationOptions');
   }
   return value;
 }
 
-void _uniffiWriteOrientationConfig(
-    OrientationConfig value, _UniFfiBinaryWriter writer) {
+void _uniffiWriteOrientationConfig(OrientationConfig value, _UniFfiBinaryWriter writer) {
   if (value.enabled == null) {
     writer.writeI8(0);
   } else {
@@ -2859,24 +2245,9 @@ Uint8List _uniffiEncodeOrientationConfig(OrientationConfig value) {
 
 OrientationConfig _uniffiReadOrientationConfig(_UniFfiBinaryReader reader) {
   return OrientationConfig(
-    enabled: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readBool();
-    })(),
-    modelPath: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readString();
-    })(),
-    thresh: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
+    enabled: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    modelPath: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
+    thresh: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
   );
 }
 
@@ -2916,8 +2287,7 @@ Point2D _uniffiDecodePoint2D(Uint8List bytes) {
   return value;
 }
 
-void _uniffiWritePostprocessRunOptions(
-    PostprocessRunOptions value, _UniFfiBinaryWriter writer) {
+void _uniffiWritePostprocessRunOptions(PostprocessRunOptions value, _UniFfiBinaryWriter writer) {
   if (value.threshold == null) {
     writer.writeI8(0);
   } else {
@@ -2948,6 +2318,12 @@ void _uniffiWritePostprocessRunOptions(
     writer.writeI8(1);
     writer.writeBool(value.useDilation!);
   }
+  if (value.scoreMode == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeString(value.scoreMode!);
+  }
 }
 
 Uint8List _uniffiEncodePostprocessRunOptions(PostprocessRunOptions value) {
@@ -2956,39 +2332,14 @@ Uint8List _uniffiEncodePostprocessRunOptions(PostprocessRunOptions value) {
   return writer.toBytes();
 }
 
-PostprocessRunOptions _uniffiReadPostprocessRunOptions(
-    _UniFfiBinaryReader reader) {
+PostprocessRunOptions _uniffiReadPostprocessRunOptions(_UniFfiBinaryReader reader) {
   return PostprocessRunOptions(
-    threshold: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    boxThreshold: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    maxCandidates: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readI32();
-    })(),
-    unclipRatio: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readF32();
-    })(),
-    useDilation: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readBool();
-    })(),
+    threshold: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    boxThreshold: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    maxCandidates: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readI32(); })(),
+    unclipRatio: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    useDilation: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    scoreMode: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
   );
 }
 
@@ -2996,14 +2347,12 @@ PostprocessRunOptions _uniffiDecodePostprocessRunOptions(Uint8List bytes) {
   final reader = _UniFfiBinaryReader(bytes);
   final value = _uniffiReadPostprocessRunOptions(reader);
   if (!reader.isDone) {
-    throw StateError(
-        'extra bytes remaining while decoding PostprocessRunOptions');
+    throw StateError('extra bytes remaining while decoding PostprocessRunOptions');
   }
   return value;
 }
 
-void _uniffiWriteRecognitionConfig(
-    RecognitionConfig value, _UniFfiBinaryWriter writer) {
+void _uniffiWriteRecognitionConfig(RecognitionConfig value, _UniFfiBinaryWriter writer) {
   if (value.enabled == null) {
     writer.writeI8(0);
   } else {
@@ -3032,24 +2381,9 @@ Uint8List _uniffiEncodeRecognitionConfig(RecognitionConfig value) {
 
 RecognitionConfig _uniffiReadRecognitionConfig(_UniFfiBinaryReader reader) {
   return RecognitionConfig(
-    enabled: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readBool();
-    })(),
-    modelPath: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readString();
-    })(),
-    dictPath: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readString();
-    })(),
+    enabled: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    modelPath: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
+    dictPath: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
   );
 }
 
@@ -3082,14 +2416,7 @@ TextResult _uniffiReadTextResult(_UniFfiBinaryReader reader) {
   return TextResult(
     text: reader.readString(),
     score: reader.readF32(),
-    boxPoints: (() {
-      final int __len = reader.readI32();
-      final out = <Point2D>[];
-      for (var i = 0; i < __len; i++) {
-        out.add(_uniffiReadPoint2D(reader));
-      }
-      return out;
-    })(),
+    boxPoints: (() { final int __len = reader.readI32(); final out = <Point2D>[]; for (var i = 0; i < __len; i++) { out.add(_uniffiReadPoint2D(reader)); } return out; })(),
     frame: _uniffiReadFrame(reader),
   );
 }
@@ -3126,18 +2453,8 @@ Uint8List _uniffiEncodeUnwarpConfig(UnwarpConfig value) {
 
 UnwarpConfig _uniffiReadUnwarpConfig(_UniFfiBinaryReader reader) {
   return UnwarpConfig(
-    enabled: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readBool();
-    })(),
-    modelPath: (() {
-      final int __tag = reader.readI8();
-      if (__tag == 0) return null;
-      if (__tag != 1) throw StateError('invalid optional tag: $__tag');
-      return reader.readString();
-    })(),
+    enabled: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    modelPath: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
   );
 }
 
@@ -3150,18 +2467,19 @@ UnwarpConfig _uniffiDecodeUnwarpConfig(Uint8List bytes) {
   return value;
 }
 
-void _uniffiWriteDetectTextResult(
-    DetectTextResult value, _UniFfiBinaryWriter writer) {
+void _uniffiWriteDetectTextResult(DetectTextResult value, _UniFfiBinaryWriter writer) {
   if (value is DetectTextResultStructured) {
     writer.writeI32(1);
     writer.writeI32(value.results.length);
     for (final item in value.results) {
       _uniffiWriteTextResult(item, writer);
     }
-  } else if (value is DetectTextResultSpatial) {
+  }
+  else if (value is DetectTextResultSpatial) {
     writer.writeI32(2);
     writer.writeString(value.text);
-  } else {
+  }
+  else {
     throw StateError('Unknown DetectTextResult variant instance: $value');
   }
 }
@@ -3177,14 +2495,7 @@ DetectTextResult _uniffiReadDetectTextResult(_UniFfiBinaryReader reader) {
   switch (tag) {
     case 1:
       return DetectTextResultStructured(
-        results: (() {
-          final int __len = reader.readI32();
-          final out = <TextResult>[];
-          for (var i = 0; i < __len; i++) {
-            out.add(_uniffiReadTextResult(reader));
-          }
-          return out;
-        })(),
+        results: (() { final int __len = reader.readI32(); final out = <TextResult>[]; for (var i = 0; i < __len; i++) { out.add(_uniffiReadTextResult(reader)); } return out; })(),
       );
     case 2:
       return DetectTextResultSpatial(
@@ -3208,11 +2519,13 @@ void _uniffiWriteImageSource(ImageSource value, _UniFfiBinaryWriter writer) {
   if (value is ImageSourcePath) {
     writer.writeI32(1);
     writer.writeString(value.path);
-  } else if (value is ImageSourceBytes) {
+  }
+  else if (value is ImageSourceBytes) {
     writer.writeI32(2);
     writer.writeI32(value.data.length);
     writer.writeBytes(value.data);
-  } else {
+  }
+  else {
     throw StateError('Unknown ImageSource variant instance: $value');
   }
 }
@@ -3232,10 +2545,7 @@ ImageSource _uniffiReadImageSource(_UniFfiBinaryReader reader) {
       );
     case 2:
       return ImageSourceBytes(
-        data: (() {
-          final int __len = reader.readI32();
-          return reader.readBytes(__len);
-        })(),
+        data: (() { final int __len = reader.readI32(); return reader.readBytes(__len); })(),
       );
     default:
       throw StateError('Unknown ImageSource variant tag: $tag');
@@ -3251,8 +2561,7 @@ ImageSource _uniffiDecodeImageSource(Uint8List bytes) {
   return value;
 }
 
-void _uniffiWriteOutputGranularity(
-    OutputGranularity value, _UniFfiBinaryWriter writer) {
+void _uniffiWriteOutputGranularity(OutputGranularity value, _UniFfiBinaryWriter writer) {
   final int tag = switch (value) {
     OutputGranularity.lines => 1,
     OutputGranularity.words => 2,
@@ -3290,24 +2599,28 @@ OutputGranularity _uniffiDecodeOutputGranularity(Uint8List bytes) {
   return value;
 }
 
-void _uniffiWriteRustoBindingError(
-    RustoBindingError value, _UniFfiBinaryWriter writer) {
+void _uniffiWriteRustoBindingError(RustoBindingError value, _UniFfiBinaryWriter writer) {
   if (value is RustoBindingErrorInitialization) {
     writer.writeI32(1);
     writer.writeString(value.msg);
-  } else if (value is RustoBindingErrorPreprocess) {
+  }
+  else if (value is RustoBindingErrorPreprocess) {
     writer.writeI32(2);
     writer.writeString(value.msg);
-  } else if (value is RustoBindingErrorInference) {
+  }
+  else if (value is RustoBindingErrorInference) {
     writer.writeI32(3);
     writer.writeString(value.msg);
-  } else if (value is RustoBindingErrorPostprocess) {
+  }
+  else if (value is RustoBindingErrorPostprocess) {
     writer.writeI32(4);
     writer.writeString(value.msg);
-  } else if (value is RustoBindingErrorInvalidInput) {
+  }
+  else if (value is RustoBindingErrorInvalidInput) {
     writer.writeI32(5);
     writer.writeString(value.msg);
-  } else {
+  }
+  else {
     throw StateError('Unknown RustoBindingError variant instance: $value');
   }
 }
@@ -3377,138 +2690,93 @@ class RustoFfi {
     const int bindingsContractVersion = 30;
     final int scaffoldingContractVersion;
     try {
-      final int Function() ffiContractVersion =
-          lib.lookupFunction<ffi.Uint32 Function(), int Function()>(
-              'ffi_rusto_uniffi_contract_version');
+      final int Function() ffiContractVersion = lib.lookupFunction<ffi.Uint32 Function(), int Function()>('ffi_rusto_uniffi_contract_version');
       scaffoldingContractVersion = ffiContractVersion();
     } catch (err) {
-      throw StateError(
-          'Missing or invalid UniFFI contract-version symbol `ffi_rusto_uniffi_contract_version`: $err');
+      throw StateError('Missing or invalid UniFFI contract-version symbol `ffi_rusto_uniffi_contract_version`: $err');
     }
     if (bindingsContractVersion != scaffoldingContractVersion) {
-      throw StateError(
-          'UniFFI contract version mismatch: expected $bindingsContractVersion, got $scaffoldingContractVersion');
+      throw StateError('UniFFI contract version mismatch: expected $bindingsContractVersion, got $scaffoldingContractVersion');
     }
-    final int
-        _checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6;
+    final int _checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6;
     try {
-      final int Function() checksumFn =
-          lib.lookupFunction<ffi.Uint16 Function(), int Function()>(
-              'uniffi_rusto_checksum_func_create_initialize_config_ppv6');
-      _checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6 =
-          checksumFn();
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_func_create_initialize_config_ppv6');
+      _checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6 = checksumFn();
     } catch (err) {
-      throw StateError(
-          'Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_func_create_initialize_config_ppv6`: $err');
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_func_create_initialize_config_ppv6`: $err');
     }
-    if (_checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6 !=
-        12132) {
-      throw StateError(
-          'UniFFI API checksum mismatch for `uniffi_rusto_checksum_func_create_initialize_config_ppv6`: expected 12132, got $_checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6');
+    if (_checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6 != 12132) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_func_create_initialize_config_ppv6`: expected 12132, got $_checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6');
     }
     final int _checksum_uniffi_rusto_checksum_func_default_ocr_run_options;
     try {
-      final int Function() checksumFn =
-          lib.lookupFunction<ffi.Uint16 Function(), int Function()>(
-              'uniffi_rusto_checksum_func_default_ocr_run_options');
-      _checksum_uniffi_rusto_checksum_func_default_ocr_run_options =
-          checksumFn();
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_func_default_ocr_run_options');
+      _checksum_uniffi_rusto_checksum_func_default_ocr_run_options = checksumFn();
     } catch (err) {
-      throw StateError(
-          'Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_func_default_ocr_run_options`: $err');
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_func_default_ocr_run_options`: $err');
     }
     if (_checksum_uniffi_rusto_checksum_func_default_ocr_run_options != 50314) {
-      throw StateError(
-          'UniFFI API checksum mismatch for `uniffi_rusto_checksum_func_default_ocr_run_options`: expected 50314, got $_checksum_uniffi_rusto_checksum_func_default_ocr_run_options');
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_func_default_ocr_run_options`: expected 50314, got $_checksum_uniffi_rusto_checksum_func_default_ocr_run_options');
     }
     final int _checksum_uniffi_rusto_checksum_func_rusto_version;
     try {
-      final int Function() checksumFn =
-          lib.lookupFunction<ffi.Uint16 Function(), int Function()>(
-              'uniffi_rusto_checksum_func_rusto_version');
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_func_rusto_version');
       _checksum_uniffi_rusto_checksum_func_rusto_version = checksumFn();
     } catch (err) {
-      throw StateError(
-          'Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_func_rusto_version`: $err');
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_func_rusto_version`: $err');
     }
     if (_checksum_uniffi_rusto_checksum_func_rusto_version != 3477) {
-      throw StateError(
-          'UniFFI API checksum mismatch for `uniffi_rusto_checksum_func_rusto_version`: expected 3477, got $_checksum_uniffi_rusto_checksum_func_rusto_version');
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_func_rusto_version`: expected 3477, got $_checksum_uniffi_rusto_checksum_func_rusto_version');
     }
     final int _checksum_uniffi_rusto_checksum_method_rusto_detect_text;
     try {
-      final int Function() checksumFn =
-          lib.lookupFunction<ffi.Uint16 Function(), int Function()>(
-              'uniffi_rusto_checksum_method_rusto_detect_text');
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_method_rusto_detect_text');
       _checksum_uniffi_rusto_checksum_method_rusto_detect_text = checksumFn();
     } catch (err) {
-      throw StateError(
-          'Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_method_rusto_detect_text`: $err');
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_method_rusto_detect_text`: $err');
     }
     if (_checksum_uniffi_rusto_checksum_method_rusto_detect_text != 5963) {
-      throw StateError(
-          'UniFFI API checksum mismatch for `uniffi_rusto_checksum_method_rusto_detect_text`: expected 5963, got $_checksum_uniffi_rusto_checksum_method_rusto_detect_text');
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_method_rusto_detect_text`: expected 5963, got $_checksum_uniffi_rusto_checksum_method_rusto_detect_text');
     }
     final int _checksum_uniffi_rusto_checksum_method_rusto_detect_text_rgb;
     try {
-      final int Function() checksumFn =
-          lib.lookupFunction<ffi.Uint16 Function(), int Function()>(
-              'uniffi_rusto_checksum_method_rusto_detect_text_rgb');
-      _checksum_uniffi_rusto_checksum_method_rusto_detect_text_rgb =
-          checksumFn();
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_method_rusto_detect_text_rgb');
+      _checksum_uniffi_rusto_checksum_method_rusto_detect_text_rgb = checksumFn();
     } catch (err) {
-      throw StateError(
-          'Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_method_rusto_detect_text_rgb`: $err');
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_method_rusto_detect_text_rgb`: $err');
     }
     if (_checksum_uniffi_rusto_checksum_method_rusto_detect_text_rgb != 9991) {
-      throw StateError(
-          'UniFFI API checksum mismatch for `uniffi_rusto_checksum_method_rusto_detect_text_rgb`: expected 9991, got $_checksum_uniffi_rusto_checksum_method_rusto_detect_text_rgb');
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_method_rusto_detect_text_rgb`: expected 9991, got $_checksum_uniffi_rusto_checksum_method_rusto_detect_text_rgb');
     }
     final int _checksum_uniffi_rusto_checksum_method_rusto_version;
     try {
-      final int Function() checksumFn =
-          lib.lookupFunction<ffi.Uint16 Function(), int Function()>(
-              'uniffi_rusto_checksum_method_rusto_version');
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_method_rusto_version');
       _checksum_uniffi_rusto_checksum_method_rusto_version = checksumFn();
     } catch (err) {
-      throw StateError(
-          'Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_method_rusto_version`: $err');
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_method_rusto_version`: $err');
     }
     if (_checksum_uniffi_rusto_checksum_method_rusto_version != 31217) {
-      throw StateError(
-          'UniFFI API checksum mismatch for `uniffi_rusto_checksum_method_rusto_version`: expected 31217, got $_checksum_uniffi_rusto_checksum_method_rusto_version');
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_method_rusto_version`: expected 31217, got $_checksum_uniffi_rusto_checksum_method_rusto_version');
     }
     final int _checksum_uniffi_rusto_checksum_constructor_rusto_initialize;
     try {
-      final int Function() checksumFn =
-          lib.lookupFunction<ffi.Uint16 Function(), int Function()>(
-              'uniffi_rusto_checksum_constructor_rusto_initialize');
-      _checksum_uniffi_rusto_checksum_constructor_rusto_initialize =
-          checksumFn();
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_constructor_rusto_initialize');
+      _checksum_uniffi_rusto_checksum_constructor_rusto_initialize = checksumFn();
     } catch (err) {
-      throw StateError(
-          'Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_constructor_rusto_initialize`: $err');
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_constructor_rusto_initialize`: $err');
     }
     if (_checksum_uniffi_rusto_checksum_constructor_rusto_initialize != 41233) {
-      throw StateError(
-          'UniFFI API checksum mismatch for `uniffi_rusto_checksum_constructor_rusto_initialize`: expected 41233, got $_checksum_uniffi_rusto_checksum_constructor_rusto_initialize');
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_constructor_rusto_initialize`: expected 41233, got $_checksum_uniffi_rusto_checksum_constructor_rusto_initialize');
     }
-    final int
-        _checksum_uniffi_rusto_checksum_constructor_rusto_initialize_from_json;
+    final int _checksum_uniffi_rusto_checksum_constructor_rusto_initialize_from_json;
     try {
-      final int Function() checksumFn =
-          lib.lookupFunction<ffi.Uint16 Function(), int Function()>(
-              'uniffi_rusto_checksum_constructor_rusto_initialize_from_json');
-      _checksum_uniffi_rusto_checksum_constructor_rusto_initialize_from_json =
-          checksumFn();
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_constructor_rusto_initialize_from_json');
+      _checksum_uniffi_rusto_checksum_constructor_rusto_initialize_from_json = checksumFn();
     } catch (err) {
-      throw StateError(
-          'Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_constructor_rusto_initialize_from_json`: $err');
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_constructor_rusto_initialize_from_json`: $err');
     }
-    if (_checksum_uniffi_rusto_checksum_constructor_rusto_initialize_from_json !=
-        40384) {
-      throw StateError(
-          'UniFFI API checksum mismatch for `uniffi_rusto_checksum_constructor_rusto_initialize_from_json`: expected 40384, got $_checksum_uniffi_rusto_checksum_constructor_rusto_initialize_from_json');
+    if (_checksum_uniffi_rusto_checksum_constructor_rusto_initialize_from_json != 40384) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_constructor_rusto_initialize_from_json`: expected 40384, got $_checksum_uniffi_rusto_checksum_constructor_rusto_initialize_from_json');
     }
   }
 
@@ -3518,170 +2786,106 @@ class RustoFfi {
     return lib;
   })();
 
-  late final _UniFfiRustBuffer Function(_UniFfiForeignBytes bytes,
-          ffi.Pointer<_UniFfiRustCallStatus> outStatus)
-      _uniFfiRustBufferFromBytes = _lib.lookupFunction<
-              _UniFfiRustBuffer Function(_UniFfiForeignBytes bytes,
-                  ffi.Pointer<_UniFfiRustCallStatus> outStatus),
-              _UniFfiRustBuffer Function(_UniFfiForeignBytes bytes,
-                  ffi.Pointer<_UniFfiRustCallStatus> outStatus)>(
-          'ffi_uniffi_rusto_rustbuffer_from_bytes');
-  late final void Function(
-          _UniFfiRustBuffer buf, ffi.Pointer<_UniFfiRustCallStatus> outStatus)
-      _uniFfiRustBufferFree = _lib.lookupFunction<
-              ffi.Void Function(_UniFfiRustBuffer buf,
-                  ffi.Pointer<_UniFfiRustCallStatus> outStatus),
-              void Function(_UniFfiRustBuffer buf,
-                  ffi.Pointer<_UniFfiRustCallStatus> outStatus)>(
-          'ffi_uniffi_rusto_rustbuffer_free');
+  late final _UniFfiRustBuffer Function(_UniFfiForeignBytes bytes, ffi.Pointer<_UniFfiRustCallStatus> outStatus) _uniFfiRustBufferFromBytes = _lib.lookupFunction<_UniFfiRustBuffer Function(_UniFfiForeignBytes bytes, ffi.Pointer<_UniFfiRustCallStatus> outStatus), _UniFfiRustBuffer Function(_UniFfiForeignBytes bytes, ffi.Pointer<_UniFfiRustCallStatus> outStatus)>('ffi_uniffi_rusto_rustbuffer_from_bytes');
+  late final void Function(_UniFfiRustBuffer buf, ffi.Pointer<_UniFfiRustCallStatus> outStatus) _uniFfiRustBufferFree = _lib.lookupFunction<ffi.Void Function(_UniFfiRustBuffer buf, ffi.Pointer<_UniFfiRustCallStatus> outStatus), void Function(_UniFfiRustBuffer buf, ffi.Pointer<_UniFfiRustCallStatus> outStatus)>('ffi_uniffi_rusto_rustbuffer_free');
 
-  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-          ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)
-      _createInitializeConfigPpv6FfiBuffer = _lib.lookupFunction<
-              ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr),
-              void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>(
-          'uniffi_ffibuffer_rusto_fn_func_create_initialize_config_ppv6');
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _createInitializeConfigPpv6FfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_func_create_initialize_config_ppv6');
 
-  InitializeConfig createInitializeConfigPpv6(
-      String detModelPath, String recModelPath, String dictPath) {
-    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf =
-        calloc<_UniFfiFfiBufferElement>(9);
-    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf =
-        calloc<_UniFfiFfiBufferElement>(7);
+  InitializeConfig createInitializeConfigPpv6(String detModelPath, String recModelPath, String dictPath) {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(9);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
     final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
     final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
     try {
-      final Uint8List detModelPathBytes =
-          Uint8List.fromList(utf8.encode(detModelPath));
-      final ffi.Pointer<ffi.Uint8> detModelPathPtr = detModelPathBytes.isEmpty
-          ? ffi.nullptr
-          : calloc<ffi.Uint8>(detModelPathBytes.length);
-      if (detModelPathBytes.isNotEmpty) {
-        detModelPathPtr
-            .asTypedList(detModelPathBytes.length)
-            .setAll(0, detModelPathBytes);
-      }
+      final Uint8List detModelPathBytes = Uint8List.fromList(utf8.encode(detModelPath));
+      final ffi.Pointer<ffi.Uint8> detModelPathPtr = detModelPathBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(detModelPathBytes.length);
+      if (detModelPathBytes.isNotEmpty) { detModelPathPtr.asTypedList(detModelPathBytes.length).setAll(0, detModelPathBytes); }
       foreignArgPtrs.add(detModelPathPtr);
-      final ffi.Pointer<_UniFfiRustCallStatus> detModelPathFromBytesStatusPtr =
-          calloc<_UniFfiRustCallStatus>();
+      final ffi.Pointer<_UniFfiRustCallStatus> detModelPathFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
       detModelPathFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
       detModelPathFromBytesStatusPtr.ref.errorBuf
         ..capacity = 0
         ..len = 0
         ..data = ffi.nullptr;
-      final ffi.Pointer<_UniFfiForeignBytes> detModelPathForeignPtr =
-          calloc<_UniFfiForeignBytes>();
+      final ffi.Pointer<_UniFfiForeignBytes> detModelPathForeignPtr = calloc<_UniFfiForeignBytes>();
       detModelPathForeignPtr.ref
         ..len = detModelPathBytes.length
         ..data = detModelPathPtr;
-      final _UniFfiRustBuffer detModelPathRustBuffer =
-          _uniFfiRustBufferFromBytes(
-              detModelPathForeignPtr.ref, detModelPathFromBytesStatusPtr);
+      final _UniFfiRustBuffer detModelPathRustBuffer = _uniFfiRustBufferFromBytes(detModelPathForeignPtr.ref, detModelPathFromBytesStatusPtr);
       calloc.free(detModelPathForeignPtr);
-      final int detModelPathFromBytesCode =
-          detModelPathFromBytesStatusPtr.ref.code;
-      final _UniFfiRustBuffer detModelPathFromBytesErrBuf =
-          detModelPathFromBytesStatusPtr.ref.errorBuf;
+      final int detModelPathFromBytesCode = detModelPathFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer detModelPathFromBytesErrBuf = detModelPathFromBytesStatusPtr.ref.errorBuf;
       calloc.free(detModelPathFromBytesStatusPtr);
       if (detModelPathFromBytesCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> detModelPathFromBytesErrBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> detModelPathFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
         detModelPathFromBytesErrBufPtr.ref
           ..capacity = detModelPathFromBytesErrBuf.capacity
           ..len = detModelPathFromBytesErrBuf.len
           ..data = detModelPathFromBytesErrBuf.data;
         rustRetBufferPtrs.add(detModelPathFromBytesErrBufPtr);
-        throw StateError(
-            'UniFFI rustbuffer_from_bytes failed with status $detModelPathFromBytesCode');
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $detModelPathFromBytesCode');
       }
       (argBuf + 0).ref.u64 = detModelPathRustBuffer.capacity;
       (argBuf + 1).ref.u64 = detModelPathRustBuffer.len;
       (argBuf + 2).ref.ptr = detModelPathRustBuffer.data.cast<ffi.Void>();
-      final Uint8List recModelPathBytes =
-          Uint8List.fromList(utf8.encode(recModelPath));
-      final ffi.Pointer<ffi.Uint8> recModelPathPtr = recModelPathBytes.isEmpty
-          ? ffi.nullptr
-          : calloc<ffi.Uint8>(recModelPathBytes.length);
-      if (recModelPathBytes.isNotEmpty) {
-        recModelPathPtr
-            .asTypedList(recModelPathBytes.length)
-            .setAll(0, recModelPathBytes);
-      }
+      final Uint8List recModelPathBytes = Uint8List.fromList(utf8.encode(recModelPath));
+      final ffi.Pointer<ffi.Uint8> recModelPathPtr = recModelPathBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(recModelPathBytes.length);
+      if (recModelPathBytes.isNotEmpty) { recModelPathPtr.asTypedList(recModelPathBytes.length).setAll(0, recModelPathBytes); }
       foreignArgPtrs.add(recModelPathPtr);
-      final ffi.Pointer<_UniFfiRustCallStatus> recModelPathFromBytesStatusPtr =
-          calloc<_UniFfiRustCallStatus>();
+      final ffi.Pointer<_UniFfiRustCallStatus> recModelPathFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
       recModelPathFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
       recModelPathFromBytesStatusPtr.ref.errorBuf
         ..capacity = 0
         ..len = 0
         ..data = ffi.nullptr;
-      final ffi.Pointer<_UniFfiForeignBytes> recModelPathForeignPtr =
-          calloc<_UniFfiForeignBytes>();
+      final ffi.Pointer<_UniFfiForeignBytes> recModelPathForeignPtr = calloc<_UniFfiForeignBytes>();
       recModelPathForeignPtr.ref
         ..len = recModelPathBytes.length
         ..data = recModelPathPtr;
-      final _UniFfiRustBuffer recModelPathRustBuffer =
-          _uniFfiRustBufferFromBytes(
-              recModelPathForeignPtr.ref, recModelPathFromBytesStatusPtr);
+      final _UniFfiRustBuffer recModelPathRustBuffer = _uniFfiRustBufferFromBytes(recModelPathForeignPtr.ref, recModelPathFromBytesStatusPtr);
       calloc.free(recModelPathForeignPtr);
-      final int recModelPathFromBytesCode =
-          recModelPathFromBytesStatusPtr.ref.code;
-      final _UniFfiRustBuffer recModelPathFromBytesErrBuf =
-          recModelPathFromBytesStatusPtr.ref.errorBuf;
+      final int recModelPathFromBytesCode = recModelPathFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer recModelPathFromBytesErrBuf = recModelPathFromBytesStatusPtr.ref.errorBuf;
       calloc.free(recModelPathFromBytesStatusPtr);
       if (recModelPathFromBytesCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> recModelPathFromBytesErrBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> recModelPathFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
         recModelPathFromBytesErrBufPtr.ref
           ..capacity = recModelPathFromBytesErrBuf.capacity
           ..len = recModelPathFromBytesErrBuf.len
           ..data = recModelPathFromBytesErrBuf.data;
         rustRetBufferPtrs.add(recModelPathFromBytesErrBufPtr);
-        throw StateError(
-            'UniFFI rustbuffer_from_bytes failed with status $recModelPathFromBytesCode');
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $recModelPathFromBytesCode');
       }
       (argBuf + 3).ref.u64 = recModelPathRustBuffer.capacity;
       (argBuf + 4).ref.u64 = recModelPathRustBuffer.len;
       (argBuf + 5).ref.ptr = recModelPathRustBuffer.data.cast<ffi.Void>();
       final Uint8List dictPathBytes = Uint8List.fromList(utf8.encode(dictPath));
-      final ffi.Pointer<ffi.Uint8> dictPathPtr = dictPathBytes.isEmpty
-          ? ffi.nullptr
-          : calloc<ffi.Uint8>(dictPathBytes.length);
-      if (dictPathBytes.isNotEmpty) {
-        dictPathPtr.asTypedList(dictPathBytes.length).setAll(0, dictPathBytes);
-      }
+      final ffi.Pointer<ffi.Uint8> dictPathPtr = dictPathBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(dictPathBytes.length);
+      if (dictPathBytes.isNotEmpty) { dictPathPtr.asTypedList(dictPathBytes.length).setAll(0, dictPathBytes); }
       foreignArgPtrs.add(dictPathPtr);
-      final ffi.Pointer<_UniFfiRustCallStatus> dictPathFromBytesStatusPtr =
-          calloc<_UniFfiRustCallStatus>();
+      final ffi.Pointer<_UniFfiRustCallStatus> dictPathFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
       dictPathFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
       dictPathFromBytesStatusPtr.ref.errorBuf
         ..capacity = 0
         ..len = 0
         ..data = ffi.nullptr;
-      final ffi.Pointer<_UniFfiForeignBytes> dictPathForeignPtr =
-          calloc<_UniFfiForeignBytes>();
+      final ffi.Pointer<_UniFfiForeignBytes> dictPathForeignPtr = calloc<_UniFfiForeignBytes>();
       dictPathForeignPtr.ref
         ..len = dictPathBytes.length
         ..data = dictPathPtr;
-      final _UniFfiRustBuffer dictPathRustBuffer = _uniFfiRustBufferFromBytes(
-          dictPathForeignPtr.ref, dictPathFromBytesStatusPtr);
+      final _UniFfiRustBuffer dictPathRustBuffer = _uniFfiRustBufferFromBytes(dictPathForeignPtr.ref, dictPathFromBytesStatusPtr);
       calloc.free(dictPathForeignPtr);
       final int dictPathFromBytesCode = dictPathFromBytesStatusPtr.ref.code;
-      final _UniFfiRustBuffer dictPathFromBytesErrBuf =
-          dictPathFromBytesStatusPtr.ref.errorBuf;
+      final _UniFfiRustBuffer dictPathFromBytesErrBuf = dictPathFromBytesStatusPtr.ref.errorBuf;
       calloc.free(dictPathFromBytesStatusPtr);
       if (dictPathFromBytesCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> dictPathFromBytesErrBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> dictPathFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
         dictPathFromBytesErrBufPtr.ref
           ..capacity = dictPathFromBytesErrBuf.capacity
           ..len = dictPathFromBytesErrBuf.len
           ..data = dictPathFromBytesErrBuf.data;
         rustRetBufferPtrs.add(dictPathFromBytesErrBufPtr);
-        throw StateError(
-            'UniFFI rustbuffer_from_bytes failed with status $dictPathFromBytesCode');
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $dictPathFromBytesCode');
       }
       (argBuf + 6).ref.u64 = dictPathRustBuffer.capacity;
       (argBuf + 7).ref.u64 = dictPathRustBuffer.len;
@@ -3689,27 +2893,21 @@ class RustoFfi {
       _createInitializeConfigPpv6FfiBuffer(argBuf, returnBuf);
       final int statusCode = (returnBuf + 3).ref.i8;
       if (statusCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
         errBufPtr.ref
           ..capacity = (returnBuf + 4).ref.u64
           ..len = (returnBuf + 5).ref.u64
           ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
         rustRetBufferPtrs.add(errBufPtr);
-        throw StateError(
-            'UniFFI ffibuffer call failed with status $statusCode');
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
       }
-      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr =
-          calloc<_UniFfiRustBuffer>();
+      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();
       retBufPtr.ref
         ..capacity = (returnBuf + 0).ref.u64
         ..len = (returnBuf + 1).ref.u64
         ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();
       rustRetBufferPtrs.add(retBufPtr);
-      final Uint8List retBytes = retBufPtr.ref.len == 0
-          ? Uint8List(0)
-          : Uint8List.fromList(
-              retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
+      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
       final decodedValue = _uniffiDecodeInitializeConfig(retBytes);
       return decodedValue;
     } finally {
@@ -3719,13 +2917,10 @@ class RustoFfi {
         }
       }
       for (final bufPtr in rustRetBufferPtrs) {
-        if (bufPtr.ref.data == ffi.nullptr &&
-            bufPtr.ref.len == 0 &&
-            bufPtr.ref.capacity == 0) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
           continue;
         }
-        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr =
-            calloc<_UniFfiRustCallStatus>();
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
         freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
         freeStatusPtr.ref.errorBuf
           ..capacity = 0
@@ -3740,47 +2935,32 @@ class RustoFfi {
     }
   }
 
-  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-          ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)
-      _defaultOcrRunOptionsFfiBuffer = _lib.lookupFunction<
-              ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr),
-              void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>(
-          'uniffi_ffibuffer_rusto_fn_func_default_ocr_run_options');
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _defaultOcrRunOptionsFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_func_default_ocr_run_options');
 
   OcrRunOptions defaultOcrRunOptions() {
-    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf =
-        calloc<_UniFfiFfiBufferElement>(0);
-    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf =
-        calloc<_UniFfiFfiBufferElement>(7);
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(0);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
     final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
     final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
     try {
       _defaultOcrRunOptionsFfiBuffer(argBuf, returnBuf);
       final int statusCode = (returnBuf + 3).ref.i8;
       if (statusCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
         errBufPtr.ref
           ..capacity = (returnBuf + 4).ref.u64
           ..len = (returnBuf + 5).ref.u64
           ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
         rustRetBufferPtrs.add(errBufPtr);
-        throw StateError(
-            'UniFFI ffibuffer call failed with status $statusCode');
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
       }
-      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr =
-          calloc<_UniFfiRustBuffer>();
+      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();
       retBufPtr.ref
         ..capacity = (returnBuf + 0).ref.u64
         ..len = (returnBuf + 1).ref.u64
         ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();
       rustRetBufferPtrs.add(retBufPtr);
-      final Uint8List retBytes = retBufPtr.ref.len == 0
-          ? Uint8List(0)
-          : Uint8List.fromList(
-              retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
+      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
       final decodedValue = _uniffiDecodeOcrRunOptions(retBytes);
       return decodedValue;
     } finally {
@@ -3790,13 +2970,10 @@ class RustoFfi {
         }
       }
       for (final bufPtr in rustRetBufferPtrs) {
-        if (bufPtr.ref.data == ffi.nullptr &&
-            bufPtr.ref.len == 0 &&
-            bufPtr.ref.capacity == 0) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
           continue;
         }
-        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr =
-            calloc<_UniFfiRustCallStatus>();
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
         freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
         freeStatusPtr.ref.errorBuf
           ..capacity = 0
@@ -3811,47 +2988,32 @@ class RustoFfi {
     }
   }
 
-  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-          ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)
-      _rustoVersionFfiBuffer = _lib.lookupFunction<
-              ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr),
-              void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>(
-          'uniffi_ffibuffer_rusto_fn_func_rusto_version');
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _rustoVersionFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_func_rusto_version');
 
   String rustoVersion() {
-    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf =
-        calloc<_UniFfiFfiBufferElement>(0);
-    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf =
-        calloc<_UniFfiFfiBufferElement>(7);
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(0);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
     final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
     final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
     try {
       _rustoVersionFfiBuffer(argBuf, returnBuf);
       final int statusCode = (returnBuf + 3).ref.i8;
       if (statusCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
         errBufPtr.ref
           ..capacity = (returnBuf + 4).ref.u64
           ..len = (returnBuf + 5).ref.u64
           ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
         rustRetBufferPtrs.add(errBufPtr);
-        throw StateError(
-            'UniFFI ffibuffer call failed with status $statusCode');
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
       }
-      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr =
-          calloc<_UniFfiRustBuffer>();
+      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();
       retBufPtr.ref
         ..capacity = (returnBuf + 0).ref.u64
         ..len = (returnBuf + 1).ref.u64
         ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();
       rustRetBufferPtrs.add(retBufPtr);
-      final Uint8List retBytes = retBufPtr.ref.len == 0
-          ? Uint8List(0)
-          : Uint8List.fromList(
-              retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
+      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
       final decodedValue = utf8.decode(retBytes);
       return decodedValue;
     } finally {
@@ -3861,13 +3023,10 @@ class RustoFfi {
         }
       }
       for (final bufPtr in rustRetBufferPtrs) {
-        if (bufPtr.ref.data == ffi.nullptr &&
-            bufPtr.ref.len == 0 &&
-            bufPtr.ref.capacity == 0) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
           continue;
         }
-        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr =
-            calloc<_UniFfiRustCallStatus>();
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
         freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
         freeStatusPtr.ref.errorBuf
           ..capacity = 0
@@ -3882,14 +3041,7 @@ class RustoFfi {
     }
   }
 
-  late final void Function(
-          int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus)
-      _rustOFreeRaw = _lib.lookupFunction<
-              ffi.Void Function(ffi.Uint64 handle,
-                  ffi.Pointer<_UniFfiRustCallStatus> outStatus),
-              void Function(
-                  int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus)>(
-          'uniffi_rusto_fn_free_rusto');
+  late final void Function(int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus) _rustOFreeRaw = _lib.lookupFunction<ffi.Void Function(ffi.Uint64 handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus), void Function(int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus)>('uniffi_rusto_fn_free_rusto');
   late final void Function(int handle) _rustOFree = (int handle) {
     final statusPtr = calloc<_UniFfiRustCallStatus>();
     statusPtr.ref.code = _uniFfiRustCallStatusSuccess;
@@ -3901,69 +3053,43 @@ class RustoFfi {
     calloc.free(statusPtr);
   };
 
-  late final int Function(
-          int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus)
-      _rustOClone = _lib.lookupFunction<
-              ffi.Uint64 Function(ffi.Uint64 handle,
-                  ffi.Pointer<_UniFfiRustCallStatus> outStatus),
-              int Function(
-                  int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus)>(
-          'uniffi_rusto_fn_clone_rusto');
+  late final int Function(int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus) _rustOClone = _lib.lookupFunction<ffi.Uint64 Function(ffi.Uint64 handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus), int Function(int handle, ffi.Pointer<_UniFfiRustCallStatus> outStatus)>('uniffi_rusto_fn_clone_rusto');
 
-  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-          ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)
-      _rustOCtorInitializeFfiBuffer = _lib.lookupFunction<
-              ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr),
-              void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>(
-          'uniffi_ffibuffer_rusto_fn_constructor_rusto_initialize');
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _rustOCtorInitializeFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_constructor_rusto_initialize');
 
   RustO rustOCreateInitialize(InitializeConfig config) {
-    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf =
-        calloc<_UniFfiFfiBufferElement>(3);
-    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf =
-        calloc<_UniFfiFfiBufferElement>(5);
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(3);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(5);
     final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
     final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
     try {
       final Uint8List configBytes = _uniffiEncodeInitializeConfig(config);
-      final ffi.Pointer<ffi.Uint8> configPtr = configBytes.isEmpty
-          ? ffi.nullptr
-          : calloc<ffi.Uint8>(configBytes.length);
-      if (configBytes.isNotEmpty) {
-        configPtr.asTypedList(configBytes.length).setAll(0, configBytes);
-      }
+      final ffi.Pointer<ffi.Uint8> configPtr = configBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(configBytes.length);
+      if (configBytes.isNotEmpty) { configPtr.asTypedList(configBytes.length).setAll(0, configBytes); }
       foreignArgPtrs.add(configPtr);
-      final ffi.Pointer<_UniFfiRustCallStatus> configFromBytesStatusPtr =
-          calloc<_UniFfiRustCallStatus>();
+      final ffi.Pointer<_UniFfiRustCallStatus> configFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
       configFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
       configFromBytesStatusPtr.ref.errorBuf
         ..capacity = 0
         ..len = 0
         ..data = ffi.nullptr;
-      final ffi.Pointer<_UniFfiForeignBytes> configForeignPtr =
-          calloc<_UniFfiForeignBytes>();
+      final ffi.Pointer<_UniFfiForeignBytes> configForeignPtr = calloc<_UniFfiForeignBytes>();
       configForeignPtr.ref
         ..len = configBytes.length
         ..data = configPtr;
-      final _UniFfiRustBuffer configRustBuffer = _uniFfiRustBufferFromBytes(
-          configForeignPtr.ref, configFromBytesStatusPtr);
+      final _UniFfiRustBuffer configRustBuffer = _uniFfiRustBufferFromBytes(configForeignPtr.ref, configFromBytesStatusPtr);
       calloc.free(configForeignPtr);
       final int configFromBytesCode = configFromBytesStatusPtr.ref.code;
-      final _UniFfiRustBuffer configFromBytesErrBuf =
-          configFromBytesStatusPtr.ref.errorBuf;
+      final _UniFfiRustBuffer configFromBytesErrBuf = configFromBytesStatusPtr.ref.errorBuf;
       calloc.free(configFromBytesStatusPtr);
       if (configFromBytesCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> configFromBytesErrBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> configFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
         configFromBytesErrBufPtr.ref
           ..capacity = configFromBytesErrBuf.capacity
           ..len = configFromBytesErrBuf.len
           ..data = configFromBytesErrBuf.data;
         rustRetBufferPtrs.add(configFromBytesErrBufPtr);
-        throw StateError(
-            'UniFFI rustbuffer_from_bytes failed with status $configFromBytesCode');
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $configFromBytesCode');
       }
       (argBuf + 0).ref.u64 = configRustBuffer.capacity;
       (argBuf + 1).ref.u64 = configRustBuffer.len;
@@ -3971,22 +3097,17 @@ class RustoFfi {
       _rustOCtorInitializeFfiBuffer(argBuf, returnBuf);
       final int statusCode = (returnBuf + 1).ref.i8;
       if (statusCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
         errBufPtr.ref
           ..capacity = (returnBuf + 2).ref.u64
           ..len = (returnBuf + 3).ref.u64
           ..data = (returnBuf + 4).ref.ptr.cast<ffi.Uint8>();
         rustRetBufferPtrs.add(errBufPtr);
         if (statusCode == _uniFfiRustCallStatusError) {
-          final Uint8List errBytes = errBufPtr.ref.len == 0
-              ? Uint8List(0)
-              : Uint8List.fromList(
-                  errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));
+          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));
           throw _uniffiLiftRustoBindingErrorException(errBytes);
         }
-        throw StateError(
-            'UniFFI ffibuffer call failed with status $statusCode');
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
       }
       final int handle = (returnBuf + 0).ref.u64;
       return RustO._(this, handle);
@@ -3997,13 +3118,10 @@ class RustoFfi {
         }
       }
       for (final bufPtr in rustRetBufferPtrs) {
-        if (bufPtr.ref.data == ffi.nullptr &&
-            bufPtr.ref.len == 0 &&
-            bufPtr.ref.capacity == 0) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
           continue;
         }
-        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr =
-            calloc<_UniFfiRustCallStatus>();
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
         freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
         freeStatusPtr.ref.errorBuf
           ..capacity = 0
@@ -4018,63 +3136,41 @@ class RustoFfi {
     }
   }
 
-  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-          ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)
-      _rustOCtorInitializeFromJsonFfiBuffer = _lib.lookupFunction<
-              ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr),
-              void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>(
-          'uniffi_ffibuffer_rusto_fn_constructor_rusto_initialize_from_json');
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _rustOCtorInitializeFromJsonFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_constructor_rusto_initialize_from_json');
 
   RustO rustOCreateInitializeFromJson(String configJson) {
-    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf =
-        calloc<_UniFfiFfiBufferElement>(3);
-    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf =
-        calloc<_UniFfiFfiBufferElement>(5);
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(3);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(5);
     final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
     final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
     try {
-      final Uint8List configJsonBytes =
-          Uint8List.fromList(utf8.encode(configJson));
-      final ffi.Pointer<ffi.Uint8> configJsonPtr = configJsonBytes.isEmpty
-          ? ffi.nullptr
-          : calloc<ffi.Uint8>(configJsonBytes.length);
-      if (configJsonBytes.isNotEmpty) {
-        configJsonPtr
-            .asTypedList(configJsonBytes.length)
-            .setAll(0, configJsonBytes);
-      }
+      final Uint8List configJsonBytes = Uint8List.fromList(utf8.encode(configJson));
+      final ffi.Pointer<ffi.Uint8> configJsonPtr = configJsonBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(configJsonBytes.length);
+      if (configJsonBytes.isNotEmpty) { configJsonPtr.asTypedList(configJsonBytes.length).setAll(0, configJsonBytes); }
       foreignArgPtrs.add(configJsonPtr);
-      final ffi.Pointer<_UniFfiRustCallStatus> configJsonFromBytesStatusPtr =
-          calloc<_UniFfiRustCallStatus>();
+      final ffi.Pointer<_UniFfiRustCallStatus> configJsonFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
       configJsonFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
       configJsonFromBytesStatusPtr.ref.errorBuf
         ..capacity = 0
         ..len = 0
         ..data = ffi.nullptr;
-      final ffi.Pointer<_UniFfiForeignBytes> configJsonForeignPtr =
-          calloc<_UniFfiForeignBytes>();
+      final ffi.Pointer<_UniFfiForeignBytes> configJsonForeignPtr = calloc<_UniFfiForeignBytes>();
       configJsonForeignPtr.ref
         ..len = configJsonBytes.length
         ..data = configJsonPtr;
-      final _UniFfiRustBuffer configJsonRustBuffer = _uniFfiRustBufferFromBytes(
-          configJsonForeignPtr.ref, configJsonFromBytesStatusPtr);
+      final _UniFfiRustBuffer configJsonRustBuffer = _uniFfiRustBufferFromBytes(configJsonForeignPtr.ref, configJsonFromBytesStatusPtr);
       calloc.free(configJsonForeignPtr);
       final int configJsonFromBytesCode = configJsonFromBytesStatusPtr.ref.code;
-      final _UniFfiRustBuffer configJsonFromBytesErrBuf =
-          configJsonFromBytesStatusPtr.ref.errorBuf;
+      final _UniFfiRustBuffer configJsonFromBytesErrBuf = configJsonFromBytesStatusPtr.ref.errorBuf;
       calloc.free(configJsonFromBytesStatusPtr);
       if (configJsonFromBytesCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> configJsonFromBytesErrBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> configJsonFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
         configJsonFromBytesErrBufPtr.ref
           ..capacity = configJsonFromBytesErrBuf.capacity
           ..len = configJsonFromBytesErrBuf.len
           ..data = configJsonFromBytesErrBuf.data;
         rustRetBufferPtrs.add(configJsonFromBytesErrBufPtr);
-        throw StateError(
-            'UniFFI rustbuffer_from_bytes failed with status $configJsonFromBytesCode');
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $configJsonFromBytesCode');
       }
       (argBuf + 0).ref.u64 = configJsonRustBuffer.capacity;
       (argBuf + 1).ref.u64 = configJsonRustBuffer.len;
@@ -4082,22 +3178,17 @@ class RustoFfi {
       _rustOCtorInitializeFromJsonFfiBuffer(argBuf, returnBuf);
       final int statusCode = (returnBuf + 1).ref.i8;
       if (statusCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
         errBufPtr.ref
           ..capacity = (returnBuf + 2).ref.u64
           ..len = (returnBuf + 3).ref.u64
           ..data = (returnBuf + 4).ref.ptr.cast<ffi.Uint8>();
         rustRetBufferPtrs.add(errBufPtr);
         if (statusCode == _uniFfiRustCallStatusError) {
-          final Uint8List errBytes = errBufPtr.ref.len == 0
-              ? Uint8List(0)
-              : Uint8List.fromList(
-                  errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));
+          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));
           throw _uniffiLiftRustoBindingErrorException(errBytes);
         }
-        throw StateError(
-            'UniFFI ffibuffer call failed with status $statusCode');
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
       }
       final int handle = (returnBuf + 0).ref.u64;
       return RustO._(this, handle);
@@ -4108,13 +3199,10 @@ class RustoFfi {
         }
       }
       for (final bufPtr in rustRetBufferPtrs) {
-        if (bufPtr.ref.data == ffi.nullptr &&
-            bufPtr.ref.len == 0 &&
-            bufPtr.ref.capacity == 0) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
           continue;
         }
-        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr =
-            calloc<_UniFfiRustCallStatus>();
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
         freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
         freeStatusPtr.ref.errorBuf
           ..capacity = 0
@@ -4129,21 +3217,11 @@ class RustoFfi {
     }
   }
 
-  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-          ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)
-      _rustODetectTextFfiBuffer = _lib.lookupFunction<
-              ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr),
-              void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>(
-          'uniffi_ffibuffer_rusto_fn_method_rusto_detect_text');
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _rustODetectTextFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_method_rusto_detect_text');
 
-  DetectTextResult rustOInvokeDetectText(
-      int handle, ImageSource source, OcrRunOptions options) {
-    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf =
-        calloc<_UniFfiFfiBufferElement>(7);
-    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf =
-        calloc<_UniFfiFfiBufferElement>(7);
+  DetectTextResult rustOInvokeDetectText(int handle, ImageSource source, OcrRunOptions options) {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(7);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
     final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
     final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
     try {
@@ -4158,8 +3236,7 @@ class RustoFfi {
             ..data = ffi.nullptr;
           clonedHandle = _rustOClone(handle, cloneStatusPtr);
           if (cloneStatusPtr.ref.code != _uniFfiRustCallStatusSuccess) {
-            throw StateError(
-                'UniFFI clone failed with status ${cloneStatusPtr.ref.code}');
+            throw StateError('UniFFI clone failed with status ${cloneStatusPtr.ref.code}');
           }
         } finally {
           calloc.free(cloneStatusPtr);
@@ -4167,83 +3244,63 @@ class RustoFfi {
       }
       (argBuf + 0).ref.u64 = clonedHandle;
       final Uint8List sourceBytes = _uniffiEncodeImageSource(source);
-      final ffi.Pointer<ffi.Uint8> sourcePtr = sourceBytes.isEmpty
-          ? ffi.nullptr
-          : calloc<ffi.Uint8>(sourceBytes.length);
-      if (sourceBytes.isNotEmpty) {
-        sourcePtr.asTypedList(sourceBytes.length).setAll(0, sourceBytes);
-      }
+      final ffi.Pointer<ffi.Uint8> sourcePtr = sourceBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(sourceBytes.length);
+      if (sourceBytes.isNotEmpty) { sourcePtr.asTypedList(sourceBytes.length).setAll(0, sourceBytes); }
       foreignArgPtrs.add(sourcePtr);
-      final ffi.Pointer<_UniFfiRustCallStatus> sourceFromBytesStatusPtr =
-          calloc<_UniFfiRustCallStatus>();
+      final ffi.Pointer<_UniFfiRustCallStatus> sourceFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
       sourceFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
       sourceFromBytesStatusPtr.ref.errorBuf
         ..capacity = 0
         ..len = 0
         ..data = ffi.nullptr;
-      final ffi.Pointer<_UniFfiForeignBytes> sourceForeignPtr =
-          calloc<_UniFfiForeignBytes>();
+      final ffi.Pointer<_UniFfiForeignBytes> sourceForeignPtr = calloc<_UniFfiForeignBytes>();
       sourceForeignPtr.ref
         ..len = sourceBytes.length
         ..data = sourcePtr;
-      final _UniFfiRustBuffer sourceRustBuffer = _uniFfiRustBufferFromBytes(
-          sourceForeignPtr.ref, sourceFromBytesStatusPtr);
+      final _UniFfiRustBuffer sourceRustBuffer = _uniFfiRustBufferFromBytes(sourceForeignPtr.ref, sourceFromBytesStatusPtr);
       calloc.free(sourceForeignPtr);
       final int sourceFromBytesCode = sourceFromBytesStatusPtr.ref.code;
-      final _UniFfiRustBuffer sourceFromBytesErrBuf =
-          sourceFromBytesStatusPtr.ref.errorBuf;
+      final _UniFfiRustBuffer sourceFromBytesErrBuf = sourceFromBytesStatusPtr.ref.errorBuf;
       calloc.free(sourceFromBytesStatusPtr);
       if (sourceFromBytesCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> sourceFromBytesErrBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> sourceFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
         sourceFromBytesErrBufPtr.ref
           ..capacity = sourceFromBytesErrBuf.capacity
           ..len = sourceFromBytesErrBuf.len
           ..data = sourceFromBytesErrBuf.data;
         rustRetBufferPtrs.add(sourceFromBytesErrBufPtr);
-        throw StateError(
-            'UniFFI rustbuffer_from_bytes failed with status $sourceFromBytesCode');
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $sourceFromBytesCode');
       }
       (argBuf + 1).ref.u64 = sourceRustBuffer.capacity;
       (argBuf + 2).ref.u64 = sourceRustBuffer.len;
       (argBuf + 3).ref.ptr = sourceRustBuffer.data.cast<ffi.Void>();
       final Uint8List optionsBytes = _uniffiEncodeOcrRunOptions(options);
-      final ffi.Pointer<ffi.Uint8> optionsPtr = optionsBytes.isEmpty
-          ? ffi.nullptr
-          : calloc<ffi.Uint8>(optionsBytes.length);
-      if (optionsBytes.isNotEmpty) {
-        optionsPtr.asTypedList(optionsBytes.length).setAll(0, optionsBytes);
-      }
+      final ffi.Pointer<ffi.Uint8> optionsPtr = optionsBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(optionsBytes.length);
+      if (optionsBytes.isNotEmpty) { optionsPtr.asTypedList(optionsBytes.length).setAll(0, optionsBytes); }
       foreignArgPtrs.add(optionsPtr);
-      final ffi.Pointer<_UniFfiRustCallStatus> optionsFromBytesStatusPtr =
-          calloc<_UniFfiRustCallStatus>();
+      final ffi.Pointer<_UniFfiRustCallStatus> optionsFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
       optionsFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
       optionsFromBytesStatusPtr.ref.errorBuf
         ..capacity = 0
         ..len = 0
         ..data = ffi.nullptr;
-      final ffi.Pointer<_UniFfiForeignBytes> optionsForeignPtr =
-          calloc<_UniFfiForeignBytes>();
+      final ffi.Pointer<_UniFfiForeignBytes> optionsForeignPtr = calloc<_UniFfiForeignBytes>();
       optionsForeignPtr.ref
         ..len = optionsBytes.length
         ..data = optionsPtr;
-      final _UniFfiRustBuffer optionsRustBuffer = _uniFfiRustBufferFromBytes(
-          optionsForeignPtr.ref, optionsFromBytesStatusPtr);
+      final _UniFfiRustBuffer optionsRustBuffer = _uniFfiRustBufferFromBytes(optionsForeignPtr.ref, optionsFromBytesStatusPtr);
       calloc.free(optionsForeignPtr);
       final int optionsFromBytesCode = optionsFromBytesStatusPtr.ref.code;
-      final _UniFfiRustBuffer optionsFromBytesErrBuf =
-          optionsFromBytesStatusPtr.ref.errorBuf;
+      final _UniFfiRustBuffer optionsFromBytesErrBuf = optionsFromBytesStatusPtr.ref.errorBuf;
       calloc.free(optionsFromBytesStatusPtr);
       if (optionsFromBytesCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> optionsFromBytesErrBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> optionsFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
         optionsFromBytesErrBufPtr.ref
           ..capacity = optionsFromBytesErrBuf.capacity
           ..len = optionsFromBytesErrBuf.len
           ..data = optionsFromBytesErrBuf.data;
         rustRetBufferPtrs.add(optionsFromBytesErrBufPtr);
-        throw StateError(
-            'UniFFI rustbuffer_from_bytes failed with status $optionsFromBytesCode');
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $optionsFromBytesCode');
       }
       (argBuf + 4).ref.u64 = optionsRustBuffer.capacity;
       (argBuf + 5).ref.u64 = optionsRustBuffer.len;
@@ -4251,34 +3308,25 @@ class RustoFfi {
       _rustODetectTextFfiBuffer(argBuf, returnBuf);
       final int statusCode = (returnBuf + 3).ref.i8;
       if (statusCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
         errBufPtr.ref
           ..capacity = (returnBuf + 4).ref.u64
           ..len = (returnBuf + 5).ref.u64
           ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
         rustRetBufferPtrs.add(errBufPtr);
         if (statusCode == _uniFfiRustCallStatusError) {
-          final Uint8List errBytes = errBufPtr.ref.len == 0
-              ? Uint8List(0)
-              : Uint8List.fromList(
-                  errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));
+          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));
           throw _uniffiLiftRustoBindingErrorException(errBytes);
         }
-        throw StateError(
-            'UniFFI ffibuffer call failed with status $statusCode');
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
       }
-      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr =
-          calloc<_UniFfiRustBuffer>();
+      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();
       retBufPtr.ref
         ..capacity = (returnBuf + 0).ref.u64
         ..len = (returnBuf + 1).ref.u64
         ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();
       rustRetBufferPtrs.add(retBufPtr);
-      final Uint8List retBytes = retBufPtr.ref.len == 0
-          ? Uint8List(0)
-          : Uint8List.fromList(
-              retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
+      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
       return _uniffiDecodeDetectTextResult(retBytes);
     } finally {
       for (final ptr in foreignArgPtrs) {
@@ -4287,13 +3335,10 @@ class RustoFfi {
         }
       }
       for (final bufPtr in rustRetBufferPtrs) {
-        if (bufPtr.ref.data == ffi.nullptr &&
-            bufPtr.ref.len == 0 &&
-            bufPtr.ref.capacity == 0) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
           continue;
         }
-        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr =
-            calloc<_UniFfiRustCallStatus>();
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
         freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
         freeStatusPtr.ref.errorBuf
           ..capacity = 0
@@ -4308,21 +3353,11 @@ class RustoFfi {
     }
   }
 
-  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-          ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)
-      _rustODetectTextRgbFfiBuffer = _lib.lookupFunction<
-              ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr),
-              void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>(
-          'uniffi_ffibuffer_rusto_fn_method_rusto_detect_text_rgb');
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _rustODetectTextRgbFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_method_rusto_detect_text_rgb');
 
-  DetectTextResult rustOInvokeDetectTextRgb(int handle, Uint8List pixels,
-      int width, int height, int stride, OcrRunOptions options) {
-    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf =
-        calloc<_UniFfiFfiBufferElement>(10);
-    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf =
-        calloc<_UniFfiFfiBufferElement>(7);
+  DetectTextResult rustOInvokeDetectTextRgb(int handle, Uint8List pixels, int width, int height, int stride, OcrRunOptions options) {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(10);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
     final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
     final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
     try {
@@ -4337,8 +3372,7 @@ class RustoFfi {
             ..data = ffi.nullptr;
           clonedHandle = _rustOClone(handle, cloneStatusPtr);
           if (cloneStatusPtr.ref.code != _uniFfiRustCallStatusSuccess) {
-            throw StateError(
-                'UniFFI clone failed with status ${cloneStatusPtr.ref.code}');
+            throw StateError('UniFFI clone failed with status ${cloneStatusPtr.ref.code}');
           }
         } finally {
           calloc.free(cloneStatusPtr);
@@ -4346,42 +3380,32 @@ class RustoFfi {
       }
       (argBuf + 0).ref.u64 = clonedHandle;
       final Uint8List pixelsBytes = pixels;
-      final ffi.Pointer<ffi.Uint8> pixelsPtr = pixelsBytes.isEmpty
-          ? ffi.nullptr
-          : calloc<ffi.Uint8>(pixelsBytes.length);
-      if (pixelsBytes.isNotEmpty) {
-        pixelsPtr.asTypedList(pixelsBytes.length).setAll(0, pixelsBytes);
-      }
+      final ffi.Pointer<ffi.Uint8> pixelsPtr = pixelsBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(pixelsBytes.length);
+      if (pixelsBytes.isNotEmpty) { pixelsPtr.asTypedList(pixelsBytes.length).setAll(0, pixelsBytes); }
       foreignArgPtrs.add(pixelsPtr);
-      final ffi.Pointer<_UniFfiRustCallStatus> pixelsFromBytesStatusPtr =
-          calloc<_UniFfiRustCallStatus>();
+      final ffi.Pointer<_UniFfiRustCallStatus> pixelsFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
       pixelsFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
       pixelsFromBytesStatusPtr.ref.errorBuf
         ..capacity = 0
         ..len = 0
         ..data = ffi.nullptr;
-      final ffi.Pointer<_UniFfiForeignBytes> pixelsForeignPtr =
-          calloc<_UniFfiForeignBytes>();
+      final ffi.Pointer<_UniFfiForeignBytes> pixelsForeignPtr = calloc<_UniFfiForeignBytes>();
       pixelsForeignPtr.ref
         ..len = pixelsBytes.length
         ..data = pixelsPtr;
-      final _UniFfiRustBuffer pixelsRustBuffer = _uniFfiRustBufferFromBytes(
-          pixelsForeignPtr.ref, pixelsFromBytesStatusPtr);
+      final _UniFfiRustBuffer pixelsRustBuffer = _uniFfiRustBufferFromBytes(pixelsForeignPtr.ref, pixelsFromBytesStatusPtr);
       calloc.free(pixelsForeignPtr);
       final int pixelsFromBytesCode = pixelsFromBytesStatusPtr.ref.code;
-      final _UniFfiRustBuffer pixelsFromBytesErrBuf =
-          pixelsFromBytesStatusPtr.ref.errorBuf;
+      final _UniFfiRustBuffer pixelsFromBytesErrBuf = pixelsFromBytesStatusPtr.ref.errorBuf;
       calloc.free(pixelsFromBytesStatusPtr);
       if (pixelsFromBytesCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> pixelsFromBytesErrBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> pixelsFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
         pixelsFromBytesErrBufPtr.ref
           ..capacity = pixelsFromBytesErrBuf.capacity
           ..len = pixelsFromBytesErrBuf.len
           ..data = pixelsFromBytesErrBuf.data;
         rustRetBufferPtrs.add(pixelsFromBytesErrBufPtr);
-        throw StateError(
-            'UniFFI rustbuffer_from_bytes failed with status $pixelsFromBytesCode');
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $pixelsFromBytesCode');
       }
       (argBuf + 1).ref.u64 = pixelsRustBuffer.capacity;
       (argBuf + 2).ref.u64 = pixelsRustBuffer.len;
@@ -4390,42 +3414,32 @@ class RustoFfi {
       (argBuf + 5).ref.u32 = height;
       (argBuf + 6).ref.u64 = stride;
       final Uint8List optionsBytes = _uniffiEncodeOcrRunOptions(options);
-      final ffi.Pointer<ffi.Uint8> optionsPtr = optionsBytes.isEmpty
-          ? ffi.nullptr
-          : calloc<ffi.Uint8>(optionsBytes.length);
-      if (optionsBytes.isNotEmpty) {
-        optionsPtr.asTypedList(optionsBytes.length).setAll(0, optionsBytes);
-      }
+      final ffi.Pointer<ffi.Uint8> optionsPtr = optionsBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(optionsBytes.length);
+      if (optionsBytes.isNotEmpty) { optionsPtr.asTypedList(optionsBytes.length).setAll(0, optionsBytes); }
       foreignArgPtrs.add(optionsPtr);
-      final ffi.Pointer<_UniFfiRustCallStatus> optionsFromBytesStatusPtr =
-          calloc<_UniFfiRustCallStatus>();
+      final ffi.Pointer<_UniFfiRustCallStatus> optionsFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
       optionsFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
       optionsFromBytesStatusPtr.ref.errorBuf
         ..capacity = 0
         ..len = 0
         ..data = ffi.nullptr;
-      final ffi.Pointer<_UniFfiForeignBytes> optionsForeignPtr =
-          calloc<_UniFfiForeignBytes>();
+      final ffi.Pointer<_UniFfiForeignBytes> optionsForeignPtr = calloc<_UniFfiForeignBytes>();
       optionsForeignPtr.ref
         ..len = optionsBytes.length
         ..data = optionsPtr;
-      final _UniFfiRustBuffer optionsRustBuffer = _uniFfiRustBufferFromBytes(
-          optionsForeignPtr.ref, optionsFromBytesStatusPtr);
+      final _UniFfiRustBuffer optionsRustBuffer = _uniFfiRustBufferFromBytes(optionsForeignPtr.ref, optionsFromBytesStatusPtr);
       calloc.free(optionsForeignPtr);
       final int optionsFromBytesCode = optionsFromBytesStatusPtr.ref.code;
-      final _UniFfiRustBuffer optionsFromBytesErrBuf =
-          optionsFromBytesStatusPtr.ref.errorBuf;
+      final _UniFfiRustBuffer optionsFromBytesErrBuf = optionsFromBytesStatusPtr.ref.errorBuf;
       calloc.free(optionsFromBytesStatusPtr);
       if (optionsFromBytesCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> optionsFromBytesErrBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> optionsFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
         optionsFromBytesErrBufPtr.ref
           ..capacity = optionsFromBytesErrBuf.capacity
           ..len = optionsFromBytesErrBuf.len
           ..data = optionsFromBytesErrBuf.data;
         rustRetBufferPtrs.add(optionsFromBytesErrBufPtr);
-        throw StateError(
-            'UniFFI rustbuffer_from_bytes failed with status $optionsFromBytesCode');
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $optionsFromBytesCode');
       }
       (argBuf + 7).ref.u64 = optionsRustBuffer.capacity;
       (argBuf + 8).ref.u64 = optionsRustBuffer.len;
@@ -4433,34 +3447,25 @@ class RustoFfi {
       _rustODetectTextRgbFfiBuffer(argBuf, returnBuf);
       final int statusCode = (returnBuf + 3).ref.i8;
       if (statusCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
         errBufPtr.ref
           ..capacity = (returnBuf + 4).ref.u64
           ..len = (returnBuf + 5).ref.u64
           ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
         rustRetBufferPtrs.add(errBufPtr);
         if (statusCode == _uniFfiRustCallStatusError) {
-          final Uint8List errBytes = errBufPtr.ref.len == 0
-              ? Uint8List(0)
-              : Uint8List.fromList(
-                  errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));
+          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));
           throw _uniffiLiftRustoBindingErrorException(errBytes);
         }
-        throw StateError(
-            'UniFFI ffibuffer call failed with status $statusCode');
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
       }
-      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr =
-          calloc<_UniFfiRustBuffer>();
+      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();
       retBufPtr.ref
         ..capacity = (returnBuf + 0).ref.u64
         ..len = (returnBuf + 1).ref.u64
         ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();
       rustRetBufferPtrs.add(retBufPtr);
-      final Uint8List retBytes = retBufPtr.ref.len == 0
-          ? Uint8List(0)
-          : Uint8List.fromList(
-              retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
+      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
       return _uniffiDecodeDetectTextResult(retBytes);
     } finally {
       for (final ptr in foreignArgPtrs) {
@@ -4469,13 +3474,10 @@ class RustoFfi {
         }
       }
       for (final bufPtr in rustRetBufferPtrs) {
-        if (bufPtr.ref.data == ffi.nullptr &&
-            bufPtr.ref.len == 0 &&
-            bufPtr.ref.capacity == 0) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
           continue;
         }
-        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr =
-            calloc<_UniFfiRustCallStatus>();
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
         freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
         freeStatusPtr.ref.errorBuf
           ..capacity = 0
@@ -4490,20 +3492,11 @@ class RustoFfi {
     }
   }
 
-  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-          ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)
-      _rustOVersionFfiBuffer = _lib.lookupFunction<
-              ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr),
-              void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr,
-                  ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>(
-          'uniffi_ffibuffer_rusto_fn_method_rusto_version');
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _rustOVersionFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_method_rusto_version');
 
   String rustOInvokeVersion(int handle) {
-    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf =
-        calloc<_UniFfiFfiBufferElement>(1);
-    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf =
-        calloc<_UniFfiFfiBufferElement>(7);
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(1);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
     final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
     final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
     try {
@@ -4518,8 +3511,7 @@ class RustoFfi {
             ..data = ffi.nullptr;
           clonedHandle = _rustOClone(handle, cloneStatusPtr);
           if (cloneStatusPtr.ref.code != _uniFfiRustCallStatusSuccess) {
-            throw StateError(
-                'UniFFI clone failed with status ${cloneStatusPtr.ref.code}');
+            throw StateError('UniFFI clone failed with status ${cloneStatusPtr.ref.code}');
           }
         } finally {
           calloc.free(cloneStatusPtr);
@@ -4529,18 +3521,15 @@ class RustoFfi {
       _rustOVersionFfiBuffer(argBuf, returnBuf);
       final int statusCode = (returnBuf + 3).ref.i8;
       if (statusCode != _uniFfiRustCallStatusSuccess) {
-        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr =
-            calloc<_UniFfiRustBuffer>();
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
         errBufPtr.ref
           ..capacity = (returnBuf + 4).ref.u64
           ..len = (returnBuf + 5).ref.u64
           ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
         rustRetBufferPtrs.add(errBufPtr);
-        throw StateError(
-            'UniFFI ffibuffer call failed with status $statusCode');
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
       }
-      throw UnsupportedError(
-          'runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (version)');
+      throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (version)');
     } finally {
       for (final ptr in foreignArgPtrs) {
         if (ptr != ffi.nullptr) {
@@ -4548,13 +3537,10 @@ class RustoFfi {
         }
       }
       for (final bufPtr in rustRetBufferPtrs) {
-        if (bufPtr.ref.data == ffi.nullptr &&
-            bufPtr.ref.len == 0 &&
-            bufPtr.ref.capacity == 0) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
           continue;
         }
-        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr =
-            calloc<_UniFfiRustCallStatus>();
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
         freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
         freeStatusPtr.ref.errorBuf
           ..capacity = 0
@@ -4579,8 +3565,7 @@ final class _RustOFinalizerToken {
 /// High-level RustO OCR Engine for multi-platform bindings.
 final class RustO {
   RustO._(this._ffi, this._handle) {
-    _finalizer.attach(this, _RustOFinalizerToken(_ffi._rustOFree, _handle),
-        detach: this);
+    _finalizer.attach(this, _RustOFinalizerToken(_ffi._rustOFree, _handle), detach: this);
   }
 
   final RustoFfi _ffi;
@@ -4625,11 +3610,9 @@ final class RustO {
   }
 
   /// Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
-  DetectTextResult detectTextRgb(Uint8List pixels, int width, int height,
-      int stride, OcrRunOptions options) {
+  DetectTextResult detectTextRgb(Uint8List pixels, int width, int height, int stride, OcrRunOptions options) {
     _ensureOpen();
-    return _ffi.rustOInvokeDetectTextRgb(
-        _handle, pixels, width, height, stride, options);
+    return _ffi.rustOInvokeDetectTextRgb(_handle, pixels, width, height, stride, options);
   }
 
   /// Returns the engine library version string.
@@ -4637,6 +3620,7 @@ final class RustO {
     _ensureOpen();
     return _ffi.rustOInvokeVersion(_handle);
   }
+
 }
 
 final class RustOFfiCodec {
@@ -4651,20 +3635,16 @@ RustoFfi? _defaultBindings;
 
 RustoFfi _bindings() => _defaultBindings ??= RustoFfi();
 
-void configureDefaultBindings(
-    {ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}) {
-  _defaultBindings =
-      RustoFfi(dynamicLibrary: dynamicLibrary, libraryPath: libraryPath);
+void configureDefaultBindings({ffi.DynamicLibrary? dynamicLibrary, String? libraryPath}) {
+  _defaultBindings = RustoFfi(dynamicLibrary: dynamicLibrary, libraryPath: libraryPath);
 }
 
 void resetDefaultBindings() {
   _defaultBindings = null;
 }
 
-InitializeConfig createInitializeConfigPpv6(
-    String detModelPath, String recModelPath, String dictPath) {
-  return _bindings()
-      .createInitializeConfigPpv6(detModelPath, recModelPath, dictPath);
+InitializeConfig createInitializeConfigPpv6(String detModelPath, String recModelPath, String dictPath) {
+  return _bindings().createInitializeConfigPpv6(detModelPath, recModelPath, dictPath);
 }
 
 OcrRunOptions defaultOcrRunOptions() {
@@ -4675,3 +3655,4 @@ OcrRunOptions defaultOcrRunOptions() {
 String rustoVersion() {
   return _bindings().rustoVersion();
 }
+

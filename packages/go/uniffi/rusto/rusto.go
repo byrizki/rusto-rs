@@ -994,6 +994,8 @@ type DetectionConfig struct {
 	LimitType *string
 	// Enable morphological dilation.
 	UseDilation *bool
+	// DB score calculation mode: "fast" or "slow".
+	ScoreMode *string
 }
 
 func (r *DetectionConfig) Destroy() {
@@ -1005,6 +1007,7 @@ func (r *DetectionConfig) Destroy() {
 	FfiDestroyerOptionalInt32{}.Destroy(r.LimitSideLen)
 	FfiDestroyerOptionalString{}.Destroy(r.LimitType)
 	FfiDestroyerOptionalBool{}.Destroy(r.UseDilation)
+	FfiDestroyerOptionalString{}.Destroy(r.ScoreMode)
 }
 
 type FfiConverterDetectionConfig struct{}
@@ -1025,6 +1028,7 @@ func (c FfiConverterDetectionConfig) Read(reader io.Reader) DetectionConfig {
 		FfiConverterOptionalInt32INSTANCE.Read(reader),
 		FfiConverterOptionalStringINSTANCE.Read(reader),
 		FfiConverterOptionalBoolINSTANCE.Read(reader),
+		FfiConverterOptionalStringINSTANCE.Read(reader),
 	}
 }
 
@@ -1045,6 +1049,7 @@ func (c FfiConverterDetectionConfig) Write(writer io.Writer, value DetectionConf
 	FfiConverterOptionalInt32INSTANCE.Write(writer, value.LimitSideLen)
 	FfiConverterOptionalStringINSTANCE.Write(writer, value.LimitType)
 	FfiConverterOptionalBoolINSTANCE.Write(writer, value.UseDilation)
+	FfiConverterOptionalStringINSTANCE.Write(writer, value.ScoreMode)
 }
 
 type FfiDestroyerDetectionConfig struct{}
@@ -1504,6 +1509,8 @@ type PostprocessRunOptions struct {
 	UnclipRatio *float32
 	// Enable morphological dilation to connect broken text strokes.
 	UseDilation *bool
+	// DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
+	ScoreMode *string
 }
 
 func (r *PostprocessRunOptions) Destroy() {
@@ -1512,6 +1519,7 @@ func (r *PostprocessRunOptions) Destroy() {
 	FfiDestroyerOptionalInt32{}.Destroy(r.MaxCandidates)
 	FfiDestroyerOptionalFloat32{}.Destroy(r.UnclipRatio)
 	FfiDestroyerOptionalBool{}.Destroy(r.UseDilation)
+	FfiDestroyerOptionalString{}.Destroy(r.ScoreMode)
 }
 
 type FfiConverterPostprocessRunOptions struct{}
@@ -1529,6 +1537,7 @@ func (c FfiConverterPostprocessRunOptions) Read(reader io.Reader) PostprocessRun
 		FfiConverterOptionalInt32INSTANCE.Read(reader),
 		FfiConverterOptionalFloat32INSTANCE.Read(reader),
 		FfiConverterOptionalBoolINSTANCE.Read(reader),
+		FfiConverterOptionalStringINSTANCE.Read(reader),
 	}
 }
 
@@ -1546,6 +1555,7 @@ func (c FfiConverterPostprocessRunOptions) Write(writer io.Writer, value Postpro
 	FfiConverterOptionalInt32INSTANCE.Write(writer, value.MaxCandidates)
 	FfiConverterOptionalFloat32INSTANCE.Write(writer, value.UnclipRatio)
 	FfiConverterOptionalBoolINSTANCE.Write(writer, value.UseDilation)
+	FfiConverterOptionalStringINSTANCE.Write(writer, value.ScoreMode)
 }
 
 type FfiDestroyerPostprocessRunOptions struct{}

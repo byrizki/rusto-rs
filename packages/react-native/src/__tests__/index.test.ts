@@ -85,6 +85,7 @@ describe('React Native API', () => {
     { detection: { mean: [0.5, 0.5] } },
     { detection: { std: [0.5, 0, 0.5] } },
     { postprocess: { useDilation: 'true' } },
+    { postprocess: { scoreMode: 'invalid' } },
     // obsolete nested key must reject
     { preprocessing: { minHeight: 24 } },
     { unknown: true },
