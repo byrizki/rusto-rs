@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>RustODotnet.Models.UVDoc</PackageId>
+    <Version>0.3.2</Version>
+    <Authors>RustO Contributors</Authors>
+    <Description>UVDoc document geometric unwarping model for RustODotnet (~30 MB)</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/byrizki/rusto-rs</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/byrizki/rusto-rs</PackageProjectUrl>
+    <PackageTags>OCR;PaddleOCR;RTen;Unwarp;UVDoc;Models</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="models\**\*" Pack="true" PackagePath="content\models\" />
+    <None Include="buildTransitive\$(PackageId).targets" Pack="true" PackagePath="buildTransitive\$(PackageId).targets" />
+    <None Include="buildTransitive\$(PackageId).targets" Pack="true" PackagePath="build\$(PackageId).targets" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
+

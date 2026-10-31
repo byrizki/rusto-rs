@@ -10,7 +10,9 @@ use crate::image_impl::Mat;
 use crate::engine::{EngineError, EngineSession, InferenceSession};
 use crate::types::LayoutConfig;
 
-#[derive(Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BBox {
     pub x_min: i32,
     pub y_min: i32,
@@ -19,7 +21,7 @@ pub struct BBox {
 }
 
 /// Layout element types
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LayoutType {
     Text = 0,
     Title = 1,
@@ -66,7 +68,7 @@ impl LayoutType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LayoutRegion {
     pub bbox: BBox,
     pub layout_type: LayoutType,
@@ -80,7 +82,7 @@ pub struct LayoutOutput {
 
 pub struct LayoutDetector {
     session: EngineSession,
-    config: LayoutConfig,
+    pub config: LayoutConfig,
 }
 
 impl LayoutDetector {
@@ -231,36 +233,30 @@ impl LayoutDetector {
         scale_w: f32,
         scale_h: f32,
     ) -> Result<Vec<LayoutRegion>, EngineError> {
-        // Find the output tensor containing boxes
-        // Usually it's the one with shape [N, 6]
-        let mut boxes_tensor = None;
+        let mut raw_boxes = Vec::new();
+        let mut found = false;
         for tensor in outputs.values() {
             let shape = tensor.shape();
             if shape.len() == 2 && shape[1] == 6 {
-                boxes_tensor = Some(tensor);
+                for row in tensor.outer_iter() {
+                    raw_boxes.push([row[0], row[1], row[2], row[3], row[4], row[5]]);
+                }
+                found = true;
+                break;
+            } else if shape.len() == 3 && shape[2] == 6 {
+                let batch0 = tensor.index_axis(ndarray::Axis(0), 0);
+                for row in batch0.outer_iter() {
+                    raw_boxes.push([row[0], row[1], row[2], row[3], row[4], row[5]]);
+                }
+                found = true;
                 break;
             }
         }
 
-        let boxes_tensor = match boxes_tensor {
-            Some(t) => t,
-            None => {
-                return Err(EngineError::OutputError(
-                    "No suitable output tensor found".to_string(),
-                ))
-            }
-        };
-
-        let mut raw_boxes = Vec::new();
-        for row in boxes_tensor.outer_iter() {
-            let class_id = row[0] as usize;
-            let score = row[1];
-            let x1 = row[2];
-            let y1 = row[3];
-            let x2 = row[4];
-            let y2 = row[5];
-
-            raw_boxes.push([class_id as f32, score, x1, y1, x2, y2]);
+        if !found {
+            return Err(EngineError::OutputError(
+                "No suitable output tensor found (expected [N, 6] or [1, N, 6])".to_string(),
+            ));
         }
 
         // Filter by confidence (handled by NMS or manual filter)

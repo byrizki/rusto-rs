@@ -39,6 +39,10 @@ extension RustO {
             unwarp.modelPath = resolveModelPath(path) ?? path
             resolvedConfig.unwarp = unwarp
         }
+        if var layout = config.layout, let path = layout.modelPath {
+            layout.modelPath = resolveModelPath(path) ?? path
+            resolvedConfig.layout = layout
+        }
 
         return try RustO.initialize(config: resolvedConfig)
     }
@@ -92,7 +96,19 @@ extension InitializeConfig {
             recognition: nil,
             classification: nil,
             orientation: nil,
-            unwarp: nil
+            unwarp: nil,
+            layout: nil
+        )
+    }
+}
+
+extension LayoutConfig {
+    public init() {
+        self.init(
+            enabled: nil,
+            modelPath: nil,
+            confThresh: nil,
+            targetSize: nil
         )
     }
 }
@@ -203,6 +219,8 @@ extension OcrRunOptions {
             textScore: nil,
             classification: nil,
             orientation: nil,
+            unwarp: nil,
+            layout: nil,
             minHeight: nil,
             maxSideLen: nil,
             minSideLen: nil,

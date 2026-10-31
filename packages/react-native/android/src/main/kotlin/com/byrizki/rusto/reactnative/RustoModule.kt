@@ -51,7 +51,7 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
             require(map.getType("models") == ReadableType.Map) { "InitializeConfig.models must be an object." }
             map.getMap("models")!!
         } else null
-        models?.let { requireOnlyKeys(it, setOf("detection", "recognition", "dictionary", "classification", "orientation"), "InitializeConfig.models contains an unknown key.") }
+        models?.let { requireOnlyKeys(it, setOf("detection", "recognition", "dictionary", "classification", "orientation", "unwarp", "layout"), "InitializeConfig.models contains an unknown key.") }
         fun model(name: String): String? {
             if (models == null || !models.hasKey(name) || models.isNull(name)) return null
             require(models.getType(name) == ReadableType.String) { "InitializeConfig.models.$name must be a string." }
@@ -63,6 +63,8 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
             recognition = RecognitionConfig(modelPath = model("recognition") ?: "rec.rten", dictPath = model("dictionary") ?: "dict.txt"),
             classification = model("classification")?.let { ClassificationConfig(enabled = true, modelPath = it) },
             orientation = model("orientation")?.let { OrientationConfig(enabled = true, modelPath = it) },
+            unwarp = model("unwarp")?.let { com.byrizki.rusto.UnwarpConfig(enabled = true, modelPath = it) },
+            layout = model("layout")?.let { com.byrizki.rusto.LayoutConfig(enabled = true, modelPath = it) },
         )
     }
 
@@ -111,7 +113,7 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
 
     private fun parseOptions(options: ReadableMap?): OcrRunOptions {
         if (options == null) return OcrRunOptions()
-        requireOnlyKeys(options, setOf("output", "lineYThreshold", "wordXThreshold", "textScore", "classification", "orientation", "minHeight", "maxSideLen", "minSideLen", "widthHeightRatio", "detection", "postprocess"), "DetectTextOptions contains an unknown key.")
+        requireOnlyKeys(options, setOf("output", "lineYThreshold", "wordXThreshold", "textScore", "classification", "orientation", "unwarp", "layout", "minHeight", "maxSideLen", "minSideLen", "widthHeightRatio", "detection", "postprocess"), "DetectTextOptions contains an unknown key.")
         val output = if (options.hasKey("output") && !options.isNull("output")) {
             require(options.getType("output") == ReadableType.String) { "DetectTextOptions.output must be a string." }
             options.getString("output")!!
@@ -137,7 +139,7 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
         val ratio = if (!options.hasKey("widthHeightRatio") || options.isNull("widthHeightRatio")) null else { require(options.getType("widthHeightRatio") == ReadableType.Number) { "DetectTextOptions.widthHeightRatio must be a number." }; options.getDouble("widthHeightRatio").also { require(it.isFinite() && (it > 0 || it == -1.0)) { "DetectTextOptions.widthHeightRatio is invalid." } }.toFloat() }
         val detection = if (!options.hasKey("detection") || options.isNull("detection")) null else { require(options.getType("detection") == ReadableType.Map) { "DetectTextOptions.detection must be an object." }; parseRuntimeDetection(options.getMap("detection")!!) }
         val postprocess = if (!options.hasKey("postprocess") || options.isNull("postprocess")) null else { require(options.getType("postprocess") == ReadableType.Map) { "DetectTextOptions.postprocess must be an object." }; parseRuntimePostprocess(options.getMap("postprocess")!!) }
-        return OcrRunOptions(OutputGranularity.entries.first { it.wireValue == output }, y?.toFloat(), x?.toFloat(), score?.toFloat(), boolean("classification"), boolean("orientation"), minHeight, maxSideLen, minSideLen, ratio, detection, postprocess)
+        return OcrRunOptions(OutputGranularity.entries.first { it.wireValue == output }, y?.toFloat(), x?.toFloat(), score?.toFloat(), boolean("classification"), boolean("orientation"), minHeight, maxSideLen, minSideLen, ratio, detection, postprocess, boolean("unwarp"), boolean("layout"))
     }
 
     private fun parseRuntimeDetection(map: ReadableMap): DetectionRunOptions {

@@ -82,3 +82,18 @@ project(':rusto-models-ppocrv4-chinese-cht').projectDir = file('models/rusto-mod
 
 include ':rusto-models-ppocrv4-kannada'
 project(':rusto-models-ppocrv4-kannada').projectDir = file('models/rusto-models-ppocrv4-kannada')
+
+include ':rusto-models-cls'
+project(':rusto-models-cls').projectDir = file('models/rusto-models-cls')
+
+include ':rusto-models-orient'
+project(':rusto-models-orient').projectDir = file('models/rusto-models-orient')
+
+include ':rusto-models-uvdoc'
+project(':rusto-models-uvdoc').projectDir = file('models/rusto-models-uvdoc')
+
+include ':rusto-models-layout-s'
+project(':rusto-models-layout-s').projectDir = file('models/rusto-models-layout-s')
+
+include ':rusto-models-layout-l'
+project(':rusto-models-layout-l').projectDir = file('models/rusto-models-layout-l')

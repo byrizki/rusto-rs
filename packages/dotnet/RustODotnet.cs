@@ -111,6 +111,18 @@ namespace RustODotnet
         public string ModelPath { get; set; }
     }
 
+    public class LayoutConfig
+    {
+        [JsonPropertyName("model_path")]
+        public string ModelPath { get; set; }
+
+        [JsonPropertyName("conf_thresh")]
+        public float? ConfThresh { get; set; }
+
+        [JsonPropertyName("target_size")]
+        public int? TargetSize { get; set; }
+    }
+
     /// <summary>
     /// Configuration for engine initialization and model paths.
     /// </summary>
@@ -139,6 +151,10 @@ namespace RustODotnet
         /// <summary>Optional document dewarping model configuration.</summary>
         [JsonPropertyName("unwarp")]
         public UnwarpConfig Unwarp { get; set; }
+
+        /// <summary>Optional document layout model configuration.</summary>
+        [JsonPropertyName("layout")]
+        public LayoutConfig Layout { get; set; }
 
         /// <summary>Creates a preset configuration for PP-OCRv3.</summary>
         public static InitializeConfig Ppv3() => new() { Template = "ppv3" };
@@ -187,6 +203,10 @@ namespace RustODotnet
         public bool? Classification { get; set; }
         [JsonPropertyName("orientation")]
         public bool? Orientation { get; set; }
+        [JsonPropertyName("unwarp")]
+        public bool? Unwarp { get; set; }
+        [JsonPropertyName("layout")]
+        public bool? Layout { get; set; }
         [JsonPropertyName("minHeight")] public float? MinHeight { get; set; }
         [JsonPropertyName("maxSideLen")] public float? MaxSideLen { get; set; }
         [JsonPropertyName("minSideLen")] public float? MinSideLen { get; set; }
@@ -490,6 +510,8 @@ namespace RustODotnet
                 TextScore = options.TextScore,
                 Classification = options.Classification,
                 Orientation = options.Orientation,
+                Unwarp = options.Unwarp,
+                Layout = options.Layout,
                 MinHeight = options.MinHeight,
                 MaxSideLen = options.MaxSideLen,
                 MinSideLen = options.MinSideLen,

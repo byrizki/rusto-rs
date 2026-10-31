@@ -390,8 +390,10 @@ pub struct GlobalConfig {
     pub use_rec: bool,
     pub use_orient: bool,
     pub use_unwarp: bool,
+    pub use_layout: bool,
     pub orient_config: Option<OrientConfig>,
     pub unwarp_config: Option<UnwarpConfig>,
+    pub layout_config: Option<LayoutConfig>,
     /// Enable debug images (oriented and rectified)
     pub debug_images: bool,
     pub min_height: f32,
@@ -419,8 +421,10 @@ impl Default for GlobalConfig {
             use_rec: true,
             use_orient: false,
             use_unwarp: false,
+            use_layout: false,
             orient_config: None,
             unwarp_config: None,
+            layout_config: None,
             debug_images: false, // Disabled by default for performance
             min_height: 30.0,
             width_height_ratio: 8.0,

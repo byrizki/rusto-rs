@@ -128,6 +128,14 @@ impl EngineSession {
         Self::from_path(&cfg.model_path, &cfg.engine_cfg)
     }
 
+    pub fn from_unwarp_config(cfg: &crate::types::UnwarpConfig) -> Result<Self, EngineError> {
+        Self::from_path(&cfg.model_path, &cfg.engine_cfg)
+    }
+
+    pub fn from_layout_config(cfg: &crate::types::LayoutConfig) -> Result<Self, EngineError> {
+        Self::from_path(&cfg.model_path, &cfg.engine_cfg)
+    }
+
     pub fn from_custom(session: impl InferenceSession + 'static) -> Self {
         Self::Custom(Box::new(session))
     }
@@ -233,23 +241,38 @@ fn resolve_model_path(path: &Path) -> PathBuf {
     if let Some(file_name) = path.file_name().and_then(|s| s.to_str()) {
         let is_det = file_name.starts_with("det");
         let is_rec = file_name.starts_with("rec");
-        let base = if is_det {
-            "det"
+        let is_cls = file_name.starts_with("cls");
+        let is_orient = file_name.starts_with("orient") || file_name.starts_with("rapid_orientation") || file_name.starts_with("lcnet");
+        let is_unwarp = file_name.starts_with("unwarp") || file_name.starts_with("uvdoc");
+        let is_layout = file_name.starts_with("layout") || file_name.starts_with("pp_doclayout");
+
+        let candidates: &[&str] = if is_det {
+            &["det"]
         } else if is_rec {
-            "rec"
+            &["rec"]
+        } else if is_cls {
+            &["cls", "lcnet-text", "ch_ppocr_mobile_v2.0_cls"]
+        } else if is_orient {
+            &["orient", "rapid_orientation", "lcnet"]
+        } else if is_unwarp {
+            &["unwarp", "uvdoc"]
+        } else if is_layout {
+            &["layout", "pp_doclayout_plus_l", "pp_doclayout_s"]
         } else {
-            ""
+            &[]
         };
 
-        if !base.is_empty() {
-            for dir in &["models/PPOCR_v6_tiny", "models/PPOCR_v6", "models"] {
-                let p_rten = PathBuf::from(format!("{}/{}.rten", dir, base));
-                if p_rten.exists() {
-                    return p_rten;
-                }
-                let p_onnx = PathBuf::from(format!("{}/{}.onnx", dir, base));
-                if p_onnx.exists() {
-                    return p_onnx;
+        if !candidates.is_empty() {
+            for dir in &["models/PPOCR_v6_tiny", "models/PPOCR_v6", "models/PPOCR_v5", "models/PPOCR_v4_mobile", "models/DocOCR", "models"] {
+                for candidate in candidates {
+                    let p_rten = PathBuf::from(format!("{}/{}.rten", dir, candidate));
+                    if p_rten.exists() {
+                        return p_rten;
+                    }
+                    let p_onnx = PathBuf::from(format!("{}/{}.onnx", dir, candidate));
+                    if p_onnx.exists() {
+                        return p_onnx;
+                    }
                 }
             }
         }
@@ -340,11 +363,16 @@ impl RtenSession {
     ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
         let mut rten_tensors = Vec::new();
 
+        let model_in_ids = self.model.input_ids();
         for (name, input) in &inputs_map {
             let node_id = if let Some(id) = self.model.find_node(name) {
                 id
-            } else if inputs_map.len() == 1 && !self.model.input_ids().is_empty() {
-                self.model.input_ids()[0]
+            } else if model_in_ids.len() == 1 {
+                if name == "image" || inputs_map.len() == 1 {
+                    model_in_ids[0]
+                } else {
+                    continue;
+                }
             } else {
                 return Err(EngineError::OutputError(format!(
                     "Input node '{}' not found in model",

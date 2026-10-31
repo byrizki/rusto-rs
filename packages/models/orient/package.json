@@ -1,0 +1,57 @@
+{
+  "name": "@rustors/model-orient",
+  "version": "0.3.2",
+  "description": "PP-LCNet document orientation classifier (~6.4 MB) for RustO OCR. Detects 0\u00b0/90\u00b0/180\u00b0/270\u00b0 page rotation.",
+  "keywords": [
+    "ocr",
+    "rusto",
+    "models",
+    "paddleocr",
+    "onnx",
+    "rten",
+    "pipeline",
+    "optional",
+    "multilingual"
+  ],
+  "homepage": "https://github.com/byrizki/rusto-rs#readme",
+  "bugs": {
+    "url": "https://github.com/byrizki/rusto-rs/issues"
+  },
+  "license": "MIT",
+  "author": "byrizki <contact@byrizki.com> (https://github.com/byrizki)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/byrizki/rusto-rs.git",
+    "directory": "packages/models/orient"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./models/*": "./models/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "models",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.2"
+  }
+}

@@ -93,6 +93,10 @@ export interface InitializeConfig {
     classification?: string;
     /** Optional document orientation angle classifier model path. */
     orientation?: string;
+    /** Optional document unwarping model path (.rten or .onnx). */
+    unwarp?: string;
+    /** Optional document layout analysis model path (.rten or .onnx). */
+    layout?: string;
   };
 }
 
@@ -112,6 +116,10 @@ export interface DetectTextOptions {
   classification?: boolean;
   /** Enable 0°/90°/180°/270° document orientation rotation stage. */
   orientation?: boolean;
+  /** Enable document dewarping stage before detection. */
+  unwarp?: boolean;
+  /** Enable document layout analysis stage. */
+  layout?: boolean;
   /** Request-local minimum height resize override. */
   minHeight?: number;
   /** Request-local maximum side length resize override. */
@@ -154,6 +162,47 @@ export interface TextResult {
   frame: Frame;
 }
 
+/**
+ * Semantic layout category of a detected document region.
+ */
+export type LayoutType =
+  | 'text'
+  | 'title'
+  | 'figure'
+  | 'figureCaption'
+  | 'table'
+  | 'tableCaption'
+  | 'header'
+  | 'footer'
+  | 'reference'
+  | 'equation';
+
+/**
+ * Axis-aligned bounding box coordinates for a detected document layout region.
+ */
+export interface LayoutBBox {
+  /** Left coordinate (minimum X) in pixels. */
+  xMin: number;
+  /** Top coordinate (minimum Y) in pixels. */
+  yMin: number;
+  /** Right coordinate (maximum X) in pixels. */
+  xMax: number;
+  /** Bottom coordinate (maximum Y) in pixels. */
+  yMax: number;
+}
+
+/**
+ * Detected document layout region with category, bounding box, and confidence score.
+ */
+export interface LayoutRegion {
+  /** Bounding box coordinates. */
+  bbox: LayoutBBox;
+  /** Semantic layout category. */
+  layoutType: LayoutType;
+  /** Classification confidence score [0.0 - 1.0]. */
+  confidence: number;
+}
+
 const SOURCE_KEYS = ['uri', 'base64', 'bytes'] as const;
 const OPTION_KEYS = [
   'output',
@@ -162,6 +211,8 @@ const OPTION_KEYS = [
   'textScore',
   'classification',
   'orientation',
+  'unwarp',
+  'layout',
   'minHeight',
   'maxSideLen',
   'minSideLen',
@@ -175,6 +226,8 @@ const MODEL_KEYS = [
   'dictionary',
   'classification',
   'orientation',
+  'unwarp',
+  'layout',
 ] as const;
 const DETECTION_KEYS = ['limitSideLen', 'limitType', 'mean', 'std'] as const;
 const POSTPROCESS_KEYS = [
@@ -329,7 +382,7 @@ function normalizeOptions(options: DetectTextOptions | undefined): DetectTextOpt
     (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 1)
   )
     throw new TypeError('DetectTextOptions.textScore must be a finite number from 0 to 1.');
-  for (const key of ['classification', 'orientation'] as const) {
+  for (const key of ['classification', 'orientation', 'unwarp', 'layout'] as const) {
     const value = options[key];
     if (value !== undefined && typeof value !== 'boolean')
       throw new TypeError(`DetectTextOptions.${key} must be a boolean.`);
@@ -421,4 +474,14 @@ export function detectText(
   options: DetectTextOptions = {}
 ): Promise<TextResult[] | string> {
   return Rusto.detectText(normalizeSource(source), normalizeOptions(options));
+}
+
+/**
+ * Runs document layout analysis on an image source.
+ *
+ * @param source - Image source object ({ uri }, { base64 }, or { bytes }).
+ * @returns Array of detected LayoutRegion objects.
+ */
+export function detectLayout(source: ImageSource): Promise<LayoutRegion[]> {
+  return Rusto.detectLayout(normalizeSource(source));
 }

@@ -25,6 +25,14 @@ struct Cli {
     #[arg(short, long, value_enum, default_value_t = OutputFormat::Json)]
     format: OutputFormat,
 
+    /// Enable text line orientation classifier
+    #[arg(long)]
+    enable_cls: bool,
+
+    /// Path to text line orientation classifier model
+    #[arg(long)]
+    cls_model: Option<PathBuf>,
+
     /// Enable document orientation classification
     #[arg(long)]
     enable_orient: bool,
@@ -40,7 +48,14 @@ struct Cli {
     /// Path to text unwarping model (uvdoc.rten)
     #[arg(long)]
     unwarp_model: Option<PathBuf>,
-    // Layout detection removed
+
+    /// Enable document layout detection
+    #[arg(long)]
+    enable_layout: bool,
+
+    /// Path to document layout detection model
+    #[arg(long)]
+    layout_model: Option<PathBuf>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -60,29 +75,89 @@ enum OutputFormat {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
-    // Initialize base OCR using the advanced API
-    let mut ocr = RustO::initialize(InitializeConfig::ppv5(&cli.det_model, &cli.rec_model, &cli.dict))?;
+    // Initialize base OCR configuration
+    let mut config = InitializeConfig::ppv5(&cli.det_model, &cli.rec_model, &cli.dict);
 
-    if cli.enable_orient || cli.orient_model.is_some() || cli.enable_unwarp || cli.unwarp_model.is_some() {
-        eprintln!("Warning: CLI optional stages are not configured by this canonical API command.");
+    if let Some(cls_model) = cli.cls_model {
+        config = config.with_cls(cls_model);
+    } else if cli.enable_cls {
+        config.global.use_cls = true;
     }
 
-    // Layout detection removed
+    if let Some(orient_model) = cli.orient_model {
+        config = config.with_orientation(orient_model);
+    } else if cli.enable_orient {
+        config.global.use_orient = true;
+    }
+
+    if let Some(unwarp_model) = cli.unwarp_model {
+        config = config.with_unwarp(unwarp_model);
+    } else if cli.enable_unwarp {
+        config.global.use_unwarp = true;
+    }
+
+    if let Some(layout_model) = cli.layout_model {
+        config = config.with_layout(layout_model);
+    } else if cli.enable_layout {
+        config.global.use_layout = true;
+    }
+
+    let mut ocr = RustO::initialize(config)?;
+
+    let mut options = OcrRunOptions::default();
+    if cli.enable_cls {
+        options.classification = Some(true);
+    }
+    if cli.enable_orient {
+        options.orientation = Some(true);
+    }
+    if cli.enable_unwarp {
+        options.unwarp = Some(true);
+    }
+    if cli.enable_layout {
+        options.layout = Some(true);
+    }
 
     // Run OCR
     eprintln!("Processing image...");
     let detected = ocr.detect_text(
         &ImageSource::Path(cli.image.clone()),
-        &OcrRunOptions::default(),
+        &options,
     )?;
     let DetectTextResult::Structured(results) = detected else {
         unreachable!("default OCR output is structured lines");
     };
     eprintln!("✓ OCR completed");
 
+    let layout_regions = if cli.enable_layout && ocr.layout.is_some() {
+        match ocr.detect_layout(&ImageSource::Path(cli.image.clone())) {
+            Ok(regions) => Some(regions),
+            Err(e) => {
+                eprintln!("Warning: Layout detection failed: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // Output projected text results.
     match cli.format {
-        OutputFormat::Json => println!("{}", serde_json::to_string_pretty(&results)?),
+        OutputFormat::Json => {
+            if let Some(regions) = &layout_regions {
+                #[derive(serde::Serialize)]
+                struct OutputWithLayout<'a> {
+                    text_results: &'a [rusto::TextResult],
+                    layout_regions: &'a [rusto::LayoutRegion],
+                }
+                println!("{}", serde_json::to_string_pretty(&OutputWithLayout {
+                    text_results: &results,
+                    layout_regions: regions,
+                })?);
+            } else {
+                println!("{}", serde_json::to_string_pretty(&results)?);
+            }
+        }
         OutputFormat::Text | OutputFormat::TextOrdered => {
             for result in &results {
                 println!("{}", result.text);

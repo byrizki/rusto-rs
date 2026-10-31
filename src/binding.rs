@@ -165,6 +165,10 @@ pub struct OcrRunOptions {
     pub classification: Option<bool>,
     /// Enable document orientation angle correction stage.
     pub orientation: Option<bool>,
+    /// Enable document unwarping stage.
+    pub unwarp: Option<bool>,
+    /// Enable document layout analysis stage.
+    pub layout: Option<bool>,
     /// Request-local minimum height resize override.
     pub min_height: Option<f32>,
     /// Request-local maximum side length resize override.
@@ -253,6 +257,70 @@ pub struct UnwarpConfig {
     pub model_path: Option<String>,
 }
 
+/// Category of document layout region.
+#[derive(uniffi::Enum, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LayoutType {
+    Text,
+    Title,
+    Figure,
+    FigureCaption,
+    Table,
+    TableCaption,
+    Header,
+    Footer,
+    Reference,
+    Equation,
+}
+
+/// Bounding box coordinates for a detected document layout region.
+#[derive(uniffi::Record, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LayoutBBox {
+    /// Minimum horizontal coordinate (left).
+    pub x_min: i32,
+    /// Minimum vertical coordinate (top).
+    pub y_min: i32,
+    /// Maximum horizontal coordinate (right).
+    pub x_max: i32,
+    /// Maximum vertical coordinate (bottom).
+    pub y_max: i32,
+}
+
+/// Detected document layout region with category, bounding box, and confidence score.
+#[derive(uniffi::Record, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LayoutRegion {
+    /// Axis-aligned bounding box.
+    pub bbox: LayoutBBox,
+    /// Semantic layout category.
+    pub layout_type: LayoutType,
+    /// Classification confidence score [0.0 - 1.0].
+    pub confidence: f32,
+}
+
+/// Document layout analysis model configuration.
+#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LayoutConfig {
+    /// Whether layout stage is enabled.
+    pub enabled: Option<bool>,
+    /// Filesystem path to layout model (.rten or .onnx).
+    pub model_path: Option<String>,
+    /// Confidence threshold.
+    pub conf_thresh: Option<f32>,
+    /// Target input side length for resizing.
+    pub target_size: Option<i32>,
+}
+
+/// Unwarped image result with raw RGB8 pixel buffer and dimensions.
+#[derive(uniffi::Record, Clone, Debug, PartialEq)]
+pub struct UnwarpedImageResult {
+    /// Interleaved 24-bit RGB pixel bytes.
+    pub pixels: Vec<u8>,
+    /// Image width in pixels.
+    pub width: u32,
+    /// Image height in pixels.
+    pub height: u32,
+}
+
 /// Engine initialization configuration specifying model paths and template preset.
 #[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -269,6 +337,8 @@ pub struct InitializeConfig {
     pub orientation: Option<OrientationConfig>,
     /// Optional unwarp configuration.
     pub unwarp: Option<UnwarpConfig>,
+    /// Optional layout configuration.
+    pub layout: Option<LayoutConfig>,
 }
 
 /// High-level RustO OCR Engine for multi-platform bindings.
@@ -333,6 +403,68 @@ impl RustO {
         })?;
         let result = guard.detect_text_rgb(&pixels, width, height, stride_usize, &internal_options)?;
         Ok(convert_result(result))
+    }
+
+    /// Detects document layout regions from an image source.
+    pub fn detect_layout(
+        &self,
+        source: ImageSource,
+    ) -> Result<Vec<LayoutRegion>, RustoBindingError> {
+        let internal_source = convert_source(&source)?;
+        let mut guard = self.inner.lock().map_err(|_| RustoBindingError::Inference {
+            msg: "Internal engine lock poisoned".into(),
+        })?;
+        let regions = guard.detect_layout(&internal_source)?;
+        Ok(regions.into_iter().map(convert_layout_region).collect())
+    }
+
+    /// Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
+    pub fn detect_layout_rgb(
+        &self,
+        pixels: Vec<u8>,
+        width: u32,
+        height: u32,
+        stride: u64,
+    ) -> Result<Vec<LayoutRegion>, RustoBindingError> {
+        let mut guard = self.inner.lock().map_err(|_| RustoBindingError::Inference {
+            msg: "Internal engine lock poisoned".into(),
+        })?;
+        let stride_usize = usize::try_from(stride).map_err(|_| RustoBindingError::InvalidInput {
+            msg: "stride exceeds platform address space".into(),
+        })?;
+        let regions = guard.detect_layout_rgb(&pixels, width, height, stride_usize)?;
+        Ok(regions.into_iter().map(convert_layout_region).collect())
+    }
+
+    /// Unwarps a distorted or curved document image from an image source.
+    pub fn unwarp_image(
+        &self,
+        source: ImageSource,
+    ) -> Result<UnwarpedImageResult, RustoBindingError> {
+        let internal_source = convert_source(&source)?;
+        let mut guard = self.inner.lock().map_err(|_| RustoBindingError::Inference {
+            msg: "Internal engine lock poisoned".into(),
+        })?;
+        let mat = guard.unwarp_image(&internal_source)?;
+        convert_mat_to_unwarped(mat)
+    }
+
+    /// Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
+    pub fn unwarp_image_rgb(
+        &self,
+        pixels: Vec<u8>,
+        width: u32,
+        height: u32,
+        stride: u64,
+    ) -> Result<UnwarpedImageResult, RustoBindingError> {
+        let mut guard = self.inner.lock().map_err(|_| RustoBindingError::Inference {
+            msg: "Internal engine lock poisoned".into(),
+        })?;
+        let stride_usize = usize::try_from(stride).map_err(|_| RustoBindingError::InvalidInput {
+            msg: "stride exceeds platform address space".into(),
+        })?;
+        let mat = guard.unwarp_image_rgb(&pixels, width, height, stride_usize)?;
+        convert_mat_to_unwarped(mat)
     }
 
     /// Returns the engine library version string.
@@ -455,6 +587,8 @@ fn convert_options(opts: &OcrRunOptions) -> Result<crate::rusto_ocr::OcrRunOptio
         text_score: opts.text_score,
         classification: opts.classification,
         orientation: opts.orientation,
+        unwarp: opts.unwarp,
+        layout: opts.layout,
         min_height: opts.min_height,
         max_side_len: opts.max_side_len,
         min_side_len: opts.min_side_len,
@@ -496,6 +630,57 @@ fn convert_result(res: crate::rusto_ocr::DetectTextResult) -> DetectTextResult {
     }
 }
 
+fn convert_layout_type(t: crate::layout::LayoutType) -> LayoutType {
+    match t {
+        crate::layout::LayoutType::Text => LayoutType::Text,
+        crate::layout::LayoutType::Title => LayoutType::Title,
+        crate::layout::LayoutType::Figure => LayoutType::Figure,
+        crate::layout::LayoutType::FigureCaption => LayoutType::FigureCaption,
+        crate::layout::LayoutType::Table => LayoutType::Table,
+        crate::layout::LayoutType::TableCaption => LayoutType::TableCaption,
+        crate::layout::LayoutType::Header => LayoutType::Header,
+        crate::layout::LayoutType::Footer => LayoutType::Footer,
+        crate::layout::LayoutType::Reference => LayoutType::Reference,
+        crate::layout::LayoutType::Equation => LayoutType::Equation,
+    }
+}
+
+fn convert_layout_region(r: crate::layout::LayoutRegion) -> LayoutRegion {
+    LayoutRegion {
+        bbox: LayoutBBox {
+            x_min: r.bbox.x_min,
+            y_min: r.bbox.y_min,
+            x_max: r.bbox.x_max,
+            y_max: r.bbox.y_max,
+        },
+        layout_type: convert_layout_type(r.layout_type),
+        confidence: r.confidence,
+    }
+}
+
+fn convert_mat_to_unwarped(mat: crate::image_impl::Mat) -> Result<UnwarpedImageResult, RustoBindingError> {
+    #[cfg(not(feature = "use-opencv"))]
+    {
+        let width = mat.cols() as u32;
+        let height = mat.rows() as u32;
+        let rgb = mat.to_rgb8();
+        Ok(UnwarpedImageResult {
+            pixels: rgb.into_raw(),
+            width,
+            height,
+        })
+    }
+    #[cfg(feature = "use-opencv")]
+    {
+        let _ = mat;
+        Err(RustoBindingError::InvalidInput {
+            msg: "RGB unwarped image export requires the pure Rust image backend".into(),
+        })
+    }
+}
+
+/// # Safety
+/// Construct RustBuffer from foreign bytes. Caller must guarantee bytes validity.
 #[no_mangle]
 pub unsafe extern "C" fn ffi_uniffi_rusto_rustbuffer_from_bytes(
     bytes: uniffi::ForeignBytes,
@@ -504,6 +689,8 @@ pub unsafe extern "C" fn ffi_uniffi_rusto_rustbuffer_from_bytes(
     uniffi::uniffi_rustbuffer_from_bytes(bytes, out_status)
 }
 
+/// # Safety
+/// Free RustBuffer previously allocated by UniFFI.
 #[no_mangle]
 pub unsafe extern "C" fn ffi_uniffi_rusto_rustbuffer_free(
     buf: uniffi::RustBuffer,

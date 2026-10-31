@@ -450,6 +450,8 @@ class InitializeConfig {
     required this.orientation,
     /// Optional unwarp configuration.
     required this.unwarp,
+    /// Optional layout configuration.
+    required this.layout,
   });
 
   /// Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
@@ -464,6 +466,8 @@ class InitializeConfig {
   final OrientationConfig? orientation;
   /// Optional unwarp configuration.
   final UnwarpConfig? unwarp;
+  /// Optional layout configuration.
+  final LayoutConfig? layout;
 
   Map<String, dynamic> toJson() {
     return {
@@ -473,6 +477,7 @@ class InitializeConfig {
       'classification': this.classification == null ? null : (() { final __tmp = this.classification!; return __tmp.toJson(); })(),
       'orientation': this.orientation == null ? null : (() { final __tmp = this.orientation!; return __tmp.toJson(); })(),
       'unwarp': this.unwarp == null ? null : (() { final __tmp = this.unwarp!; return __tmp.toJson(); })(),
+      'layout': this.layout == null ? null : (() { final __tmp = this.layout!; return __tmp.toJson(); })(),
     };
   }
 
@@ -484,6 +489,7 @@ class InitializeConfig {
       classification: json['classification'] == null ? null : (() { final __tmp = json['classification']; return ClassificationConfig.fromJson(__tmp as Map<String, dynamic>); })(),
       orientation: json['orientation'] == null ? null : (() { final __tmp = json['orientation']; return OrientationConfig.fromJson(__tmp as Map<String, dynamic>); })(),
       unwarp: json['unwarp'] == null ? null : (() { final __tmp = json['unwarp']; return UnwarpConfig.fromJson(__tmp as Map<String, dynamic>); })(),
+      layout: json['layout'] == null ? null : (() { final __tmp = json['layout']; return LayoutConfig.fromJson(__tmp as Map<String, dynamic>); })(),
     );
   }
 
@@ -494,6 +500,7 @@ class InitializeConfig {
     Object? classification = _sentinel,
     Object? orientation = _sentinel,
     Object? unwarp = _sentinel,
+    Object? layout = _sentinel,
   }) {
     return InitializeConfig(
       template: template == _sentinel ? this.template : template as String?,
@@ -502,21 +509,218 @@ class InitializeConfig {
       classification: classification == _sentinel ? this.classification : classification as ClassificationConfig?,
       orientation: orientation == _sentinel ? this.orientation : orientation as OrientationConfig?,
       unwarp: unwarp == _sentinel ? this.unwarp : unwarp as UnwarpConfig?,
+      layout: layout == _sentinel ? this.layout : layout as LayoutConfig?,
     );
   }
 
   @override
   String toString() {
-    return 'InitializeConfig(template: $template, detection: $detection, recognition: $recognition, classification: $classification, orientation: $orientation, unwarp: $unwarp)';
+    return 'InitializeConfig(template: $template, detection: $detection, recognition: $recognition, classification: $classification, orientation: $orientation, unwarp: $unwarp, layout: $layout)';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is InitializeConfig && template == other.template && detection == other.detection && recognition == other.recognition && classification == other.classification && orientation == other.orientation && unwarp == other.unwarp;
+      other is InitializeConfig && template == other.template && detection == other.detection && recognition == other.recognition && classification == other.classification && orientation == other.orientation && unwarp == other.unwarp && layout == other.layout;
 
   @override
-  int get hashCode => Object.hash(template, detection, recognition, classification, orientation, unwarp);
+  int get hashCode => Object.hash(template, detection, recognition, classification, orientation, unwarp, layout);
+}
+
+/// Bounding box coordinates for a detected document layout region.
+class LayoutBBox {
+  const LayoutBBox({
+    /// Minimum horizontal coordinate (left).
+    required this.xMin,
+    /// Minimum vertical coordinate (top).
+    required this.yMin,
+    /// Maximum horizontal coordinate (right).
+    required this.xMax,
+    /// Maximum vertical coordinate (bottom).
+    required this.yMax,
+  });
+
+  /// Minimum horizontal coordinate (left).
+  final int xMin;
+  /// Minimum vertical coordinate (top).
+  final int yMin;
+  /// Maximum horizontal coordinate (right).
+  final int xMax;
+  /// Maximum vertical coordinate (bottom).
+  final int yMax;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'xMin': this.xMin,
+      'yMin': this.yMin,
+      'xMax': this.xMax,
+      'yMax': this.yMax,
+    };
+  }
+
+  factory LayoutBBox.fromJson(Map<String, dynamic> json) {
+    return LayoutBBox(
+      xMin: (json['xMin'] as num).toInt(),
+      yMin: (json['yMin'] as num).toInt(),
+      xMax: (json['xMax'] as num).toInt(),
+      yMax: (json['yMax'] as num).toInt(),
+    );
+  }
+
+  LayoutBBox copyWith({
+    int? xMin,
+    int? yMin,
+    int? xMax,
+    int? yMax,
+  }) {
+    return LayoutBBox(
+      xMin: xMin ?? this.xMin,
+      yMin: yMin ?? this.yMin,
+      xMax: xMax ?? this.xMax,
+      yMax: yMax ?? this.yMax,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'LayoutBBox(xMin: $xMin, yMin: $yMin, xMax: $xMax, yMax: $yMax)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LayoutBBox && xMin == other.xMin && yMin == other.yMin && xMax == other.xMax && yMax == other.yMax;
+
+  @override
+  int get hashCode => Object.hash(xMin, yMin, xMax, yMax);
+}
+
+/// Document layout analysis model configuration.
+class LayoutConfig {
+  const LayoutConfig({
+    /// Whether layout stage is enabled.
+    required this.enabled,
+    /// Filesystem path to layout model (.rten or .onnx).
+    required this.modelPath,
+    /// Confidence threshold.
+    required this.confThresh,
+    /// Target input side length for resizing.
+    required this.targetSize,
+  });
+
+  /// Whether layout stage is enabled.
+  final bool? enabled;
+  /// Filesystem path to layout model (.rten or .onnx).
+  final String? modelPath;
+  /// Confidence threshold.
+  final double? confThresh;
+  /// Target input side length for resizing.
+  final int? targetSize;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'enabled': this.enabled,
+      'modelPath': this.modelPath,
+      'confThresh': this.confThresh,
+      'targetSize': this.targetSize,
+    };
+  }
+
+  factory LayoutConfig.fromJson(Map<String, dynamic> json) {
+    return LayoutConfig(
+      enabled: json['enabled'] == null ? null : json['enabled'] as bool,
+      modelPath: json['modelPath'] == null ? null : json['modelPath'] as String,
+      confThresh: json['confThresh'] == null ? null : (json['confThresh'] as num).toDouble(),
+      targetSize: json['targetSize'] == null ? null : (json['targetSize'] as num).toInt(),
+    );
+  }
+
+  LayoutConfig copyWith({
+    Object? enabled = _sentinel,
+    Object? modelPath = _sentinel,
+    Object? confThresh = _sentinel,
+    Object? targetSize = _sentinel,
+  }) {
+    return LayoutConfig(
+      enabled: enabled == _sentinel ? this.enabled : enabled as bool?,
+      modelPath: modelPath == _sentinel ? this.modelPath : modelPath as String?,
+      confThresh: confThresh == _sentinel ? this.confThresh : confThresh as double?,
+      targetSize: targetSize == _sentinel ? this.targetSize : targetSize as int?,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'LayoutConfig(enabled: $enabled, modelPath: $modelPath, confThresh: $confThresh, targetSize: $targetSize)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LayoutConfig && enabled == other.enabled && modelPath == other.modelPath && confThresh == other.confThresh && targetSize == other.targetSize;
+
+  @override
+  int get hashCode => Object.hash(enabled, modelPath, confThresh, targetSize);
+}
+
+/// Detected document layout region with category, bounding box, and confidence score.
+class LayoutRegion {
+  const LayoutRegion({
+    /// Axis-aligned bounding box.
+    required this.bbox,
+    /// Semantic layout category.
+    required this.layoutType,
+    /// Classification confidence score [0.0 - 1.0].
+    required this.confidence,
+  });
+
+  /// Axis-aligned bounding box.
+  final LayoutBBox bbox;
+  /// Semantic layout category.
+  final LayoutType layoutType;
+  /// Classification confidence score [0.0 - 1.0].
+  final double confidence;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'bbox': this.bbox.toJson(),
+      'layoutType': LayoutTypeFfiCodec.encode(this.layoutType),
+      'confidence': this.confidence,
+    };
+  }
+
+  factory LayoutRegion.fromJson(Map<String, dynamic> json) {
+    return LayoutRegion(
+      bbox: LayoutBBox.fromJson(json['bbox'] as Map<String, dynamic>),
+      layoutType: LayoutTypeFfiCodec.decode(json['layoutType'] as String),
+      confidence: (json['confidence'] as num).toDouble(),
+    );
+  }
+
+  LayoutRegion copyWith({
+    LayoutBBox? bbox,
+    LayoutType? layoutType,
+    double? confidence,
+  }) {
+    return LayoutRegion(
+      bbox: bbox ?? this.bbox,
+      layoutType: layoutType ?? this.layoutType,
+      confidence: confidence ?? this.confidence,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'LayoutRegion(bbox: $bbox, layoutType: $layoutType, confidence: $confidence)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LayoutRegion && bbox == other.bbox && layoutType == other.layoutType && confidence == other.confidence;
+
+  @override
+  int get hashCode => Object.hash(bbox, layoutType, confidence);
 }
 
 /// Per-request execution options for text detection.
@@ -534,6 +738,10 @@ class OcrRunOptions {
     required this.classification,
     /// Enable document orientation angle correction stage.
     required this.orientation,
+    /// Enable document unwarping stage.
+    required this.unwarp,
+    /// Enable document layout analysis stage.
+    required this.layout,
     /// Request-local minimum height resize override.
     required this.minHeight,
     /// Request-local maximum side length resize override.
@@ -564,6 +772,10 @@ class OcrRunOptions {
   final bool? classification;
   /// Enable document orientation angle correction stage.
   final bool? orientation;
+  /// Enable document unwarping stage.
+  final bool? unwarp;
+  /// Enable document layout analysis stage.
+  final bool? layout;
   /// Request-local minimum height resize override.
   final double? minHeight;
   /// Request-local maximum side length resize override.
@@ -589,6 +801,8 @@ class OcrRunOptions {
       'textScore': this.textScore,
       'classification': this.classification,
       'orientation': this.orientation,
+      'unwarp': this.unwarp,
+      'layout': this.layout,
       'minHeight': this.minHeight,
       'maxSideLen': this.maxSideLen,
       'minSideLen': this.minSideLen,
@@ -608,6 +822,8 @@ class OcrRunOptions {
       textScore: json['textScore'] == null ? null : (json['textScore'] as num).toDouble(),
       classification: json['classification'] == null ? null : json['classification'] as bool,
       orientation: json['orientation'] == null ? null : json['orientation'] as bool,
+      unwarp: json['unwarp'] == null ? null : json['unwarp'] as bool,
+      layout: json['layout'] == null ? null : json['layout'] as bool,
       minHeight: json['minHeight'] == null ? null : (json['minHeight'] as num).toDouble(),
       maxSideLen: json['maxSideLen'] == null ? null : (json['maxSideLen'] as num).toDouble(),
       minSideLen: json['minSideLen'] == null ? null : (json['minSideLen'] as num).toDouble(),
@@ -626,6 +842,8 @@ class OcrRunOptions {
     Object? textScore = _sentinel,
     Object? classification = _sentinel,
     Object? orientation = _sentinel,
+    Object? unwarp = _sentinel,
+    Object? layout = _sentinel,
     Object? minHeight = _sentinel,
     Object? maxSideLen = _sentinel,
     Object? minSideLen = _sentinel,
@@ -642,6 +860,8 @@ class OcrRunOptions {
       textScore: textScore == _sentinel ? this.textScore : textScore as double?,
       classification: classification == _sentinel ? this.classification : classification as bool?,
       orientation: orientation == _sentinel ? this.orientation : orientation as bool?,
+      unwarp: unwarp == _sentinel ? this.unwarp : unwarp as bool?,
+      layout: layout == _sentinel ? this.layout : layout as bool?,
       minHeight: minHeight == _sentinel ? this.minHeight : minHeight as double?,
       maxSideLen: maxSideLen == _sentinel ? this.maxSideLen : maxSideLen as double?,
       minSideLen: minSideLen == _sentinel ? this.minSideLen : minSideLen as double?,
@@ -655,16 +875,16 @@ class OcrRunOptions {
 
   @override
   String toString() {
-    return 'OcrRunOptions(output: $output, lineYThreshold: $lineYThreshold, wordXThreshold: $wordXThreshold, textScore: $textScore, classification: $classification, orientation: $orientation, minHeight: $minHeight, maxSideLen: $maxSideLen, minSideLen: $minSideLen, widthHeightRatio: $widthHeightRatio, detection: $detection, postprocess: $postprocess, calibration: $calibration, optimization: $optimization)';
+    return 'OcrRunOptions(output: $output, lineYThreshold: $lineYThreshold, wordXThreshold: $wordXThreshold, textScore: $textScore, classification: $classification, orientation: $orientation, unwarp: $unwarp, layout: $layout, minHeight: $minHeight, maxSideLen: $maxSideLen, minSideLen: $minSideLen, widthHeightRatio: $widthHeightRatio, detection: $detection, postprocess: $postprocess, calibration: $calibration, optimization: $optimization)';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is OcrRunOptions && output == other.output && lineYThreshold == other.lineYThreshold && wordXThreshold == other.wordXThreshold && textScore == other.textScore && classification == other.classification && orientation == other.orientation && minHeight == other.minHeight && maxSideLen == other.maxSideLen && minSideLen == other.minSideLen && widthHeightRatio == other.widthHeightRatio && detection == other.detection && postprocess == other.postprocess && calibration == other.calibration && optimization == other.optimization;
+      other is OcrRunOptions && output == other.output && lineYThreshold == other.lineYThreshold && wordXThreshold == other.wordXThreshold && textScore == other.textScore && classification == other.classification && orientation == other.orientation && unwarp == other.unwarp && layout == other.layout && minHeight == other.minHeight && maxSideLen == other.maxSideLen && minSideLen == other.minSideLen && widthHeightRatio == other.widthHeightRatio && detection == other.detection && postprocess == other.postprocess && calibration == other.calibration && optimization == other.optimization;
 
   @override
-  int get hashCode => Object.hash(output, lineYThreshold, wordXThreshold, textScore, classification, orientation, minHeight, maxSideLen, minSideLen, widthHeightRatio, detection, postprocess, calibration, optimization);
+  int get hashCode => Object.hash(output, lineYThreshold, wordXThreshold, textScore, classification, orientation, unwarp, layout, minHeight, maxSideLen, minSideLen, widthHeightRatio, detection, postprocess, calibration, optimization);
 }
 
 /// Runtime crop and resolution optimization options.
@@ -1095,6 +1315,66 @@ class UnwarpConfig {
   int get hashCode => Object.hash(enabled, modelPath);
 }
 
+/// Unwarped image result with raw RGB8 pixel buffer and dimensions.
+class UnwarpedImageResult {
+  const UnwarpedImageResult({
+    /// Interleaved 24-bit RGB pixel bytes.
+    required this.pixels,
+    /// Image width in pixels.
+    required this.width,
+    /// Image height in pixels.
+    required this.height,
+  });
+
+  /// Interleaved 24-bit RGB pixel bytes.
+  final Uint8List pixels;
+  /// Image width in pixels.
+  final int width;
+  /// Image height in pixels.
+  final int height;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'pixels': base64Encode(this.pixels),
+      'width': this.width,
+      'height': this.height,
+    };
+  }
+
+  factory UnwarpedImageResult.fromJson(Map<String, dynamic> json) {
+    return UnwarpedImageResult(
+      pixels: base64Decode(json['pixels'] as String),
+      width: (json['width'] as num).toInt(),
+      height: (json['height'] as num).toInt(),
+    );
+  }
+
+  UnwarpedImageResult copyWith({
+    Uint8List? pixels,
+    int? width,
+    int? height,
+  }) {
+    return UnwarpedImageResult(
+      pixels: pixels ?? this.pixels,
+      width: width ?? this.width,
+      height: height ?? this.height,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'UnwarpedImageResult(pixels: $pixels, width: $width, height: $height)';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UnwarpedImageResult && pixels == other.pixels && width == other.width && height == other.height;
+
+  @override
+  int get hashCode => Object.hash(pixels, width, height);
+}
+
 /// Detection result: structured text items or formatted 2D spatial text string.
 sealed class DetectTextResult {
   const DetectTextResult();
@@ -1187,6 +1467,20 @@ final class ImageSourceBytes extends ImageSource {
 
   @override
   int get hashCode => data.hashCode;
+}
+
+/// Category of document layout region.
+enum LayoutType {
+  text,
+  title,
+  figure,
+  figureCaption,
+  table,
+  tableCaption,
+  header,
+  footer,
+  reference,
+  equation,
 }
 
 /// Output format granularity for text detection.
@@ -1463,6 +1757,37 @@ ImageSource _decodeImageSource(String raw) {
   }
 }
 
+String _encodeLayoutType(LayoutType value) {
+  return switch (value) {
+    LayoutType.text => 'text',
+    LayoutType.title => 'title',
+    LayoutType.figure => 'figure',
+    LayoutType.figureCaption => 'figureCaption',
+    LayoutType.table => 'table',
+    LayoutType.tableCaption => 'tableCaption',
+    LayoutType.header => 'header',
+    LayoutType.footer => 'footer',
+    LayoutType.reference => 'reference',
+    LayoutType.equation => 'equation',
+  };
+}
+
+LayoutType _decodeLayoutType(String raw) {
+  return switch (raw) {
+    'text' => LayoutType.text,
+    'title' => LayoutType.title,
+    'figure' => LayoutType.figure,
+    'figureCaption' => LayoutType.figureCaption,
+    'table' => LayoutType.table,
+    'tableCaption' => LayoutType.tableCaption,
+    'header' => LayoutType.header,
+    'footer' => LayoutType.footer,
+    'reference' => LayoutType.reference,
+    'equation' => LayoutType.equation,
+    _ => throw StateError('Unknown LayoutType variant: $raw'),
+  };
+}
+
 String _encodeOutputGranularity(OutputGranularity value) {
   return switch (value) {
     OutputGranularity.lines => 'lines',
@@ -1620,6 +1945,14 @@ final class ImageSourceFfiCodec {
   static String encode(ImageSource value) => _encodeImageSource(value);
 
   static ImageSource decode(String raw) => _decodeImageSource(raw);
+}
+
+final class LayoutTypeFfiCodec {
+  const LayoutTypeFfiCodec._();
+
+  static String encode(LayoutType value) => _encodeLayoutType(value);
+
+  static LayoutType decode(String raw) => _decodeLayoutType(raw);
 }
 
 final class OutputGranularityFfiCodec {
@@ -2035,6 +2368,12 @@ void _uniffiWriteInitializeConfig(InitializeConfig value, _UniFfiBinaryWriter wr
     writer.writeI8(1);
     _uniffiWriteUnwarpConfig(value.unwarp!, writer);
   }
+  if (value.layout == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    _uniffiWriteLayoutConfig(value.layout!, writer);
+  }
 }
 
 Uint8List _uniffiEncodeInitializeConfig(InitializeConfig value) {
@@ -2051,6 +2390,7 @@ InitializeConfig _uniffiReadInitializeConfig(_UniFfiBinaryReader reader) {
     classification: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadClassificationConfig(reader); })(),
     orientation: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadOrientationConfig(reader); })(),
     unwarp: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadUnwarpConfig(reader); })(),
+    layout: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadLayoutConfig(reader); })(),
   );
 }
 
@@ -2059,6 +2399,117 @@ InitializeConfig _uniffiDecodeInitializeConfig(Uint8List bytes) {
   final value = _uniffiReadInitializeConfig(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding InitializeConfig');
+  }
+  return value;
+}
+
+void _uniffiWriteLayoutBBox(LayoutBBox value, _UniFfiBinaryWriter writer) {
+  writer.writeI32(value.xMin);
+  writer.writeI32(value.yMin);
+  writer.writeI32(value.xMax);
+  writer.writeI32(value.yMax);
+}
+
+Uint8List _uniffiEncodeLayoutBBox(LayoutBBox value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteLayoutBBox(value, writer);
+  return writer.toBytes();
+}
+
+LayoutBBox _uniffiReadLayoutBBox(_UniFfiBinaryReader reader) {
+  return LayoutBBox(
+    xMin: reader.readI32(),
+    yMin: reader.readI32(),
+    xMax: reader.readI32(),
+    yMax: reader.readI32(),
+  );
+}
+
+LayoutBBox _uniffiDecodeLayoutBBox(Uint8List bytes) {
+  final reader = _UniFfiBinaryReader(bytes);
+  final value = _uniffiReadLayoutBBox(reader);
+  if (!reader.isDone) {
+    throw StateError('extra bytes remaining while decoding LayoutBBox');
+  }
+  return value;
+}
+
+void _uniffiWriteLayoutConfig(LayoutConfig value, _UniFfiBinaryWriter writer) {
+  if (value.enabled == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeBool(value.enabled!);
+  }
+  if (value.modelPath == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeString(value.modelPath!);
+  }
+  if (value.confThresh == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeF32(value.confThresh!);
+  }
+  if (value.targetSize == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeI32(value.targetSize!);
+  }
+}
+
+Uint8List _uniffiEncodeLayoutConfig(LayoutConfig value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteLayoutConfig(value, writer);
+  return writer.toBytes();
+}
+
+LayoutConfig _uniffiReadLayoutConfig(_UniFfiBinaryReader reader) {
+  return LayoutConfig(
+    enabled: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    modelPath: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
+    confThresh: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    targetSize: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readI32(); })(),
+  );
+}
+
+LayoutConfig _uniffiDecodeLayoutConfig(Uint8List bytes) {
+  final reader = _UniFfiBinaryReader(bytes);
+  final value = _uniffiReadLayoutConfig(reader);
+  if (!reader.isDone) {
+    throw StateError('extra bytes remaining while decoding LayoutConfig');
+  }
+  return value;
+}
+
+void _uniffiWriteLayoutRegion(LayoutRegion value, _UniFfiBinaryWriter writer) {
+  _uniffiWriteLayoutBBox(value.bbox, writer);
+  _uniffiWriteLayoutType(value.layoutType, writer);
+  writer.writeF32(value.confidence);
+}
+
+Uint8List _uniffiEncodeLayoutRegion(LayoutRegion value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteLayoutRegion(value, writer);
+  return writer.toBytes();
+}
+
+LayoutRegion _uniffiReadLayoutRegion(_UniFfiBinaryReader reader) {
+  return LayoutRegion(
+    bbox: _uniffiReadLayoutBBox(reader),
+    layoutType: _uniffiReadLayoutType(reader),
+    confidence: reader.readF32(),
+  );
+}
+
+LayoutRegion _uniffiDecodeLayoutRegion(Uint8List bytes) {
+  final reader = _UniFfiBinaryReader(bytes);
+  final value = _uniffiReadLayoutRegion(reader);
+  if (!reader.isDone) {
+    throw StateError('extra bytes remaining while decoding LayoutRegion');
   }
   return value;
 }
@@ -2094,6 +2545,18 @@ void _uniffiWriteOcrRunOptions(OcrRunOptions value, _UniFfiBinaryWriter writer) 
   } else {
     writer.writeI8(1);
     writer.writeBool(value.orientation!);
+  }
+  if (value.unwarp == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeBool(value.unwarp!);
+  }
+  if (value.layout == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeBool(value.layout!);
   }
   if (value.minHeight == null) {
     writer.writeI8(0);
@@ -2159,6 +2622,8 @@ OcrRunOptions _uniffiReadOcrRunOptions(_UniFfiBinaryReader reader) {
     textScore: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
     classification: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
     orientation: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    unwarp: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    layout: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
     minHeight: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
     maxSideLen: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
     minSideLen: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
@@ -2467,6 +2932,36 @@ UnwarpConfig _uniffiDecodeUnwarpConfig(Uint8List bytes) {
   return value;
 }
 
+void _uniffiWriteUnwarpedImageResult(UnwarpedImageResult value, _UniFfiBinaryWriter writer) {
+  writer.writeI32(value.pixels.length);
+  writer.writeBytes(value.pixels);
+  writer.writeU32(value.width);
+  writer.writeU32(value.height);
+}
+
+Uint8List _uniffiEncodeUnwarpedImageResult(UnwarpedImageResult value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteUnwarpedImageResult(value, writer);
+  return writer.toBytes();
+}
+
+UnwarpedImageResult _uniffiReadUnwarpedImageResult(_UniFfiBinaryReader reader) {
+  return UnwarpedImageResult(
+    pixels: (() { final int __len = reader.readI32(); return reader.readBytes(__len); })(),
+    width: reader.readU32(),
+    height: reader.readU32(),
+  );
+}
+
+UnwarpedImageResult _uniffiDecodeUnwarpedImageResult(Uint8List bytes) {
+  final reader = _UniFfiBinaryReader(bytes);
+  final value = _uniffiReadUnwarpedImageResult(reader);
+  if (!reader.isDone) {
+    throw StateError('extra bytes remaining while decoding UnwarpedImageResult');
+  }
+  return value;
+}
+
 void _uniffiWriteDetectTextResult(DetectTextResult value, _UniFfiBinaryWriter writer) {
   if (value is DetectTextResultStructured) {
     writer.writeI32(1);
@@ -2557,6 +3052,65 @@ ImageSource _uniffiDecodeImageSource(Uint8List bytes) {
   final value = _uniffiReadImageSource(reader);
   if (!reader.isDone) {
     throw StateError('extra bytes remaining while decoding ImageSource');
+  }
+  return value;
+}
+
+void _uniffiWriteLayoutType(LayoutType value, _UniFfiBinaryWriter writer) {
+  final int tag = switch (value) {
+    LayoutType.text => 1,
+    LayoutType.title => 2,
+    LayoutType.figure => 3,
+    LayoutType.figureCaption => 4,
+    LayoutType.table => 5,
+    LayoutType.tableCaption => 6,
+    LayoutType.header => 7,
+    LayoutType.footer => 8,
+    LayoutType.reference => 9,
+    LayoutType.equation => 10,
+  };
+  writer.writeI32(tag);
+}
+
+Uint8List _uniffiEncodeLayoutType(LayoutType value) {
+  final writer = _UniFfiBinaryWriter();
+  _uniffiWriteLayoutType(value, writer);
+  return writer.toBytes();
+}
+
+LayoutType _uniffiReadLayoutType(_UniFfiBinaryReader reader) {
+  final int tag = reader.readI32();
+  switch (tag) {
+    case 1:
+      return LayoutType.text;
+    case 2:
+      return LayoutType.title;
+    case 3:
+      return LayoutType.figure;
+    case 4:
+      return LayoutType.figureCaption;
+    case 5:
+      return LayoutType.table;
+    case 6:
+      return LayoutType.tableCaption;
+    case 7:
+      return LayoutType.header;
+    case 8:
+      return LayoutType.footer;
+    case 9:
+      return LayoutType.reference;
+    case 10:
+      return LayoutType.equation;
+    default:
+      throw StateError('Unknown LayoutType variant tag: $tag');
+  }
+}
+
+LayoutType _uniffiDecodeLayoutType(Uint8List bytes) {
+  final reader = _UniFfiBinaryReader(bytes);
+  final value = _uniffiReadLayoutType(reader);
+  if (!reader.isDone) {
+    throw StateError('extra bytes remaining while decoding LayoutType');
   }
   return value;
 }
@@ -2728,6 +3282,26 @@ class RustoFfi {
     if (_checksum_uniffi_rusto_checksum_func_rusto_version != 3477) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_func_rusto_version`: expected 3477, got $_checksum_uniffi_rusto_checksum_func_rusto_version');
     }
+    final int _checksum_uniffi_rusto_checksum_method_rusto_detect_layout;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_method_rusto_detect_layout');
+      _checksum_uniffi_rusto_checksum_method_rusto_detect_layout = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_method_rusto_detect_layout`: $err');
+    }
+    if (_checksum_uniffi_rusto_checksum_method_rusto_detect_layout != 43417) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_method_rusto_detect_layout`: expected 43417, got $_checksum_uniffi_rusto_checksum_method_rusto_detect_layout');
+    }
+    final int _checksum_uniffi_rusto_checksum_method_rusto_detect_layout_rgb;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_method_rusto_detect_layout_rgb');
+      _checksum_uniffi_rusto_checksum_method_rusto_detect_layout_rgb = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_method_rusto_detect_layout_rgb`: $err');
+    }
+    if (_checksum_uniffi_rusto_checksum_method_rusto_detect_layout_rgb != 59477) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_method_rusto_detect_layout_rgb`: expected 59477, got $_checksum_uniffi_rusto_checksum_method_rusto_detect_layout_rgb');
+    }
     final int _checksum_uniffi_rusto_checksum_method_rusto_detect_text;
     try {
       final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_method_rusto_detect_text');
@@ -2747,6 +3321,26 @@ class RustoFfi {
     }
     if (_checksum_uniffi_rusto_checksum_method_rusto_detect_text_rgb != 9991) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_method_rusto_detect_text_rgb`: expected 9991, got $_checksum_uniffi_rusto_checksum_method_rusto_detect_text_rgb');
+    }
+    final int _checksum_uniffi_rusto_checksum_method_rusto_unwarp_image;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_method_rusto_unwarp_image');
+      _checksum_uniffi_rusto_checksum_method_rusto_unwarp_image = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_method_rusto_unwarp_image`: $err');
+    }
+    if (_checksum_uniffi_rusto_checksum_method_rusto_unwarp_image != 24978) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_method_rusto_unwarp_image`: expected 24978, got $_checksum_uniffi_rusto_checksum_method_rusto_unwarp_image');
+    }
+    final int _checksum_uniffi_rusto_checksum_method_rusto_unwarp_image_rgb;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_method_rusto_unwarp_image_rgb');
+      _checksum_uniffi_rusto_checksum_method_rusto_unwarp_image_rgb = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_method_rusto_unwarp_image_rgb`: $err');
+    }
+    if (_checksum_uniffi_rusto_checksum_method_rusto_unwarp_image_rgb != 44077) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_method_rusto_unwarp_image_rgb`: expected 44077, got $_checksum_uniffi_rusto_checksum_method_rusto_unwarp_image_rgb');
     }
     final int _checksum_uniffi_rusto_checksum_method_rusto_version;
     try {
@@ -3217,6 +3811,205 @@ class RustoFfi {
     }
   }
 
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _rustODetectLayoutFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_method_rusto_detect_layout');
+
+  List<LayoutRegion> rustOInvokeDetectLayout(int handle, ImageSource source) {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(4);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
+    final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
+    final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
+    try {
+      final int clonedHandle;
+      {
+        final cloneStatusPtr = calloc<_UniFfiRustCallStatus>();
+        try {
+          cloneStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+          cloneStatusPtr.ref.errorBuf
+            ..capacity = 0
+            ..len = 0
+            ..data = ffi.nullptr;
+          clonedHandle = _rustOClone(handle, cloneStatusPtr);
+          if (cloneStatusPtr.ref.code != _uniFfiRustCallStatusSuccess) {
+            throw StateError('UniFFI clone failed with status ${cloneStatusPtr.ref.code}');
+          }
+        } finally {
+          calloc.free(cloneStatusPtr);
+        }
+      }
+      (argBuf + 0).ref.u64 = clonedHandle;
+      final Uint8List sourceBytes = _uniffiEncodeImageSource(source);
+      final ffi.Pointer<ffi.Uint8> sourcePtr = sourceBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(sourceBytes.length);
+      if (sourceBytes.isNotEmpty) { sourcePtr.asTypedList(sourceBytes.length).setAll(0, sourceBytes); }
+      foreignArgPtrs.add(sourcePtr);
+      final ffi.Pointer<_UniFfiRustCallStatus> sourceFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
+      sourceFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+      sourceFromBytesStatusPtr.ref.errorBuf
+        ..capacity = 0
+        ..len = 0
+        ..data = ffi.nullptr;
+      final ffi.Pointer<_UniFfiForeignBytes> sourceForeignPtr = calloc<_UniFfiForeignBytes>();
+      sourceForeignPtr.ref
+        ..len = sourceBytes.length
+        ..data = sourcePtr;
+      final _UniFfiRustBuffer sourceRustBuffer = _uniFfiRustBufferFromBytes(sourceForeignPtr.ref, sourceFromBytesStatusPtr);
+      calloc.free(sourceForeignPtr);
+      final int sourceFromBytesCode = sourceFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer sourceFromBytesErrBuf = sourceFromBytesStatusPtr.ref.errorBuf;
+      calloc.free(sourceFromBytesStatusPtr);
+      if (sourceFromBytesCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> sourceFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
+        sourceFromBytesErrBufPtr.ref
+          ..capacity = sourceFromBytesErrBuf.capacity
+          ..len = sourceFromBytesErrBuf.len
+          ..data = sourceFromBytesErrBuf.data;
+        rustRetBufferPtrs.add(sourceFromBytesErrBufPtr);
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $sourceFromBytesCode');
+      }
+      (argBuf + 1).ref.u64 = sourceRustBuffer.capacity;
+      (argBuf + 2).ref.u64 = sourceRustBuffer.len;
+      (argBuf + 3).ref.ptr = sourceRustBuffer.data.cast<ffi.Void>();
+      _rustODetectLayoutFfiBuffer(argBuf, returnBuf);
+      final int statusCode = (returnBuf + 3).ref.i8;
+      if (statusCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
+        errBufPtr.ref
+          ..capacity = (returnBuf + 4).ref.u64
+          ..len = (returnBuf + 5).ref.u64
+          ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
+        rustRetBufferPtrs.add(errBufPtr);
+        if (statusCode == _uniFfiRustCallStatusError) {
+          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));
+          throw _uniffiLiftRustoBindingErrorException(errBytes);
+        }
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
+      }
+      throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (detect_layout)');
+    } finally {
+      for (final ptr in foreignArgPtrs) {
+        if (ptr != ffi.nullptr) {
+          calloc.free(ptr);
+        }
+      }
+      for (final bufPtr in rustRetBufferPtrs) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
+          continue;
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
+        freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        freeStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        _uniFfiRustBufferFree(bufPtr.ref, freeStatusPtr);
+        calloc.free(freeStatusPtr);
+        calloc.free(bufPtr);
+      }
+      calloc.free(argBuf);
+      calloc.free(returnBuf);
+    }
+  }
+
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _rustODetectLayoutRgbFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_method_rusto_detect_layout_rgb');
+
+  List<LayoutRegion> rustOInvokeDetectLayoutRgb(int handle, Uint8List pixels, int width, int height, int stride) {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(7);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
+    final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
+    final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
+    try {
+      final int clonedHandle;
+      {
+        final cloneStatusPtr = calloc<_UniFfiRustCallStatus>();
+        try {
+          cloneStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+          cloneStatusPtr.ref.errorBuf
+            ..capacity = 0
+            ..len = 0
+            ..data = ffi.nullptr;
+          clonedHandle = _rustOClone(handle, cloneStatusPtr);
+          if (cloneStatusPtr.ref.code != _uniFfiRustCallStatusSuccess) {
+            throw StateError('UniFFI clone failed with status ${cloneStatusPtr.ref.code}');
+          }
+        } finally {
+          calloc.free(cloneStatusPtr);
+        }
+      }
+      (argBuf + 0).ref.u64 = clonedHandle;
+      final Uint8List pixelsBytes = pixels;
+      final ffi.Pointer<ffi.Uint8> pixelsPtr = pixelsBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(pixelsBytes.length);
+      if (pixelsBytes.isNotEmpty) { pixelsPtr.asTypedList(pixelsBytes.length).setAll(0, pixelsBytes); }
+      foreignArgPtrs.add(pixelsPtr);
+      final ffi.Pointer<_UniFfiRustCallStatus> pixelsFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
+      pixelsFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+      pixelsFromBytesStatusPtr.ref.errorBuf
+        ..capacity = 0
+        ..len = 0
+        ..data = ffi.nullptr;
+      final ffi.Pointer<_UniFfiForeignBytes> pixelsForeignPtr = calloc<_UniFfiForeignBytes>();
+      pixelsForeignPtr.ref
+        ..len = pixelsBytes.length
+        ..data = pixelsPtr;
+      final _UniFfiRustBuffer pixelsRustBuffer = _uniFfiRustBufferFromBytes(pixelsForeignPtr.ref, pixelsFromBytesStatusPtr);
+      calloc.free(pixelsForeignPtr);
+      final int pixelsFromBytesCode = pixelsFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer pixelsFromBytesErrBuf = pixelsFromBytesStatusPtr.ref.errorBuf;
+      calloc.free(pixelsFromBytesStatusPtr);
+      if (pixelsFromBytesCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> pixelsFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
+        pixelsFromBytesErrBufPtr.ref
+          ..capacity = pixelsFromBytesErrBuf.capacity
+          ..len = pixelsFromBytesErrBuf.len
+          ..data = pixelsFromBytesErrBuf.data;
+        rustRetBufferPtrs.add(pixelsFromBytesErrBufPtr);
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $pixelsFromBytesCode');
+      }
+      (argBuf + 1).ref.u64 = pixelsRustBuffer.capacity;
+      (argBuf + 2).ref.u64 = pixelsRustBuffer.len;
+      (argBuf + 3).ref.ptr = pixelsRustBuffer.data.cast<ffi.Void>();
+      (argBuf + 4).ref.u32 = width;
+      (argBuf + 5).ref.u32 = height;
+      (argBuf + 6).ref.u64 = stride;
+      _rustODetectLayoutRgbFfiBuffer(argBuf, returnBuf);
+      final int statusCode = (returnBuf + 3).ref.i8;
+      if (statusCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
+        errBufPtr.ref
+          ..capacity = (returnBuf + 4).ref.u64
+          ..len = (returnBuf + 5).ref.u64
+          ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
+        rustRetBufferPtrs.add(errBufPtr);
+        if (statusCode == _uniFfiRustCallStatusError) {
+          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));
+          throw _uniffiLiftRustoBindingErrorException(errBytes);
+        }
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
+      }
+      throw UnsupportedError('runtime invocation for this UniFFI ABI (RustCallStatus out-arg) is not implemented yet (detect_layout_rgb)');
+    } finally {
+      for (final ptr in foreignArgPtrs) {
+        if (ptr != ffi.nullptr) {
+          calloc.free(ptr);
+        }
+      }
+      for (final bufPtr in rustRetBufferPtrs) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
+          continue;
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
+        freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        freeStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        _uniFfiRustBufferFree(bufPtr.ref, freeStatusPtr);
+        calloc.free(freeStatusPtr);
+        calloc.free(bufPtr);
+      }
+      calloc.free(argBuf);
+      calloc.free(returnBuf);
+    }
+  }
+
   late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _rustODetectTextFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_method_rusto_detect_text');
 
   DetectTextResult rustOInvokeDetectText(int handle, ImageSource source, OcrRunOptions options) {
@@ -3492,6 +4285,219 @@ class RustoFfi {
     }
   }
 
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _rustOUnwarpImageFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_method_rusto_unwarp_image');
+
+  UnwarpedImageResult rustOInvokeUnwarpImage(int handle, ImageSource source) {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(4);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
+    final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
+    final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
+    try {
+      final int clonedHandle;
+      {
+        final cloneStatusPtr = calloc<_UniFfiRustCallStatus>();
+        try {
+          cloneStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+          cloneStatusPtr.ref.errorBuf
+            ..capacity = 0
+            ..len = 0
+            ..data = ffi.nullptr;
+          clonedHandle = _rustOClone(handle, cloneStatusPtr);
+          if (cloneStatusPtr.ref.code != _uniFfiRustCallStatusSuccess) {
+            throw StateError('UniFFI clone failed with status ${cloneStatusPtr.ref.code}');
+          }
+        } finally {
+          calloc.free(cloneStatusPtr);
+        }
+      }
+      (argBuf + 0).ref.u64 = clonedHandle;
+      final Uint8List sourceBytes = _uniffiEncodeImageSource(source);
+      final ffi.Pointer<ffi.Uint8> sourcePtr = sourceBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(sourceBytes.length);
+      if (sourceBytes.isNotEmpty) { sourcePtr.asTypedList(sourceBytes.length).setAll(0, sourceBytes); }
+      foreignArgPtrs.add(sourcePtr);
+      final ffi.Pointer<_UniFfiRustCallStatus> sourceFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
+      sourceFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+      sourceFromBytesStatusPtr.ref.errorBuf
+        ..capacity = 0
+        ..len = 0
+        ..data = ffi.nullptr;
+      final ffi.Pointer<_UniFfiForeignBytes> sourceForeignPtr = calloc<_UniFfiForeignBytes>();
+      sourceForeignPtr.ref
+        ..len = sourceBytes.length
+        ..data = sourcePtr;
+      final _UniFfiRustBuffer sourceRustBuffer = _uniFfiRustBufferFromBytes(sourceForeignPtr.ref, sourceFromBytesStatusPtr);
+      calloc.free(sourceForeignPtr);
+      final int sourceFromBytesCode = sourceFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer sourceFromBytesErrBuf = sourceFromBytesStatusPtr.ref.errorBuf;
+      calloc.free(sourceFromBytesStatusPtr);
+      if (sourceFromBytesCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> sourceFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
+        sourceFromBytesErrBufPtr.ref
+          ..capacity = sourceFromBytesErrBuf.capacity
+          ..len = sourceFromBytesErrBuf.len
+          ..data = sourceFromBytesErrBuf.data;
+        rustRetBufferPtrs.add(sourceFromBytesErrBufPtr);
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $sourceFromBytesCode');
+      }
+      (argBuf + 1).ref.u64 = sourceRustBuffer.capacity;
+      (argBuf + 2).ref.u64 = sourceRustBuffer.len;
+      (argBuf + 3).ref.ptr = sourceRustBuffer.data.cast<ffi.Void>();
+      _rustOUnwarpImageFfiBuffer(argBuf, returnBuf);
+      final int statusCode = (returnBuf + 3).ref.i8;
+      if (statusCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
+        errBufPtr.ref
+          ..capacity = (returnBuf + 4).ref.u64
+          ..len = (returnBuf + 5).ref.u64
+          ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
+        rustRetBufferPtrs.add(errBufPtr);
+        if (statusCode == _uniFfiRustCallStatusError) {
+          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));
+          throw _uniffiLiftRustoBindingErrorException(errBytes);
+        }
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
+      }
+      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();
+      retBufPtr.ref
+        ..capacity = (returnBuf + 0).ref.u64
+        ..len = (returnBuf + 1).ref.u64
+        ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();
+      rustRetBufferPtrs.add(retBufPtr);
+      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
+      return _uniffiDecodeUnwarpedImageResult(retBytes);
+    } finally {
+      for (final ptr in foreignArgPtrs) {
+        if (ptr != ffi.nullptr) {
+          calloc.free(ptr);
+        }
+      }
+      for (final bufPtr in rustRetBufferPtrs) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
+          continue;
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
+        freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        freeStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        _uniFfiRustBufferFree(bufPtr.ref, freeStatusPtr);
+        calloc.free(freeStatusPtr);
+        calloc.free(bufPtr);
+      }
+      calloc.free(argBuf);
+      calloc.free(returnBuf);
+    }
+  }
+
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _rustOUnwarpImageRgbFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_method_rusto_unwarp_image_rgb');
+
+  UnwarpedImageResult rustOInvokeUnwarpImageRgb(int handle, Uint8List pixels, int width, int height, int stride) {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(7);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
+    final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
+    final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
+    try {
+      final int clonedHandle;
+      {
+        final cloneStatusPtr = calloc<_UniFfiRustCallStatus>();
+        try {
+          cloneStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+          cloneStatusPtr.ref.errorBuf
+            ..capacity = 0
+            ..len = 0
+            ..data = ffi.nullptr;
+          clonedHandle = _rustOClone(handle, cloneStatusPtr);
+          if (cloneStatusPtr.ref.code != _uniFfiRustCallStatusSuccess) {
+            throw StateError('UniFFI clone failed with status ${cloneStatusPtr.ref.code}');
+          }
+        } finally {
+          calloc.free(cloneStatusPtr);
+        }
+      }
+      (argBuf + 0).ref.u64 = clonedHandle;
+      final Uint8List pixelsBytes = pixels;
+      final ffi.Pointer<ffi.Uint8> pixelsPtr = pixelsBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(pixelsBytes.length);
+      if (pixelsBytes.isNotEmpty) { pixelsPtr.asTypedList(pixelsBytes.length).setAll(0, pixelsBytes); }
+      foreignArgPtrs.add(pixelsPtr);
+      final ffi.Pointer<_UniFfiRustCallStatus> pixelsFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
+      pixelsFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+      pixelsFromBytesStatusPtr.ref.errorBuf
+        ..capacity = 0
+        ..len = 0
+        ..data = ffi.nullptr;
+      final ffi.Pointer<_UniFfiForeignBytes> pixelsForeignPtr = calloc<_UniFfiForeignBytes>();
+      pixelsForeignPtr.ref
+        ..len = pixelsBytes.length
+        ..data = pixelsPtr;
+      final _UniFfiRustBuffer pixelsRustBuffer = _uniFfiRustBufferFromBytes(pixelsForeignPtr.ref, pixelsFromBytesStatusPtr);
+      calloc.free(pixelsForeignPtr);
+      final int pixelsFromBytesCode = pixelsFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer pixelsFromBytesErrBuf = pixelsFromBytesStatusPtr.ref.errorBuf;
+      calloc.free(pixelsFromBytesStatusPtr);
+      if (pixelsFromBytesCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> pixelsFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
+        pixelsFromBytesErrBufPtr.ref
+          ..capacity = pixelsFromBytesErrBuf.capacity
+          ..len = pixelsFromBytesErrBuf.len
+          ..data = pixelsFromBytesErrBuf.data;
+        rustRetBufferPtrs.add(pixelsFromBytesErrBufPtr);
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $pixelsFromBytesCode');
+      }
+      (argBuf + 1).ref.u64 = pixelsRustBuffer.capacity;
+      (argBuf + 2).ref.u64 = pixelsRustBuffer.len;
+      (argBuf + 3).ref.ptr = pixelsRustBuffer.data.cast<ffi.Void>();
+      (argBuf + 4).ref.u32 = width;
+      (argBuf + 5).ref.u32 = height;
+      (argBuf + 6).ref.u64 = stride;
+      _rustOUnwarpImageRgbFfiBuffer(argBuf, returnBuf);
+      final int statusCode = (returnBuf + 3).ref.i8;
+      if (statusCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
+        errBufPtr.ref
+          ..capacity = (returnBuf + 4).ref.u64
+          ..len = (returnBuf + 5).ref.u64
+          ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
+        rustRetBufferPtrs.add(errBufPtr);
+        if (statusCode == _uniFfiRustCallStatusError) {
+          final Uint8List errBytes = errBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(errBufPtr.ref.data.asTypedList(errBufPtr.ref.len));
+          throw _uniffiLiftRustoBindingErrorException(errBytes);
+        }
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
+      }
+      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();
+      retBufPtr.ref
+        ..capacity = (returnBuf + 0).ref.u64
+        ..len = (returnBuf + 1).ref.u64
+        ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();
+      rustRetBufferPtrs.add(retBufPtr);
+      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
+      return _uniffiDecodeUnwarpedImageResult(retBytes);
+    } finally {
+      for (final ptr in foreignArgPtrs) {
+        if (ptr != ffi.nullptr) {
+          calloc.free(ptr);
+        }
+      }
+      for (final bufPtr in rustRetBufferPtrs) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
+          continue;
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
+        freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        freeStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        _uniFfiRustBufferFree(bufPtr.ref, freeStatusPtr);
+        calloc.free(freeStatusPtr);
+        calloc.free(bufPtr);
+      }
+      calloc.free(argBuf);
+      calloc.free(returnBuf);
+    }
+  }
+
   late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _rustOVersionFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_method_rusto_version');
 
   String rustOInvokeVersion(int handle) {
@@ -3603,6 +4609,18 @@ final class RustO {
     return _bindings().rustOCreateInitializeFromJson(configJson);
   }
 
+  /// Detects document layout regions from an image source.
+  List<LayoutRegion> detectLayout(ImageSource source) {
+    _ensureOpen();
+    return _ffi.rustOInvokeDetectLayout(_handle, source);
+  }
+
+  /// Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
+  List<LayoutRegion> detectLayoutRgb(Uint8List pixels, int width, int height, int stride) {
+    _ensureOpen();
+    return _ffi.rustOInvokeDetectLayoutRgb(_handle, pixels, width, height, stride);
+  }
+
   /// Runs text detection and recognition on an image source.
   DetectTextResult detectText(ImageSource source, OcrRunOptions options) {
     _ensureOpen();
@@ -3613,6 +4631,18 @@ final class RustO {
   DetectTextResult detectTextRgb(Uint8List pixels, int width, int height, int stride, OcrRunOptions options) {
     _ensureOpen();
     return _ffi.rustOInvokeDetectTextRgb(_handle, pixels, width, height, stride, options);
+  }
+
+  /// Unwarps a distorted or curved document image from an image source.
+  UnwarpedImageResult unwarpImage(ImageSource source) {
+    _ensureOpen();
+    return _ffi.rustOInvokeUnwarpImage(_handle, source);
+  }
+
+  /// Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
+  UnwarpedImageResult unwarpImageRgb(Uint8List pixels, int width, int height, int stride) {
+    _ensureOpen();
+    return _ffi.rustOInvokeUnwarpImageRgb(_handle, pixels, width, height, stride);
   }
 
   /// Returns the engine library version string.

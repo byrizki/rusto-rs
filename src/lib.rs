@@ -49,6 +49,7 @@ pub mod rec;
 pub mod rusto_ocr;
 pub mod table;
 pub mod types;
+pub mod unwarp;
 
 #[cfg(not(feature = "use-opencv"))]
 mod contours;
@@ -70,12 +71,13 @@ pub use config::{ModelPreset, InitializeConfig, PPV3_MODEL_CONFIG, PPV4_MODEL_CO
 pub use rusto_ocr::{DetectionRunOptions, PostprocessRunOptions};
 pub use det::TextDetector;
 pub use doc_pipeline::{DocBlock, DocPipeline, DocPipelineConfig, DocResult};
-pub use layout::{LayoutDetector, LayoutOutput, LayoutRegion, LayoutType};
+pub use layout::{BBox, LayoutDetector, LayoutOutput, LayoutRegion, LayoutType};
 pub use orient::{OrientClassifier, OrientOutput, Orientation};
 pub use rec::{TextRecOutput, TextRecognizer, WordInfo, WordType};
 pub use rusto_ocr::{DetectTextResult, ImageSource, OcrRunOptions, OutputGranularity, RustO};
 pub use table::{TableDetector, TableDetectorConfig, TableModelType, TableStructure, TableStructureConfig, TableStructureRecognizer};
-pub use types::{ClsConfig, DetConfig, Frame, GlobalConfig, LayoutConfig, OrientConfig, RecConfig};
+pub use types::{ClsConfig, DetConfig, Frame, GlobalConfig, LayoutConfig, OrientConfig, RecConfig, UnwarpConfig};
+pub use unwarp::{DocUnwarper, UnwarpOutput};
 
 // Re-export for easier access
 pub use crate::engine::{EngineError, EngineSession, InferenceSession, RtenSession};
