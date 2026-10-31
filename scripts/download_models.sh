@@ -14,6 +14,10 @@ OUTPUT_DIR=""
 DOWNLOAD_ALL=false
 CONVERT_RTEN=false
 KEEP_ONNX=false
+WITH_CLS=false
+WITH_ORIENT=false
+WITH_UNWARP=false
+WITH_LAYOUT=false
 
 # Parse optional arguments
 while [[ "$#" -gt 0 ]]; do
@@ -21,6 +25,10 @@ while [[ "$#" -gt 0 ]]; do
         --all) DOWNLOAD_ALL=true ;;
         --convert-rten) CONVERT_RTEN=true ;;
         --keep-onnx) KEEP_ONNX=true ;;
+        --with-cls) WITH_CLS=true ;;
+        --with-orient) WITH_ORIENT=true ;;
+        --with-unwarp) WITH_UNWARP=true ;;
+        --with-layout) WITH_LAYOUT=true ;;
         --model) MODEL_TYPE="$2"; shift ;;
         --tier) TIER="$2"; shift ;;
         --lang) LANG="$2"; shift ;;
@@ -85,10 +93,17 @@ download_file_to() {
             echo "  Resuming partial transfer ($(du -h "$partial" | cut -f1))"
         fi
 
+        local url=""
+        if [[ "$ms_path" =~ ^https?:// ]]; then
+            url="$ms_path"
+        else
+            url="$MODELSCOPE_BASE$ms_path"
+        fi
+
         if curl --fail --location --silent --show-error \
             --connect-timeout "$MODEL_DOWNLOAD_CONNECT_TIMEOUT" \
             "${resume_args[@]}" \
-            "$MODELSCOPE_BASE$ms_path" \
+            "$url" \
             --output "$partial"; then
             mv "$partial" "$dest"
             echo "✓ Downloaded: $filename ($(du -h "$dest" | cut -f1))"
@@ -250,6 +265,46 @@ download_ppocrv4_lang() {
     wait_jobs "${pids[@]}"
 }
 
+download_cls() {
+    local dir="$1"
+    echo "=== Downloading Text-Line Classifier (cls.onnx) ==="
+    download_file_to "$dir" "cls.onnx" "onnx%2FPP-OCRv4%2Fcls%2Fch_ppocr_mobile_v2.0_cls_mobile.onnx"
+}
+
+download_orient() {
+    local dir="$1"
+    echo "=== Downloading Document Orientation Classifier (orient.onnx) ==="
+    download_file_to "$dir" "orient.onnx" "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/correction/PP-LCNet_x1_0_doc_ori.onnx"
+}
+
+download_unwarp() {
+    local dir="$1"
+    echo "=== Downloading Document Unwarp Model (uvdoc.onnx) ==="
+    download_file_to "$dir" "uvdoc.onnx" "https://huggingface.co/PaddlePaddle/UVDoc_onnx/resolve/main/inference.onnx"
+}
+
+download_layout_s() {
+    local dir="$1"
+    echo "=== Downloading Document Layout Model Small (layout_s.onnx) ==="
+    download_file_to "$dir" "layout_s.onnx" "https://www.modelscope.cn/api/v1/models/RapidAI/RapidDoc/repo?Revision=master&FilePath=layout%2FPP-DocLayout-S%2Fpp_doclayout_s.onnx"
+}
+
+download_layout_l() {
+    local dir="$1"
+    echo "=== Downloading Document Layout Model Large (layout_l.onnx) ==="
+    download_file_to "$dir" "layout_l.onnx" "https://www.modelscope.cn/api/v1/models/RapidAI/RapidDoc/repo?Revision=master&FilePath=layout%2FPP-DocLayout_plus-L%2Fpp_doclayout_plus_l.onnx"
+}
+
+download_layout() {
+    local dir="$1"
+    local variant="${2:-s}"
+    if [ "$variant" = "l" ] || [ "$variant" = "large" ] || [ "$variant" = "plus-l" ]; then
+        download_layout_l "$dir"
+    else
+        download_layout_s "$dir"
+    fi
+}
+
 V5_LANGS=("arabic" "cyrillic" "devanagari" "el" "eslav" "korean" "latin" "ta" "te" "th")
 V4_LANGS=("japan" "chinese_cht" "kannada")
 
@@ -285,6 +340,13 @@ if [ "$DOWNLOAD_ALL" = true ]; then
         start_model_group download_ppocrv4_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$lang}"
     done
 
+    # Optional document pipeline models (both layout variants downloaded separately)
+    start_model_group download_cls      "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    start_model_group download_orient   "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    start_model_group download_unwarp   "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    start_model_group download_layout_s "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    start_model_group download_layout_l "${OUTPUT_DIR:-$REPO_ROOT/models}"
+
     if ! wait_jobs "${tier_pids[@]}"; then
         tier_failed=1
     fi
@@ -293,22 +355,27 @@ if [ "$DOWNLOAD_ALL" = true ]; then
         exit 1
     fi
 else
+    TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6}"
     case "$MODEL_TYPE" in
         ppocrv6)
-            download_ppocrv6 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6}"
+            download_ppocrv6 "$TIER" "$TARGET_DIR"
             ;;
         ppocrv5)
             if [ -n "$LANG" ]; then
-                download_ppocrv5_lang "$LANG" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$LANG}"
+                TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$LANG}"
+                download_ppocrv5_lang "$LANG" "$TARGET_DIR"
             else
-                download_ppocrv5 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5}"
+                TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5}"
+                download_ppocrv5 "$TIER" "$TARGET_DIR"
             fi
             ;;
         ppocrv4)
             if [ -n "$LANG" ]; then
-                download_ppocrv4_lang "$LANG" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$LANG}"
+                TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$LANG}"
+                download_ppocrv4_lang "$LANG" "$TARGET_DIR"
             else
-                download_ppocrv4 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4}"
+                TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4}"
+                download_ppocrv4 "$TIER" "$TARGET_DIR"
             fi
             ;;
         *)
@@ -316,6 +383,21 @@ else
             exit 1
             ;;
     esac
+
+    # Download requested optional models into the target model directory
+    if [ "$WITH_CLS" = true ]; then
+        download_cls "$TARGET_DIR"
+    fi
+    if [ "$WITH_ORIENT" = true ]; then
+        download_orient "$TARGET_DIR"
+    fi
+    if [ "$WITH_UNWARP" = true ]; then
+        download_unwarp "$TARGET_DIR"
+    fi
+    if [ "$WITH_LAYOUT" = true ]; then
+        download_layout_s "$TARGET_DIR"
+        download_layout_l "$TARGET_DIR"
+    fi
 fi
 
 echo ""

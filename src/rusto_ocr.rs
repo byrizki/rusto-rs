@@ -20,9 +20,11 @@ use crate::geometry::{
     apply_vertical_padding, get_rotate_crop_image, map_boxes_to_original,
     resize_image_within_bounds, OpRecord,
 };
+use crate::layout::LayoutDetector;
 use crate::orient::{OrientClassifier, Orientation};
 use crate::rec::{TextRecOutput, TextRecognizer};
 use crate::types::GlobalConfig;
+use crate::unwarp::DocUnwarper;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -63,6 +65,8 @@ pub struct OcrRunOptions {
     pub text_score: Option<f32>,
     pub classification: Option<bool>,
     pub orientation: Option<bool>,
+    pub unwarp: Option<bool>,
+    pub layout: Option<bool>,
     pub min_height: Option<f32>,
     pub max_side_len: Option<f32>,
     pub min_side_len: Option<f32>,
@@ -201,8 +205,13 @@ pub(crate) struct RustOOutput {
     pub elapse_det: f64,
     pub elapse_rec: f64,
     pub elapse_orient: f64,
+    pub elapse_unwarp: f64,
     /// Debug: Orientation-corrected image (if orientation was detected)
     pub debug_oriented_image: Option<Mat>,
+    /// Debug: Rectified image (if unwarp was applied)
+    pub debug_unwarped_image: Option<Mat>,
+    /// Optional: Detected document layout regions
+    pub layout_regions: Option<Vec<crate::LayoutRegion>>,
     pub y_threshold_multiplier: Option<f32>,
     pub x_threshold_multiplier: Option<f32>,
 }
@@ -214,6 +223,8 @@ pub struct RustO {
     pub cal_rec_boxes: CalRecBoxes,
     pub orient: Option<OrientClassifier>,
     pub cls: Option<OrientClassifier>,
+    pub unwarp: Option<DocUnwarper>,
+    pub layout: Option<LayoutDetector>,
 }
 
 fn validate_preprocessing(global: &GlobalConfig) -> Result<(), EngineError> {
@@ -268,6 +279,20 @@ impl RustO {
             None
         };
 
+        // Initialize unwarp if provided
+        let unwarp = if let Some(unwarp_cfg) = config.unwarp {
+            Some(DocUnwarper::new(unwarp_cfg)?)
+        } else {
+            None
+        };
+
+        // Initialize layout detector if provided
+        let layout = if let Some(layout_cfg) = config.layout {
+            Some(LayoutDetector::new(layout_cfg)?)
+        } else {
+            None
+        };
+
         Ok(Self {
             det,
             rec,
@@ -275,6 +300,8 @@ impl RustO {
             cal_rec_boxes,
             orient,
             cls,
+            unwarp,
+            layout,
         })
     }
 
@@ -293,6 +320,8 @@ impl RustO {
             cal_rec_boxes,
             orient: None,
             cls: None,
+            unwarp: None,
+            layout: None,
         })
     }
 
@@ -332,6 +361,20 @@ impl RustO {
             None
         };
 
+        // Initialize unwarp if provided
+        let unwarp = if let Some(unwarp_cfg) = config.unwarp {
+            Some(DocUnwarper::new(unwarp_cfg)?)
+        } else {
+            None
+        };
+
+        // Initialize layout detector if provided
+        let layout = if let Some(layout_cfg) = config.layout {
+            Some(LayoutDetector::new(layout_cfg)?)
+        } else {
+            None
+        };
+
         Ok(Self {
             det,
             rec,
@@ -339,6 +382,8 @@ impl RustO {
             cal_rec_boxes,
             orient,
             cls,
+            unwarp,
+            layout,
         })
     }
 
@@ -351,6 +396,18 @@ impl RustO {
     /// Set a line orientation classifier.
     pub fn with_cls(mut self, cls: OrientClassifier) -> Self {
         self.cls = Some(cls);
+        self
+    }
+
+    /// Set a document unwarper.
+    pub fn with_unwarp(mut self, unwarp: DocUnwarper) -> Self {
+        self.unwarp = Some(unwarp);
+        self
+    }
+
+    /// Set a document layout detector.
+    pub fn with_layout(mut self, layout: LayoutDetector) -> Self {
+        self.layout = Some(layout);
         self
     }
 
@@ -443,6 +500,158 @@ impl RustO {
         }
     }
 
+    /// Detect document layout regions from a file path or in-memory image bytes.
+    pub fn detect_layout(
+        &mut self,
+        source: &ImageSource,
+    ) -> Result<Vec<crate::LayoutRegion>, EngineError> {
+        let detector = self.layout.as_mut().ok_or_else(|| {
+            EngineError::Engine("Layout detector model is not initialized or configured".into())
+        })?;
+        match source {
+            ImageSource::Path(path) => {
+                use crate::image_impl::imread;
+                let img = imread(path)?;
+                let res = detector.detect(&img)?;
+                Ok(res.regions)
+            }
+            ImageSource::Bytes(bytes) => {
+                #[cfg(not(feature = "use-opencv"))]
+                {
+                    let image = image::load_from_memory(bytes)
+                        .map_err(|error| EngineError::ImageError(error.to_string()))?;
+                    let mat = Mat::new(image);
+                    let res = detector.detect(&mat)?;
+                    Ok(res.regions)
+                }
+                #[cfg(feature = "use-opencv")]
+                {
+                    let _ = bytes;
+                    Err(EngineError::ImageError(
+                        "in-memory image sources require the pure Rust image backend".into(),
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Detect document layout regions from interleaved RGB8 pixels without encoding or decoding.
+    pub fn detect_layout_rgb(
+        &mut self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        stride: usize,
+    ) -> Result<Vec<crate::LayoutRegion>, EngineError> {
+        let detector = self.layout.as_mut().ok_or_else(|| {
+            EngineError::Engine("Layout detector model is not initialized or configured".into())
+        })?;
+        let (row_bytes, required) = rgb_layout(width, height, stride)?;
+        if pixels.len() < required {
+            return Err(EngineError::ImageError("RGB buffer is too short".into()));
+        }
+        #[cfg(not(feature = "use-opencv"))]
+        {
+            let packed = if stride == row_bytes {
+                pixels[..required].to_vec()
+            } else {
+                let mut buf = Vec::new();
+                buf.try_reserve_exact(row_bytes * height as usize)
+                    .map_err(|error| EngineError::ImageError(error.to_string()))?;
+                for row in 0..height as usize {
+                    buf.extend_from_slice(&pixels[row * stride..row * stride + row_bytes]);
+                }
+                buf
+            };
+            let image = Mat::from_rgb8(width, height, packed)?;
+            let res = detector.detect(&image)?;
+            Ok(res.regions)
+        }
+        #[cfg(feature = "use-opencv")]
+        {
+            let _ = row_bytes;
+            Err(EngineError::ImageError(
+                "RGB image sources require the pure Rust image backend".into(),
+            ))
+        }
+    }
+
+    /// Unwarp a distorted/curved document image from a file path or in-memory image bytes.
+    pub fn unwarp_image(
+        &mut self,
+        source: &ImageSource,
+    ) -> Result<Mat, EngineError> {
+        let unwarper = self.unwarp.as_mut().ok_or_else(|| {
+            EngineError::Engine("Document unwarper model is not initialized or configured".into())
+        })?;
+        match source {
+            ImageSource::Path(path) => {
+                use crate::image_impl::imread;
+                let img = imread(path)?;
+                let res = unwarper.unwarp(&img)?;
+                Ok(res.unwarped_image)
+            }
+            ImageSource::Bytes(bytes) => {
+                #[cfg(not(feature = "use-opencv"))]
+                {
+                    let image = image::load_from_memory(bytes)
+                        .map_err(|error| EngineError::ImageError(error.to_string()))?;
+                    let mat = Mat::new(image);
+                    let res = unwarper.unwarp(&mat)?;
+                    Ok(res.unwarped_image)
+                }
+                #[cfg(feature = "use-opencv")]
+                {
+                    let _ = bytes;
+                    Err(EngineError::ImageError(
+                        "in-memory image sources require the pure Rust image backend".into(),
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Unwarp a distorted/curved document image from interleaved RGB8 pixels without encoding or decoding.
+    pub fn unwarp_image_rgb(
+        &mut self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        stride: usize,
+    ) -> Result<Mat, EngineError> {
+        let unwarper = self.unwarp.as_mut().ok_or_else(|| {
+            EngineError::Engine("Document unwarper model is not initialized or configured".into())
+        })?;
+        let (row_bytes, required) = rgb_layout(width, height, stride)?;
+        if pixels.len() < required {
+            return Err(EngineError::ImageError("RGB buffer is too short".into()));
+        }
+        #[cfg(not(feature = "use-opencv"))]
+        {
+            let packed = if stride == row_bytes {
+                pixels[..required].to_vec()
+            } else {
+                let mut buf = Vec::new();
+                buf.try_reserve_exact(row_bytes * height as usize)
+                    .map_err(|error| EngineError::ImageError(error.to_string()))?;
+                for row in 0..height as usize {
+                    buf.extend_from_slice(&pixels[row * stride..row * stride + row_bytes]);
+                }
+                buf
+            };
+            let image = Mat::from_rgb8(width, height, packed)?;
+            let res = unwarper.unwarp(&image)?;
+            Ok(res.unwarped_image)
+        }
+        #[cfg(feature = "use-opencv")]
+        {
+            let _ = row_bytes;
+            Err(EngineError::ImageError(
+                "RGB image sources require the pure Rust image backend".into(),
+            ))
+        }
+    }
+
     pub(crate) fn run_with_options<P: AsRef<Path>>(
         &mut self,
         image_path: P,
@@ -460,9 +669,10 @@ impl RustO {
         let mut effective = self.global.clone();
         effective.return_word_box = options.output == OutputGranularity::Words;
         effective.return_single_char_box = false;
-        effective.use_cls = options.classification.unwrap_or(false) && self.cls.is_some();
-        effective.use_orient = options.orientation.unwrap_or(false) && self.orient.is_some();
-        effective.use_unwarp = false;
+        effective.use_cls = options.classification.unwrap_or(self.global.use_cls) && self.cls.is_some();
+        effective.use_orient = options.orientation.unwrap_or(self.global.use_orient) && self.orient.is_some();
+        effective.use_unwarp = options.unwarp.unwrap_or(self.global.use_unwarp) && self.unwarp.is_some();
+        effective.use_layout = options.layout.unwrap_or(self.global.use_layout) && self.layout.is_some();
         if let Some(value) = options.text_score {
             effective.text_score = value;
         }
@@ -483,8 +693,11 @@ impl RustO {
         postprocess: Option<&PostprocessRunOptions>,
     ) -> Result<RustOOutput, EngineError> {
         let mut elapse_orient = 0.0;
+        let mut elapse_unwarp = 0.0;
         let mut orientation = None;
         let mut debug_oriented_image = None;
+        let mut debug_unwarped_image = None;
+        let mut layout_regions = None;
 
         // Step 0: Image Calibration (if enabled)
         let calibrated_img = if let Some(calib) = &global.calibration {
@@ -519,6 +732,26 @@ impl RustO {
                 } else if orient_result.orientation.degrees() == 0 {
                     orientation = Some(orient_result.orientation);
                 }
+            }
+        }
+
+        // Step 1.5: Document unwarping (if enabled)
+        if global.use_unwarp && self.unwarp.is_some() {
+            if let Some(unwarper) = &mut self.unwarp {
+                let unwarp_res = unwarper.unwarp(&working_img)?;
+                elapse_unwarp = unwarp_res.elapse;
+                if global.debug_images {
+                    debug_unwarped_image = Some(unwarp_res.unwarped_image.clone());
+                }
+                working_img = unwarp_res.unwarped_image;
+            }
+        }
+
+        // Step 1.6: Document layout detection (if enabled)
+        if global.use_layout && self.layout.is_some() {
+            if let Some(layout_detector) = &mut self.layout {
+                let layout_res = layout_detector.detect(&working_img)?;
+                layout_regions = Some(layout_res.regions);
             }
         }
 
@@ -569,7 +802,10 @@ impl RustO {
                     elapse_det: det_res.elapse,
                     elapse_rec: 0.0,
                     elapse_orient,
+                    elapse_unwarp,
                     debug_oriented_image,
+                    debug_unwarped_image,
+                    layout_regions,
                     y_threshold_multiplier: global.y_threshold_multiplier,
                     x_threshold_multiplier: global.x_threshold_multiplier,
                 });
@@ -689,7 +925,10 @@ impl RustO {
             elapse_det: det_res.elapse,
             elapse_rec: rec_res.elapse,
             elapse_orient,
+            elapse_unwarp,
             debug_oriented_image,
+            debug_unwarped_image,
+            layout_regions,
             y_threshold_multiplier: global.y_threshold_multiplier,
             x_threshold_multiplier: global.x_threshold_multiplier,
         })

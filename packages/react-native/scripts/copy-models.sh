@@ -64,6 +64,19 @@ cp "$MODELS_SOURCE/$DET_FILE" "$RN_ANDROID_ASSETS/"
 cp "$MODELS_SOURCE/$REC_FILE" "$RN_ANDROID_ASSETS/"
 cp "$MODELS_SOURCE/dict.txt" "$RN_ANDROID_ASSETS/"
 
+# Copy optional models if present in model source or repository models dir
+for opt_prefix in cls orient unwarp uvdoc layout; do
+    for search_dir in "$MODELS_SOURCE" "$REPO_ROOT/models"; do
+        for ext in onnx rten mnn; do
+            if [ -f "$search_dir/$opt_prefix.$ext" ]; then
+                cp "$search_dir/$opt_prefix.$ext" "$ANDROID_ASSETS/"
+                cp "$search_dir/$opt_prefix.$ext" "$RN_ANDROID_ASSETS/"
+                break 2
+            fi
+        done
+    done
+done
+
 echo "✓ Copied models to $ANDROID_ASSETS and $RN_ANDROID_ASSETS"
 echo "  - $DET_FILE ($(du -h "$ANDROID_ASSETS/$DET_FILE" | cut -f1))"
 echo "  - $REC_FILE ($(du -h "$ANDROID_ASSETS/$REC_FILE" | cut -f1))"
@@ -78,6 +91,17 @@ mkdir -p "$IOS_MODELS"
 cp "$MODELS_SOURCE/$DET_FILE" "$IOS_MODELS/"
 cp "$MODELS_SOURCE/$REC_FILE" "$IOS_MODELS/"
 cp "$MODELS_SOURCE/dict.txt" "$IOS_MODELS/"
+
+for opt_prefix in cls orient unwarp uvdoc layout; do
+    for search_dir in "$MODELS_SOURCE" "$REPO_ROOT/models"; do
+        for ext in onnx rten mnn; do
+            if [ -f "$search_dir/$opt_prefix.$ext" ]; then
+                cp "$search_dir/$opt_prefix.$ext" "$IOS_MODELS/"
+                break 2
+            fi
+        done
+    done
+done
 
 echo "✓ Copied models to $IOS_MODELS"
 echo "  - $DET_FILE ($(du -h "$IOS_MODELS/$DET_FILE" | cut -f1))"

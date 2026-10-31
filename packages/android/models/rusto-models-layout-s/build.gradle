@@ -1,0 +1,54 @@
+plugins {
+    id 'com.android.library'
+    id 'com.vanniktech.maven.publish'
+}
+
+android {
+    namespace 'com.byrizki.rusto.models.layout.s'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "0.3.2"
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/main/assets']
+        }
+    }
+}
+
+mavenPublishing {
+
+    coordinates('com.github.byrizki.rusto-rs', 'rusto-models-layout-s', '0.3.2')
+
+    pom {
+        name = 'RustO! Models Document Layout Small'
+        description = 'PP-DocLayout-S document layout detection model for RustO! Android (~4.7 MB)'
+        url = 'https://github.com/byrizki/rusto-rs'
+
+        licenses {
+            license {
+                name = 'MIT License'
+                url = 'https://opensource.org/licenses/MIT'
+            }
+        }
+
+        developers {
+            developer {
+                id = 'rusto'
+                name = 'RustO Contributors'
+            }
+        }
+
+        scm {
+            connection = 'scm:git:git://github.com/byrizki/rusto-rs.git'
+            developerConnection = 'scm:git:ssh://github.com/byrizki/rusto-rs.git'
+            url = 'https://github.com/byrizki/rusto-rs'
+        }
+    }
+}
+

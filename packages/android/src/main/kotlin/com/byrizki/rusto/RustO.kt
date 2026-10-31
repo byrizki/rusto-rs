@@ -92,11 +92,15 @@ data class UnwarpConfig(
 )
 
 /**
- * Spatial layout reconstruction thresholds.
+ * Document layout analysis and spatial reconstruction configuration.
  */
 data class LayoutConfig(
     val yThresholdMultiplier: Float? = null,
-    val xThresholdMultiplier: Float? = null
+    val xThresholdMultiplier: Float? = null,
+    val enabled: Boolean? = null,
+    val modelPath: String? = null,
+    val confThresh: Float? = null,
+    val targetSize: Int? = null,
 )
 
 /**
@@ -163,6 +167,10 @@ data class InitializeConfig(
 
         layout?.let { lay ->
             val layObj = JSONObject()
+            lay.enabled?.let { layObj.put("enabled", it) }
+            lay.modelPath?.let { layObj.put("modelPath", resolveModel(context, it)) }
+            lay.confThresh?.let { layObj.put("confThresh", it.toDouble()) }
+            lay.targetSize?.let { layObj.put("targetSize", it) }
             lay.yThresholdMultiplier?.let { layObj.put("yThresholdMultiplier", it.toDouble()) }
             lay.xThresholdMultiplier?.let { layObj.put("xThresholdMultiplier", it.toDouble()) }
             if (layObj.length() > 0) json.put("layout", layObj)
@@ -229,6 +237,8 @@ data class OcrRunOptions(
     val widthHeightRatio: Float? = null,
     val detection: DetectionRunOptions? = null,
     val postprocess: PostprocessRunOptions? = null,
+    val unwarp: Boolean? = null,
+    val layout: Boolean? = null,
 ) {
     internal fun toJson(): String {
         require(lineYThreshold == null || lineYThreshold.isFinite() && lineYThreshold >= 0f) {
@@ -248,6 +258,8 @@ data class OcrRunOptions(
             textScore?.let { put("textScore", it.toDouble()) }
             classification?.let { put("classification", it) }
             orientation?.let { put("orientation", it) }
+            unwarp?.let { put("unwarp", it) }
+            layout?.let { put("layout", it) }
             minHeight?.let { put("minHeight", it.toDouble()) }
             maxSideLen?.let { put("maxSideLen", it.toDouble()) }
             minSideLen?.let { put("minSideLen", it.toDouble()) }
@@ -392,6 +404,8 @@ class RustO private constructor(
             textScore = options.textScore,
             classification = options.classification,
             orientation = options.orientation,
+            unwarp = options.unwarp,
+            layout = options.layout,
             minHeight = options.minHeight,
             maxSideLen = options.maxSideLen,
             minSideLen = options.minSideLen,

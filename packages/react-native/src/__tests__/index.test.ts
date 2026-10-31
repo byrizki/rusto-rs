@@ -1,11 +1,11 @@
 import { NativeModules } from 'react-native';
 
 jest.mock('react-native', () => ({
-  NativeModules: { Rusto: { initialize: jest.fn(), detectText: jest.fn() } },
+  NativeModules: { Rusto: { initialize: jest.fn(), detectText: jest.fn(), detectLayout: jest.fn() } },
   Platform: { select: jest.fn() },
 }));
 
-import { detectText, initialize } from '../index';
+import { detectLayout, detectText, initialize } from '../index';
 
 describe('React Native API', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -48,6 +48,47 @@ describe('React Native API', () => {
     (NativeModules.Rusto.detectText as jest.Mock).mockResolvedValue([]);
     await detectText({ uri: ' /tmp/image.png ' });
     expect(NativeModules.Rusto.detectText).toHaveBeenCalledWith({ uri: '/tmp/image.png' }, {});
+  });
+
+  it('forwards optional pipeline stages in initialize and detect options', async () => {
+    (NativeModules.Rusto.initialize as jest.Mock).mockResolvedValue(null);
+    await initialize({
+      models: {
+        unwarp: 'uvdoc.rten',
+        layout: 'layout.rten',
+        classification: 'cls.rten',
+        orientation: 'orient.rten',
+      },
+    });
+    expect(NativeModules.Rusto.initialize).toHaveBeenCalledWith({
+      models: {
+        unwarp: 'uvdoc.rten',
+        layout: 'layout.rten',
+        classification: 'cls.rten',
+        orientation: 'orient.rten',
+      },
+    });
+
+    (NativeModules.Rusto.detectText as jest.Mock).mockResolvedValue([]);
+    await detectText({ uri: '/tmp/test.png' }, { unwarp: true, layout: true });
+    expect(NativeModules.Rusto.detectText).toHaveBeenCalledWith(
+      { uri: '/tmp/test.png' },
+      { unwarp: true, layout: true }
+    );
+  });
+
+  it('forwards detectLayout request', async () => {
+    const mockRegions = [
+      {
+        bbox: { xMin: 10, yMin: 20, xMax: 200, yMax: 60 },
+        layoutType: 'title',
+        confidence: 0.95,
+      },
+    ];
+    (NativeModules.Rusto.detectLayout as jest.Mock).mockResolvedValue(mockRegions);
+    const result = await detectLayout({ uri: '/tmp/doc.png' });
+    expect(result).toEqual(mockRegions);
+    expect(NativeModules.Rusto.detectLayout).toHaveBeenCalledWith({ uri: '/tmp/doc.png' });
   });
 
   it.each([

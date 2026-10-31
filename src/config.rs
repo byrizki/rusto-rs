@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use crate::calibration::{CalibrationOptions, OptimizationOptions};
-use crate::types::{ClsConfig, DetConfig, RecConfig, OrientConfig, UnwarpConfig, GlobalConfig};
+use crate::types::{ClsConfig, DetConfig, RecConfig, OrientConfig, UnwarpConfig, LayoutConfig, GlobalConfig};
 
 /// Preset configuration for OCR model architectures
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -94,6 +94,9 @@ pub struct InitializeConfig {
     
     /// Optional: Text classification (line orientation) configuration
     pub cls: Option<ClsConfig>,
+
+    /// Optional: Document layout detection configuration
+    pub layout: Option<LayoutConfig>,
 }
 
 impl Default for InitializeConfig {
@@ -171,6 +174,14 @@ struct UnwarpConfigJson {
 
 #[derive(Deserialize, Default, Clone, Debug)]
 struct LayoutConfigJson {
+    #[serde(alias = "useLayout", alias = "use_layout")]
+    enabled: Option<bool>,
+    #[serde(alias = "modelPath", alias = "layoutModelPath", alias = "model_path", alias = "layout_model_path")]
+    model_path: Option<PathBuf>,
+    #[serde(alias = "confThresh", alias = "conf_thresh", alias = "threshold")]
+    conf_thresh: Option<f32>,
+    #[serde(alias = "targetSize", alias = "target_size")]
+    target_size: Option<i32>,
     #[serde(alias = "yThresholdMultiplier", alias = "y_threshold_multiplier")]
     y_threshold_multiplier: Option<f32>,
     #[serde(alias = "xThresholdMultiplier", alias = "x_threshold_multiplier")]
@@ -237,6 +248,7 @@ impl InitializeConfig {
             orient: None,
             unwarp: None,
             cls: None,
+            layout: None,
         }
     }
 
@@ -326,6 +338,18 @@ impl InitializeConfig {
             config = config.with_unwarp(path);
         }
 
+        let layout_path = flat.layout.as_ref().and_then(|l| l.model_path.clone());
+        if let Some(path) = layout_path {
+            let mut l_cfg = LayoutConfig::default(path);
+            if let Some(conf) = flat.layout.as_ref().and_then(|l| l.conf_thresh) {
+                l_cfg.conf_thresh = conf;
+            }
+            if let Some(target_size) = flat.layout.as_ref().and_then(|l| l.target_size) {
+                l_cfg.target_size = target_size;
+            }
+            config = config.with_layout_config(l_cfg);
+        }
+
         if let Some(score) = flat.recognition.as_ref().and_then(|r| r.score_thresh) {
             config.global.text_score = score;
         }
@@ -364,6 +388,9 @@ impl InitializeConfig {
         }
         if let Some(use_unwarp) = flat.unwarp.as_ref().and_then(|u| u.enabled) {
             config.global.use_unwarp = use_unwarp;
+        }
+        if let Some(use_layout) = flat.layout.as_ref().and_then(|l| l.enabled) {
+            config.global.use_layout = use_layout;
         }
         if let Some(word_box) = flat.recognition.as_ref().and_then(|r| r.return_word_box) {
             config.global.return_word_box = word_box;
@@ -415,6 +442,7 @@ impl InitializeConfig {
     pub fn with_orientation_threshold<P: Into<PathBuf>>(mut self, model_path: P, threshold: f32) -> Self {
         let mut config = OrientConfig::default(model_path.into());
         config.confidence_threshold = threshold;
+        config.orient_thresh = threshold;
         self.orient = Some(config);
         self.global.use_orient = true;
         self
@@ -440,6 +468,20 @@ impl InitializeConfig {
         config.cls_thresh = threshold;
         self.cls = Some(config);
         self.global.use_cls = true;
+        self
+    }
+
+    /// Add document layout detection to the configuration
+    pub fn with_layout<P: Into<PathBuf>>(mut self, model_path: P) -> Self {
+        self.layout = Some(LayoutConfig::default(model_path.into()));
+        self.global.use_layout = true;
+        self
+    }
+
+    /// Add document layout detection with custom layout configuration
+    pub fn with_layout_config(mut self, layout: LayoutConfig) -> Self {
+        self.layout = Some(layout);
+        self.global.use_layout = true;
         self
     }
     

@@ -322,6 +322,82 @@ MODEL_DEFINITIONS = [
         "optional_files": ["rec.onnx"],
         "is_core": False,
     },
+    # Optional document pipeline models
+    {
+        "id": "cls",
+        "name": "@rustors/model-cls",
+        "title": "Text-Line Angle Classifier",
+        "description": "PP-OCRv4 text-line angle classifier (~585 KB) for RustO OCR. Detects 180° inverted text lines.",
+        "preset": "pipeline",
+        "tier": "optional",
+        "language": "multilingual",
+        "source_dirs": [""],
+        "source_files": {"cls.rten": "cls.rten", "cls.onnx": "cls.onnx"},
+        "files": ["cls.rten"],
+        "optional_files": ["cls.onnx"],
+        "is_core": False,
+        "is_optin": True,
+    },
+    {
+        "id": "orient",
+        "name": "@rustors/model-orient",
+        "title": "Document Orientation Classifier",
+        "description": "PP-LCNet document orientation classifier (~6.4 MB) for RustO OCR. Detects 0°/90°/180°/270° page rotation.",
+        "preset": "pipeline",
+        "tier": "optional",
+        "language": "multilingual",
+        "source_dirs": [""],
+        "source_files": {"orient.rten": "orient.rten", "orient.onnx": "orient.onnx"},
+        "files": ["orient.rten"],
+        "optional_files": ["orient.onnx"],
+        "is_core": False,
+        "is_optin": True,
+    },
+    {
+        "id": "uvdoc",
+        "name": "@rustors/model-uvdoc",
+        "title": "Document Unwarping (UVDoc)",
+        "description": "UVDoc geometric unwarping model (~30 MB) for RustO OCR. Corrects page curvature, folds, and perspective distortion.",
+        "preset": "pipeline",
+        "tier": "optional",
+        "language": "multilingual",
+        "source_dirs": [""],
+        "source_files": {"uvdoc.rten": "uvdoc.rten", "uvdoc.onnx": "uvdoc.onnx"},
+        "files": ["uvdoc.rten"],
+        "optional_files": ["uvdoc.onnx"],
+        "is_core": False,
+        "is_optin": True,
+    },
+    {
+        "id": "layout-s",
+        "name": "@rustors/model-layout-s",
+        "title": "Document Layout Detection (Small)",
+        "description": "PP-DocLayout-S document layout model (~4.7 MB) for RustO OCR. Detects text, title, figure, table, and list regions.",
+        "preset": "pipeline",
+        "tier": "optional",
+        "language": "multilingual",
+        "source_dirs": [""],
+        "source_files": {"layout_s.rten": "layout_s.rten", "layout_s.onnx": "layout_s.onnx"},
+        "files": ["layout_s.rten"],
+        "optional_files": ["layout_s.onnx"],
+        "is_core": False,
+        "is_optin": True,
+    },
+    {
+        "id": "layout-l",
+        "name": "@rustors/model-layout-l",
+        "title": "Document Layout Detection (Large)",
+        "description": "PP-DocLayout-Plus-L document layout model (~124 MB) for RustO OCR. High-precision layout detection for complex documents.",
+        "preset": "pipeline",
+        "tier": "optional",
+        "language": "multilingual",
+        "source_dirs": [""],
+        "source_files": {"layout_l.rten": "layout_l.rten", "layout_l.onnx": "layout_l.onnx"},
+        "files": ["layout_l.rten"],
+        "optional_files": ["layout_l.onnx"],
+        "is_core": False,
+        "is_optin": True,
+    },
 ]
 
 def get_current_version() -> str:
@@ -451,7 +527,41 @@ def generate_src_index_ts(definition: dict, version: str) -> str:
         elif f.startswith("dict.") or f.endswith("_dict.txt") or f == "dict.txt":
             files_dict["dictionary"] = f"models/{f}"
         elif f.startswith("cls."):
-            files_dict["classification"] = f"models/{f}"
+            if f.endswith(".rten"):
+                files_dict["classificationRten"] = f"models/{f}"
+                if "classification" not in files_dict or not files_dict["classification"].endswith(".rten"):
+                    files_dict["classification"] = f"models/{f}"
+            elif f.endswith(".onnx"):
+                files_dict["classificationOnnx"] = f"models/{f}"
+                if "classification" not in files_dict:
+                    files_dict["classification"] = f"models/{f}"
+        elif f.startswith("orient."):
+            if f.endswith(".rten"):
+                files_dict["orientationRten"] = f"models/{f}"
+                if "orientation" not in files_dict or not files_dict["orientation"].endswith(".rten"):
+                    files_dict["orientation"] = f"models/{f}"
+            elif f.endswith(".onnx"):
+                files_dict["orientationOnnx"] = f"models/{f}"
+                if "orientation" not in files_dict:
+                    files_dict["orientation"] = f"models/{f}"
+        elif f.startswith("uvdoc."):
+            if f.endswith(".rten"):
+                files_dict["unwarpRten"] = f"models/{f}"
+                if "unwarp" not in files_dict or not files_dict["unwarp"].endswith(".rten"):
+                    files_dict["unwarp"] = f"models/{f}"
+            elif f.endswith(".onnx"):
+                files_dict["unwarpOnnx"] = f"models/{f}"
+                if "unwarp" not in files_dict:
+                    files_dict["unwarp"] = f"models/{f}"
+        elif f.startswith("layout_s.") or f.startswith("layout_l.") or f.startswith("layout."):
+            if f.endswith(".rten"):
+                files_dict["layoutRten"] = f"models/{f}"
+                if "layout" not in files_dict or not files_dict["layout"].endswith(".rten"):
+                    files_dict["layout"] = f"models/{f}"
+            elif f.endswith(".onnx"):
+                files_dict["layoutOnnx"] = f"models/{f}"
+                if "layout" not in files_dict:
+                    files_dict["layout"] = f"models/{f}"
         elif f.startswith("rec_en."):
             if f.endswith(".rten"):
                 files_dict["recognitionEnglishRten"] = f"models/{f}"
@@ -485,6 +595,17 @@ export interface ModelFilesConfig {{
   recognitionOnnx?: string;
   dictionary?: string;
   classification?: string;
+  classificationRten?: string;
+  classificationOnnx?: string;
+  orientation?: string;
+  orientationRten?: string;
+  orientationOnnx?: string;
+  unwarp?: string;
+  unwarpRten?: string;
+  unwarpOnnx?: string;
+  layout?: string;
+  layoutRten?: string;
+  layoutOnnx?: string;
   recognitionEnglish?: string;
   dictionaryEnglish?: string;
   [key: string]: string | undefined;
@@ -568,6 +689,36 @@ def generate_readme_md(definition: dict, version: str) -> str:
     tier = definition["tier"]
     lang = definition["language"]
 
+    if definition.get("is_optin"):
+        usage_web = f"""### In Web / React apps (`@rustors/web` or `@rustors/react`)
+
+```ts
+import {{ modelMetadata, getModelUrls }} from '{pkg_name}';
+
+// Retrieve model URLs (e.g. hosted under public/cdn)
+const urls = getModelUrls('/models/{definition["id"]}');
+console.log('Model URLs:', urls);
+```"""
+    else:
+        usage_web = f"""### In Web / React apps (`@rustors/web` or `@rustors/react`)
+
+```ts
+import {{ modelMetadata, getModelUrls }} from '{pkg_name}';
+import {{ initialize }} from '@rustors/web';
+
+// Initialize with model URLs (e.g. hosted under public/cdn)
+const urls = getModelUrls('/models/{definition["id"]}');
+
+await initialize({{
+  preset: '{preset}',
+  models: {{
+    detection: urls.detection,
+    recognition: urls.recognition,
+    dictionary: urls.dictionary,
+  }},
+}});
+```"""
+
     return f"""# {pkg_name}
 
 > Pre-trained {title} model package for [RustO!](https://github.com/byrizki/rusto-rs)
@@ -591,24 +742,7 @@ pnpm add {pkg_name}
 
 ## Usage
 
-### In Web / React apps (`@rustors/web` or `@rustors/react`)
-
-```ts
-import {{ modelMetadata, getModelUrls }} from '{pkg_name}';
-import {{ initialize }} from '@rustors/web';
-
-// Initialize with model URLs (e.g. hosted under public/cdn)
-const urls = getModelUrls('/models/{definition["id"]}');
-
-await initialize({{
-  preset: '{preset}',
-  models: {{
-    detection: urls.detection,
-    recognition: urls.recognition,
-    dictionary: urls.dictionary,
-  }},
-}});
-```
+{usage_web}
 
 ### In Node.js / Server environments
 
@@ -665,28 +799,35 @@ def generate_model_package(definition: dict, version: str, copy_models: bool = F
     # 6. Copy models if requested and available
     if copy_models:
         copied_any = False
-        for sdir_name in definition["source_dirs"]:
-            source_candidate = MODELS_SOURCE_DIR / sdir_name
-            if source_candidate.exists() and source_candidate.is_dir():
-                target_files = set(definition["files"] + definition.get("optional_files", []))
-                for item in source_candidate.iterdir():
-                    if item.is_file() and item.suffix in [".rten", ".onnx", ".txt"]:
-                        if not item.name.endswith("_tract.onnx"):
-                            target_files.add(item.name)
+        if definition.get("source_files"):
+            for dest_name, src_name in definition["source_files"].items():
+                src_file = MODELS_SOURCE_DIR / src_name
+                if src_file.exists():
+                    shutil.copy2(src_file, models_dir / dest_name)
+                    copied_any = True
+        else:
+            for sdir_name in definition["source_dirs"]:
+                source_candidate = MODELS_SOURCE_DIR / sdir_name
+                if source_candidate.exists() and source_candidate.is_dir():
+                    target_files = set(definition["files"] + definition.get("optional_files", []))
+                    for item in source_candidate.iterdir():
+                        if item.is_file() and item.suffix in [".rten", ".onnx", ".txt"]:
+                            if not item.name.endswith("_tract.onnx"):
+                                target_files.add(item.name)
 
-                for f_name in sorted(target_files):
-                    src_file = source_candidate / f_name
-                    if src_file.exists():
-                        shutil.copy2(src_file, models_dir / f_name)
-                        copied_any = True
-                if copied_any:
-                    break
+                    for f_name in sorted(target_files):
+                        src_file = source_candidate / f_name
+                        if src_file.exists():
+                            shutil.copy2(src_file, models_dir / f_name)
+                            copied_any = True
+                    if copied_any:
+                        break
 
     print(f"  [OK] Generated npm package {definition['name']} -> {pkg_dir.relative_to(REPO_ROOT)}")
 
 def main():
     parser = argparse.ArgumentParser(description="Generate npm packages for RustO pre-trained models")
-    parser.add_argument("--all", action="store_true", help="Generate all 20 model packages")
+    parser.add_argument("--all", action="store_true", help="Generate all model packages (OCR + optional pipeline)")
     parser.add_argument("--core", action="store_true", help="Generate core model packages (ppocrv6-tiny, ppocrv6-small, ppocrv6-medium, ppocrv5-mobile)")
     parser.add_argument("--model", type=str, help="Generate a specific model package by id (e.g. ppocrv6-tiny)")
     parser.add_argument("--version", type=str, default=None, help="Explicit version for the generated packages")

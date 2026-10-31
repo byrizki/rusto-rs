@@ -165,6 +165,24 @@ jobs:
           package_model_zip "models/PPOCR_v4_chinese_cht" "RustO-Models-PPOCRv4-TraditionalChinese" &
           package_model_zip "models/PPOCR_v4_kannada" "RustO-Models-PPOCRv4-Kannada" &
 
+          # Optional pipeline model bundles (single-file zips)
+          package_optin_zip() {
+            local src_file="$1"
+            local zip_name="$2"
+            local tmp_dir="build/tmp_$zip_name"
+            mkdir -p "$tmp_dir"
+            [ -f "$src_file" ] && cp "$src_file" "$tmp_dir/"
+            (cd "$tmp_dir" && zip -q -r "../../build/$zip_name.zip" .)
+            rm -rf "$tmp_dir"
+            echo "✓ Created build/$zip_name.zip"
+          }
+
+          package_optin_zip "models/cls.rten"      "RustO-Models-Cls"      &
+          package_optin_zip "models/orient.rten"   "RustO-Models-Orient"   &
+          package_optin_zip "models/uvdoc.rten"    "RustO-Models-UVDoc"    &
+          package_optin_zip "models/layout_s.rten" "RustO-Models-Layout-S" &
+          package_optin_zip "models/layout_l.rten" "RustO-Models-Layout-L" &
+
           wait
           echo "✓ All iOS model bundles packaged in parallel"
 
@@ -191,6 +209,24 @@ jobs:
             fi
           done
 
+          # Optional pipeline model AARs: copy single model files into assets
+          copy_optin_to_aar() {
+            local model_file="$1"
+            local pkg_name="$2"
+            local pkg_dir="packages/android/models/$pkg_name"
+            if [ -d "$pkg_dir" ] && [ -f "$model_file" ]; then
+              mkdir -p "$pkg_dir/src/main/assets"
+              cp "$model_file" "$pkg_dir/src/main/assets/"
+              echo "Copied $model_file -> $pkg_dir/src/main/assets/"
+            fi
+          }
+
+          copy_optin_to_aar "models/cls.rten"      "rusto-models-cls"
+          copy_optin_to_aar "models/orient.rten"   "rusto-models-orient"
+          copy_optin_to_aar "models/uvdoc.rten"    "rusto-models-uvdoc"
+          copy_optin_to_aar "models/layout_s.rten" "rusto-models-layout-s"
+          copy_optin_to_aar "models/layout_l.rten" "rusto-models-layout-l"
+
           cd packages/android
           chmod +x gradlew || true
           # Build all model submodules in parallel using Gradle workers
@@ -215,6 +251,24 @@ jobs:
               fi
             fi
           done
+
+          # Optional pipeline model NuGet packages: copy single model files directly
+          copy_optin_to_nuget() {
+            local model_file="$1"
+            local nuget_pkg="$2"
+            local dest="packages/dotnet/models/$nuget_pkg/models"
+            if [ -f "$model_file" ]; then
+              mkdir -p "$dest"
+              cp "$model_file" "$dest/"
+              echo "Copied $model_file -> $dest/"
+            fi
+          }
+
+          copy_optin_to_nuget "models/cls.rten"      "RustODotnet.Models.Cls"
+          copy_optin_to_nuget "models/orient.rten"   "RustODotnet.Models.Orient"
+          copy_optin_to_nuget "models/uvdoc.rten"    "RustODotnet.Models.UVDoc"
+          copy_optin_to_nuget "models/layout_s.rten" "RustODotnet.Models.Layout.S"
+          copy_optin_to_nuget "models/layout_l.rten" "RustODotnet.Models.Layout.L"
 
           mkdir -p nupkg
           for proj in packages/dotnet/models/*/*.csproj; do
@@ -307,11 +361,18 @@ jobs:
             Pre-trained PaddleOCR weights converted to pure-Rust RTen format.
             Compatible with RustO! core libraries.
 
-            ### Included Packages:
+            ### OCR Model Packages:
             - **iOS**: Resource bundles (`RustO-Models-*.zip`)
             - **Android**: Model AAR packages (`rusto-models-*.aar`)
             - **.NET**: Model NuGet packages (`RustODotnet.Models.*.nupkg`)
             - **NPM / Web**: Model NPM packages (`@rustors/model-*`)
+
+            ### Optional Pipeline Model Packages:
+            - **Text-Line Classifier**: `RustO-Models-Cls.*`
+            - **Orientation Classifier**: `RustO-Models-Orient.*`
+            - **Document Unwarp (UVDoc)**: `RustO-Models-UVDoc.*`
+            - **Layout Detection Small**: `RustO-Models-Layout-S.*`
+            - **Layout Detection Large**: `RustO-Models-Layout-L.*`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
