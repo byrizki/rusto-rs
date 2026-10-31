@@ -813,6 +813,14 @@ static class _UniFFILib {
     
     
     
+    
+    
+    
+    
+    
+    
+    
+    
 
     static _UniFFILib() {
         _UniFFILib.uniffiCheckContractApiVersion();
@@ -872,6 +880,28 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
+     RustBuffer uniffi_rusto_fn_method_rusto_detect_layout(ulong @ptr,RustBuffer @source,ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
+     RustBuffer uniffi_rusto_fn_method_rusto_detect_layout_rgb(ulong @ptr,RustBuffer @pixels,uint @width,uint @height,ulong @stride,ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
      RustBuffer uniffi_rusto_fn_method_rusto_detect_text(ulong @ptr,RustBuffer @source,RustBuffer @options,ref UniffiRustCallStatus _uniffi_out_err
     );
 
@@ -884,6 +914,28 @@ static class _UniFFILib {
     public static extern
 #endif
      RustBuffer uniffi_rusto_fn_method_rusto_detect_text_rgb(ulong @ptr,RustBuffer @pixels,uint @width,uint @height,ulong @stride,RustBuffer @options,ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
+     RustBuffer uniffi_rusto_fn_method_rusto_unwarp_image(ulong @ptr,RustBuffer @source,ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
+     RustBuffer uniffi_rusto_fn_method_rusto_unwarp_image_rgb(ulong @ptr,RustBuffer @pixels,uint @width,uint @height,ulong @stride,ref UniffiRustCallStatus _uniffi_out_err
     );
 
     #if NET8_0_OR_GREATER
@@ -1543,6 +1595,28 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
+     ushort uniffi_rusto_checksum_method_rusto_detect_layout(
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
+     ushort uniffi_rusto_checksum_method_rusto_detect_layout_rgb(
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
      ushort uniffi_rusto_checksum_method_rusto_detect_text(
     );
 
@@ -1555,6 +1629,28 @@ static class _UniFFILib {
     public static extern
 #endif
      ushort uniffi_rusto_checksum_method_rusto_detect_text_rgb(
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
+     ushort uniffi_rusto_checksum_method_rusto_unwarp_image(
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
+     ushort uniffi_rusto_checksum_method_rusto_unwarp_image_rgb(
     );
 
     #if NET8_0_OR_GREATER
@@ -1629,6 +1725,18 @@ static class _UniFFILib {
             }
         }
         {
+            var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_detect_layout();
+            if (checksum != 43417) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_layout` checksum `43417`, library returned `{checksum}`");
+            }
+        }
+        {
+            var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_detect_layout_rgb();
+            if (checksum != 59477) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_layout_rgb` checksum `59477`, library returned `{checksum}`");
+            }
+        }
+        {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_detect_text();
             if (checksum != 5963) {
                 throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text` checksum `5963`, library returned `{checksum}`");
@@ -1638,6 +1746,18 @@ static class _UniFFILib {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_detect_text_rgb();
             if (checksum != 9991) {
                 throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text_rgb` checksum `9991`, library returned `{checksum}`");
+            }
+        }
+        {
+            var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_unwarp_image();
+            if (checksum != 24978) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_unwarp_image` checksum `24978`, library returned `{checksum}`");
+            }
+        }
+        {
+            var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_unwarp_image_rgb();
+            if (checksum != 44077) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_unwarp_image_rgb` checksum `44077`, library returned `{checksum}`");
             }
         }
         {
@@ -1879,6 +1999,16 @@ class FfiConverterByteArray: FfiConverterRustBuffer<byte[]> {
 /// </summary>
 public interface IRustO {
     /// <summary>
+    /// Detects document layout regions from an image source.
+    /// </summary>
+    /// <exception cref="RustoBindingException"></exception>
+    LayoutRegion[] DetectLayout(ImageSource @source);
+    /// <summary>
+    /// Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
+    /// </summary>
+    /// <exception cref="RustoBindingException"></exception>
+    LayoutRegion[] DetectLayoutRgb(byte[] @pixels, uint @width, uint @height, ulong @stride);
+    /// <summary>
     /// Runs text detection and recognition on an image source.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
@@ -1888,6 +2018,16 @@ public interface IRustO {
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
     DetectTextResult DetectTextRgb(byte[] @pixels, uint @width, uint @height, ulong @stride, OcrRunOptions @options);
+    /// <summary>
+    /// Unwarps a distorted or curved document image from an image source.
+    /// </summary>
+    /// <exception cref="RustoBindingException"></exception>
+    UnwarpedImageResult UnwarpImage(ImageSource @source);
+    /// <summary>
+    /// Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
+    /// </summary>
+    /// <exception cref="RustoBindingException"></exception>
+    UnwarpedImageResult UnwarpImageRgb(byte[] @pixels, uint @width, uint @height, ulong @stride);
     /// <summary>
     /// Returns the engine library version string.
     /// </summary>
@@ -1986,6 +2126,30 @@ public class RustO : IRustO, IDisposable {
 
     
     /// <summary>
+    /// Detects document layout regions from an image source.
+    /// </summary>
+    /// <exception cref="RustoBindingException"></exception>
+    public LayoutRegion[] DetectLayout(ImageSource @source) {
+        return CallWithPointer(thisPtr => FfiConverterSequenceTypeLayoutRegion.INSTANCE.Lift(
+    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
+    _UniFFILib.uniffi_rusto_fn_method_rusto_detect_layout(thisPtr, FfiConverterTypeImageSource.INSTANCE.Lower(@source), ref _status)
+)));
+    }
+    
+    
+    /// <summary>
+    /// Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
+    /// </summary>
+    /// <exception cref="RustoBindingException"></exception>
+    public LayoutRegion[] DetectLayoutRgb(byte[] @pixels, uint @width, uint @height, ulong @stride) {
+        return CallWithPointer(thisPtr => FfiConverterSequenceTypeLayoutRegion.INSTANCE.Lift(
+    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
+    _UniFFILib.uniffi_rusto_fn_method_rusto_detect_layout_rgb(thisPtr, FfiConverterByteArray.INSTANCE.Lower(@pixels), FfiConverterUInt32.INSTANCE.Lower(@width), FfiConverterUInt32.INSTANCE.Lower(@height), FfiConverterUInt64.INSTANCE.Lower(@stride), ref _status)
+)));
+    }
+    
+    
+    /// <summary>
     /// Runs text detection and recognition on an image source.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
@@ -2005,6 +2169,30 @@ public class RustO : IRustO, IDisposable {
         return CallWithPointer(thisPtr => FfiConverterTypeDetectTextResult.INSTANCE.Lift(
     _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
     _UniFFILib.uniffi_rusto_fn_method_rusto_detect_text_rgb(thisPtr, FfiConverterByteArray.INSTANCE.Lower(@pixels), FfiConverterUInt32.INSTANCE.Lower(@width), FfiConverterUInt32.INSTANCE.Lower(@height), FfiConverterUInt64.INSTANCE.Lower(@stride), FfiConverterTypeOcrRunOptions.INSTANCE.Lower(@options), ref _status)
+)));
+    }
+    
+    
+    /// <summary>
+    /// Unwarps a distorted or curved document image from an image source.
+    /// </summary>
+    /// <exception cref="RustoBindingException"></exception>
+    public UnwarpedImageResult UnwarpImage(ImageSource @source) {
+        return CallWithPointer(thisPtr => FfiConverterTypeUnwarpedImageResult.INSTANCE.Lift(
+    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
+    _UniFFILib.uniffi_rusto_fn_method_rusto_unwarp_image(thisPtr, FfiConverterTypeImageSource.INSTANCE.Lower(@source), ref _status)
+)));
+    }
+    
+    
+    /// <summary>
+    /// Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
+    /// </summary>
+    /// <exception cref="RustoBindingException"></exception>
+    public UnwarpedImageResult UnwarpImageRgb(byte[] @pixels, uint @width, uint @height, ulong @stride) {
+        return CallWithPointer(thisPtr => FfiConverterTypeUnwarpedImageResult.INSTANCE.Lift(
+    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
+    _UniFFILib.uniffi_rusto_fn_method_rusto_unwarp_image_rgb(thisPtr, FfiConverterByteArray.INSTANCE.Lower(@pixels), FfiConverterUInt32.INSTANCE.Lower(@width), FfiConverterUInt32.INSTANCE.Lower(@height), FfiConverterUInt64.INSTANCE.Lower(@stride), ref _status)
 )));
     }
     
@@ -2439,6 +2627,9 @@ class FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
 /// <param name="Unwarp">
 /// Optional unwarp configuration.
 /// </param>
+/// <param name="Layout">
+/// Optional layout configuration.
+/// </param>
 public record InitializeConfig (
     /// <summary>
     /// Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
@@ -2463,7 +2654,11 @@ public record InitializeConfig (
     /// <summary>
     /// Optional unwarp configuration.
     /// </summary>
-    UnwarpConfig? Unwarp
+    UnwarpConfig? Unwarp, 
+    /// <summary>
+    /// Optional layout configuration.
+    /// </summary>
+    LayoutConfig? Layout
 ) {
 }
 
@@ -2477,7 +2672,8 @@ class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig>
             Recognition: FfiConverterOptionalTypeRecognitionConfig.INSTANCE.Read(stream),
             Classification: FfiConverterOptionalTypeClassificationConfig.INSTANCE.Read(stream),
             Orientation: FfiConverterOptionalTypeOrientationConfig.INSTANCE.Read(stream),
-            Unwarp: FfiConverterOptionalTypeUnwarpConfig.INSTANCE.Read(stream)
+            Unwarp: FfiConverterOptionalTypeUnwarpConfig.INSTANCE.Read(stream),
+            Layout: FfiConverterOptionalTypeLayoutConfig.INSTANCE.Read(stream)
         );
     }
 
@@ -2488,7 +2684,8 @@ class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig>
             + FfiConverterOptionalTypeRecognitionConfig.INSTANCE.AllocationSize(value.Recognition)
             + FfiConverterOptionalTypeClassificationConfig.INSTANCE.AllocationSize(value.Classification)
             + FfiConverterOptionalTypeOrientationConfig.INSTANCE.AllocationSize(value.Orientation)
-            + FfiConverterOptionalTypeUnwarpConfig.INSTANCE.AllocationSize(value.Unwarp);
+            + FfiConverterOptionalTypeUnwarpConfig.INSTANCE.AllocationSize(value.Unwarp)
+            + FfiConverterOptionalTypeLayoutConfig.INSTANCE.AllocationSize(value.Layout);
     }
 
     public override void Write(InitializeConfig value, BigEndianStream stream) {
@@ -2498,6 +2695,192 @@ class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig>
             FfiConverterOptionalTypeClassificationConfig.INSTANCE.Write(value.Classification, stream);
             FfiConverterOptionalTypeOrientationConfig.INSTANCE.Write(value.Orientation, stream);
             FfiConverterOptionalTypeUnwarpConfig.INSTANCE.Write(value.Unwarp, stream);
+            FfiConverterOptionalTypeLayoutConfig.INSTANCE.Write(value.Layout, stream);
+    }
+}
+
+
+
+/// <summary>
+/// Bounding box coordinates for a detected document layout region.
+/// </summary>
+/// <param name="XMin">
+/// Minimum horizontal coordinate (left).
+/// </param>
+/// <param name="YMin">
+/// Minimum vertical coordinate (top).
+/// </param>
+/// <param name="XMax">
+/// Maximum horizontal coordinate (right).
+/// </param>
+/// <param name="YMax">
+/// Maximum vertical coordinate (bottom).
+/// </param>
+public record LayoutBBox (
+    /// <summary>
+    /// Minimum horizontal coordinate (left).
+    /// </summary>
+    int XMin, 
+    /// <summary>
+    /// Minimum vertical coordinate (top).
+    /// </summary>
+    int YMin, 
+    /// <summary>
+    /// Maximum horizontal coordinate (right).
+    /// </summary>
+    int XMax, 
+    /// <summary>
+    /// Maximum vertical coordinate (bottom).
+    /// </summary>
+    int YMax
+) {
+}
+
+class FfiConverterTypeLayoutBBox: FfiConverterRustBuffer<LayoutBBox> {
+    public static FfiConverterTypeLayoutBBox INSTANCE = new FfiConverterTypeLayoutBBox();
+
+    public override LayoutBBox Read(BigEndianStream stream) {
+        return new LayoutBBox(
+            XMin: FfiConverterInt32.INSTANCE.Read(stream),
+            YMin: FfiConverterInt32.INSTANCE.Read(stream),
+            XMax: FfiConverterInt32.INSTANCE.Read(stream),
+            YMax: FfiConverterInt32.INSTANCE.Read(stream)
+        );
+    }
+
+    public override int AllocationSize(LayoutBBox value) {
+        return 0
+            + FfiConverterInt32.INSTANCE.AllocationSize(value.XMin)
+            + FfiConverterInt32.INSTANCE.AllocationSize(value.YMin)
+            + FfiConverterInt32.INSTANCE.AllocationSize(value.XMax)
+            + FfiConverterInt32.INSTANCE.AllocationSize(value.YMax);
+    }
+
+    public override void Write(LayoutBBox value, BigEndianStream stream) {
+            FfiConverterInt32.INSTANCE.Write(value.XMin, stream);
+            FfiConverterInt32.INSTANCE.Write(value.YMin, stream);
+            FfiConverterInt32.INSTANCE.Write(value.XMax, stream);
+            FfiConverterInt32.INSTANCE.Write(value.YMax, stream);
+    }
+}
+
+
+
+/// <summary>
+/// Document layout analysis model configuration.
+/// </summary>
+/// <param name="Enabled">
+/// Whether layout stage is enabled.
+/// </param>
+/// <param name="ModelPath">
+/// Filesystem path to layout model (.rten or .onnx).
+/// </param>
+/// <param name="ConfThresh">
+/// Confidence threshold.
+/// </param>
+/// <param name="TargetSize">
+/// Target input side length for resizing.
+/// </param>
+public record LayoutConfig (
+    /// <summary>
+    /// Whether layout stage is enabled.
+    /// </summary>
+    bool? Enabled, 
+    /// <summary>
+    /// Filesystem path to layout model (.rten or .onnx).
+    /// </summary>
+    string? ModelPath, 
+    /// <summary>
+    /// Confidence threshold.
+    /// </summary>
+    float? ConfThresh, 
+    /// <summary>
+    /// Target input side length for resizing.
+    /// </summary>
+    int? TargetSize
+) {
+}
+
+class FfiConverterTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig> {
+    public static FfiConverterTypeLayoutConfig INSTANCE = new FfiConverterTypeLayoutConfig();
+
+    public override LayoutConfig Read(BigEndianStream stream) {
+        return new LayoutConfig(
+            Enabled: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
+            ModelPath: FfiConverterOptionalString.INSTANCE.Read(stream),
+            ConfThresh: FfiConverterOptionalFloat.INSTANCE.Read(stream),
+            TargetSize: FfiConverterOptionalInt32.INSTANCE.Read(stream)
+        );
+    }
+
+    public override int AllocationSize(LayoutConfig value) {
+        return 0
+            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Enabled)
+            + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ModelPath)
+            + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.ConfThresh)
+            + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.TargetSize);
+    }
+
+    public override void Write(LayoutConfig value, BigEndianStream stream) {
+            FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
+            FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
+            FfiConverterOptionalFloat.INSTANCE.Write(value.ConfThresh, stream);
+            FfiConverterOptionalInt32.INSTANCE.Write(value.TargetSize, stream);
+    }
+}
+
+
+
+/// <summary>
+/// Detected document layout region with category, bounding box, and confidence score.
+/// </summary>
+/// <param name="Bbox">
+/// Axis-aligned bounding box.
+/// </param>
+/// <param name="LayoutType">
+/// Semantic layout category.
+/// </param>
+/// <param name="Confidence">
+/// Classification confidence score [0.0 - 1.0].
+/// </param>
+public record LayoutRegion (
+    /// <summary>
+    /// Axis-aligned bounding box.
+    /// </summary>
+    LayoutBBox Bbox, 
+    /// <summary>
+    /// Semantic layout category.
+    /// </summary>
+    LayoutType LayoutType, 
+    /// <summary>
+    /// Classification confidence score [0.0 - 1.0].
+    /// </summary>
+    float Confidence
+) {
+}
+
+class FfiConverterTypeLayoutRegion: FfiConverterRustBuffer<LayoutRegion> {
+    public static FfiConverterTypeLayoutRegion INSTANCE = new FfiConverterTypeLayoutRegion();
+
+    public override LayoutRegion Read(BigEndianStream stream) {
+        return new LayoutRegion(
+            Bbox: FfiConverterTypeLayoutBBox.INSTANCE.Read(stream),
+            LayoutType: FfiConverterTypeLayoutType.INSTANCE.Read(stream),
+            Confidence: FfiConverterFloat.INSTANCE.Read(stream)
+        );
+    }
+
+    public override int AllocationSize(LayoutRegion value) {
+        return 0
+            + FfiConverterTypeLayoutBBox.INSTANCE.AllocationSize(value.Bbox)
+            + FfiConverterTypeLayoutType.INSTANCE.AllocationSize(value.LayoutType)
+            + FfiConverterFloat.INSTANCE.AllocationSize(value.Confidence);
+    }
+
+    public override void Write(LayoutRegion value, BigEndianStream stream) {
+            FfiConverterTypeLayoutBBox.INSTANCE.Write(value.Bbox, stream);
+            FfiConverterTypeLayoutType.INSTANCE.Write(value.LayoutType, stream);
+            FfiConverterFloat.INSTANCE.Write(value.Confidence, stream);
     }
 }
 
@@ -2523,6 +2906,12 @@ class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig>
 /// </param>
 /// <param name="Orientation">
 /// Enable document orientation angle correction stage.
+/// </param>
+/// <param name="Unwarp">
+/// Enable document unwarping stage.
+/// </param>
+/// <param name="Layout">
+/// Enable document layout analysis stage.
 /// </param>
 /// <param name="MinHeight">
 /// Request-local minimum height resize override.
@@ -2574,6 +2963,14 @@ public record OcrRunOptions (
     /// </summary>
     bool? Orientation, 
     /// <summary>
+    /// Enable document unwarping stage.
+    /// </summary>
+    bool? Unwarp, 
+    /// <summary>
+    /// Enable document layout analysis stage.
+    /// </summary>
+    bool? Layout, 
+    /// <summary>
     /// Request-local minimum height resize override.
     /// </summary>
     float? MinHeight, 
@@ -2619,6 +3016,8 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
             TextScore: FfiConverterOptionalFloat.INSTANCE.Read(stream),
             Classification: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             Orientation: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
+            Unwarp: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
+            Layout: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             MinHeight: FfiConverterOptionalFloat.INSTANCE.Read(stream),
             MaxSideLen: FfiConverterOptionalFloat.INSTANCE.Read(stream),
             MinSideLen: FfiConverterOptionalFloat.INSTANCE.Read(stream),
@@ -2638,6 +3037,8 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.TextScore)
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Classification)
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Orientation)
+            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Unwarp)
+            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Layout)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.MinHeight)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.MaxSideLen)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.MinSideLen)
@@ -2655,6 +3056,8 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
             FfiConverterOptionalFloat.INSTANCE.Write(value.TextScore, stream);
             FfiConverterOptionalBoolean.INSTANCE.Write(value.Classification, stream);
             FfiConverterOptionalBoolean.INSTANCE.Write(value.Orientation, stream);
+            FfiConverterOptionalBoolean.INSTANCE.Write(value.Unwarp, stream);
+            FfiConverterOptionalBoolean.INSTANCE.Write(value.Layout, stream);
             FfiConverterOptionalFloat.INSTANCE.Write(value.MinHeight, stream);
             FfiConverterOptionalFloat.INSTANCE.Write(value.MaxSideLen, stream);
             FfiConverterOptionalFloat.INSTANCE.Write(value.MinSideLen, stream);
@@ -3063,6 +3466,61 @@ class FfiConverterTypeUnwarpConfig: FfiConverterRustBuffer<UnwarpConfig> {
 
 
 
+/// <summary>
+/// Unwarped image result with raw RGB8 pixel buffer and dimensions.
+/// </summary>
+/// <param name="Pixels">
+/// Interleaved 24-bit RGB pixel bytes.
+/// </param>
+/// <param name="Width">
+/// Image width in pixels.
+/// </param>
+/// <param name="Height">
+/// Image height in pixels.
+/// </param>
+public record UnwarpedImageResult (
+    /// <summary>
+    /// Interleaved 24-bit RGB pixel bytes.
+    /// </summary>
+    byte[] Pixels, 
+    /// <summary>
+    /// Image width in pixels.
+    /// </summary>
+    uint Width, 
+    /// <summary>
+    /// Image height in pixels.
+    /// </summary>
+    uint Height
+) {
+}
+
+class FfiConverterTypeUnwarpedImageResult: FfiConverterRustBuffer<UnwarpedImageResult> {
+    public static FfiConverterTypeUnwarpedImageResult INSTANCE = new FfiConverterTypeUnwarpedImageResult();
+
+    public override UnwarpedImageResult Read(BigEndianStream stream) {
+        return new UnwarpedImageResult(
+            Pixels: FfiConverterByteArray.INSTANCE.Read(stream),
+            Width: FfiConverterUInt32.INSTANCE.Read(stream),
+            Height: FfiConverterUInt32.INSTANCE.Read(stream)
+        );
+    }
+
+    public override int AllocationSize(UnwarpedImageResult value) {
+        return 0
+            + FfiConverterByteArray.INSTANCE.AllocationSize(value.Pixels)
+            + FfiConverterUInt32.INSTANCE.AllocationSize(value.Width)
+            + FfiConverterUInt32.INSTANCE.AllocationSize(value.Height);
+    }
+
+    public override void Write(UnwarpedImageResult value, BigEndianStream stream) {
+            FfiConverterByteArray.INSTANCE.Write(value.Pixels, stream);
+            FfiConverterUInt32.INSTANCE.Write(value.Width, stream);
+            FfiConverterUInt32.INSTANCE.Write(value.Height, stream);
+    }
+}
+
+
+
 
 
 /// <summary>
@@ -3209,6 +3667,69 @@ class FfiConverterTypeImageSource : FfiConverterRustBuffer<ImageSource>{
                 break;
             default:
                 throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeImageSource.Write()", value));
+        }
+    }
+}
+
+
+
+
+
+
+
+/// <summary>
+/// Category of document layout region.
+/// </summary>
+public enum LayoutType: int {
+    Text,
+    Title,
+    Figure,
+    FigureCaption,
+    Table,
+    TableCaption,
+    Header,
+    Footer,
+    Reference,
+    Equation
+}
+
+class FfiConverterTypeLayoutType: FfiConverterRustBuffer<LayoutType> {
+    public static FfiConverterTypeLayoutType INSTANCE = new FfiConverterTypeLayoutType();
+
+    public override LayoutType Read(BigEndianStream stream) {
+        var value = stream.ReadInt();
+        switch (value) {
+            case 1: return LayoutType.Text;
+            case 2: return LayoutType.Title;
+            case 3: return LayoutType.Figure;
+            case 4: return LayoutType.FigureCaption;
+            case 5: return LayoutType.Table;
+            case 6: return LayoutType.TableCaption;
+            case 7: return LayoutType.Header;
+            case 8: return LayoutType.Footer;
+            case 9: return LayoutType.Reference;
+            case 10: return LayoutType.Equation;
+            default: throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeLayoutType.Read()", value));
+        }
+    }
+
+    public override int AllocationSize(LayoutType value) {
+        return 4;
+    }
+
+    public override void Write(LayoutType value, BigEndianStream stream) {
+        switch (value) {
+            case LayoutType.Text: stream.WriteInt(1); break;
+            case LayoutType.Title: stream.WriteInt(2); break;
+            case LayoutType.Figure: stream.WriteInt(3); break;
+            case LayoutType.FigureCaption: stream.WriteInt(4); break;
+            case LayoutType.Table: stream.WriteInt(5); break;
+            case LayoutType.TableCaption: stream.WriteInt(6); break;
+            case LayoutType.Header: stream.WriteInt(7); break;
+            case LayoutType.Footer: stream.WriteInt(8); break;
+            case LayoutType.Reference: stream.WriteInt(9); break;
+            case LayoutType.Equation: stream.WriteInt(10); break;
+            default: throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeLayoutType.Write()", value));
         }
     }
 }
@@ -3682,6 +4203,37 @@ class FfiConverterOptionalTypeDetectionRunOptions: FfiConverterRustBuffer<Detect
 
 
 
+class FfiConverterOptionalTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig?> {
+    public static FfiConverterOptionalTypeLayoutConfig INSTANCE = new FfiConverterOptionalTypeLayoutConfig();
+
+    public override LayoutConfig? Read(BigEndianStream stream) {
+        if (stream.ReadByte() == 0) {
+            return null;
+        }
+        return FfiConverterTypeLayoutConfig.INSTANCE.Read(stream);
+    }
+
+    public override int AllocationSize(LayoutConfig? value) {
+        if (value == null) {
+            return 1;
+        } else {
+            return 1 + FfiConverterTypeLayoutConfig.INSTANCE.AllocationSize((LayoutConfig)value);
+        }
+    }
+
+    public override void Write(LayoutConfig? value, BigEndianStream stream) {
+        if (value == null) {
+            stream.WriteByte(0);
+        } else {
+            stream.WriteByte(1);
+            FfiConverterTypeLayoutConfig.INSTANCE.Write((LayoutConfig)value, stream);
+        }
+    }
+}
+
+
+
+
 class FfiConverterOptionalTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOptions?> {
     public static FfiConverterOptionalTypeOptimizationOptions INSTANCE = new FfiConverterOptionalTypeOptimizationOptions();
 
@@ -3907,6 +4459,52 @@ class FfiConverterSequenceFloat: FfiConverterRustBuffer<float[]> {
 
         stream.WriteInt(value.Length);
         var writerFn = FfiConverterFloat.INSTANCE.Write;
+        value.ForEach(item => writerFn(item, stream));
+    }
+}
+
+
+
+
+class FfiConverterSequenceTypeLayoutRegion: FfiConverterRustBuffer<LayoutRegion[]> {
+    public static FfiConverterSequenceTypeLayoutRegion INSTANCE = new FfiConverterSequenceTypeLayoutRegion();
+
+    public override LayoutRegion[]  Read(BigEndianStream stream) {
+        var length = stream.ReadInt();
+        if (length == 0) {
+            return [];
+        }
+
+        var result = new LayoutRegion[length];
+        var readFn = FfiConverterTypeLayoutRegion.INSTANCE.Read;
+        for (int i = 0; i < length; i++) {
+            result[i] = readFn(stream);
+        }
+        return result;
+    }
+
+    public override int AllocationSize(LayoutRegion[]  value) {
+        var sizeForLength = 4;
+
+        // details/1-empty-list-as-default-method-parameter.md
+        if (value == null) {
+            return sizeForLength;
+        }
+
+        var allocationSizeFn = FfiConverterTypeLayoutRegion.INSTANCE.AllocationSize;
+        var sizeForItems = value.Sum(item => allocationSizeFn(item));
+        return sizeForLength + sizeForItems;
+    }
+
+    public override void Write(LayoutRegion[] value, BigEndianStream stream) {
+        // details/1-empty-list-as-default-method-parameter.md
+        if (value == null) {
+            stream.WriteInt(0);
+            return;
+        }
+
+        stream.WriteInt(value.Length);
+        var writerFn = FfiConverterTypeLayoutRegion.INSTANCE.Write;
         value.ForEach(item => writerFn(item, stream));
     }
 }

@@ -260,6 +260,8 @@ class RustO {
         textScore: opts.textScore,
         classification: opts.classification,
         orientation: opts.orientation,
+        unwarp: opts.unwarp,
+        layout: opts.layout,
         minHeight: opts.minHeight,
         maxSideLen: opts.maxSideLen,
         minSideLen: opts.minSideLen,

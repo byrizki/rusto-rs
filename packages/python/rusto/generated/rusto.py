@@ -488,9 +488,17 @@ def _uniffi_check_api_checksums(lib):
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     if lib.uniffi_rusto_checksum_constructor_rusto_initialize_from_json() != 40384:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_rusto_checksum_method_rusto_detect_layout() != 43417:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_rusto_checksum_method_rusto_detect_layout_rgb() != 59477:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     if lib.uniffi_rusto_checksum_method_rusto_detect_text() != 5963:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     if lib.uniffi_rusto_checksum_method_rusto_detect_text_rgb() != 9991:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_rusto_checksum_method_rusto_unwarp_image() != 24978:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_rusto_checksum_method_rusto_unwarp_image_rgb() != 44077:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     if lib.uniffi_rusto_checksum_method_rusto_version() != 31217:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
@@ -792,6 +800,21 @@ _UniffiLib.uniffi_rusto_fn_constructor_rusto_initialize_from_json.argtypes = (
     ctypes.POINTER(_UniffiRustCallStatus),
 )
 _UniffiLib.uniffi_rusto_fn_constructor_rusto_initialize_from_json.restype = ctypes.c_uint64
+_UniffiLib.uniffi_rusto_fn_method_rusto_detect_layout.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_rusto_fn_method_rusto_detect_layout.restype = _UniffiRustBuffer
+_UniffiLib.uniffi_rusto_fn_method_rusto_detect_layout_rgb.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    ctypes.c_uint32,
+    ctypes.c_uint32,
+    ctypes.c_uint64,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_rusto_fn_method_rusto_detect_layout_rgb.restype = _UniffiRustBuffer
 _UniffiLib.uniffi_rusto_fn_method_rusto_detect_text.argtypes = (
     ctypes.c_uint64,
     _UniffiRustBuffer,
@@ -809,6 +832,21 @@ _UniffiLib.uniffi_rusto_fn_method_rusto_detect_text_rgb.argtypes = (
     ctypes.POINTER(_UniffiRustCallStatus),
 )
 _UniffiLib.uniffi_rusto_fn_method_rusto_detect_text_rgb.restype = _UniffiRustBuffer
+_UniffiLib.uniffi_rusto_fn_method_rusto_unwarp_image.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_rusto_fn_method_rusto_unwarp_image.restype = _UniffiRustBuffer
+_UniffiLib.uniffi_rusto_fn_method_rusto_unwarp_image_rgb.argtypes = (
+    ctypes.c_uint64,
+    _UniffiRustBuffer,
+    ctypes.c_uint32,
+    ctypes.c_uint32,
+    ctypes.c_uint64,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_rusto_fn_method_rusto_unwarp_image_rgb.restype = _UniffiRustBuffer
 _UniffiLib.uniffi_rusto_fn_method_rusto_version.argtypes = (
     ctypes.c_uint64,
     ctypes.POINTER(_UniffiRustCallStatus),
@@ -832,12 +870,24 @@ _UniffiLib.uniffi_rusto_checksum_constructor_rusto_initialize.restype = ctypes.c
 _UniffiLib.uniffi_rusto_checksum_constructor_rusto_initialize_from_json.argtypes = (
 )
 _UniffiLib.uniffi_rusto_checksum_constructor_rusto_initialize_from_json.restype = ctypes.c_uint16
+_UniffiLib.uniffi_rusto_checksum_method_rusto_detect_layout.argtypes = (
+)
+_UniffiLib.uniffi_rusto_checksum_method_rusto_detect_layout.restype = ctypes.c_uint16
+_UniffiLib.uniffi_rusto_checksum_method_rusto_detect_layout_rgb.argtypes = (
+)
+_UniffiLib.uniffi_rusto_checksum_method_rusto_detect_layout_rgb.restype = ctypes.c_uint16
 _UniffiLib.uniffi_rusto_checksum_method_rusto_detect_text.argtypes = (
 )
 _UniffiLib.uniffi_rusto_checksum_method_rusto_detect_text.restype = ctypes.c_uint16
 _UniffiLib.uniffi_rusto_checksum_method_rusto_detect_text_rgb.argtypes = (
 )
 _UniffiLib.uniffi_rusto_checksum_method_rusto_detect_text_rgb.restype = ctypes.c_uint16
+_UniffiLib.uniffi_rusto_checksum_method_rusto_unwarp_image.argtypes = (
+)
+_UniffiLib.uniffi_rusto_checksum_method_rusto_unwarp_image.restype = ctypes.c_uint16
+_UniffiLib.uniffi_rusto_checksum_method_rusto_unwarp_image_rgb.argtypes = (
+)
+_UniffiLib.uniffi_rusto_checksum_method_rusto_unwarp_image_rgb.restype = ctypes.c_uint16
 _UniffiLib.uniffi_rusto_checksum_method_rusto_version.argtypes = (
 )
 _UniffiLib.uniffi_rusto_checksum_method_rusto_version.restype = ctypes.c_uint16
@@ -1683,23 +1733,100 @@ class _UniffiFfiConverterOptionalTypeUnwarpConfig(_UniffiConverterRustBuffer):
             raise InternalError("Unexpected flag byte for optional type")
 
 @dataclass
+class LayoutConfig:
+    """
+    Document layout analysis model configuration.
+"""
+    def __init__(self, *, enabled:typing.Optional[bool], model_path:typing.Optional[str], conf_thresh:typing.Optional[float], target_size:typing.Optional[int]):
+        self.enabled = enabled
+        self.model_path = model_path
+        self.conf_thresh = conf_thresh
+        self.target_size = target_size
+        
+        
+
+    
+    def __str__(self):
+        return "LayoutConfig(enabled={}, model_path={}, conf_thresh={}, target_size={})".format(self.enabled, self.model_path, self.conf_thresh, self.target_size)
+    def __eq__(self, other):
+        if self.enabled != other.enabled:
+            return False
+        if self.model_path != other.model_path:
+            return False
+        if self.conf_thresh != other.conf_thresh:
+            return False
+        if self.target_size != other.target_size:
+            return False
+        return True
+
+class _UniffiFfiConverterTypeLayoutConfig(_UniffiConverterRustBuffer):
+    @staticmethod
+    def read(buf):
+        return LayoutConfig(
+            enabled=_UniffiFfiConverterOptionalBoolean.read(buf),
+            model_path=_UniffiFfiConverterOptionalString.read(buf),
+            conf_thresh=_UniffiFfiConverterOptionalFloat32.read(buf),
+            target_size=_UniffiFfiConverterOptionalInt32.read(buf),
+        )
+
+    @staticmethod
+    def check_lower(value):
+        _UniffiFfiConverterOptionalBoolean.check_lower(value.enabled)
+        _UniffiFfiConverterOptionalString.check_lower(value.model_path)
+        _UniffiFfiConverterOptionalFloat32.check_lower(value.conf_thresh)
+        _UniffiFfiConverterOptionalInt32.check_lower(value.target_size)
+
+    @staticmethod
+    def write(value, buf):
+        _UniffiFfiConverterOptionalBoolean.write(value.enabled, buf)
+        _UniffiFfiConverterOptionalString.write(value.model_path, buf)
+        _UniffiFfiConverterOptionalFloat32.write(value.conf_thresh, buf)
+        _UniffiFfiConverterOptionalInt32.write(value.target_size, buf)
+
+class _UniffiFfiConverterOptionalTypeLayoutConfig(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        if value is not None:
+            _UniffiFfiConverterTypeLayoutConfig.check_lower(value)
+
+    @classmethod
+    def write(cls, value, buf):
+        if value is None:
+            buf.write_u8(0)
+            return
+
+        buf.write_u8(1)
+        _UniffiFfiConverterTypeLayoutConfig.write(value, buf)
+
+    @classmethod
+    def read(cls, buf):
+        flag = buf.read_u8()
+        if flag == 0:
+            return None
+        elif flag == 1:
+            return _UniffiFfiConverterTypeLayoutConfig.read(buf)
+        else:
+            raise InternalError("Unexpected flag byte for optional type")
+
+@dataclass
 class InitializeConfig:
     """
     Engine initialization configuration specifying model paths and template preset.
 """
-    def __init__(self, *, template:typing.Optional[str], detection:typing.Optional[DetectionConfig], recognition:typing.Optional[RecognitionConfig], classification:typing.Optional[ClassificationConfig], orientation:typing.Optional[OrientationConfig], unwarp:typing.Optional[UnwarpConfig]):
+    def __init__(self, *, template:typing.Optional[str], detection:typing.Optional[DetectionConfig], recognition:typing.Optional[RecognitionConfig], classification:typing.Optional[ClassificationConfig], orientation:typing.Optional[OrientationConfig], unwarp:typing.Optional[UnwarpConfig], layout:typing.Optional[LayoutConfig]):
         self.template = template
         self.detection = detection
         self.recognition = recognition
         self.classification = classification
         self.orientation = orientation
         self.unwarp = unwarp
+        self.layout = layout
         
         
 
     
     def __str__(self):
-        return "InitializeConfig(template={}, detection={}, recognition={}, classification={}, orientation={}, unwarp={})".format(self.template, self.detection, self.recognition, self.classification, self.orientation, self.unwarp)
+        return "InitializeConfig(template={}, detection={}, recognition={}, classification={}, orientation={}, unwarp={}, layout={})".format(self.template, self.detection, self.recognition, self.classification, self.orientation, self.unwarp, self.layout)
     def __eq__(self, other):
         if self.template != other.template:
             return False
@@ -1713,6 +1840,8 @@ class InitializeConfig:
             return False
         if self.unwarp != other.unwarp:
             return False
+        if self.layout != other.layout:
+            return False
         return True
 
 class _UniffiFfiConverterTypeInitializeConfig(_UniffiConverterRustBuffer):
@@ -1725,6 +1854,7 @@ class _UniffiFfiConverterTypeInitializeConfig(_UniffiConverterRustBuffer):
             classification=_UniffiFfiConverterOptionalTypeClassificationConfig.read(buf),
             orientation=_UniffiFfiConverterOptionalTypeOrientationConfig.read(buf),
             unwarp=_UniffiFfiConverterOptionalTypeUnwarpConfig.read(buf),
+            layout=_UniffiFfiConverterOptionalTypeLayoutConfig.read(buf),
         )
 
     @staticmethod
@@ -1735,6 +1865,7 @@ class _UniffiFfiConverterTypeInitializeConfig(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalTypeClassificationConfig.check_lower(value.classification)
         _UniffiFfiConverterOptionalTypeOrientationConfig.check_lower(value.orientation)
         _UniffiFfiConverterOptionalTypeUnwarpConfig.check_lower(value.unwarp)
+        _UniffiFfiConverterOptionalTypeLayoutConfig.check_lower(value.layout)
 
     @staticmethod
     def write(value, buf):
@@ -1744,6 +1875,210 @@ class _UniffiFfiConverterTypeInitializeConfig(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalTypeClassificationConfig.write(value.classification, buf)
         _UniffiFfiConverterOptionalTypeOrientationConfig.write(value.orientation, buf)
         _UniffiFfiConverterOptionalTypeUnwarpConfig.write(value.unwarp, buf)
+        _UniffiFfiConverterOptionalTypeLayoutConfig.write(value.layout, buf)
+
+@dataclass
+class LayoutBBox:
+    """
+    Bounding box coordinates for a detected document layout region.
+"""
+    def __init__(self, *, x_min:int, y_min:int, x_max:int, y_max:int):
+        self.x_min = x_min
+        self.y_min = y_min
+        self.x_max = x_max
+        self.y_max = y_max
+        
+        
+
+    
+    def __str__(self):
+        return "LayoutBBox(x_min={}, y_min={}, x_max={}, y_max={})".format(self.x_min, self.y_min, self.x_max, self.y_max)
+    def __eq__(self, other):
+        if self.x_min != other.x_min:
+            return False
+        if self.y_min != other.y_min:
+            return False
+        if self.x_max != other.x_max:
+            return False
+        if self.y_max != other.y_max:
+            return False
+        return True
+
+class _UniffiFfiConverterTypeLayoutBBox(_UniffiConverterRustBuffer):
+    @staticmethod
+    def read(buf):
+        return LayoutBBox(
+            x_min=_UniffiFfiConverterInt32.read(buf),
+            y_min=_UniffiFfiConverterInt32.read(buf),
+            x_max=_UniffiFfiConverterInt32.read(buf),
+            y_max=_UniffiFfiConverterInt32.read(buf),
+        )
+
+    @staticmethod
+    def check_lower(value):
+        _UniffiFfiConverterInt32.check_lower(value.x_min)
+        _UniffiFfiConverterInt32.check_lower(value.y_min)
+        _UniffiFfiConverterInt32.check_lower(value.x_max)
+        _UniffiFfiConverterInt32.check_lower(value.y_max)
+
+    @staticmethod
+    def write(value, buf):
+        _UniffiFfiConverterInt32.write(value.x_min, buf)
+        _UniffiFfiConverterInt32.write(value.y_min, buf)
+        _UniffiFfiConverterInt32.write(value.x_max, buf)
+        _UniffiFfiConverterInt32.write(value.y_max, buf)
+
+
+
+
+
+
+class LayoutType(enum.Enum):
+    """
+    Category of document layout region.
+"""
+    
+    TEXT = 0
+    
+    TITLE = 1
+    
+    FIGURE = 2
+    
+    FIGURE_CAPTION = 3
+    
+    TABLE = 4
+    
+    TABLE_CAPTION = 5
+    
+    HEADER = 6
+    
+    FOOTER = 7
+    
+    REFERENCE = 8
+    
+    EQUATION = 9
+    
+
+
+class _UniffiFfiConverterTypeLayoutType(_UniffiConverterRustBuffer):
+    @staticmethod
+    def read(buf):
+        variant = buf.read_i32()
+        if variant == 1:
+            return LayoutType.TEXT
+        if variant == 2:
+            return LayoutType.TITLE
+        if variant == 3:
+            return LayoutType.FIGURE
+        if variant == 4:
+            return LayoutType.FIGURE_CAPTION
+        if variant == 5:
+            return LayoutType.TABLE
+        if variant == 6:
+            return LayoutType.TABLE_CAPTION
+        if variant == 7:
+            return LayoutType.HEADER
+        if variant == 8:
+            return LayoutType.FOOTER
+        if variant == 9:
+            return LayoutType.REFERENCE
+        if variant == 10:
+            return LayoutType.EQUATION
+        raise InternalError("Raw enum value doesn't match any cases")
+
+    @staticmethod
+    def check_lower(value):
+        if value == LayoutType.TEXT:
+            return
+        if value == LayoutType.TITLE:
+            return
+        if value == LayoutType.FIGURE:
+            return
+        if value == LayoutType.FIGURE_CAPTION:
+            return
+        if value == LayoutType.TABLE:
+            return
+        if value == LayoutType.TABLE_CAPTION:
+            return
+        if value == LayoutType.HEADER:
+            return
+        if value == LayoutType.FOOTER:
+            return
+        if value == LayoutType.REFERENCE:
+            return
+        if value == LayoutType.EQUATION:
+            return
+        raise ValueError(value)
+
+    @staticmethod
+    def write(value, buf):
+        if value == LayoutType.TEXT:
+            buf.write_i32(1)
+        if value == LayoutType.TITLE:
+            buf.write_i32(2)
+        if value == LayoutType.FIGURE:
+            buf.write_i32(3)
+        if value == LayoutType.FIGURE_CAPTION:
+            buf.write_i32(4)
+        if value == LayoutType.TABLE:
+            buf.write_i32(5)
+        if value == LayoutType.TABLE_CAPTION:
+            buf.write_i32(6)
+        if value == LayoutType.HEADER:
+            buf.write_i32(7)
+        if value == LayoutType.FOOTER:
+            buf.write_i32(8)
+        if value == LayoutType.REFERENCE:
+            buf.write_i32(9)
+        if value == LayoutType.EQUATION:
+            buf.write_i32(10)
+
+
+
+@dataclass
+class LayoutRegion:
+    """
+    Detected document layout region with category, bounding box, and confidence score.
+"""
+    def __init__(self, *, bbox:LayoutBBox, layout_type:LayoutType, confidence:float):
+        self.bbox = bbox
+        self.layout_type = layout_type
+        self.confidence = confidence
+        
+        
+
+    
+    def __str__(self):
+        return "LayoutRegion(bbox={}, layout_type={}, confidence={})".format(self.bbox, self.layout_type, self.confidence)
+    def __eq__(self, other):
+        if self.bbox != other.bbox:
+            return False
+        if self.layout_type != other.layout_type:
+            return False
+        if self.confidence != other.confidence:
+            return False
+        return True
+
+class _UniffiFfiConverterTypeLayoutRegion(_UniffiConverterRustBuffer):
+    @staticmethod
+    def read(buf):
+        return LayoutRegion(
+            bbox=_UniffiFfiConverterTypeLayoutBBox.read(buf),
+            layout_type=_UniffiFfiConverterTypeLayoutType.read(buf),
+            confidence=_UniffiFfiConverterFloat32.read(buf),
+        )
+
+    @staticmethod
+    def check_lower(value):
+        _UniffiFfiConverterTypeLayoutBBox.check_lower(value.bbox)
+        _UniffiFfiConverterTypeLayoutType.check_lower(value.layout_type)
+        _UniffiFfiConverterFloat32.check_lower(value.confidence)
+
+    @staticmethod
+    def write(value, buf):
+        _UniffiFfiConverterTypeLayoutBBox.write(value.bbox, buf)
+        _UniffiFfiConverterTypeLayoutType.write(value.layout_type, buf)
+        _UniffiFfiConverterFloat32.write(value.confidence, buf)
 
 
 
@@ -1924,13 +2259,15 @@ class OcrRunOptions:
     """
     Per-request execution options for text detection.
 """
-    def __init__(self, *, output:OutputGranularity, line_y_threshold:typing.Optional[float], word_x_threshold:typing.Optional[float], text_score:typing.Optional[float], classification:typing.Optional[bool], orientation:typing.Optional[bool], min_height:typing.Optional[float], max_side_len:typing.Optional[float], min_side_len:typing.Optional[float], width_height_ratio:typing.Optional[float], detection:typing.Optional[DetectionRunOptions], postprocess:typing.Optional[PostprocessRunOptions], calibration:typing.Optional[CalibrationOptions], optimization:typing.Optional[OptimizationOptions]):
+    def __init__(self, *, output:OutputGranularity, line_y_threshold:typing.Optional[float], word_x_threshold:typing.Optional[float], text_score:typing.Optional[float], classification:typing.Optional[bool], orientation:typing.Optional[bool], unwarp:typing.Optional[bool], layout:typing.Optional[bool], min_height:typing.Optional[float], max_side_len:typing.Optional[float], min_side_len:typing.Optional[float], width_height_ratio:typing.Optional[float], detection:typing.Optional[DetectionRunOptions], postprocess:typing.Optional[PostprocessRunOptions], calibration:typing.Optional[CalibrationOptions], optimization:typing.Optional[OptimizationOptions]):
         self.output = output
         self.line_y_threshold = line_y_threshold
         self.word_x_threshold = word_x_threshold
         self.text_score = text_score
         self.classification = classification
         self.orientation = orientation
+        self.unwarp = unwarp
+        self.layout = layout
         self.min_height = min_height
         self.max_side_len = max_side_len
         self.min_side_len = min_side_len
@@ -1944,7 +2281,7 @@ class OcrRunOptions:
 
     
     def __str__(self):
-        return "OcrRunOptions(output={}, line_y_threshold={}, word_x_threshold={}, text_score={}, classification={}, orientation={}, min_height={}, max_side_len={}, min_side_len={}, width_height_ratio={}, detection={}, postprocess={}, calibration={}, optimization={})".format(self.output, self.line_y_threshold, self.word_x_threshold, self.text_score, self.classification, self.orientation, self.min_height, self.max_side_len, self.min_side_len, self.width_height_ratio, self.detection, self.postprocess, self.calibration, self.optimization)
+        return "OcrRunOptions(output={}, line_y_threshold={}, word_x_threshold={}, text_score={}, classification={}, orientation={}, unwarp={}, layout={}, min_height={}, max_side_len={}, min_side_len={}, width_height_ratio={}, detection={}, postprocess={}, calibration={}, optimization={})".format(self.output, self.line_y_threshold, self.word_x_threshold, self.text_score, self.classification, self.orientation, self.unwarp, self.layout, self.min_height, self.max_side_len, self.min_side_len, self.width_height_ratio, self.detection, self.postprocess, self.calibration, self.optimization)
     def __eq__(self, other):
         if self.output != other.output:
             return False
@@ -1957,6 +2294,10 @@ class OcrRunOptions:
         if self.classification != other.classification:
             return False
         if self.orientation != other.orientation:
+            return False
+        if self.unwarp != other.unwarp:
+            return False
+        if self.layout != other.layout:
             return False
         if self.min_height != other.min_height:
             return False
@@ -1986,6 +2327,8 @@ class _UniffiFfiConverterTypeOcrRunOptions(_UniffiConverterRustBuffer):
             text_score=_UniffiFfiConverterOptionalFloat32.read(buf),
             classification=_UniffiFfiConverterOptionalBoolean.read(buf),
             orientation=_UniffiFfiConverterOptionalBoolean.read(buf),
+            unwarp=_UniffiFfiConverterOptionalBoolean.read(buf),
+            layout=_UniffiFfiConverterOptionalBoolean.read(buf),
             min_height=_UniffiFfiConverterOptionalFloat32.read(buf),
             max_side_len=_UniffiFfiConverterOptionalFloat32.read(buf),
             min_side_len=_UniffiFfiConverterOptionalFloat32.read(buf),
@@ -2004,6 +2347,8 @@ class _UniffiFfiConverterTypeOcrRunOptions(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalFloat32.check_lower(value.text_score)
         _UniffiFfiConverterOptionalBoolean.check_lower(value.classification)
         _UniffiFfiConverterOptionalBoolean.check_lower(value.orientation)
+        _UniffiFfiConverterOptionalBoolean.check_lower(value.unwarp)
+        _UniffiFfiConverterOptionalBoolean.check_lower(value.layout)
         _UniffiFfiConverterOptionalFloat32.check_lower(value.min_height)
         _UniffiFfiConverterOptionalFloat32.check_lower(value.max_side_len)
         _UniffiFfiConverterOptionalFloat32.check_lower(value.min_side_len)
@@ -2021,6 +2366,8 @@ class _UniffiFfiConverterTypeOcrRunOptions(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalFloat32.write(value.text_score, buf)
         _UniffiFfiConverterOptionalBoolean.write(value.classification, buf)
         _UniffiFfiConverterOptionalBoolean.write(value.orientation, buf)
+        _UniffiFfiConverterOptionalBoolean.write(value.unwarp, buf)
+        _UniffiFfiConverterOptionalBoolean.write(value.layout, buf)
         _UniffiFfiConverterOptionalFloat32.write(value.min_height, buf)
         _UniffiFfiConverterOptionalFloat32.write(value.max_side_len, buf)
         _UniffiFfiConverterOptionalFloat32.write(value.min_side_len, buf)
@@ -2142,6 +2489,84 @@ class _UniffiFfiConverterTypeTextResult(_UniffiConverterRustBuffer):
         _UniffiFfiConverterFloat32.write(value.score, buf)
         _UniffiFfiConverterSequenceTypePoint2D.write(value.box_points, buf)
         _UniffiFfiConverterTypeFrame.write(value.frame, buf)
+
+class _UniffiFfiConverterBytes(_UniffiConverterRustBuffer):
+    @staticmethod
+    def read(buf):
+        size = buf.read_i32()
+        if size < 0:
+            raise InternalError("Unexpected negative byte string length")
+        return buf.read(size)
+
+    @staticmethod
+    def check_lower(value):
+        try:
+            memoryview(value)
+        except TypeError:
+            raise TypeError("a bytes-like object is required, not {!r}".format(type(value).__name__))
+
+    @staticmethod
+    def write(value, buf):
+        buf.write_i32(len(value))
+        buf.write(value)
+
+class _UniffiFfiConverterUInt32(_UniffiConverterPrimitiveInt):
+    CLASS_NAME = "u32"
+    VALUE_MIN = 0
+    VALUE_MAX = 2**32
+
+    @staticmethod
+    def read(buf):
+        return buf.read_u32()
+
+    @staticmethod
+    def write(value, buf):
+        buf.write_u32(value)
+
+@dataclass
+class UnwarpedImageResult:
+    """
+    Unwarped image result with raw RGB8 pixel buffer and dimensions.
+"""
+    def __init__(self, *, pixels:bytes, width:int, height:int):
+        self.pixels = pixels
+        self.width = width
+        self.height = height
+        
+        
+
+    
+    def __str__(self):
+        return "UnwarpedImageResult(pixels={}, width={}, height={})".format(self.pixels, self.width, self.height)
+    def __eq__(self, other):
+        if self.pixels != other.pixels:
+            return False
+        if self.width != other.width:
+            return False
+        if self.height != other.height:
+            return False
+        return True
+
+class _UniffiFfiConverterTypeUnwarpedImageResult(_UniffiConverterRustBuffer):
+    @staticmethod
+    def read(buf):
+        return UnwarpedImageResult(
+            pixels=_UniffiFfiConverterBytes.read(buf),
+            width=_UniffiFfiConverterUInt32.read(buf),
+            height=_UniffiFfiConverterUInt32.read(buf),
+        )
+
+    @staticmethod
+    def check_lower(value):
+        _UniffiFfiConverterBytes.check_lower(value.pixels)
+        _UniffiFfiConverterUInt32.check_lower(value.width)
+        _UniffiFfiConverterUInt32.check_lower(value.height)
+
+    @staticmethod
+    def write(value, buf):
+        _UniffiFfiConverterBytes.write(value.pixels, buf)
+        _UniffiFfiConverterUInt32.write(value.width, buf)
+        _UniffiFfiConverterUInt32.write(value.height, buf)
 
 class _UniffiFfiConverterSequenceTypeTextResult(_UniffiConverterRustBuffer):
     @classmethod
@@ -2290,26 +2715,6 @@ class _UniffiFfiConverterTypeDetectTextResult(_UniffiConverterRustBuffer):
             _UniffiFfiConverterString.write(value.text, buf)
 
 
-
-class _UniffiFfiConverterBytes(_UniffiConverterRustBuffer):
-    @staticmethod
-    def read(buf):
-        size = buf.read_i32()
-        if size < 0:
-            raise InternalError("Unexpected negative byte string length")
-        return buf.read(size)
-
-    @staticmethod
-    def check_lower(value):
-        try:
-            memoryview(value)
-        except TypeError:
-            raise TypeError("a bytes-like object is required, not {!r}".format(type(value).__name__))
-
-    @staticmethod
-    def write(value, buf):
-        buf.write_i32(len(value))
-        buf.write(value)
 
 
 
@@ -2573,18 +2978,28 @@ class _UniffiFfiConverterTypeRustoBindingError(_UniffiConverterRustBuffer):
             buf.write_i32(5)
             _UniffiFfiConverterString.write(value.msg, buf)
 
-class _UniffiFfiConverterUInt32(_UniffiConverterPrimitiveInt):
-    CLASS_NAME = "u32"
-    VALUE_MIN = 0
-    VALUE_MAX = 2**32
+class _UniffiFfiConverterSequenceTypeLayoutRegion(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        for item in value:
+            _UniffiFfiConverterTypeLayoutRegion.check_lower(item)
 
-    @staticmethod
-    def read(buf):
-        return buf.read_u32()
+    @classmethod
+    def write(cls, value, buf):
+        items = len(value)
+        buf.write_i32(items)
+        for item in value:
+            _UniffiFfiConverterTypeLayoutRegion.write(item, buf)
 
-    @staticmethod
-    def write(value, buf):
-        buf.write_u32(value)
+    @classmethod
+    def read(cls, buf):
+        count = buf.read_i32()
+        if count < 0:
+            raise InternalError("Unexpected negative sequence length")
+
+        return [
+            _UniffiFfiConverterTypeLayoutRegion.read(buf) for i in range(count)
+        ]
 
 class _UniffiFfiConverterUInt64(_UniffiConverterPrimitiveInt):
     CLASS_NAME = "u64"
@@ -2605,6 +3020,16 @@ class RustOProtocol(typing.Protocol):
     High-level RustO OCR Engine for multi-platform bindings.
 """
     
+    def detect_layout(self, source: ImageSource) -> typing.List[LayoutRegion]:
+        """
+        Detects document layout regions from an image source.
+"""
+        raise NotImplementedError
+    def detect_layout_rgb(self, pixels: bytes,width: int,height: int,stride: int) -> typing.List[LayoutRegion]:
+        """
+        Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
+"""
+        raise NotImplementedError
     def detect_text(self, source: ImageSource,options: OcrRunOptions) -> DetectTextResult:
         """
         Runs text detection and recognition on an image source.
@@ -2613,6 +3038,16 @@ class RustOProtocol(typing.Protocol):
     def detect_text_rgb(self, pixels: bytes,width: int,height: int,stride: int,options: OcrRunOptions) -> DetectTextResult:
         """
         Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
+"""
+        raise NotImplementedError
+    def unwarp_image(self, source: ImageSource) -> UnwarpedImageResult:
+        """
+        Unwarps a distorted or curved document image from an image source.
+"""
+        raise NotImplementedError
+    def unwarp_image_rgb(self, pixels: bytes,width: int,height: int,stride: int) -> UnwarpedImageResult:
+        """
+        Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
 """
         raise NotImplementedError
     def version(self, ) -> str:
@@ -2684,6 +3119,51 @@ class RustO(RustOProtocol):
         inst = cls.__new__(cls)
         inst._handle = handle
         return inst
+    def detect_layout(self, source: ImageSource) -> typing.List[LayoutRegion]:
+        """
+        Detects document layout regions from an image source.
+"""
+        
+        _UniffiFfiConverterTypeImageSource.check_lower(source)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterTypeImageSource.lower(source),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterSequenceTypeLayoutRegion.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeRustoBindingError
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_rusto_fn_method_rusto_detect_layout,
+            *_uniffi_lowered_args,
+        )
+        return _uniffi_lift_return(_uniffi_ffi_result)
+    def detect_layout_rgb(self, pixels: bytes,width: int,height: int,stride: int) -> typing.List[LayoutRegion]:
+        """
+        Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
+"""
+        
+        _UniffiFfiConverterBytes.check_lower(pixels)
+
+        _UniffiFfiConverterUInt32.check_lower(width)
+
+        _UniffiFfiConverterUInt32.check_lower(height)
+
+        _UniffiFfiConverterUInt64.check_lower(stride)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterBytes.lower(pixels),
+            _UniffiFfiConverterUInt32.lower(width),
+            _UniffiFfiConverterUInt32.lower(height),
+            _UniffiFfiConverterUInt64.lower(stride),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterSequenceTypeLayoutRegion.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeRustoBindingError
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_rusto_fn_method_rusto_detect_layout_rgb,
+            *_uniffi_lowered_args,
+        )
+        return _uniffi_lift_return(_uniffi_ffi_result)
     def detect_text(self, source: ImageSource,options: OcrRunOptions) -> DetectTextResult:
         """
         Runs text detection and recognition on an image source.
@@ -2732,6 +3212,51 @@ class RustO(RustOProtocol):
         _uniffi_ffi_result = _uniffi_rust_call_with_error(
             _uniffi_error_converter,
             _UniffiLib.uniffi_rusto_fn_method_rusto_detect_text_rgb,
+            *_uniffi_lowered_args,
+        )
+        return _uniffi_lift_return(_uniffi_ffi_result)
+    def unwarp_image(self, source: ImageSource) -> UnwarpedImageResult:
+        """
+        Unwarps a distorted or curved document image from an image source.
+"""
+        
+        _UniffiFfiConverterTypeImageSource.check_lower(source)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterTypeImageSource.lower(source),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeUnwarpedImageResult.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeRustoBindingError
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_rusto_fn_method_rusto_unwarp_image,
+            *_uniffi_lowered_args,
+        )
+        return _uniffi_lift_return(_uniffi_ffi_result)
+    def unwarp_image_rgb(self, pixels: bytes,width: int,height: int,stride: int) -> UnwarpedImageResult:
+        """
+        Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
+"""
+        
+        _UniffiFfiConverterBytes.check_lower(pixels)
+
+        _UniffiFfiConverterUInt32.check_lower(width)
+
+        _UniffiFfiConverterUInt32.check_lower(height)
+
+        _UniffiFfiConverterUInt64.check_lower(stride)
+        _uniffi_lowered_args = (
+            self._uniffi_clone_handle(),
+            _UniffiFfiConverterBytes.lower(pixels),
+            _UniffiFfiConverterUInt32.lower(width),
+            _UniffiFfiConverterUInt32.lower(height),
+            _UniffiFfiConverterUInt64.lower(stride),
+        )
+        _uniffi_lift_return = _UniffiFfiConverterTypeUnwarpedImageResult.lift
+        _uniffi_error_converter = _UniffiFfiConverterTypeRustoBindingError
+        _uniffi_ffi_result = _uniffi_rust_call_with_error(
+            _uniffi_error_converter,
+            _UniffiLib.uniffi_rusto_fn_method_rusto_unwarp_image_rgb,
             *_uniffi_lowered_args,
         )
         return _uniffi_lift_return(_uniffi_ffi_result)
@@ -2840,6 +3365,7 @@ def rusto_version() -> str:
 
 __all__ = [
     "InternalError",
+    "LayoutType",
     "OutputGranularity",
     "DetectTextResult",
     "ImageSource",
@@ -2853,11 +3379,15 @@ __all__ = [
     "RecognitionConfig",
     "OrientationConfig",
     "UnwarpConfig",
+    "LayoutConfig",
     "InitializeConfig",
+    "LayoutBBox",
+    "LayoutRegion",
     "OptimizationOptions",
     "OcrRunOptions",
     "Point2D",
     "TextResult",
+    "UnwarpedImageResult",
     "create_initialize_config_ppv6",
     "default_ocr_run_options",
     "rusto_version",
