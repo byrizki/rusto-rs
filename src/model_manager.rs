@@ -28,14 +28,16 @@ pub fn normalize_model_name(name: Option<&str>) -> &'static str {
         Some("ppocrv6-small-int8") | Some("small-int8") => "ppocrv6-small-int8",
         Some("ppocrv6-medium") | Some("v6-medium") | Some("medium") => "ppocrv6-medium",
         Some("ppocrv6-medium-int8") | Some("medium-int8") => "ppocrv6-medium-int8",
-        Some("ppocrv6-tiny") | Some("v6-tiny") | Some("tiny") => "ppocrv6-tiny",
+        Some("ppocrv6") | Some("v6") | Some("ppocrv6-tiny") | Some("v6-tiny") | Some("tiny") => {
+            "ppocrv6-tiny"
+        }
         Some("ppocrv6-tiny-int8") | Some("tiny-int8") => "ppocrv6-tiny-int8",
         Some("ppocrv5") | Some("ppocrv5-mobile") | Some("v5") => "ppocrv5-mobile",
         Some("ppocrv5-server") | Some("v5-server") => "ppocrv5-server",
         Some("ppocrv4") | Some("ppocrv4-mobile") | Some("v4") => "ppocrv4-mobile",
         Some("ppocrv4-server") | Some("v4-server") => "ppocrv4-server",
         // Default flagship
-        _ => "ppocrv6-tiny",
+        _ => "indraocr",
     }
 }
 
@@ -138,10 +140,15 @@ pub fn get_base_pipeline_assets(model_name: &str) -> BasePipelineAssets {
             rec_filename: "ppocrv4_server_rec.rten",
             dict_filename: "ppocrv4_dict.txt",
         },
-        _ => BasePipelineAssets {
+        "ppocrv6-tiny" | "ppocrv6" => BasePipelineAssets {
             det_filename: "ppocrv6_tiny_det.rten",
             rec_filename: "ppocrv6_tiny_rec.rten",
             dict_filename: "ppocrv6_dict.txt",
+        },
+        _ => BasePipelineAssets {
+            det_filename: "indra_det.rten",
+            rec_filename: "indra_rec.rten",
+            dict_filename: "indra_meta.json",
         },
     }
 }
@@ -665,8 +672,8 @@ mod tests {
 
     #[test]
     fn test_normalize_model_name() {
-        assert_eq!(normalize_model_name(None), "ppocrv6-tiny");
-        assert_eq!(normalize_model_name(Some("")), "ppocrv6-tiny");
+        assert_eq!(normalize_model_name(None), "indraocr");
+        assert_eq!(normalize_model_name(Some("")), "indraocr");
         assert_eq!(normalize_model_name(Some("ppocrv6")), "ppocrv6-tiny");
         assert_eq!(normalize_model_name(Some("PP-OCRv6-Tiny")), "ppocrv6-tiny");
         assert_eq!(normalize_model_name(Some("ppocrv6_small")), "ppocrv6-small");

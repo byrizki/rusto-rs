@@ -47,7 +47,7 @@ const {
 const progress = ref<ProgressState>({ ...defaultProgressState });
 
 // Reactive state
-const selectedModel = ref<string>('ppocrv6-tiny');
+const selectedModel = ref<string>('indraocr');
 const activeLoadedModel = ref<string | null>(null);
 const currentModel = computed<OcrModelOption>(
   () => availableModels.find((m) => m.id === selectedModel.value) ?? defaultModel
@@ -56,7 +56,7 @@ const currentModel = computed<OcrModelOption>(
 const selectedSample = ref<string>('invoice');
 const imageSrc = ref<string>(defaultSample.url);
 const status = ref<'idle' | 'initializing' | 'ready' | 'error'>('idle');
-const statusMessage = ref<string>('PP-OCRv6 Tiny selected (click Run OCR to load)');
+const statusMessage = ref<string>('Indra OCR selected (click Run OCR to load)');
 const isScanning = ref<boolean>(false);
 const durationMs = ref<number | null>(null);
 

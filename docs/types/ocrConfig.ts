@@ -10,6 +10,13 @@ export interface OcrModelOption {
 
 export const availableModels: OcrModelOption[] = [
   {
+    id: 'indraocr',
+    name: 'Indra OCR',
+    preset: 'indra',
+    size: '~5.5 MB',
+    trait: 'Flagship Default (DataLab)',
+  },
+  {
     id: 'ppocrv6-tiny',
     name: 'PP-OCRv6 Tiny',
     preset: 'ppv6',
@@ -22,13 +29,6 @@ export const availableModels: OcrModelOption[] = [
     preset: 'ppv6',
     size: '~3.4 MB',
     trait: 'Ultra-lightweight INT8',
-  },
-  {
-    id: 'indraocr',
-    name: 'Indra OCR',
-    preset: 'indra',
-    size: '~5.5 MB',
-    trait: 'Indonesian ID & Document OCR (DataLab)',
   },
   {
     id: 'ppocrv6-small',

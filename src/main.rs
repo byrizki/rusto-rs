@@ -13,8 +13,8 @@ struct Cli {
     #[arg(value_name = "IMAGE")]
     image: Option<PathBuf>,
 
-    /// OCR model pipeline: "ppocrv6-tiny" (default), "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4", etc.
-    #[arg(short, long, default_value = "ppocrv6-tiny")]
+    /// OCR model pipeline: "indraocr" (default), "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4", etc.
+    #[arg(short, long, default_value = "indraocr")]
     model: String,
 
     /// Base model directory containing det, rec, and dict files (overridden by --det-model, --rec-model, --dict)
@@ -110,8 +110,8 @@ enum Commands {
 
 #[derive(Args)]
 struct DownloadArgs {
-    /// OCR model pipeline to download: "ppocrv6-tiny" (default), "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4", etc.
-    #[arg(short, long, default_value = "ppocrv6-tiny")]
+    /// OCR model pipeline to download: "indraocr" (default), "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4", etc.
+    #[arg(short, long, default_value = "indraocr")]
     model: String,
 
     /// Target language: "latin" (default), "ja", "ko", "ar", "cyrillic", "devanagari", "chinese-cht", etc.

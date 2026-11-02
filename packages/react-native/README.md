@@ -24,9 +24,9 @@ yarn add @rustors/react-native
 
 ### Models Setup
 
-RustO automatically downloads required models (e.g. `ppocrv6-tiny` default) on demand into the app's cache directory on first run. No separate model pods or Gradle packages are needed.
+RustO automatically downloads required models (e.g. `indraocr` default) on demand into the app's cache directory on first run. No separate model pods or Gradle packages are needed.
 
-To bundle models directly within your application, pass local file paths to `initialize({ model: 'ppocrv6-tiny' })` or place models in the application storage directory.
+To bundle models directly within your application, pass local file paths to `initialize({ model: 'indraocr' })` or place models in the application storage directory.
 
 ## Complete example
 

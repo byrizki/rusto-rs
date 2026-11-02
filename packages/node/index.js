@@ -52,7 +52,7 @@ class RustO {
   /**
    * Downloads model assets for a specific OCR pipeline ahead of time.
    *
-   * @param {string} [model] - Canonical model name (e.g. 'ppocrv6-tiny', 'indraocr', 'ppocrv5').
+   * @param {string} [model] - Canonical model name (e.g. 'indraocr', 'ppocrv6-tiny', 'ppocrv5'). Defaults to 'indraocr'.
    * @param {string} [lang] - Optional language code.
    * @param {string} [cacheDir] - Optional custom cache directory.
    * @returns {string[]} Array of downloaded local file paths.

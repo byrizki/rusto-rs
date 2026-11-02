@@ -337,7 +337,7 @@ pub struct UnwarpedImageResult {
 #[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InitializeConfig {
-    /// Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+    /// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
     pub model: Option<String>,
     /// Base model directory containing det, rec, and dict files.
     pub model_path: Option<String>,

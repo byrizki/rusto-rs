@@ -184,7 +184,7 @@ namespace RustODotnet
         public LayoutConfig Layout { get; set; }
 
         /// <summary>Creates a configuration for a canonical model identifier with optional language and model directory.</summary>
-        public static InitializeConfig ForModel(string model = "ppocrv6-tiny", string lang = null, string modelPath = null) =>
+        public static InitializeConfig ForModel(string model = "indraocr", string lang = null, string modelPath = null) =>
             new() { Model = model, Lang = lang, ModelPath = modelPath };
 
         /// <summary>Creates a preset configuration for PP-OCRv3.</summary>

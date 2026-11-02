@@ -103,7 +103,7 @@ export interface OptimizationOptions {
 export interface InitializeConfig {
   /** Model architecture template preset. Defaults to 'ppv6'. */
   preset?: ModelPreset;
-  /** Model pipeline identifier: 'ppocrv6-tiny' (default), 'indraocr', 'ppocrv6-small', 'ppocrv5', 'ppocrv4'. */
+  /** Model pipeline identifier: 'indraocr' (default), 'ppocrv6-tiny', 'ppocrv6-small', 'ppocrv5', 'ppocrv4'. */
   model?: string;
   /** Base model directory containing det, rec, and dict files. */
   modelPath?: string;

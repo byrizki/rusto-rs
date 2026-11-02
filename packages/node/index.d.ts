@@ -116,7 +116,7 @@ export interface OcrRunOptions {
 export interface InitializeConfig {
   /** Model template preset: 'ppv6', 'ppv5', 'ppv4', or 'ppv3'. */
   preset?: 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3';
-  /** Canonical model identifier or name (e.g. 'ppocrv6-tiny', 'indraocr', 'ppocrv6-small', 'ppocrv5', 'ppocrv4'). */
+  /** Canonical model identifier or name (e.g. 'indraocr' (default), 'ppocrv6-tiny', 'ppocrv6-small', 'ppocrv5', 'ppocrv4'). */
   model?: string;
   /** Directory path containing det, rec, and dict model files. */
   modelPath?: string;
@@ -206,7 +206,7 @@ export class RustO {
   /**
    * Downloads model assets for a specific OCR pipeline ahead of time.
    *
-   * @param model - Canonical model name (e.g. 'ppocrv6-tiny', 'indraocr', 'ppocrv5').
+   * @param model - Canonical model name (e.g. 'indraocr', 'ppocrv6-tiny', 'ppocrv5'). Defaults to 'indraocr'.
    * @param lang - Optional language identifier (e.g. 'latin', 'cyrillic', 'ar', 'ja').
    * @param cacheDir - Optional custom cache directory.
    * @returns Array of downloaded local file paths.

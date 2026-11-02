@@ -82,7 +82,7 @@ export function getModelCandidateUrls(
   recognition: string[];
   dictionary: string[];
 } {
-  const asset = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['ppocrv6-tiny']!;
+  const asset = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['indraocr']!;
   const cleanBase = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
   const isIndra = modelId === 'indraocr' || modelId === 'indra';
   const dictFile = isIndra ? 'meta.json' : 'dict.txt';
@@ -114,7 +114,7 @@ export function getModelCdnUrls(
   recognition: string;
   dictionary: string;
 } {
-  const asset = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['ppocrv6-tiny']!;
+  const asset = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['indraocr']!;
   return {
     detection: `${GITHUB_RELEASE_BASE}/${tag}/${asset.detection}`,
     recognition: `${GITHUB_RELEASE_BASE}/${tag}/${asset.recognition}`,

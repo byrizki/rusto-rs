@@ -405,7 +405,8 @@ impl InitializeConfig {
             let orient_path = if let Some(p) = orient_override {
                 PathBuf::from(p)
             } else {
-                let orient_file = if effective_model == Some("indraocr") || effective_model == Some("indra") {
+                let canonical = crate::model_manager::normalize_model_name(effective_model);
+                let orient_file = if canonical == "indraocr" {
                     "indra_orient.rten"
                 } else {
                     "ppocr_orient.rten"
