@@ -67,3 +67,34 @@ fn test_sample_images() {
     }
 }
 
+#[test]
+fn test_indra_inference_pipeline() {
+    let indra_dir = Path::new("../../models/indra");
+    let det_file = indra_dir.join("det.rten");
+    let rec_file = indra_dir.join("rec.rten");
+    let meta_file = indra_dir.join("meta.json");
+    if !det_file.exists() || !rec_file.exists() || !meta_file.exists() {
+        return;
+    }
+    let det_data = fs::read(&det_file).expect("read det.rten");
+    let rec_data = fs::read(&rec_file).expect("read rec.rten");
+    let meta_text = fs::read_to_string(&meta_file).expect("read meta.json");
+
+    let pipeline = RtenOcrPipeline::new(det_data, rec_data, &meta_text).expect("init indra pipeline");
+    let img_path = Path::new("../../models/test_images/idcard.jpg");
+    let img = image::open(img_path).expect("open idcard.jpg");
+    let (w, h) = img.dimensions();
+    let rgba = img.to_rgba8().into_raw();
+
+    let json_res = pipeline
+        .detect_and_recognize(&rgba, w, h, 0.4, 0.4, 1.8, false, None, None)
+        .expect("detect_and_recognize with indra");
+
+    println!("Indra pipeline recognized JSON:\n{}", json_res);
+    assert!(json_res.contains("UNITED KINGDOM"));
+    assert!(json_res.contains("PASSPORT") || json_res.contains("PASSEPORT"));
+    assert!(json_res.contains("882802433"));
+    assert!(json_res.contains("DOE") || json_res.contains("D O E"));
+    assert!(json_res.contains("JOHN"));
+}
+

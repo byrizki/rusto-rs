@@ -50,17 +50,9 @@ jobs:
           echo "Checking GitHub Releases for target tag: ${TARGET_TAG}..."
 
           FOUND_TAG=""
-          # Check exact target tag release
+          # Check exact target tag release matching the current version
           if gh release view "$TARGET_TAG" --json assets -q '.assets[].name' 2>/dev/null | grep -q -E '(rustors|rusto)-(web|wasm)'; then
             FOUND_TAG="$TARGET_TAG"
-          else
-            # Check recent published releases
-            for tag in $(gh release list --limit 10 --json tagName,isDraft,isPrerelease -q '.[] | select(.isDraft == false and .isPrerelease == false) | .tagName' 2>/dev/null); do
-              if gh release view "$tag" --json assets -q '.assets[].name' 2>/dev/null | grep -q -E '(rustors|rusto)-(web|wasm)'; then
-                FOUND_TAG="$tag"
-                break
-              fi
-            done
           fi
 
           if [ -n "$FOUND_TAG" ]; then
@@ -139,7 +131,7 @@ jobs:
           if [ "$RELEASE_TAG" = "build" ]; then
             echo "Building rten-wasm with wasm-pack on runner..."
             curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-            (cd .. && wasm-pack build crates/rten-wasm --target web --out-dir packages/web/src/wasm)
+            (cd .. && wasm-pack build crates/rten-wasm --target web --out-dir "$PWD/packages/web/src/wasm")
           elif [ "$RELEASE_TAG" = "run" ] && [ -n "$ARTIFACT_RUN_ID" ]; then
             echo "Downloading prebuilt WASM from workflow run ${ARTIFACT_RUN_ID}..."
             gh run download "$ARTIFACT_RUN_ID" -n rusto-wasm-package --dir /tmp/wasm-assets || true
