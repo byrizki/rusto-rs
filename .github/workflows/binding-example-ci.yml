@@ -155,13 +155,6 @@ jobs:
       - uses: actions/download-artifact@v4
         if: inputs.build-run-id != ''
         with:
-          name: rusto-android-model-aars
-          path: artifacts/rusto-android-model-aars
-          run-id: ${{ inputs.build-run-id }}
-          github-token: ${{ github.token }}
-      - uses: actions/download-artifact@v4
-        if: inputs.build-run-id != ''
-        with:
           name: rusto-react-native-package
           path: artifacts/rusto-react-native-package
           run-id: ${{ inputs.build-run-id }}
@@ -211,13 +204,13 @@ jobs:
           PY
       - name: Install consumer dependencies from current release NPM artifact
         run: yarn install --ignore-scripts --non-interactive
-      - name: Patch installed React Native package with release AARs
+      - name: Patch installed React Native package with release AAR
         run: |
           set -euo pipefail
           core="$(find "$GITHUB_WORKSPACE/artifacts/rusto-android-core-aar" -name '*.aar' -print -quit)"
-          model="$(find "$GITHUB_WORKSPACE/artifacts/rusto-android-model-aars/ppocrv6-tiny" -name '*.aar' -print -quit)"
+          test -n "$core"
           "$GITHUB_WORKSPACE/scripts/patch-rn-example-artifacts.sh" \
-            --platform android --app . --core "$core" --model "$model" --version "$(node -p "require('./node_modules/@rustors/react-native/package.json').version")"
+            --platform android --app . --core "$core" --version "$(node -p "require('./node_modules/@rustors/react-native/package.json').version")"
       - name: Assert artifact mode and autolinking
         run: |
           ! grep -Fq "include ':rusto-android'" android/settings.gradle
@@ -274,13 +267,6 @@ jobs:
         with:
           name: rusto-ios-core-xcframework
           path: artifacts/rusto-ios-core-xcframework
-          run-id: ${{ inputs.build-run-id }}
-          github-token: ${{ github.token }}
-      - uses: actions/download-artifact@v4
-        if: inputs.build-run-id != ''
-        with:
-          name: rusto-ios-model-resources
-          path: artifacts/rusto-ios-model-resources
           run-id: ${{ inputs.build-run-id }}
           github-token: ${{ github.token }}
       - uses: actions/download-artifact@v4
@@ -352,11 +338,11 @@ jobs:
         run: |
           set -euo pipefail
           core="$(find artifacts/rusto-ios-core-xcframework -name 'RustO.xcframework.zip' -print -quit)"
-          model="$(find artifacts/rusto-ios-model-resources/ppocrv6-tiny -name 'RustO-Models-PPOCRv6-Tiny.zip' -print -quit)"
+          test -n "$core"
           version="$(node -p "require('./examples/react-native-${{ matrix.app }}/node_modules/@rustors/react-native/package.json').version")"
           scripts/patch-rn-example-artifacts.sh \
             --platform ios --app "examples/react-native-${{ matrix.app }}" \
-            --core "$core" --model "$model" --model-pod RustO-Models-PPOCRv6-Tiny \
+            --core "$core" \
             --version "$version"
       - name: Install pods from current checkout
         working-directory: examples/react-native-${{ matrix.app }}/ios
@@ -409,35 +395,25 @@ jobs:
           path: artifacts/rusto-dotnet-core-nupkg
           run-id: ${{ inputs.build-run-id }}
           github-token: ${{ github.token }}
-      - uses: actions/download-artifact@v4
-        if: inputs.build-run-id != ''
-        with:
-          name: rusto-dotnet-model-nupkgs
-          path: artifacts/rusto-dotnet-model-nupkgs
-          run-id: ${{ inputs.build-run-id }}
-          github-token: ${{ github.token }}
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
           cache: true
           cache-dependency-path: examples/dotnet/**/*.csproj
-      - name: Restore core and model NuGet packages from local artifacts
+      - name: Restore core NuGet package from local artifacts
         run: |
           set -euo pipefail
           core="$(find artifacts/rusto-dotnet-core-nupkg -name 'RustODotnet.*.nupkg' -print -quit)"
-          model="$(find artifacts/rusto-dotnet-model-nupkgs/ppocrv6-tiny -name 'RustODotnet.Models.PPOCRv6.Tiny.*.nupkg' -print -quit)"
-          test -n "$core" && test -n "$model"
+          test -n "$core"
           version="$(basename "$core" | sed -E 's/^RustODotnet\.//; s/\.nupkg$//')"
           echo "RUSTO_ARTIFACT_VERSION=$version" >> "$GITHUB_ENV"
           # dotnet resolves relative --source paths from each project directory,
           # not repository root. Use physical absolute feeds.
           core_feed="$(pwd)/artifacts/rusto-dotnet-core-nupkg"
-          model_feed="$(pwd)/artifacts/rusto-dotnet-model-nupkgs"
-          test -d "$core_feed" && test -d "$model_feed"
+          test -d "$core_feed"
           dotnet restore examples/dotnet/RustODotnet.Example.sln \
             -p:RustOArtifactVersion="$version" \
             --source "$core_feed" \
-            --source "$model_feed" \
             --source https://api.nuget.org/v3/index.json
       - run: dotnet build examples/dotnet/RustODotnet.Example.sln --configuration Release --no-restore -p:RustOArtifactVersion="$RUSTO_ARTIFACT_VERSION"
       - run: dotnet test examples/dotnet/RustODotnet.Example.sln --configuration Release --no-build -p:RustOArtifactVersion="$RUSTO_ARTIFACT_VERSION"

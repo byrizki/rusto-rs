@@ -108,17 +108,19 @@ if (result is StructuredDetectTextResult structured) {
 ### 3. Web (WASM / Browser)
 
 ```bash
-npm install @rustors/web @rustors/model-ppocrv6-tiny
+npm install @rustors/web
 ```
 
 ```typescript
 import { initialize, detectText } from '@rustors/web';
-import { getModelUrls } from '@rustors/model-ppocrv6-tiny';
 
-const urls = getModelUrls('/models/ppocrv6-tiny');
 await initialize({
   preset: 'ppv6',
-  models: { detection: urls.detection, recognition: urls.recognition, dictionary: urls.dictionary },
+  models: {
+    detection: '/models/ppocrv6-tiny/det.rten',
+    recognition: '/models/ppocrv6-tiny/rec.rten',
+    dictionary: '/models/ppocrv6-tiny/dict.txt',
+  },
 });
 
 const results = await detectText(document.querySelector('img')!);
@@ -130,14 +132,17 @@ results.forEach((r) => console.log(`${r.text} (${r.score})`));
 ### 4. React
 
 ```bash
-npm install @rustors/react @rustors/web @rustors/model-ppocrv6-tiny
+npm install @rustors/react @rustors/web
 ```
 
 ```tsx
 import { RustoProvider, useOcr } from '@rustors/react';
-import { getModelUrls } from '@rustors/model-ppocrv6-tiny';
 
-const urls = getModelUrls('/models/ppocrv6-tiny');
+const models = {
+  detection: '/models/ppocrv6-tiny/det.rten',
+  recognition: '/models/ppocrv6-tiny/rec.rten',
+  dictionary: '/models/ppocrv6-tiny/dict.txt',
+};
 
 function OcrScanner() {
   const { detect, results, isProcessing } = useOcr();
@@ -153,7 +158,7 @@ function OcrScanner() {
 
 export function App() {
   return (
-    <RustoProvider config={{ preset: 'ppv6', models: urls }}>
+    <RustoProvider config={{ preset: 'ppv6', models }}>
       <OcrScanner />
     </RustoProvider>
   );
@@ -331,7 +336,7 @@ RustO! supports PP-OCRv6 (recognizing 50+ languages simultaneously with a unifie
 | **PP-OCRv6 Medium** | ~134 MB | **~75.7 MB** | Server-grade accuracy workloads |
 | **PP-OCRv5 / v4** | ~23–28 MB (Mobile) | — | Legacy pipelines & single-language packs |
 
-Prepackaged models are available on [npm](https://www.npmjs.com/search?q=%40rustors%2Fmodel-ppocrv6) (`@rustors/model-ppocrv6-*`) and [NuGet](https://www.nuget.org/packages?q=RustODotnet.Models.PPOCRv6) (`RustODotnet.Models.PPOCRv6.*`).
+Pre-converted RTen models are distributed as standalone release assets on [GitHub Releases](https://github.com/byrizki/rusto-rs/releases) and downloaded automatically on first run by the CLI and native SDKs.
 
 👉 **[View Complete Multilingual OCR Guide & Model Matrix](https://byrizki.com/rusto-rs/en/advance-guide/multilingual-ocr)**
 

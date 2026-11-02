@@ -85,7 +85,6 @@ export function getModelCandidateUrls(
   const asset = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['ppocrv6-tiny']!;
   const cleanBase = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
   const isIndra = modelId === 'indraocr' || modelId === 'indra';
-  const pkg = isIndra ? '@rustors/model-indra' : `@rustors/model-${modelId}`;
   const dictFile = isIndra ? 'meta.json' : 'dict.txt';
 
   return {
@@ -93,39 +92,33 @@ export function getModelCandidateUrls(
       `${cleanBase}/models/${modelId}/det.rten`,
       `${cleanBase}/models/${asset.detection}`,
       `${GITHUB_RELEASE_BASE}/${tag}/${asset.detection}`,
-      `${JSDELIVR_CDN_BASE}/${pkg}/models/det.rten`,
     ],
     recognition: [
       `${cleanBase}/models/${modelId}/rec.rten`,
       `${cleanBase}/models/${asset.recognition}`,
       `${GITHUB_RELEASE_BASE}/${tag}/${asset.recognition}`,
-      `${JSDELIVR_CDN_BASE}/${pkg}/models/rec.rten`,
     ],
     dictionary: [
       `${cleanBase}/models/${modelId}/${dictFile}`,
       `${cleanBase}/models/${asset.dictionary}`,
       `${GITHUB_RELEASE_BASE}/${tag}/${asset.dictionary}`,
-      `${JSDELIVR_CDN_BASE}/${pkg}/models/${dictFile}`,
     ],
   };
 }
 
 export function getModelCdnUrls(
   modelId: string,
-  cdnBase: string = JSDELIVR_CDN_BASE
+  tag: string = DEFAULT_MODELS_TAG
 ): {
   detection: string;
   recognition: string;
   dictionary: string;
 } {
-  const isIndra = modelId === 'indraocr' || modelId === 'indra';
-  const pkg = isIndra ? '@rustors/model-indra' : `@rustors/model-${modelId}`;
-  const base = cdnBase.endsWith('/') ? cdnBase.slice(0, -1) : cdnBase;
-  const dictFile = isIndra ? 'meta.json' : 'dict.txt';
+  const asset = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['ppocrv6-tiny']!;
   return {
-    detection: `${base}/${pkg}/models/det.rten`,
-    recognition: `${base}/${pkg}/models/rec.rten`,
-    dictionary: `${base}/${pkg}/models/${dictFile}`,
+    detection: `${GITHUB_RELEASE_BASE}/${tag}/${asset.detection}`,
+    recognition: `${GITHUB_RELEASE_BASE}/${tag}/${asset.recognition}`,
+    dictionary: `${GITHUB_RELEASE_BASE}/${tag}/${asset.dictionary}`,
   };
 }
 

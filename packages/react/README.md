@@ -32,20 +32,19 @@ pnpm add @rustors/react @rustors/web
 ```tsx
 import React from 'react';
 import { RustoProvider } from '@rustors/react';
-import { getModelUrls } from '@rustors/model-ppocrv6-tiny';
 
-const modelUrls = getModelUrls('/models/ppocrv6-tiny');
+const models = {
+  detection: '/models/ppocrv6-tiny/det.rten',
+  recognition: '/models/ppocrv6-tiny/rec.rten',
+  dictionary: '/models/ppocrv6-tiny/dict.txt',
+};
 
 export function App() {
   return (
     <RustoProvider
       config={{
         preset: 'ppv6',
-        models: {
-          detection: modelUrls.detection,
-          recognition: modelUrls.recognition,
-          dictionary: modelUrls.dictionary,
-        },
+        models,
       }}
     >
       <OcrScanner />

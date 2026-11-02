@@ -30,55 +30,70 @@ mkdir -p "$output"
 
 case "$platform" in
   android)
-    if has rusto-android-core-aar && has rusto-android-model-aars; then
+    if has rusto-android-core-aar; then
       download rusto-android-core-aar "$output/rusto-android-core-aar"
-      download rusto-android-model-aars "$output/rusto-android-model-aars"
+      if has rusto-android-model-aars; then
+        download rusto-android-model-aars "$output/rusto-android-model-aars"
+      fi
     elif has rusto-android-aar; then
       echo "::warning::Build run uses legacy aggregate rusto-android-aar; normalizing it to split layout."
       legacy="$output/.legacy-android"
       download rusto-android-aar "$legacy"
       core="$(find "$legacy" -type f -name 'rusto-android-*.aar' ! -name 'rusto-models-*.aar' -print -quit)"
-      model="$(find "$legacy" -type f -name 'rusto-models-ppocrv6-tiny-*.aar' -print -quit)"
-      [[ -n "$core" && -n "$model" ]] || { echo "legacy Android artifact lacks required core or ppocrv6-tiny AAR" >&2; exit 1; }
-      mkdir -p "$output/rusto-android-core-aar" "$output/rusto-android-model-aars/ppocrv6-tiny"
+      [[ -n "$core" ]] || { echo "legacy Android artifact lacks required core AAR" >&2; exit 1; }
+      mkdir -p "$output/rusto-android-core-aar"
       cp "$core" "$output/rusto-android-core-aar/"
-      cp "$model" "$output/rusto-android-model-aars/ppocrv6-tiny/"
+      model="$(find "$legacy" -type f -name 'rusto-models-ppocrv6-tiny-*.aar' -print -quit)"
+      if [[ -n "$model" ]]; then
+        mkdir -p "$output/rusto-android-model-aars/ppocrv6-tiny"
+        cp "$model" "$output/rusto-android-model-aars/ppocrv6-tiny/"
+      fi
     else
       echo "Build run $run_id has neither split nor legacy Android artifact." >&2; exit 1
     fi
     ;;
   ios)
-    if has rusto-ios-core-xcframework && has rusto-ios-model-resources; then
+    if has rusto-ios-core-xcframework; then
       download rusto-ios-core-xcframework "$output/rusto-ios-core-xcframework"
-      download rusto-ios-model-resources "$output/rusto-ios-model-resources"
+      if has rusto-ios-model-resources; then
+        download rusto-ios-model-resources "$output/rusto-ios-model-resources"
+      fi
     elif has rusto-ios-xcframework; then
       echo "::warning::Build run uses legacy aggregate rusto-ios-xcframework; normalizing it to split layout."
       legacy="$output/.legacy-ios"
       download rusto-ios-xcframework "$legacy"
       core="$(find "$legacy" -type f -name 'RustO.xcframework.zip' -print -quit)"
-      model="$(find "$legacy" -type f -name 'RustO-Models-PPOCRv6-Tiny.zip' -print -quit)"
-      [[ -n "$core" && -n "$model" ]] || { echo "legacy iOS artifact lacks required core or PP-OCRv6 Tiny bundle" >&2; exit 1; }
-      mkdir -p "$output/rusto-ios-core-xcframework" "$output/rusto-ios-model-resources/ppocrv6-tiny"
+      [[ -n "$core" ]] || { echo "legacy iOS artifact lacks required core bundle" >&2; exit 1; }
+      mkdir -p "$output/rusto-ios-core-xcframework"
       cp "$core" "$output/rusto-ios-core-xcframework/"
-      cp "$model" "$output/rusto-ios-model-resources/ppocrv6-tiny/"
+      model="$(find "$legacy" -type f -name 'RustO-Models-PPOCRv6-Tiny.zip' -print -quit)"
+      if [[ -n "$model" ]]; then
+        mkdir -p "$output/rusto-ios-model-resources/ppocrv6-tiny"
+        cp "$model" "$output/rusto-ios-model-resources/ppocrv6-tiny/"
+      fi
     else
       echo "Build run $run_id has neither split nor legacy iOS artifact." >&2; exit 1
     fi
     ;;
   dotnet)
-    if has rusto-dotnet-core-nupkg && has rusto-dotnet-model-nupkgs; then
+    if has rusto-dotnet-core-nupkg; then
       download rusto-dotnet-core-nupkg "$output/rusto-dotnet-core-nupkg"
-      download rusto-dotnet-model-nupkgs "$output/rusto-dotnet-model-nupkgs"
+      if has rusto-dotnet-model-nupkgs; then
+        download rusto-dotnet-model-nupkgs "$output/rusto-dotnet-model-nupkgs"
+      fi
     elif has rusto-dotnet-nupkg; then
       echo "::warning::Build run uses legacy aggregate rusto-dotnet-nupkg; normalizing it to split layout."
       legacy="$output/.legacy-dotnet"
       download rusto-dotnet-nupkg "$legacy"
       core="$(find "$legacy" -type f -name 'RustODotnet.[0-9]*.nupkg' -print -quit)"
-      model="$(find "$legacy" -type f -name 'RustODotnet.Models.PPOCRv6.Tiny.*.nupkg' -print -quit)"
-      [[ -n "$core" && -n "$model" ]] || { echo "legacy .NET artifact lacks required core or PP-OCRv6 Tiny package" >&2; exit 1; }
-      mkdir -p "$output/rusto-dotnet-core-nupkg" "$output/rusto-dotnet-model-nupkgs/ppocrv6-tiny"
+      [[ -n "$core" ]] || { echo "legacy .NET artifact lacks required core package" >&2; exit 1; }
+      mkdir -p "$output/rusto-dotnet-core-nupkg"
       cp "$core" "$output/rusto-dotnet-core-nupkg/"
-      cp "$model" "$output/rusto-dotnet-model-nupkgs/ppocrv6-tiny/"
+      model="$(find "$legacy" -type f -name 'RustODotnet.Models.PPOCRv6.Tiny.*.nupkg' -print -quit)"
+      if [[ -n "$model" ]]; then
+        mkdir -p "$output/rusto-dotnet-model-nupkgs/ppocrv6-tiny"
+        cp "$model" "$output/rusto-dotnet-model-nupkgs/ppocrv6-tiny/"
+      fi
     else
       echo "Build run $run_id has neither split nor legacy .NET artifact." >&2; exit 1
     fi

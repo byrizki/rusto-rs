@@ -95,7 +95,7 @@ using var ocr = RustO.Initialize(InitializeConfig.Ppv6(
 | `Recognition.DictPath` | `string` | Dictionary; default logical name `dict.txt`. |
 | `Classification` / `Orientation` | optional config | Optional auxiliary model paths. Enable respective request option to use. |
 
-Model resolution checks model-package content and common application/model paths. For custom resources, pass explicit paths. Core and model NuGet package versions must match.
+Model resolution checks common application/model paths and automatically downloads missing models if enabled in native runtime options. For custom resources or offline environments, pass explicit paths.
 
 ## Request-local options
 

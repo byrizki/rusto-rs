@@ -22,26 +22,29 @@ while (($#)); do
     *) usage ;;
   esac
 done
-[[ -n "$platform" && -n "$app" && -n "$core" && -n "$model" && -n "$version" ]] || usage
+[[ -n "$platform" && -n "$app" && -n "$core" && -n "$version" ]] || usage
 rn_pkg_dir="$app/node_modules/@rustors/react-native"
 [[ -d "$rn_pkg_dir" ]] || { echo "@rustors/react-native is not installed: $app" >&2; exit 1; }
-[[ -s "$core" && -s "$model" ]] || { echo "missing staged release artifact" >&2; exit 1; }
+[[ -s "$core" ]] || { echo "missing staged core release artifact" >&2; exit 1; }
 
 case "$platform" in
   android)
-    [[ "$core" == *.aar && "$model" == *.aar ]] || { echo "Android requires .aar artifacts" >&2; exit 1; }
+    [[ "$core" == *.aar ]] || { echo "Android requires .aar core artifact" >&2; exit 1; }
     libs="$rn_pkg_dir/android/libs"
     rm -rf "$libs"
     mkdir -p "$libs"
-    cp "$core" "$model" "$libs/"
-    test "$(find "$libs" -maxdepth 1 -name '*.aar' | wc -l | tr -d ' ')" = 2
+    cp "$core" "$libs/"
+    if [[ -n "$model" && -s "$model" ]]; then
+      cp "$model" "$libs/"
+    fi
+    test "$(find "$libs" -maxdepth 1 -name '*.aar' | wc -l | tr -d ' ')" -ge 1
     # Artifact mode must win before bridge's JitPack fallback.
     grep -Fq 'else if (hasLocalAar)' "$rn_pkg_dir/android/build.gradle"
     ! grep -Fq "include ':rusto-android'" "$app/android/settings.gradle"
     ;;
   ios)
-    [[ "$core" == *.zip && "$model" == *.zip && -n "$model_pod" ]] || {
-      echo "iOS requires core/model .zip plus --model-pod" >&2; exit 1;
+    [[ "$core" == *.zip ]] || {
+      echo "iOS requires core .zip" >&2; exit 1;
     }
     core_pod="${RUSTO_IOS_CORE_POD_DIR:-packages/ios}"
     test -f "$core_pod/RustO.podspec"
@@ -66,18 +69,17 @@ case "$platform" in
       done
     done
 
-    model_dir="$app/ios/.rusto-artifacts/$model_pod"
-    rm -rf "$model_dir"
-    mkdir -p "$model_dir"
-    model_dir="$(cd "$model_dir" && pwd)"
-    unzip -q "$model" -d "$model_dir"
-    cp "$core_pod/models/$model_pod.podspec" "$model_dir/$model_pod.podspec"
-    python3 - "$version" "$core_pod/RustO.podspec" "$model_dir/$model_pod.podspec" <<'PY'
+    if [[ -n "$model" && -s "$model" && -n "$model_pod" ]]; then
+      model_dir="$app/ios/.rusto-artifacts/$model_pod"
+      rm -rf "$model_dir"
+      mkdir -p "$model_dir"
+      model_dir="$(cd "$model_dir" && pwd)"
+      unzip -q "$model" -d "$model_dir"
+      if [[ -f "$core_pod/models/$model_pod.podspec" ]]; then
+        cp "$core_pod/models/$model_pod.podspec" "$model_dir/$model_pod.podspec"
+        python3 - "$version" "$core_pod/RustO.podspec" "$model_dir/$model_pod.podspec" <<'PY'
 import re, sys
 version, *paths = sys.argv[1:]
-# Podspec aligns fields with spaces (`s.version          =`), so whitespace
-# must be accepted between `version` and `=`. Restrict replacement to first
-# assignment; source URLs using `s.version` stay unchanged.
 pattern = re.compile(r"(s\.version\s*=\s*)['\"][^'\"]+['\"]")
 for path in paths:
     text = open(path).read()
@@ -86,9 +88,9 @@ for path in paths:
         raise SystemExit(f"no version declaration in {path}")
     open(path, 'w').write(changed)
 PY
-    podfile="$app/ios/Podfile"
-    marker="# RustO CI artifact model override"
-    python3 - "$podfile" "$marker" "$model_pod" "$model_dir" <<'PY'
+        podfile="$app/ios/Podfile"
+        marker="# RustO CI artifact model override"
+        python3 - "$podfile" "$marker" "$model_pod" "$model_dir" <<'PY'
 import sys
 path, marker, pod, directory = sys.argv[1:]
 text = open(path).read()
@@ -100,7 +102,9 @@ if needle not in text:
 text = text.replace(needle, needle + f"  {marker}\n" + line + "\n", 1)
 open(path, 'w').write(text)
 PY
-    grep -Fq "pod '$model_pod', :path => '$model_dir'" "$podfile"
+        grep -Fq "pod '$model_pod', :path => '$model_dir'" "$podfile"
+      fi
+    fi
 
     # Old packed npm artifacts used `s.pod_target_xcconfig` as both writer and
     # reader. Current CocoaPods only exposes writer. Patch only disposable

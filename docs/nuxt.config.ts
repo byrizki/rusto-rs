@@ -5,9 +5,6 @@ const baseURL = process.env.NUXT_APP_BASE_URL || '/rusto-rs/';
 export default defineNuxtConfig({
   alias: {
     '@rustors/web': fileURLToPath(new URL('../packages/web/src/index.ts', import.meta.url)),
-    '@rustors/model-ppocrv6-tiny': fileURLToPath(
-      new URL('../packages/models/ppocrv6-tiny/src/index.ts', import.meta.url)
-    ),
   },
   modules: ['@nuxtjs/i18n'],
   site: {

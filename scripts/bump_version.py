@@ -852,6 +852,15 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
                 dry_run,
                 staged_files
             )
+        dotnet_props = examples_dotnet_dir / "Directory.Build.props"
+        if dotnet_props.exists():
+            replace_in_file(
+                dotnet_props,
+                r'(<RustOArtifactVersion Condition="\'\$\(RustOArtifactVersion\)\' == \'\'">)[^<]+(</RustOArtifactVersion>)',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files
+            )
     
     # 16. README.md & packages/react-native/README.md
     readme_file = REPO_ROOT / "README.md"
@@ -1021,6 +1030,14 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
 
     return staged_files
 
+def _update_docs_model_links(new_ver: str, dry_run: bool, staged_files: Set[Path]) -> None:
+    docs_content = REPO_ROOT / "docs" / "content"
+    if not docs_content.exists():
+        return
+    pattern = r'(https://github\.com/byrizki/rusto-rs/releases/download/models-rten-v)[0-9A-Za-z.-]+(/)'
+    for doc_file in docs_content.rglob("*.md"):
+        replace_in_file(doc_file, pattern, rf'\g<1>{new_ver}\g<2>', dry_run, staged_files, warn_if_not_found=False)
+
 def update_models_files(new_ver: str, current_ver: str = "", dry_run: bool = False) -> Set[Path]:
     print(f"\nUpdating OCR models version to '{new_ver}' across repository files...")
     staged_files: Set[Path] = set()
@@ -1033,201 +1050,35 @@ def update_models_files(new_ver: str, current_ver: str = "", dry_run: bool = Fal
         staged_files.add(models_ver_file)
     print(f"  [OK] Updated MODELS_VERSION to {new_ver}")
 
-    # 2. packages/android/gradle.properties (MODELS_VERSION_NAME)
+    # 2. src/model_manager.rs (DEFAULT_MODELS_TAG)
     replace_in_file(
-        REPO_ROOT / "packages" / "android" / "gradle.properties",
-        r'(?m)^(MODELS_VERSION_NAME\s*=\s*).*',
-        rf'\g<1>{new_ver}',
+        REPO_ROOT / "src" / "model_manager.rs",
+        r'(pub const DEFAULT_MODELS_TAG:\s*&str\s*=\s*"models-rten-v)[^"]+(";)',
+        rf'\g<1>{new_ver}\g<2>',
         dry_run,
         staged_files
     )
 
-    # 3. packages/android/models/**/build.gradle (all 20+ model submodules)
-    android_models_dir = REPO_ROOT / "packages" / "android" / "models"
-    if android_models_dir.exists():
-        for bg_file in android_models_dir.rglob("build.gradle"):
-            replace_in_file(
-                bg_file,
-                r'(versionName\s+")[^"]+(")',
-                rf'\g<1>{new_ver}\g<2>',
-                dry_run,
-                staged_files
-            )
-            replace_in_file(
-                bg_file,
-                r"(coordinates\('[^']+',\s*'[^']+',\s*')[^']+(\'\))",
-                rf"\g<1>{new_ver}\g<2>",
-                dry_run,
-                staged_files
-            )
+    # 3. docs/scripts/download-models.sh (MODELS_TAG)
+    replace_in_file(
+        REPO_ROOT / "docs" / "scripts" / "download-models.sh",
+        r'(MODELS_TAG="\$\{MODELS_TAG:-models-rten-v)[^"}]+(\}")',
+        rf'\g<1>{new_ver}\g<2>',
+        dry_run,
+        staged_files
+    )
 
-    # 4. packages/ios/models/*.podspec (all 20+ model podspecs)
-    ios_models_dir = REPO_ROOT / "packages" / "ios" / "models"
-    if ios_models_dir.exists():
-        for podspec_file in ios_models_dir.glob("*.podspec"):
-            replace_in_file(
-                podspec_file,
-                r'(s\.version\s*=\s*\')[^\']+(\')',
-                rf'\g<1>{new_ver}\g<2>',
-                dry_run,
-                staged_files
-            )
+    # 4. docs/utils/ocrReleaseModels.ts (DEFAULT_MODELS_TAG)
+    replace_in_file(
+        REPO_ROOT / "docs" / "utils" / "ocrReleaseModels.ts",
+        r"(export const DEFAULT_MODELS_TAG\s*=\s*'models-rten-v)[^']+(\';)",
+        rf"\g<1>{new_ver}\g<2>",
+        dry_run,
+        staged_files
+    )
 
-    # 5. packages/dotnet/models/**/*.csproj (all 20+ model projects)
-    dotnet_models_dir = REPO_ROOT / "packages" / "dotnet" / "models"
-    if dotnet_models_dir.exists():
-        for csproj_file in dotnet_models_dir.rglob("*.csproj"):
-            replace_in_file(
-                csproj_file,
-                r'(<Version>)[^<]+(</Version>)',
-                rf'\g<1>{new_ver}\g<2>',
-                dry_run,
-                staged_files
-            )
-
-    # 6. examples/dotnet/Directory.Build.props (RustOArtifactVersion fallback for models)
-    dotnet_props = REPO_ROOT / "examples" / "dotnet" / "Directory.Build.props"
-    if dotnet_props.exists():
-        replace_in_file(
-            dotnet_props,
-            r'(<RustOArtifactVersion Condition="\'\$\(RustOArtifactVersion\)\' == \'\'">)[^<]+(</RustOArtifactVersion>)',
-            rf'\g<1>{new_ver}\g<2>',
-            dry_run,
-            staged_files
-        )
-
-    # 7. packages/models/**/package.json & README.md (all npm model packages)
-    packages_models_dir = REPO_ROOT / "packages" / "models"
-    if packages_models_dir.exists():
-        for package_json_file in packages_models_dir.rglob("package.json"):
-            if "node_modules" in package_json_file.parts:
-                continue
-            update_json_file(package_json_file, new_ver, dry_run, staged_files)
-        for model_readme in packages_models_dir.rglob("README.md"):
-            if "node_modules" in model_readme.parts:
-                continue
-            replace_in_file(
-                model_readme,
-                r'(- \*\*Version:\*\*\s*`)[^`]+(`)',
-                rf'\g<1>{new_ver}\g<2>',
-                dry_run,
-                staged_files
-            )
-
-    # 8. scripts/generate_npm_models.py (fallback return)
-    if (REPO_ROOT / "scripts" / "generate_npm_models.py").exists():
-        replace_in_file(
-            REPO_ROOT / "scripts" / "generate_npm_models.py",
-            r'(return\s+")[0-9A-Za-z.-]+(")',
-            rf'\g<1>{new_ver}\g<2>',
-            dry_run,
-            staged_files
-        )
-
-    # 9. packages/react-native/README.md (model dependency example)
-    rn_readme = REPO_ROOT / "packages" / "react-native" / "README.md"
-    if rn_readme.exists():
-        replace_in_file(
-            rn_readme,
-            r'(com\.github\.byrizki\.rusto-rs:rusto-models-[^:]+:v?)[0-9A-Za-z.-]+',
-            rf'\g<1>{new_ver}',
-            dry_run,
-            staged_files,
-            warn_if_not_found=False
-        )
-
-    # 10. Documentation guides for models
-    docs_dir = REPO_ROOT / "docs"
-    if docs_dir.exists():
-        # Installation docs (2.installation.md)
-        for doc_file in docs_dir.rglob("2.installation.md"):
-            replace_in_file(
-                doc_file,
-                r'(com\.github\.byrizki\.rusto-rs:rusto-models-[^:]+:v?)[0-9A-Za-z.-]+',
-                rf'\g<1>{new_ver}',
-                dry_run,
-                staged_files,
-                warn_if_not_found=False
-            )
-
-        # React Native docs (02.use-react-native.md)
-        for doc_file in docs_dir.rglob("*02.use-react-native.md"):
-            replace_in_file(
-                doc_file,
-                r'(pod\s+\'RustO-Models-[^\']+\',\s*\'~>\s*)[0-9A-Za-z.-]+(\')',
-                rf'\g<1>{new_ver}\g<2>',
-                dry_run,
-                staged_files,
-                warn_if_not_found=False
-            )
-            replace_in_file(
-                doc_file,
-                r'(com\.github\.byrizki\.rusto-rs:rusto-models-[^:]+:v?)[0-9A-Za-z.-]+',
-                rf'\g<1>{new_ver}',
-                dry_run,
-                staged_files,
-                warn_if_not_found=False
-            )
-
-        # iOS Swift docs (03.use-ios-swift.md)
-        for doc_file in docs_dir.rglob("*03.use-ios-swift.md"):
-            replace_in_file(
-                doc_file,
-                r'(pod\s+\'RustO-Models-[^\']+\',\s*\'~>\s*)[0-9A-Za-z.-]+(\')',
-                rf'\g<1>{new_ver}\g<2>',
-                dry_run,
-                staged_files,
-                warn_if_not_found=False
-            )
-
-        # Android docs (04.use-android-kotlin.md)
-        for doc_file in docs_dir.rglob("*04.use-android-kotlin.md"):
-            replace_in_file(
-                doc_file,
-                r'(com\.github\.byrizki\.rusto-rs:rusto-models-[^:]+:v?)[0-9A-Za-z.-]+',
-                rf'\g<1>{new_ver}',
-                dry_run,
-                staged_files,
-                warn_if_not_found=False
-            )
-
-        # Models & Tiers docs (01.models-and-tiers.md)
-        for doc_file in docs_dir.rglob("*01.models-and-tiers.md"):
-            replace_in_file(
-                doc_file,
-                r'(pod\s+\'RustO-Models-[^\']+\',\s*\'~>\s*)[0-9A-Za-z.-]+(\')',
-                rf'\g<1>{new_ver}\g<2>',
-                dry_run,
-                staged_files,
-                warn_if_not_found=False
-            )
-            replace_in_file(
-                doc_file,
-                r'(com\.github\.byrizki\.rusto-rs:rusto-models-[^:]+:v?)[0-9A-Za-z.-]+',
-                rf'\g<1>{new_ver}',
-                dry_run,
-                staged_files,
-                warn_if_not_found=False
-            )
-            replace_in_file(
-                doc_file,
-                r'(https://github\.com/byrizki/rusto-rs/releases/download/models-rten-v)[0-9A-Za-z.-]+(/)',
-                rf'\g<1>{new_ver}\g<2>',
-                dry_run,
-                staged_files,
-                warn_if_not_found=False
-            )
-
-        # Multilingual OCR docs (02.multilingual-ocr.md)
-        for doc_file in docs_dir.rglob("*02.multilingual-ocr.md"):
-            replace_in_file(
-                doc_file,
-                r'(https://github\.com/byrizki/rusto-rs/releases/download/models-rten-v)[0-9A-Za-z.-]+(/)',
-                rf'\g<1>{new_ver}\g<2>',
-                dry_run,
-                staged_files,
-                warn_if_not_found=False
-            )
+    # 5. Documentation guides for standalone release assets
+    _update_docs_model_links(new_ver, dry_run, staged_files)
 
     return staged_files
 

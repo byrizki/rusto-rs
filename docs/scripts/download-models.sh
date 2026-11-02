@@ -8,7 +8,6 @@ TARGET_DIR="${1:-$DOCS_DIR/public/models}"
 
 MODELS_TAG="${MODELS_TAG:-models-rten-v0.3.2}"
 RELEASE_BASE="https://github.com/byrizki/rusto-rs/releases/download/$MODELS_TAG"
-CDN_BASE="https://cdn.jsdelivr.net/npm"
 
 mkdir -p "$TARGET_DIR"
 
@@ -31,8 +30,7 @@ echo "=== Indexing and Downloading Models from GitHub Release ($MODELS_TAG) ==="
 download_file() {
   local target="$1"
   local release_file="$2"
-  local cdn_url="$3"
-  local local_cand="$4"
+  local local_cand="$3"
 
   if [ -s "$target" ]; then
     return 0
@@ -48,11 +46,7 @@ download_file() {
   if curl -sSLf "$RELEASE_BASE/$release_file" -o "$target" 2>/dev/null; then
     return 0
   fi
-
-  if [ -n "$cdn_url" ]; then
-    echo "  ⚠️ GitHub Release download failed; falling back to CDN: $cdn_url"
-    curl -sSLf "$cdn_url" -o "$target" 2>/dev/null || true
-  fi
+  echo "  ⚠️ GitHub Release download failed for $release_file"
 }
 
 for model in "${!MODEL_FILES[@]}"; do
@@ -60,13 +54,13 @@ for model in "${!MODEL_FILES[@]}"; do
   read -r det_file rec_file dict_file <<< "${MODEL_FILES[$model]}"
 
   if [ "$model" = "indraocr" ]; then
-    download_file "$TARGET_DIR/$model/det.rten" "$det_file" "$CDN_BASE/@rustors/model-indra/models/det.rten" "$REPO_ROOT/packages/models/indra/models/det.rten"
-    download_file "$TARGET_DIR/$model/rec.rten" "$rec_file" "$CDN_BASE/@rustors/model-indra/models/rec.rten" "$REPO_ROOT/packages/models/indra/models/rec.rten"
-    download_file "$TARGET_DIR/$model/meta.json" "$dict_file" "$CDN_BASE/@rustors/model-indra/models/meta.json" "$REPO_ROOT/packages/models/indra/models/meta.json"
+    download_file "$TARGET_DIR/$model/det.rten" "$det_file" "$REPO_ROOT/models/indra/det.rten"
+    download_file "$TARGET_DIR/$model/rec.rten" "$rec_file" "$REPO_ROOT/models/indra/rec.rten"
+    download_file "$TARGET_DIR/$model/meta.json" "$dict_file" "$REPO_ROOT/models/indra/meta.json"
   else
-    download_file "$TARGET_DIR/$model/det.rten" "$det_file" "$CDN_BASE/@rustors/model-$model/models/det.rten" "$REPO_ROOT/models/PPOCR_${model//-/_}/det.rten"
-    download_file "$TARGET_DIR/$model/rec.rten" "$rec_file" "$CDN_BASE/@rustors/model-$model/models/rec.rten" "$REPO_ROOT/models/PPOCR_${model//-/_}/rec.rten"
-    download_file "$TARGET_DIR/$model/dict.txt" "$dict_file" "$CDN_BASE/@rustors/model-$model/models/dict.txt" "$REPO_ROOT/models/PPOCR_${model//-/_}/dict.txt"
+    download_file "$TARGET_DIR/$model/det.rten" "$det_file" "$REPO_ROOT/models/PPOCR_${model//-/_}/det.rten"
+    download_file "$TARGET_DIR/$model/rec.rten" "$rec_file" "$REPO_ROOT/models/PPOCR_${model//-/_}/rec.rten"
+    download_file "$TARGET_DIR/$model/dict.txt" "$dict_file" "$REPO_ROOT/models/PPOCR_${model//-/_}/dict.txt"
   fi
 done
 

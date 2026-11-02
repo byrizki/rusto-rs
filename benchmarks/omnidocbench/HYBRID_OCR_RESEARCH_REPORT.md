@@ -158,7 +158,7 @@ Based on these findings, we recommend three actionable integration paths for Rus
    - Run standard PP-OCR Tiny detection and recognition, construct the 14-dim feature tensor in Rust, and execute `order.rten` in RTen.
    - Elevates pure Rust PP-OCR from ~51% (with PP-Structure) to **62.5% document accuracy** at a fraction of the compute and memory.
 2. **Dual Model Packaging: Ship Indra OCR as a Self-Contained Profile**
-   - We have already compiled and packaged all Indra models into native RTen format (`det.rten`, `orient.rten`, `rec.rten`, `rec_cjk.rten`, `order.rten`) across Android (`rusto-models-indra`) and .NET (`RustODotnet.Models.Indra`).
+   - We have already compiled and packaged all Indra models into native RTen format (`det.rten`, `orient.rten`, `rec.rten`, `rec_cjk.rten`, `order.rten`) as standalone `.rten` assets.
    - Offers sub-500 ms latency and 63.8% accuracy in a tiny 8.6 MB footprint.
 3. **Pluggable Hybrid Pipeline Architecture**
    - Allow users to configure pipeline stages independently:

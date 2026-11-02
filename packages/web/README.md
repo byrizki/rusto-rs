@@ -30,17 +30,14 @@ pnpm add @rustors/web
 
 ```ts
 import { initialize, detectText } from '@rustors/web';
-import { getModelUrls } from '@rustors/model-ppocrv6-tiny';
 
-// 1. Initialize with pre-trained models
-const urls = getModelUrls('/models/ppocrv6-tiny');
-
+// 1. Initialize with model asset paths or URLs
 await initialize({
   preset: 'ppv6',
   models: {
-    detection: urls.detection,
-    recognition: urls.recognition,
-    dictionary: urls.dictionary,
+    detection: '/models/ppocrv6-tiny/det.rten',
+    recognition: '/models/ppocrv6-tiny/rec.rten',
+    dictionary: '/models/ppocrv6-tiny/dict.txt',
   },
 });
 
