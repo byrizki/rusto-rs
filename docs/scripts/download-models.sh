@@ -6,7 +6,7 @@ DOCS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$DOCS_DIR/.." && pwd)"
 TARGET_DIR="${1:-$DOCS_DIR/public/models}"
 
-MODELS_TAG="${MODELS_TAG:-models-rten-v0.3.2}"
+MODELS_TAG="${MODELS_TAG:-models-rten-v0.4.0}"
 RELEASE_BASE="https://github.com/byrizki/rusto-rs/releases/download/$MODELS_TAG"
 
 mkdir -p "$TARGET_DIR"

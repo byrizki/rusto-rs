@@ -21,6 +21,16 @@ on:
         type: boolean
         required: false
         default: true
+      draft:
+        description: 'Create draft release'
+        type: boolean
+        required: false
+        default: false
+      prerelease:
+        description: 'Create prerelease'
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   build-and-package-models:
@@ -208,9 +218,10 @@ jobs:
         with:
           tag_name: ${{ needs.build-and-package-models.outputs.tag }}
           name: RustO! OCR Models ${{ needs.build-and-package-models.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           files: model-releases/*
-          draft: false
-          prerelease: false
+          draft: ${{ inputs.draft || false }}
+          prerelease: ${{ inputs.prerelease || contains(needs.build-and-package-models.outputs.tag, '-') }}
           generate_release_notes: true
           body: |
             ## RustO! Pre-trained OCR Models ${{ needs.build-and-package-models.outputs.tag }}

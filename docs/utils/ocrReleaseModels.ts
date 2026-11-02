@@ -10,7 +10,7 @@ export interface ReleaseAssetInfo {
   browser_download_url: string;
 }
 
-export const DEFAULT_MODELS_TAG = 'models-rten-v0.3.2';
+export const DEFAULT_MODELS_TAG = 'models-rten-v0.4.0';
 export const GITHUB_RELEASE_BASE = 'https://github.com/byrizki/rusto-rs/releases/download';
 export const GITHUB_API_BASE = 'https://api.github.com/repos/byrizki/rusto-rs';
 export const JSDELIVR_CDN_BASE = 'https://cdn.jsdelivr.net/npm';
@@ -129,8 +129,27 @@ export async function fetchGitHubReleaseModelIndex(
     const res = await fetch(`${GITHUB_API_BASE}/releases/tags/${tag}`);
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data.assets)) {
+      if (Array.isArray(data.assets) && data.assets.length > 0) {
         return data.assets.map(
+          (a: { name: string; size: number; browser_download_url: string }) => ({
+            name: a.name,
+            size: a.size,
+            browser_download_url: a.browser_download_url,
+          })
+        );
+      }
+    }
+
+    // Fallback: if tag is unreleased (404), query recent releases for published models
+    const releasesRes = await fetch(`${GITHUB_API_BASE}/releases?per_page=10`);
+    if (releasesRes.ok) {
+      const releases = await releasesRes.json();
+      const modelRelease = releases.find(
+        (r: { tag_name: string; assets: unknown[] }) =>
+          r.tag_name?.startsWith('models-rten-v') && Array.isArray(r.assets) && r.assets.length > 0
+      );
+      if (modelRelease && Array.isArray(modelRelease.assets)) {
+        return modelRelease.assets.map(
           (a: { name: string; size: number; browser_download_url: string }) => ({
             name: a.name,
             size: a.size,

@@ -113,4 +113,3 @@ export function getImageDimensions(target: EventTarget | null): {
     renderH: img?.clientHeight || img?.naturalHeight || 1,
   };
 }
-

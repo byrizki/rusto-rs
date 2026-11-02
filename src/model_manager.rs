@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use crate::engine::EngineError;
 
-pub const DEFAULT_MODELS_TAG: &str = "models-rten-v0.3.2";
+pub const DEFAULT_MODELS_TAG: &str = "models-rten-v0.4.0";
 pub const DEFAULT_BASE_URL: &str = "https://github.com/byrizki/rusto-rs/releases/download";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -308,6 +308,27 @@ pub fn find_in_model_dir(dir: &Path, kind: &str) -> Option<PathBuf> {
     None
 }
 
+fn resolve_default_model_dir_asset(dir: &Path, kind: &str, filename: &str) -> PathBuf {
+    let default_name = match kind {
+        "det" => "det.rten",
+        "rec" => "rec.rten",
+        "dict" => {
+            if filename.ends_with(".json") {
+                "meta.json"
+            } else {
+                "dict.txt"
+            }
+        }
+        "cls" => "cls.rten",
+        "orient" => "orient.rten",
+        "unwarp" => "uvdoc.rten",
+        "layout" => "layout_cdla.rten",
+        "order" => "order.rten",
+        _ => filename,
+    };
+    dir.join(default_name)
+}
+
 /// Resolves a single model asset with optional custom model directory support.
 ///
 /// Flow:
@@ -350,6 +371,7 @@ pub fn resolve_asset_with_dir(
         if direct.exists() && fs::metadata(&direct).map(|m| m.len() > 0).unwrap_or(false) {
             return Ok(direct);
         }
+        return Ok(resolve_default_model_dir_asset(dir_path, asset_kind, asset_filename));
     }
 
     // 3. Cache Path
@@ -426,7 +448,7 @@ pub fn download_asset(asset_filename: &str, target_path: &Path) -> Result<PathBu
         .call()
         .map_err(|e| {
             EngineError::Engine(format!(
-                "Failed to download model '{}' from {}: {}",
+                "Failed to download model '{}' from {} (release tag may be unreleased or remote asset missing): {}",
                 asset_filename, download_url, e
             ))
         })?;
