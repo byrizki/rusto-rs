@@ -208,13 +208,52 @@ impl RtenOcrPipeline {
         let det_model = Model::load(det_data).map_err(|e| format!("Det model load error: {:?}", e))?;
         let rec_model = Model::load(rec_data).map_err(|e| format!("Rec model load error: {:?}", e))?;
 
-        // Standard PaddleOCR CTC dictionary structure:
-        // index 0: blank token
-        // index 1..=N: characters from dict.txt
-        // index N+1: ' ' (space character)
-        let mut dictionary: Vec<String> = dict_text.lines().map(|s| s.to_string()).collect();
-        dictionary.push(" ".to_string());
-        dictionary.insert(0, "blank".to_string());
+        let dictionary: Vec<String> = if dict_text.trim_start().starts_with('{') {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(dict_text) {
+                let chars_val = if let Some(c) = val.get("chars") {
+                    Some(c.clone())
+                } else if let Some(v) = val.get("vocab") {
+                    if let Some(s) = v.as_str() {
+                        serde_json::from_str::<serde_json::Value>(s)
+                            .ok()
+                            .and_then(|pv| pv.get("chars").cloned())
+                    } else {
+                        v.get("chars").cloned()
+                    }
+                } else {
+                    None
+                };
+                if let Some(chars) = chars_val.and_then(|c| c.as_array().cloned()) {
+                    let mut list = Vec::with_capacity(chars.len() + 1);
+                    list.push("blank".to_string());
+                    for c in chars {
+                        if let Some(s) = c.as_str() {
+                            list.push(s.to_string());
+                        }
+                    }
+                    list
+                } else {
+                    let mut d: Vec<String> = dict_text.lines().map(|s| s.to_string()).collect();
+                    d.push(" ".to_string());
+                    d.insert(0, "blank".to_string());
+                    d
+                }
+            } else {
+                let mut d: Vec<String> = dict_text.lines().map(|s| s.to_string()).collect();
+                d.push(" ".to_string());
+                d.insert(0, "blank".to_string());
+                d
+            }
+        } else {
+            // Standard PaddleOCR CTC dictionary structure:
+            // index 0: blank token
+            // index 1..=N: characters from dict.txt
+            // index N+1: ' ' (space character)
+            let mut d: Vec<String> = dict_text.lines().map(|s| s.to_string()).collect();
+            d.push(" ".to_string());
+            d.insert(0, "blank".to_string());
+            d
+        };
 
         Ok(RtenOcrPipeline {
             det_model,

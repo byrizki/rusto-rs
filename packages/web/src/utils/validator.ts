@@ -52,7 +52,7 @@ const OPTIMIZATION_KEYS = [
   'cropPaddingY',
 ] as const;
 
-const PRESETS: readonly ModelPreset[] = ['ppv6', 'ppv5', 'ppv4', 'ppv3'] as const;
+const PRESETS: readonly ModelPreset[] = ['ppv6', 'ppv5', 'ppv4', 'ppv3', 'indra'] as const;
 
 export function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && value !== undefined && typeof value === 'object' && !Array.isArray(value);

@@ -258,8 +258,8 @@ impl LayoutDetector {
 
                     let idx = y * (new_w as usize) + x;
                     // Store in BGR order matching OpenCV Vec3b and PP-Structure expectations
-                    data[0 * hw + idx] = (b - mean[0]) / std[0];
-                    data[1 * hw + idx] = (g - mean[1]) / std[1];
+                    data[idx] = (b - mean[0]) / std[0];
+                    data[hw + idx] = (g - mean[1]) / std[1];
                     data[2 * hw + idx] = (r - mean[2]) / std[2];
                 }
             }

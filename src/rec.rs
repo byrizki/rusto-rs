@@ -1,5 +1,3 @@
-use std::io::{BufRead, BufReader};
-use std::fs::File;
 use std::time::Instant;
 
 use ndarray::{Array3, Array4, Ix3};
@@ -46,16 +44,44 @@ pub struct CtcDecoder {
 
 impl CtcDecoder {
     pub fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, EngineError> {
-        let file = File::open(path).map_err(|e| {
+        let path_ref = path.as_ref();
+        let content = std::fs::read_to_string(path_ref).map_err(|e| {
             EngineError::Preprocess(format!("failed to open rec_keys_path: {e}"))
         })?;
-        let reader = BufReader::new(file);
+
+        if path_ref.extension().and_then(|s| s.to_str()) == Some("json")
+            || content.trim_start().starts_with('{')
+        {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                let chars_val = if let Some(c) = val.get("chars") {
+                    Some(c.clone())
+                } else if let Some(v) = val.get("vocab") {
+                    if let Some(s) = v.as_str() {
+                        serde_json::from_str::<serde_json::Value>(s)
+                            .ok()
+                            .and_then(|pv| pv.get("chars").cloned())
+                    } else {
+                        v.get("chars").cloned()
+                    }
+                } else {
+                    None
+                };
+                if let Some(chars) = chars_val.and_then(|c| c.as_array().cloned()) {
+                    let mut list = Vec::with_capacity(chars.len() + 1);
+                    list.push("blank".to_string());
+                    for c in chars {
+                        if let Some(s) = c.as_str() {
+                            list.push(s.to_string());
+                        }
+                    }
+                    return Ok(Self { chars: list });
+                }
+            }
+        }
+
         let mut list = Vec::new();
-        for line in reader.lines() {
-            let l = line.map_err(|e| {
-                EngineError::Preprocess(format!("failed to read rec_keys_path: {e}"))
-            })?;
-            list.push(l);
+        for line in content.lines() {
+            list.push(line.to_string());
         }
         list.push(" ".to_string());
         list.insert(0, "blank".to_string());

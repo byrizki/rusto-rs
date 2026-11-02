@@ -5,18 +5,16 @@ import { detectText, isInitialized, type TextResult } from '@rustors/web';
 import {
   availableModels,
   defaultModel,
-  defaultOcrConfig,
   defaultProgressState,
   getSampleImages,
   buildDetectTextOptions,
   ocrProfilePresets,
-  type OcrConfig,
   type OcrModelOption,
-  type OcrProfilePreset,
   type ActiveRunConfig,
   type ProgressState,
   type ProgressStep,
 } from '../../types/ocrConfig';
+import { useWebOcrSettings } from '../../composables/useWebOcrSettings';
 import {
   loadAndInitModel,
   formatResultsCsv,
@@ -25,6 +23,7 @@ import {
   processOcrOutput,
   isRunConfigModified,
   getImageDimensions,
+  fetchGitHubReleaseModelIndex,
 } from '../../utils/ocrModelLoader';
 import OcrActiveConfigView from '../OcrActiveConfigView.vue';
 import OcrLoadingOverlay from '../OcrLoadingOverlay.vue';
@@ -35,24 +34,15 @@ const baseURL = rawBaseURL.endsWith('/') ? rawBaseURL : `${rawBaseURL}/`;
 const samples = getSampleImages(baseURL);
 const defaultSample = samples[0]!;
 
-const ocrConfig = ref<OcrConfig>({ ...defaultOcrConfig });
-const isConfigOpen = ref<boolean>(false);
-const configTab = ref<'detection' | 'layout' | 'resizing' | 'preprocess'>('detection');
-
-function toggleConfigPopover() {
-  isConfigOpen.value = !isConfigOpen.value;
-}
-function resetConfigDefaults() {
-  ocrConfig.value = { ...defaultOcrConfig };
-}
-function applyPreset(preset: OcrProfilePreset) {
-  ocrConfig.value = { ...ocrConfig.value, ...preset.config };
-}
-function isPresetActive(preset: OcrProfilePreset): boolean {
-  return Object.entries(preset.config).every(
-    ([k, v]) => (ocrConfig.value as Record<string, unknown>)[k] === v
-  );
-}
+const {
+  ocrConfig,
+  isConfigOpen,
+  configTab,
+  toggleConfigPopover,
+  resetConfigDefaults,
+  applyPreset,
+  isPresetActive,
+} = useWebOcrSettings();
 
 const progress = ref<ProgressState>({ ...defaultProgressState });
 
@@ -305,6 +295,7 @@ const activeConfigJson = computed(() =>
 onMounted(() => {
   status.value = 'idle';
   statusMessage.value = `${currentModel.value.name} selected (click Run OCR to load)`;
+  fetchGitHubReleaseModelIndex().catch(() => {});
 });
 </script>
 

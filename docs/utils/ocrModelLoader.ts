@@ -1,17 +1,6 @@
-import {
-  type ModelSourceConfig,
-  type DetectTextOptions,
-  type TextResult,
-  formatSpatialText,
-  groupCandidatesIntoLines,
-  initialize,
-} from '@rustors/web';
-import {
-  type OcrModelOption,
-  type ActiveRunConfig,
-  type OcrConfig,
-  buildDetectTextOptions,
-} from '../types/ocrConfig';
+import { type ModelSourceConfig, initialize } from '@rustors/web';
+import { type OcrModelOption } from '../types/ocrConfig';
+import { getModelCandidateUrls } from './ocrReleaseModels';
 
 export interface ModelDownloadProgress {
   stageText: string;
@@ -26,44 +15,45 @@ export interface LoadedModelAssets extends ModelSourceConfig {
   [key: string]: string | Uint8Array | ArrayBuffer | undefined;
 }
 
-export function processOcrOutput(
-  output: TextResult[] | string,
-  lineYThreshold: number,
-  wordXThreshold: number
-): { results: TextResult[]; spatialText: string } {
-  if (Array.isArray(output)) {
-    return {
-      results: output,
-      spatialText: formatSpatialText(
-        groupCandidatesIntoLines(output, lineYThreshold),
-        wordXThreshold
-      ),
-    };
-  }
-  return { results: [], spatialText: output };
-}
+// Re-export result and UI helpers
+export {
+  processOcrOutput,
+  formatResultsCsv,
+  formatActiveConfigJson,
+  buildActiveConfigJson,
+  buildActiveRunConfig,
+  isRunConfigModified,
+  getImageDimensions,
+} from './ocrResultFormatter';
+
+// Re-export release asset helpers
+export {
+  DEFAULT_MODELS_TAG,
+  GITHUB_RELEASE_BASE,
+  GITHUB_API_BASE,
+  JSDELIVR_CDN_BASE,
+  MODEL_RELEASE_ASSETS,
+  type ModelAssetFiles,
+  type ReleaseAssetInfo,
+  getModelCandidateUrls,
+  getModelCdnUrls,
+  fetchGitHubReleaseModelIndex,
+} from './ocrReleaseModels';
 
 /* oxlint-disable eslint(no-await-in-loop) */
 /* eslint-disable no-await-in-loop */
-export async function downloadBinaryWithProgress(
-  url: string,
+async function streamBody(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  total: number,
   label: string,
   stepIndex: number,
   totalSteps: number,
-  onProgress?: (progress: ModelDownloadProgress) => void,
-  progressRange: [number, number] = [0, 100]
+  range: [number, number],
+  onProgress?: (progress: ModelDownloadProgress) => void
 ): Promise<Uint8Array> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} loading ${url}`);
-  const total = Number(res.headers.get('content-length')) || 0;
-  const reader = res.body?.getReader();
-  if (!reader) {
-    const ab = await res.arrayBuffer();
-    return new Uint8Array(ab);
-  }
   let received = 0;
   const chunks: Uint8Array[] = [];
-  const [minPct, maxPct] = progressRange;
+  const [minPct, maxPct] = range;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -89,41 +79,93 @@ export async function downloadBinaryWithProgress(
   return output;
 }
 
-export async function downloadTextAsset(url: string): Promise<string> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} loading ${url}`);
-  return await res.text();
+export async function downloadBinaryWithProgress(
+  urlOrUrls: string | string[],
+  label: string,
+  stepIndex: number,
+  totalSteps: number,
+  onProgress?: (progress: ModelDownloadProgress) => void,
+  progressRange: [number, number] = [0, 100]
+): Promise<Uint8Array> {
+  const urls = Array.isArray(urlOrUrls) ? urlOrUrls : [urlOrUrls];
+  let lastError: Error | null = null;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        lastError = new Error(`HTTP ${res.status} loading ${url}`);
+        continue;
+      }
+      const total = Number(res.headers.get('content-length')) || 0;
+      const reader = res.body?.getReader();
+      if (!reader) {
+        const ab = await res.arrayBuffer();
+        return new Uint8Array(ab);
+      }
+      return await streamBody(
+        reader,
+        total,
+        label,
+        stepIndex,
+        totalSteps,
+        progressRange,
+        onProgress
+      );
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+  throw lastError ?? new Error(`Failed to load binary asset for ${label}`);
 }
 
-export const JSDELIVR_CDN_BASE = 'https://cdn.jsdelivr.net/npm';
+export function parseModelDictionary(dictRaw: string): string {
+  const trimmed = dictRaw.trim();
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      let chars: string[] = [];
+      if (Array.isArray(parsed.chars)) {
+        chars = parsed.chars;
+      } else if (parsed.vocab) {
+        const v = typeof parsed.vocab === 'string' ? JSON.parse(parsed.vocab) : parsed.vocab;
+        if (Array.isArray(v.chars)) chars = v.chars;
+      }
+      if (chars.length > 0) return chars.join('\n');
+    } catch {
+      // Fallback to raw text
+    }
+  }
+  return dictRaw;
+}
 
-export function getModelCdnUrls(
-  modelId: string,
-  cdnBase: string = JSDELIVR_CDN_BASE
-): {
-  detection: string;
-  recognition: string;
-  dictionary: string;
-} {
-  const pkg = `@rustors/model-${modelId}`;
-  const base = cdnBase.endsWith('/') ? cdnBase.slice(0, -1) : cdnBase;
-  return {
-    detection: `${base}/${pkg}/models/det.rten`,
-    recognition: `${base}/${pkg}/models/rec.rten`,
-    dictionary: `${base}/${pkg}/models/dict.txt`,
-  };
+export async function downloadTextAsset(urlOrUrls: string | string[]): Promise<string> {
+  const urls = Array.isArray(urlOrUrls) ? urlOrUrls : [urlOrUrls];
+  let lastError: Error | null = null;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        lastError = new Error(`HTTP ${res.status} loading ${url}`);
+        continue;
+      }
+      const text = await res.text();
+      return parseModelDictionary(text);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+  throw lastError ?? new Error('Failed to load text asset');
 }
 
 export async function fetchModelAssets(
   model: OcrModelOption,
   onProgress?: (progress: ModelDownloadProgress) => void,
   progressRange: [number, number] = [0, 100],
-  cdnBase: string = JSDELIVR_CDN_BASE
+  baseURL: string = '/'
 ): Promise<LoadedModelAssets> {
-  const urls = getModelCdnUrls(model.id, cdnBase);
-
+  const candidates = getModelCandidateUrls(model.id, baseURL);
   const detBuffer = await downloadBinaryWithProgress(
-    urls.detection,
+    candidates.detection,
     `${model.name} (det.rten)`,
     1,
     2,
@@ -131,14 +173,14 @@ export async function fetchModelAssets(
     progressRange
   );
   const recBuffer = await downloadBinaryWithProgress(
-    urls.recognition,
+    candidates.recognition,
     `${model.name} (rec.rten)`,
     2,
     2,
     onProgress,
     progressRange
   );
-  const dictText = await downloadTextAsset(urls.dictionary);
+  const dictText = await downloadTextAsset(candidates.dictionary);
 
   return {
     detection: detBuffer,
@@ -153,96 +195,10 @@ export async function loadAndInitModel(
   progressRange: [number, number] = [0, 100],
   onProgress?: (progress: ModelDownloadProgress) => void
 ): Promise<void> {
-  const assets = await fetchModelAssets(model, onProgress, progressRange);
+  const assets = await fetchModelAssets(model, onProgress, progressRange, baseURL);
   await initialize({
     preset: model.preset,
     wasmUrl: `${baseURL}wasm/rusto_rten_wasm_bg.wasm?v=0.3.3`,
     models: assets,
   });
-}
-
-export function formatResultsCsv(
-  results: Array<{
-    text: string;
-    score: number;
-    frame: { left: number; top: number; width: number; height: number };
-  }>
-): string {
-  const header = 'text,score,left,top,width,height';
-  const rows = results.map(
-    (r) =>
-      `"${r.text.replaceAll('"', '""')}",${r.score.toFixed(4)},${r.frame.left},${r.frame.top},${r.frame.width},${r.frame.height}`
-  );
-  return [header, ...rows].join('\n');
-}
-
-export function formatActiveConfigJson(
-  modelName: string,
-  outputMode: string,
-  options: unknown
-): string {
-  return JSON.stringify({ model: modelName, granularity: outputMode, options }, null, 2);
-}
-
-export function buildActiveConfigJson(
-  arc: ActiveRunConfig | null,
-  fallbackModel: string,
-  fallbackMode: 'lines' | 'words',
-  fallbackConfig: OcrConfig
-): string {
-  return formatActiveConfigJson(
-    arc?.modelName ?? fallbackModel,
-    arc?.outputMode ?? fallbackMode,
-    arc?.options ?? buildDetectTextOptions(fallbackConfig, fallbackMode)
-  );
-}
-
-export function buildActiveRunConfig(
-  model: OcrModelOption,
-  outputMode: 'lines' | 'words',
-  durationMs: number | null,
-  itemsCount: number,
-  options: DetectTextOptions,
-  rawConfig: OcrConfig
-): ActiveRunConfig {
-  return {
-    modelId: model.id,
-    modelName: model.name,
-    modelPreset: model.preset,
-    outputMode,
-    timestamp: Date.now(),
-    durationMs,
-    itemsCount,
-    options,
-    rawConfig: { ...rawConfig },
-  };
-}
-
-export function isRunConfigModified(
-  arc: ActiveRunConfig | null,
-  selectedModel: string,
-  outputMode: string,
-  rawConfig: OcrConfig
-): boolean {
-  return (
-    !!arc &&
-    (selectedModel !== arc.modelId ||
-      outputMode !== arc.outputMode ||
-      JSON.stringify(rawConfig) !== JSON.stringify(arc.rawConfig))
-  );
-}
-
-export function getImageDimensions(target: EventTarget | null): {
-  naturalW: number;
-  naturalH: number;
-  renderW: number;
-  renderH: number;
-} {
-  const img = target as HTMLImageElement | null;
-  return {
-    naturalW: img?.naturalWidth || 1,
-    naturalH: img?.naturalHeight || 1,
-    renderW: img?.clientWidth || img?.naturalWidth || 1,
-    renderH: img?.clientHeight || img?.naturalHeight || 1,
-  };
 }
