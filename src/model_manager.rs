@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use crate::engine::EngineError;
 
 pub const DEFAULT_MODELS_TAG: &str = "models-rten-v0.4.0";
-pub const DEFAULT_BASE_URL: &str = "https://github.com/byrizki/rusto-rs/releases/download";
+pub const DEFAULT_HF_BASE_URL: &str = "https://huggingface.co/byrizki/rten-models/resolve/main";
+pub const DEFAULT_GITHUB_RELEASE_BASE_URL: &str = "https://github.com/byrizki/rusto-rs/releases/download";
+pub const DEFAULT_BASE_URL: &str = DEFAULT_HF_BASE_URL;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BasePipelineAssets {
@@ -408,66 +410,102 @@ pub fn resolve_asset(
     resolve_asset_with_dir(explicit_path, None, "", asset_filename, cache_dir)
 }
 
-/// Downloads a single asset from the GitHub Release tag directly to target path.
-pub fn download_asset(asset_filename: &str, target_path: &Path) -> Result<PathBuf, EngineError> {
-    if target_path.exists() && fs::metadata(target_path).map(|m| m.len() > 0).unwrap_or(false) {
-        return Ok(target_path.to_path_buf());
+/// Maps a model asset filename to its organized path in the Hugging Face repository.
+pub fn resolve_hf_asset_path<'a>(asset_filename: &'a str) -> &'a str {
+    match asset_filename {
+        "indra_det.rten" => "indraocr/det.rten",
+        "indra_rec.rten" => "indraocr/rec.rten",
+        "indra_meta.json" => "indraocr/meta.json",
+        "indra_order.rten" => "indraocr/order.rten",
+        "indra_orient.rten" => "indraocr/orient.rten",
+        "indra_rec_cjk.rten" => "indraocr/rec_cjk.rten",
+        "indra_rec_rtl.rten" => "indraocr/rec_rtl.rten",
+        "indra_rec_world.rten" => "indraocr/rec_world.rten",
+        "indra_script.rten" => "indraocr/script.rten",
+        "indra_mathcls.rten" => "indraocr/mathcls.rten",
+        "indra_math_enc.rten" => "indraocr/math_enc.rten",
+        "indra_math_dec_init.rten" => "indraocr/math_dec_init.rten",
+        "indra_math_dec_step.rten" => "indraocr/math_dec_step.rten",
+        "indra_math_meta.json" => "indraocr/math_meta.json",
+
+        "ppocrv6_tiny_det.rten" => "ppocrv6-tiny/det.rten",
+        "ppocrv6_tiny_rec.rten" => "ppocrv6-tiny/rec.rten",
+        "ppocrv6_tiny_int8_det.rten" => "ppocrv6-tiny-int8/det.rten",
+        "ppocrv6_tiny_int8_rec.rten" => "ppocrv6-tiny-int8/rec.rten",
+        "ppocrv6_dict.txt" => "ppocrv6-tiny/dict.txt",
+        "ppocrv6_small_det.rten" => "ppocrv6-small/det.rten",
+        "ppocrv6_small_rec.rten" => "ppocrv6-small/rec.rten",
+        "ppocrv6_small_int8_det.rten" => "ppocrv6-small-int8/det.rten",
+        "ppocrv6_small_int8_rec.rten" => "ppocrv6-small-int8/rec.rten",
+        "ppocrv6_medium_det.rten" => "ppocrv6-medium/det.rten",
+        "ppocrv6_medium_rec.rten" => "ppocrv6-medium/rec.rten",
+        "ppocrv6_medium_int8_det.rten" => "ppocrv6-medium-int8/det.rten",
+        "ppocrv6_medium_int8_rec.rten" => "ppocrv6-medium-int8/rec.rten",
+
+        "ppocrv5_mobile_det.rten" => "ppocrv5-mobile/det.rten",
+        "ppocrv5_mobile_rec.rten" => "ppocrv5-mobile/rec.rten",
+        "ppocrv5_server_det.rten" => "ppocrv5-server/det.rten",
+        "ppocrv5_server_rec.rten" => "ppocrv5-server/rec.rten",
+        "ppocrv5_dict.txt" => "ppocrv5-mobile/dict.txt",
+
+        "ppocrv4_mobile_det.rten" => "ppocrv4-mobile/det.rten",
+        "ppocrv4_mobile_rec.rten" => "ppocrv4-mobile/rec.rten",
+        "ppocrv4_server_det.rten" => "ppocrv4-server/det.rten",
+        "ppocrv4_server_rec.rten" => "ppocrv4-server/rec.rten",
+        "ppocrv4_dict.txt" => "ppocrv4-mobile/dict.txt",
+
+        "ppocrv5_rec_arabic.rten" => "multilingual/ppocrv5_rec_arabic.rten",
+        "ppocrv5_dict_arabic.txt" => "multilingual/ppocrv5_dict_arabic.txt",
+        "ppocrv5_rec_cyrillic.rten" => "multilingual/ppocrv5_rec_cyrillic.rten",
+        "ppocrv5_dict_cyrillic.txt" => "multilingual/ppocrv5_dict_cyrillic.txt",
+        "ppocrv5_rec_devanagari.rten" => "multilingual/ppocrv5_rec_devanagari.rten",
+        "ppocrv5_dict_devanagari.txt" => "multilingual/ppocrv5_dict_devanagari.txt",
+        "ppocrv5_rec_el.rten" => "multilingual/ppocrv5_rec_el.rten",
+        "ppocrv5_dict_el.txt" => "multilingual/ppocrv5_dict_el.txt",
+        "ppocrv5_rec_eslav.rten" => "multilingual/ppocrv5_rec_eslav.rten",
+        "ppocrv5_dict_eslav.txt" => "multilingual/ppocrv5_dict_eslav.txt",
+        "ppocrv5_rec_korean.rten" => "multilingual/ppocrv5_rec_korean.rten",
+        "ppocrv5_dict_korean.txt" => "multilingual/ppocrv5_dict_korean.txt",
+        "ppocrv5_rec_latin.rten" => "multilingual/ppocrv5_rec_latin.rten",
+        "ppocrv5_dict_latin.txt" => "multilingual/ppocrv5_dict_latin.txt",
+        "ppocrv5_rec_ta.rten" => "multilingual/ppocrv5_rec_ta.rten",
+        "ppocrv5_dict_ta.txt" => "multilingual/ppocrv5_dict_ta.txt",
+        "ppocrv5_rec_te.rten" => "multilingual/ppocrv5_rec_te.rten",
+        "ppocrv5_dict_te.txt" => "multilingual/ppocrv5_dict_te.txt",
+        "ppocrv5_rec_th.rten" => "multilingual/ppocrv5_rec_th.rten",
+        "ppocrv5_dict_th.txt" => "multilingual/ppocrv5_dict_th.txt",
+        "ppocrv4_rec_japan.rten" => "multilingual/ppocrv4_rec_japan.rten",
+        "ppocrv4_dict_japan.txt" => "multilingual/ppocrv4_dict_japan.txt",
+        "ppocrv4_rec_chinese_cht.rten" => "multilingual/ppocrv4_rec_chinese_cht.rten",
+        "ppocrv4_dict_chinese_cht.txt" => "multilingual/ppocrv4_dict_chinese_cht.txt",
+        "ppocrv4_rec_kannada.rten" => "multilingual/ppocrv4_rec_kannada.rten",
+        "ppocrv4_dict_kannada.txt" => "multilingual/ppocrv4_dict_kannada.txt",
+
+        "ppocr_cls.rten" | "cls.rten" => "modules/cls.rten",
+        "ppocr_orient.rten" | "orient.rten" => "modules/orient.rten",
+        "uvdoc.rten" => "modules/uvdoc.rten",
+        "layout_cdla.rten" => "modules/layout_cdla.rten",
+        "layout_publaynet.rten" => "modules/layout_publaynet.rten",
+
+        _ => asset_filename,
     }
+}
 
-    // If candidate exists in local checkout, copy it into target cache to avoid unnecessary network transfer
-    for cand in find_local_repo_candidates(asset_filename) {
-        if cand != target_path && cand.exists() && fs::metadata(&cand).map(|m| m.len() > 0).unwrap_or(false) {
-            if let Some(parent) = target_path.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            if fs::copy(&cand, target_path).is_ok() {
-                eprintln!("✓ Populated {} from local {}", target_path.display(), cand.display());
-                return Ok(target_path.to_path_buf());
-            }
-        }
-    }
-
-    let tag = std::env::var("RUSTO_MODELS_TAG").unwrap_or_else(|_| DEFAULT_MODELS_TAG.to_string());
-    let base_url = std::env::var("RUSTO_MODELS_URL").unwrap_or_else(|_| {
-        format!("{}/{}/{}", DEFAULT_BASE_URL, tag, asset_filename)
-    });
-
-    let download_url = if base_url.ends_with('/') {
-        format!("{}{}", base_url, asset_filename)
-    } else if base_url.contains(asset_filename) {
-        base_url
-    } else {
-        format!("{}/{}", base_url, asset_filename)
-    };
-
-    if let Some(parent) = target_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| {
-            EngineError::Engine(format!(
-                "Failed to create cache directory '{}': {}",
-                parent.display(),
-                e
-            ))
-        })?;
-    }
-
+fn stream_url_to_file(download_url: &str, target_path: &Path, asset_filename: &str) -> Result<(), EngineError> {
     eprintln!("Downloading {} from {}...", asset_filename, download_url);
 
-    let response = ureq::get(&download_url)
+    let response = ureq::get(download_url)
         .call()
         .map_err(|e| {
             EngineError::Engine(format!(
-                "Failed to download model '{}' from {} (release tag may be unreleased or remote asset missing): {}",
+                "Failed to download model '{}' from {}: {}",
                 asset_filename, download_url, e
             ))
         })?;
 
     let part_path = target_path.with_extension("part");
     let mut file = File::create(&part_path).map_err(|e| {
-        EngineError::Engine(format!(
-            "Failed to create temporary download file '{}': {}",
-            part_path.display(),
-            e
-        ))
+        EngineError::Engine(format!("Failed to create temporary file '{}': {}", part_path.display(), e))
     })?;
 
     let mut reader = response.into_reader();
@@ -494,15 +532,68 @@ pub fn download_asset(asset_filename: &str, target_path: &Path) -> Result<PathBu
 
     fs::rename(&part_path, target_path).map_err(|e| {
         let _ = fs::remove_file(&part_path);
-        EngineError::Engine(format!(
-            "Failed to finalize model file '{}': {}",
-            target_path.display(),
-            e
-        ))
+        EngineError::Engine(format!("Failed to finalize model file '{}': {}", target_path.display(), e))
     })?;
 
     eprintln!("✓ Saved {} to {}", asset_filename, target_path.display());
-    Ok(target_path.to_path_buf())
+    Ok(())
+}
+
+/// Downloads a single asset with Hugging Face primary resolution and GitHub Release fallback.
+pub fn download_asset(asset_filename: &str, target_path: &Path) -> Result<PathBuf, EngineError> {
+    if target_path.exists() && fs::metadata(target_path).map(|m| m.len() > 0).unwrap_or(false) {
+        return Ok(target_path.to_path_buf());
+    }
+
+    // If candidate exists in local checkout, copy it into target cache to avoid unnecessary network transfer
+    for cand in find_local_repo_candidates(asset_filename) {
+        if cand != target_path && cand.exists() && fs::metadata(&cand).map(|m| m.len() > 0).unwrap_or(false) {
+            if let Some(parent) = target_path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            if fs::copy(&cand, target_path).is_ok() {
+                eprintln!("✓ Populated {} from local {}", target_path.display(), cand.display());
+                return Ok(target_path.to_path_buf());
+            }
+        }
+    }
+
+    if let Some(parent) = target_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| {
+            EngineError::Engine(format!("Failed to create cache directory '{}': {}", parent.display(), e))
+        })?;
+    }
+
+    let candidates = if let Ok(custom) = std::env::var("RUSTO_MODELS_URL") {
+        if custom.ends_with('/') {
+            vec![format!("{}{}", custom, asset_filename)]
+        } else if custom.contains(asset_filename) {
+            vec![custom]
+        } else {
+            vec![format!("{}/{}", custom, asset_filename)]
+        }
+    } else {
+        let tag = std::env::var("RUSTO_MODELS_TAG").unwrap_or_else(|_| DEFAULT_MODELS_TAG.to_string());
+        let hf_path = resolve_hf_asset_path(asset_filename);
+        vec![
+            format!("{}/{}", DEFAULT_HF_BASE_URL, hf_path),
+            format!("{}/{}/{}", DEFAULT_GITHUB_RELEASE_BASE_URL, tag, asset_filename),
+        ]
+    };
+
+    let mut last_err = None;
+    for url in candidates {
+        match stream_url_to_file(&url, target_path, asset_filename) {
+            Ok(()) => return Ok(target_path.to_path_buf()),
+            Err(e) => {
+                last_err = Some(e);
+            }
+        }
+    }
+
+    Err(last_err.unwrap_or_else(|| {
+        EngineError::Engine(format!("Failed to download model '{}'", asset_filename))
+    }))
 }
 
 /// Resolves complete base OCR pipeline (detection, recognition, dictionary) paths.
@@ -763,5 +854,15 @@ mod tests {
         assert_eq!(det, custom_det);
         assert_eq!(rec, model_dir.join("rec.rten"));
         assert_eq!(dict, model_dir.join("dict.txt"));
+    }
+
+    #[test]
+    fn test_resolve_hf_asset_path() {
+        assert_eq!(resolve_hf_asset_path("indra_det.rten"), "indraocr/det.rten");
+        assert_eq!(resolve_hf_asset_path("indra_order.rten"), "indraocr/order.rten");
+        assert_eq!(resolve_hf_asset_path("ppocrv6_tiny_det.rten"), "ppocrv6-tiny/det.rten");
+        assert_eq!(resolve_hf_asset_path("ppocrv5_rec_arabic.rten"), "multilingual/ppocrv5_rec_arabic.rten");
+        assert_eq!(resolve_hf_asset_path("layout_cdla.rten"), "modules/layout_cdla.rten");
+        assert_eq!(resolve_hf_asset_path("custom_unknown.rten"), "custom_unknown.rten");
     }
 }

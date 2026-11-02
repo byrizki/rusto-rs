@@ -11,6 +11,8 @@ export interface ReleaseAssetInfo {
 }
 
 export const DEFAULT_MODELS_TAG = 'models-rten-v0.4.0';
+export const HUGGINGFACE_REPO = 'byrizki/rten-models';
+export const HUGGINGFACE_BASE = 'https://huggingface.co/byrizki/rten-models/resolve/main';
 export const GITHUB_RELEASE_BASE = 'https://github.com/byrizki/rusto-rs/releases/download';
 export const GITHUB_API_BASE = 'https://api.github.com/repos/byrizki/rusto-rs';
 export const JSDELIVR_CDN_BASE = 'https://cdn.jsdelivr.net/npm';
@@ -89,16 +91,22 @@ export function getModelCandidateUrls(
 
   return {
     detection: [
+      `${HUGGINGFACE_BASE}/${modelId}/det.rten`,
+      `${HUGGINGFACE_BASE}/${modelId}/${asset.detection}`,
       `${cleanBase}/models/${modelId}/det.rten`,
       `${cleanBase}/models/${asset.detection}`,
       `${GITHUB_RELEASE_BASE}/${tag}/${asset.detection}`,
     ],
     recognition: [
+      `${HUGGINGFACE_BASE}/${modelId}/rec.rten`,
+      `${HUGGINGFACE_BASE}/${modelId}/${asset.recognition}`,
       `${cleanBase}/models/${modelId}/rec.rten`,
       `${cleanBase}/models/${asset.recognition}`,
       `${GITHUB_RELEASE_BASE}/${tag}/${asset.recognition}`,
     ],
     dictionary: [
+      `${HUGGINGFACE_BASE}/${modelId}/${dictFile}`,
+      `${HUGGINGFACE_BASE}/${modelId}/${asset.dictionary}`,
       `${cleanBase}/models/${modelId}/${dictFile}`,
       `${cleanBase}/models/${asset.dictionary}`,
       `${GITHUB_RELEASE_BASE}/${tag}/${asset.dictionary}`,
@@ -108,17 +116,18 @@ export function getModelCandidateUrls(
 
 export function getModelCdnUrls(
   modelId: string,
-  tag: string = DEFAULT_MODELS_TAG
+  _tag: string = DEFAULT_MODELS_TAG
 ): {
   detection: string;
   recognition: string;
   dictionary: string;
 } {
-  const asset = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['indraocr']!;
+  const isIndra = modelId === 'indraocr' || modelId === 'indra';
+  const dictFile = isIndra ? 'meta.json' : 'dict.txt';
   return {
-    detection: `${GITHUB_RELEASE_BASE}/${tag}/${asset.detection}`,
-    recognition: `${GITHUB_RELEASE_BASE}/${tag}/${asset.recognition}`,
-    dictionary: `${GITHUB_RELEASE_BASE}/${tag}/${asset.dictionary}`,
+    detection: `${HUGGINGFACE_BASE}/${modelId}/det.rten`,
+    recognition: `${HUGGINGFACE_BASE}/${modelId}/rec.rten`,
+    dictionary: `${HUGGINGFACE_BASE}/${modelId}/${dictFile}`,
   };
 }
 
