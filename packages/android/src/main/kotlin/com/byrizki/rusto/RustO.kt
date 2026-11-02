@@ -465,7 +465,34 @@ class RustO private constructor(
                 else uniffi.rusto.ImageSource.Path(path!!)
             }
         }
-        val uniffiOptions = uniffi.rusto.OcrRunOptions(
+        val uniffiOptions = toUniffiOptions(options)
+
+        return try {
+            when (val res = activeEngine.detectText(uniffiSource, uniffiOptions)) {
+                is uniffi.rusto.DetectTextResult.Spatial -> DetectTextResult.Spatial(res.text)
+                is uniffi.rusto.DetectTextResult.Structured -> DetectTextResult.Structured(
+                    res.results.map { item ->
+                        TextResult(
+                            text = item.text,
+                            score = item.score,
+                            boxPoints = item.boxPoints.map { Point2D(it.x, it.y) },
+                            frame = Frame(
+                                width = item.frame.width,
+                                height = item.frame.height,
+                                top = item.frame.top,
+                                left = item.frame.left,
+                            )
+                        )
+                    }
+                )
+            }
+        } catch (e: Exception) {
+            throw RustOException("OCR detection failed: ${e.message}")
+        }
+    }
+
+    private fun toUniffiOptions(options: OcrRunOptions): uniffi.rusto.OcrRunOptions =
+        uniffi.rusto.OcrRunOptions(
             output = when (options.output) {
                 OutputGranularity.LINES -> uniffi.rusto.OutputGranularity.LINES
                 OutputGranularity.WORDS -> uniffi.rusto.OutputGranularity.WORDS
@@ -510,33 +537,21 @@ class RustO private constructor(
                     scoreMode = p.scoreMode,
                 )
             },
-            calibration = null,
-            optimization = null,
-        )
-
-        return try {
-            when (val res = activeEngine.detectText(uniffiSource, uniffiOptions)) {
-                is uniffi.rusto.DetectTextResult.Spatial -> DetectTextResult.Spatial(res.text)
-                is uniffi.rusto.DetectTextResult.Structured -> DetectTextResult.Structured(
-                    res.results.map { item ->
-                        TextResult(
-                            text = item.text,
-                            score = item.score,
-                            boxPoints = item.boxPoints.map { Point2D(it.x, it.y) },
-                            frame = Frame(
-                                width = item.frame.width,
-                                height = item.frame.height,
-                                top = item.frame.top,
-                                left = item.frame.left,
-                            )
-                        )
-                    }
+            calibration = options.calibration?.let { c ->
+                uniffi.rusto.CalibrationOptions(
+                    descreenStrength = c.descreenStrength,
                 )
-            }
-        } catch (e: Exception) {
-            throw RustOException("OCR detection failed: ${e.message}")
-        }
-    }
+            },
+            optimization = options.optimization?.let { o ->
+                uniffi.rusto.OptimizationOptions(
+                    enabled = o.enabled,
+                    targetMaxSide = o.targetMaxSide?.toUInt(),
+                    cropPaddingX = o.cropPaddingX,
+                    cropPaddingY = o.cropPaddingY,
+                )
+            },
+            recBatchNum = options.recBatchNum,
+        )
 
     private inline fun <T> withUriInput(value: String, action: (String?, ByteArray?) -> T): T {
         require(value.isNotBlank()) { "Image URI must be non-empty." }
