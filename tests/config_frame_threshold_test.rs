@@ -206,6 +206,33 @@ fn test_rusto_config_templates_and_presets() {
     assert_eq!(v3_config.det.limit_type, "max");
     assert_eq!(v3_config.det.score_mode, "slow");
 
+    let indra_config = InitializeConfig::indra("det_indra.rten", "rec_indra.rten", "meta.json");
+    assert_eq!(indra_config.rec.rec_batch_num, 1);
+    assert_eq!(indra_config.rec.rec_img_shape, [1, 48, 320]);
+    assert_eq!(indra_config.det.score_mode, "slow");
+
+    let json_str_indra = r#"{
+        "template": "indra",
+        "detModelPath": "models/indra/det.rten",
+        "recModelPath": "models/indra/rec.rten",
+        "dictPath": "models/indra/meta.json"
+    }"#;
+    let json_config_indra = InitializeConfig::from_json(json_str_indra).expect("Parse indra template JSON");
+    assert_eq!(json_config_indra.rec.rec_batch_num, 1);
+    assert_eq!(json_config_indra.rec.rec_img_shape, [1, 48, 320]);
+
+    let json_str_indra_override = r#"{
+        "template": "indra",
+        "detModelPath": "models/indra/det.rten",
+        "recModelPath": "models/indra/rec.rten",
+        "dictPath": "models/indra/meta.json",
+        "recognition": {
+            "recBatchNum": 4
+        }
+    }"#;
+    let json_config_indra_override = InitializeConfig::from_json(json_str_indra_override).expect("Parse indra override JSON");
+    assert_eq!(json_config_indra_override.rec.rec_batch_num, 4);
+
     // Test JSON with template selection
     let json_str_v6 = r#"{
         "template": "ppv6",

@@ -3472,6 +3472,16 @@ class RustoFfi {
     if (_checksum_uniffi_rusto_checksum_func_create_initialize_config_for_model != 37532) {
       throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_func_create_initialize_config_for_model`: expected 37532, got $_checksum_uniffi_rusto_checksum_func_create_initialize_config_for_model');
     }
+    final int _checksum_uniffi_rusto_checksum_func_create_initialize_config_indra;
+    try {
+      final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_func_create_initialize_config_indra');
+      _checksum_uniffi_rusto_checksum_func_create_initialize_config_indra = checksumFn();
+    } catch (err) {
+      throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_func_create_initialize_config_indra`: $err');
+    }
+    if (_checksum_uniffi_rusto_checksum_func_create_initialize_config_indra != 37620) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_func_create_initialize_config_indra`: expected 37620, got $_checksum_uniffi_rusto_checksum_func_create_initialize_config_indra');
+    }
     final int _checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6;
     try {
       final int Function() checksumFn = lib.lookupFunction<ffi.Uint16 Function(), int Function()>('uniffi_rusto_checksum_func_create_initialize_config_ppv6');
@@ -3479,8 +3489,8 @@ class RustoFfi {
     } catch (err) {
       throw StateError('Missing or invalid UniFFI checksum symbol `uniffi_rusto_checksum_func_create_initialize_config_ppv6`: $err');
     }
-    if (_checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6 != 12132) {
-      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_func_create_initialize_config_ppv6`: expected 12132, got $_checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6');
+    if (_checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6 != 42085) {
+      throw StateError('UniFFI API checksum mismatch for `uniffi_rusto_checksum_func_create_initialize_config_ppv6`: expected 42085, got $_checksum_uniffi_rusto_checksum_func_create_initialize_config_ppv6');
     }
     final int _checksum_uniffi_rusto_checksum_func_default_ocr_run_options;
     try {
@@ -3746,6 +3756,152 @@ class RustoFfi {
       (argBuf + 7).ref.u64 = modelPathRustBuffer.len;
       (argBuf + 8).ref.ptr = modelPathRustBuffer.data.cast<ffi.Void>();
       _createInitializeConfigForModelFfiBuffer(argBuf, returnBuf);
+      final int statusCode = (returnBuf + 3).ref.i8;
+      if (statusCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
+        errBufPtr.ref
+          ..capacity = (returnBuf + 4).ref.u64
+          ..len = (returnBuf + 5).ref.u64
+          ..data = (returnBuf + 6).ref.ptr.cast<ffi.Uint8>();
+        rustRetBufferPtrs.add(errBufPtr);
+        throw StateError('UniFFI ffibuffer call failed with status $statusCode');
+      }
+      final ffi.Pointer<_UniFfiRustBuffer> retBufPtr = calloc<_UniFfiRustBuffer>();
+      retBufPtr.ref
+        ..capacity = (returnBuf + 0).ref.u64
+        ..len = (returnBuf + 1).ref.u64
+        ..data = (returnBuf + 2).ref.ptr.cast<ffi.Uint8>();
+      rustRetBufferPtrs.add(retBufPtr);
+      final Uint8List retBytes = retBufPtr.ref.len == 0 ? Uint8List(0) : Uint8List.fromList(retBufPtr.ref.data.asTypedList(retBufPtr.ref.len));
+      final decodedValue = _uniffiDecodeInitializeConfig(retBytes);
+      return decodedValue;
+    } finally {
+      for (final ptr in foreignArgPtrs) {
+        if (ptr != ffi.nullptr) {
+          calloc.free(ptr);
+        }
+      }
+      for (final bufPtr in rustRetBufferPtrs) {
+        if (bufPtr.ref.data == ffi.nullptr && bufPtr.ref.len == 0 && bufPtr.ref.capacity == 0) {
+          continue;
+        }
+        final ffi.Pointer<_UniFfiRustCallStatus> freeStatusPtr = calloc<_UniFfiRustCallStatus>();
+        freeStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+        freeStatusPtr.ref.errorBuf
+          ..capacity = 0
+          ..len = 0
+          ..data = ffi.nullptr;
+        _uniFfiRustBufferFree(bufPtr.ref, freeStatusPtr);
+        calloc.free(freeStatusPtr);
+        calloc.free(bufPtr);
+      }
+      calloc.free(argBuf);
+      calloc.free(returnBuf);
+    }
+  }
+
+  late final void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr) _createInitializeConfigIndraFfiBuffer = _lib.lookupFunction<ffi.Void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr), void Function(ffi.Pointer<_UniFfiFfiBufferElement> argPtr, ffi.Pointer<_UniFfiFfiBufferElement> returnPtr)>('uniffi_ffibuffer_rusto_fn_func_create_initialize_config_indra');
+
+  InitializeConfig createInitializeConfigIndra(String detModelPath, String recModelPath, String dictPath) {
+    final ffi.Pointer<_UniFfiFfiBufferElement> argBuf = calloc<_UniFfiFfiBufferElement>(9);
+    final ffi.Pointer<_UniFfiFfiBufferElement> returnBuf = calloc<_UniFfiFfiBufferElement>(7);
+    final foreignArgPtrs = <ffi.Pointer<ffi.Uint8>>[];
+    final rustRetBufferPtrs = <ffi.Pointer<_UniFfiRustBuffer>>[];
+    try {
+      final Uint8List detModelPathBytes = Uint8List.fromList(utf8.encode(detModelPath));
+      final ffi.Pointer<ffi.Uint8> detModelPathPtr = detModelPathBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(detModelPathBytes.length);
+      if (detModelPathBytes.isNotEmpty) { detModelPathPtr.asTypedList(detModelPathBytes.length).setAll(0, detModelPathBytes); }
+      foreignArgPtrs.add(detModelPathPtr);
+      final ffi.Pointer<_UniFfiRustCallStatus> detModelPathFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
+      detModelPathFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+      detModelPathFromBytesStatusPtr.ref.errorBuf
+        ..capacity = 0
+        ..len = 0
+        ..data = ffi.nullptr;
+      final ffi.Pointer<_UniFfiForeignBytes> detModelPathForeignPtr = calloc<_UniFfiForeignBytes>();
+      detModelPathForeignPtr.ref
+        ..len = detModelPathBytes.length
+        ..data = detModelPathPtr;
+      final _UniFfiRustBuffer detModelPathRustBuffer = _uniFfiRustBufferFromBytes(detModelPathForeignPtr.ref, detModelPathFromBytesStatusPtr);
+      calloc.free(detModelPathForeignPtr);
+      final int detModelPathFromBytesCode = detModelPathFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer detModelPathFromBytesErrBuf = detModelPathFromBytesStatusPtr.ref.errorBuf;
+      calloc.free(detModelPathFromBytesStatusPtr);
+      if (detModelPathFromBytesCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> detModelPathFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
+        detModelPathFromBytesErrBufPtr.ref
+          ..capacity = detModelPathFromBytesErrBuf.capacity
+          ..len = detModelPathFromBytesErrBuf.len
+          ..data = detModelPathFromBytesErrBuf.data;
+        rustRetBufferPtrs.add(detModelPathFromBytesErrBufPtr);
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $detModelPathFromBytesCode');
+      }
+      (argBuf + 0).ref.u64 = detModelPathRustBuffer.capacity;
+      (argBuf + 1).ref.u64 = detModelPathRustBuffer.len;
+      (argBuf + 2).ref.ptr = detModelPathRustBuffer.data.cast<ffi.Void>();
+      final Uint8List recModelPathBytes = Uint8List.fromList(utf8.encode(recModelPath));
+      final ffi.Pointer<ffi.Uint8> recModelPathPtr = recModelPathBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(recModelPathBytes.length);
+      if (recModelPathBytes.isNotEmpty) { recModelPathPtr.asTypedList(recModelPathBytes.length).setAll(0, recModelPathBytes); }
+      foreignArgPtrs.add(recModelPathPtr);
+      final ffi.Pointer<_UniFfiRustCallStatus> recModelPathFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
+      recModelPathFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+      recModelPathFromBytesStatusPtr.ref.errorBuf
+        ..capacity = 0
+        ..len = 0
+        ..data = ffi.nullptr;
+      final ffi.Pointer<_UniFfiForeignBytes> recModelPathForeignPtr = calloc<_UniFfiForeignBytes>();
+      recModelPathForeignPtr.ref
+        ..len = recModelPathBytes.length
+        ..data = recModelPathPtr;
+      final _UniFfiRustBuffer recModelPathRustBuffer = _uniFfiRustBufferFromBytes(recModelPathForeignPtr.ref, recModelPathFromBytesStatusPtr);
+      calloc.free(recModelPathForeignPtr);
+      final int recModelPathFromBytesCode = recModelPathFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer recModelPathFromBytesErrBuf = recModelPathFromBytesStatusPtr.ref.errorBuf;
+      calloc.free(recModelPathFromBytesStatusPtr);
+      if (recModelPathFromBytesCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> recModelPathFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
+        recModelPathFromBytesErrBufPtr.ref
+          ..capacity = recModelPathFromBytesErrBuf.capacity
+          ..len = recModelPathFromBytesErrBuf.len
+          ..data = recModelPathFromBytesErrBuf.data;
+        rustRetBufferPtrs.add(recModelPathFromBytesErrBufPtr);
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $recModelPathFromBytesCode');
+      }
+      (argBuf + 3).ref.u64 = recModelPathRustBuffer.capacity;
+      (argBuf + 4).ref.u64 = recModelPathRustBuffer.len;
+      (argBuf + 5).ref.ptr = recModelPathRustBuffer.data.cast<ffi.Void>();
+      final Uint8List dictPathBytes = Uint8List.fromList(utf8.encode(dictPath));
+      final ffi.Pointer<ffi.Uint8> dictPathPtr = dictPathBytes.isEmpty ? ffi.nullptr : calloc<ffi.Uint8>(dictPathBytes.length);
+      if (dictPathBytes.isNotEmpty) { dictPathPtr.asTypedList(dictPathBytes.length).setAll(0, dictPathBytes); }
+      foreignArgPtrs.add(dictPathPtr);
+      final ffi.Pointer<_UniFfiRustCallStatus> dictPathFromBytesStatusPtr = calloc<_UniFfiRustCallStatus>();
+      dictPathFromBytesStatusPtr.ref.code = _uniFfiRustCallStatusSuccess;
+      dictPathFromBytesStatusPtr.ref.errorBuf
+        ..capacity = 0
+        ..len = 0
+        ..data = ffi.nullptr;
+      final ffi.Pointer<_UniFfiForeignBytes> dictPathForeignPtr = calloc<_UniFfiForeignBytes>();
+      dictPathForeignPtr.ref
+        ..len = dictPathBytes.length
+        ..data = dictPathPtr;
+      final _UniFfiRustBuffer dictPathRustBuffer = _uniFfiRustBufferFromBytes(dictPathForeignPtr.ref, dictPathFromBytesStatusPtr);
+      calloc.free(dictPathForeignPtr);
+      final int dictPathFromBytesCode = dictPathFromBytesStatusPtr.ref.code;
+      final _UniFfiRustBuffer dictPathFromBytesErrBuf = dictPathFromBytesStatusPtr.ref.errorBuf;
+      calloc.free(dictPathFromBytesStatusPtr);
+      if (dictPathFromBytesCode != _uniFfiRustCallStatusSuccess) {
+        final ffi.Pointer<_UniFfiRustBuffer> dictPathFromBytesErrBufPtr = calloc<_UniFfiRustBuffer>();
+        dictPathFromBytesErrBufPtr.ref
+          ..capacity = dictPathFromBytesErrBuf.capacity
+          ..len = dictPathFromBytesErrBuf.len
+          ..data = dictPathFromBytesErrBuf.data;
+        rustRetBufferPtrs.add(dictPathFromBytesErrBufPtr);
+        throw StateError('UniFFI rustbuffer_from_bytes failed with status $dictPathFromBytesCode');
+      }
+      (argBuf + 6).ref.u64 = dictPathRustBuffer.capacity;
+      (argBuf + 7).ref.u64 = dictPathRustBuffer.len;
+      (argBuf + 8).ref.ptr = dictPathRustBuffer.data.cast<ffi.Void>();
+      _createInitializeConfigIndraFfiBuffer(argBuf, returnBuf);
       final int statusCode = (returnBuf + 3).ref.i8;
       if (statusCode != _uniFfiRustCallStatusSuccess) {
         final ffi.Pointer<_UniFfiRustBuffer> errBufPtr = calloc<_UniFfiRustBuffer>();
@@ -5358,6 +5514,12 @@ InitializeConfig createInitializeConfigForModel(String? model, String? lang, Str
   return _bindings().createInitializeConfigForModel(model, lang, modelPath);
 }
 
+/// Creates an `InitializeConfig` using the Indra OCR preset with `rec_batch_num = 1` default.
+InitializeConfig createInitializeConfigIndra(String detModelPath, String recModelPath, String dictPath) {
+  return _bindings().createInitializeConfigIndra(detModelPath, recModelPath, dictPath);
+}
+
+/// Creates an `InitializeConfig` using the PP-OCRv6 preset.
 InitializeConfig createInitializeConfigPpv6(String detModelPath, String recModelPath, String dictPath) {
   return _bindings().createInitializeConfigPpv6(detModelPath, recModelPath, dictPath);
 }

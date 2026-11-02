@@ -74,6 +74,20 @@ pub const PPV3_MODEL_CONFIG: ModelPreset = ModelPreset {
     text_score: 0.5,
 };
 
+/// Default preset configuration for Indra OCR models (Linenet dynamic recognition with batch size 1)
+pub const INDRA_MODEL_CONFIG: ModelPreset = ModelPreset {
+    det_limit_side_len: 736,
+    det_limit_type: "min",
+    det_thresh: 0.3,
+    det_box_thresh: 0.6,
+    det_unclip_ratio: 2.0,
+    det_use_dilation: true,
+    det_score_mode: "slow",
+    rec_img_shape: [1, 48, 320],
+    rec_batch_num: 1,
+    text_score: 0.5,
+};
+
 /// Main configuration for RustO OCR engine
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InitializeConfig {
@@ -358,6 +372,15 @@ impl InitializeConfig {
         Self::from_preset(PPV3_MODEL_CONFIG, det_model_path, rec_model_path, dict_path)
     }
 
+    /// Create a configuration for Indra OCR models (Linenet with rec_batch_num = 1 default)
+    pub fn indra<P: Into<PathBuf>>(
+        det_model_path: P,
+        rec_model_path: P,
+        dict_path: P,
+    ) -> Self {
+        Self::from_preset(INDRA_MODEL_CONFIG, det_model_path, rec_model_path, dict_path)
+    }
+
     /// Parse configuration from a JSON string (supports direct structured and grouped JSON formats)
     pub fn from_json(json_str: &str) -> Result<Self, serde_json::Error> {
         // Try direct structured format first
@@ -450,7 +473,15 @@ impl InitializeConfig {
         };
 
         let model_str = effective_model.unwrap_or("").to_ascii_lowercase();
-        let preset = if model_str.contains("v5") || model_str.contains("ppocrv5") {
+        let is_indra = model_str.contains("indra")
+            || model_str.contains("linenet")
+            || flat.template.as_deref().is_some_and(|t| t.eq_ignore_ascii_case("indra") || t.eq_ignore_ascii_case("linenet"))
+            || det_path.to_string_lossy().to_ascii_lowercase().contains("indra")
+            || rec_path.to_string_lossy().to_ascii_lowercase().contains("indra");
+
+        let preset = if is_indra {
+            INDRA_MODEL_CONFIG
+        } else if model_str.contains("v5") || model_str.contains("ppocrv5") {
             PPV5_MODEL_CONFIG
         } else if model_str.contains("v4") || model_str.contains("ppocrv4") {
             PPV4_MODEL_CONFIG

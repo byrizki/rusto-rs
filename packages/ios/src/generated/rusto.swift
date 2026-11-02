@@ -3694,6 +3694,21 @@ public func createInitializeConfigForModel(model: String?, lang: String?, modelP
     )
 })
 }
+/**
+ * Creates an `InitializeConfig` using the Indra OCR preset with `rec_batch_num = 1` default.
+ */
+public func createInitializeConfigIndra(detModelPath: String, recModelPath: String, dictPath: String) -> InitializeConfig  {
+    return try!  FfiConverterTypeInitializeConfig_lift(try! rustCall() {
+    uniffi_rusto_fn_func_create_initialize_config_indra(
+        FfiConverterString.lower(detModelPath),
+        FfiConverterString.lower(recModelPath),
+        FfiConverterString.lower(dictPath),$0
+    )
+})
+}
+/**
+ * Creates an `InitializeConfig` using the PP-OCRv6 preset.
+ */
 public func createInitializeConfigPpv6(detModelPath: String, recModelPath: String, dictPath: String) -> InitializeConfig  {
     return try!  FfiConverterTypeInitializeConfig_lift(try! rustCall() {
     uniffi_rusto_fn_func_create_initialize_config_ppv6(
@@ -3759,7 +3774,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_rusto_checksum_func_create_initialize_config_for_model() != 37532) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 12132) {
+    if (uniffi_rusto_checksum_func_create_initialize_config_indra() != 37620) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 42085) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_rusto_checksum_func_default_ocr_run_options() != 50314) {

@@ -638,6 +638,8 @@ internal object IntegrityCheckingUniffiLib {
     }
     external fun uniffi_rusto_checksum_func_create_initialize_config_for_model(
     ): Int
+    external fun uniffi_rusto_checksum_func_create_initialize_config_indra(
+    ): Int
     external fun uniffi_rusto_checksum_func_create_initialize_config_ppv6(
     ): Int
     external fun uniffi_rusto_checksum_func_default_ocr_run_options(
@@ -707,6 +709,8 @@ internal object UniffiLib {
     external fun uniffi_rusto_fn_method_rusto_version(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_rusto_fn_func_create_initialize_config_for_model(`model`: RustBuffer.ByValue,`lang`: RustBuffer.ByValue,`modelPath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_rusto_fn_func_create_initialize_config_indra(`detModelPath`: RustBuffer.ByValue,`recModelPath`: RustBuffer.ByValue,`dictPath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_rusto_fn_func_create_initialize_config_ppv6(`detModelPath`: RustBuffer.ByValue,`recModelPath`: RustBuffer.ByValue,`dictPath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -840,7 +844,10 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_rusto_checksum_func_create_initialize_config_for_model() != 37532) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 12132) {
+    if (lib.uniffi_rusto_checksum_func_create_initialize_config_indra() != 37620) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 42085) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rusto_checksum_func_default_ocr_run_options() != 50314) {
@@ -4084,7 +4091,23 @@ public object FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer<List<Te
     )
     }
     
- fun `createInitializeConfigPpv6`(`detModelPath`: kotlin.String, `recModelPath`: kotlin.String, `dictPath`: kotlin.String): InitializeConfig {
+
+        /**
+         * Creates an `InitializeConfig` using the Indra OCR preset with `rec_batch_num = 1` default.
+         */ fun `createInitializeConfigIndra`(`detModelPath`: kotlin.String, `recModelPath`: kotlin.String, `dictPath`: kotlin.String): InitializeConfig {
+            return FfiConverterTypeInitializeConfig.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_rusto_fn_func_create_initialize_config_indra(
+    
+        FfiConverterString.lower(`detModelPath`),FfiConverterString.lower(`recModelPath`),FfiConverterString.lower(`dictPath`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Creates an `InitializeConfig` using the PP-OCRv6 preset.
+         */ fun `createInitializeConfigPpv6`(`detModelPath`: kotlin.String, `recModelPath`: kotlin.String, `dictPath`: kotlin.String): InitializeConfig {
             return FfiConverterTypeInitializeConfig.lift(
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_rusto_fn_func_create_initialize_config_ppv6(

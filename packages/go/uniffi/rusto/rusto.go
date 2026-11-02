@@ -380,9 +380,18 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_rusto_checksum_func_create_initialize_config_indra()
+		})
+		if checksum != 37620 {
+			// If this happens try cleaning and rebuilding your project
+			panic("rusto: uniffi_rusto_checksum_func_create_initialize_config_indra: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_rusto_checksum_func_create_initialize_config_ppv6()
 		})
-		if checksum != 12132 {
+		if checksum != 42085 {
 			// If this happens try cleaning and rebuilding your project
 			panic("rusto: uniffi_rusto_checksum_func_create_initialize_config_ppv6: UniFFI API checksum mismatch")
 		}
@@ -3598,6 +3607,16 @@ func CreateInitializeConfigForModel(model *string, lang *string, modelPath *stri
 	}))
 }
 
+// Creates an `InitializeConfig` using the Indra OCR preset with `rec_batch_num = 1` default.
+func CreateInitializeConfigIndra(detModelPath string, recModelPath string, dictPath string) InitializeConfig {
+	return FfiConverterInitializeConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_rusto_fn_func_create_initialize_config_indra(FfiConverterStringINSTANCE.Lower(detModelPath), FfiConverterStringINSTANCE.Lower(recModelPath), FfiConverterStringINSTANCE.Lower(dictPath), _uniffiStatus),
+		}
+	}))
+}
+
+// Creates an `InitializeConfig` using the PP-OCRv6 preset.
 func CreateInitializeConfigPpv6(detModelPath string, recModelPath string, dictPath string) InitializeConfig {
 	return FfiConverterInitializeConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
 		return GoRustBuffer{

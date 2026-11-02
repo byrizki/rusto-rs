@@ -68,7 +68,7 @@ pub mod binding;
 
 // Public API exports
 pub use calibration::{CalibrationOptions, OptimizationOptions};
-pub use config::{ModelPreset, InitializeConfig, PPV3_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG};
+pub use config::{ModelPreset, InitializeConfig, PPV3_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG, INDRA_MODEL_CONFIG};
 pub use rusto_ocr::{DetectionRunOptions, PostprocessRunOptions};
 pub use det::TextDetector;
 pub use doc_pipeline::{DocBlock, DocPipeline, DocPipelineConfig, DocResult};

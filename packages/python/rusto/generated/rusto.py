@@ -480,7 +480,9 @@ def _uniffi_check_contract_api_version(lib):
 def _uniffi_check_api_checksums(lib):
     if lib.uniffi_rusto_checksum_func_create_initialize_config_for_model() != 37532:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    if lib.uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 12132:
+    if lib.uniffi_rusto_checksum_func_create_initialize_config_indra() != 37620:
+        raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    if lib.uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 42085:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     if lib.uniffi_rusto_checksum_func_default_ocr_run_options() != 50314:
         raise InternalError("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
@@ -788,6 +790,13 @@ _UniffiLib.uniffi_rusto_fn_func_create_initialize_config_for_model.argtypes = (
     ctypes.POINTER(_UniffiRustCallStatus),
 )
 _UniffiLib.uniffi_rusto_fn_func_create_initialize_config_for_model.restype = _UniffiRustBuffer
+_UniffiLib.uniffi_rusto_fn_func_create_initialize_config_indra.argtypes = (
+    _UniffiRustBuffer,
+    _UniffiRustBuffer,
+    _UniffiRustBuffer,
+    ctypes.POINTER(_UniffiRustCallStatus),
+)
+_UniffiLib.uniffi_rusto_fn_func_create_initialize_config_indra.restype = _UniffiRustBuffer
 _UniffiLib.uniffi_rusto_fn_func_create_initialize_config_ppv6.argtypes = (
     _UniffiRustBuffer,
     _UniffiRustBuffer,
@@ -883,6 +892,9 @@ _UniffiLib.ffi_rusto_uniffi_contract_version.restype = ctypes.c_uint32
 _UniffiLib.uniffi_rusto_checksum_func_create_initialize_config_for_model.argtypes = (
 )
 _UniffiLib.uniffi_rusto_checksum_func_create_initialize_config_for_model.restype = ctypes.c_uint16
+_UniffiLib.uniffi_rusto_checksum_func_create_initialize_config_indra.argtypes = (
+)
+_UniffiLib.uniffi_rusto_checksum_func_create_initialize_config_indra.restype = ctypes.c_uint16
 _UniffiLib.uniffi_rusto_checksum_func_create_initialize_config_ppv6.argtypes = (
 )
 _UniffiLib.uniffi_rusto_checksum_func_create_initialize_config_ppv6.restype = ctypes.c_uint16
@@ -3528,7 +3540,33 @@ def create_initialize_config_for_model(model: typing.Optional[str],lang: typing.
         *_uniffi_lowered_args,
     )
     return _uniffi_lift_return(_uniffi_ffi_result)
+def create_initialize_config_indra(det_model_path: str,rec_model_path: str,dict_path: str) -> InitializeConfig:
+    """
+    Creates an `InitializeConfig` using the Indra OCR preset with `rec_batch_num = 1` default.
+"""
+    
+    _UniffiFfiConverterString.check_lower(det_model_path)
+
+    _UniffiFfiConverterString.check_lower(rec_model_path)
+
+    _UniffiFfiConverterString.check_lower(dict_path)
+    _uniffi_lowered_args = (
+        _UniffiFfiConverterString.lower(det_model_path),
+        _UniffiFfiConverterString.lower(rec_model_path),
+        _UniffiFfiConverterString.lower(dict_path),
+    )
+    _uniffi_lift_return = _UniffiFfiConverterTypeInitializeConfig.lift
+    _uniffi_error_converter = None
+    _uniffi_ffi_result = _uniffi_rust_call_with_error(
+        _uniffi_error_converter,
+        _UniffiLib.uniffi_rusto_fn_func_create_initialize_config_indra,
+        *_uniffi_lowered_args,
+    )
+    return _uniffi_lift_return(_uniffi_ffi_result)
 def create_initialize_config_ppv6(det_model_path: str,rec_model_path: str,dict_path: str) -> InitializeConfig:
+    """
+    Creates an `InitializeConfig` using the PP-OCRv6 preset.
+"""
     
     _UniffiFfiConverterString.check_lower(det_model_path)
 
@@ -3640,6 +3678,7 @@ __all__ = [
     "TextResult",
     "UnwarpedImageResult",
     "create_initialize_config_for_model",
+    "create_initialize_config_indra",
     "create_initialize_config_ppv6",
     "default_ocr_run_options",
     "download_all_models",

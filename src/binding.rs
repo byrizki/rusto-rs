@@ -507,6 +507,7 @@ pub fn rusto_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// Creates an `InitializeConfig` using the PP-OCRv6 preset.
 #[uniffi::export]
 pub fn create_initialize_config_ppv6(
     det_model_path: String,
@@ -525,6 +526,30 @@ pub fn create_initialize_config_ppv6(
             model_path: Some(rec_model_path),
             dict_path: Some(dict_path),
             rec_batch_num: None,
+        }),
+        ..Default::default()
+    }
+}
+
+/// Creates an `InitializeConfig` using the Indra OCR preset with `rec_batch_num = 1` default.
+#[uniffi::export]
+pub fn create_initialize_config_indra(
+    det_model_path: String,
+    rec_model_path: String,
+    dict_path: String,
+) -> InitializeConfig {
+    InitializeConfig {
+        template: Some("indra".to_string()),
+        detection: Some(DetectionConfig {
+            enabled: Some(true),
+            model_path: Some(det_model_path),
+            ..Default::default()
+        }),
+        recognition: Some(RecognitionConfig {
+            enabled: Some(true),
+            model_path: Some(rec_model_path),
+            dict_path: Some(dict_path),
+            rec_batch_num: Some(1),
         }),
         ..Default::default()
     }

@@ -241,7 +241,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     let model_lower = cli.model.to_ascii_lowercase();
-    let preset = if model_lower.contains("v5") || model_lower.contains("ppocrv5") {
+    let preset = if model_lower.contains("indra") || model_lower.contains("linenet") {
+        rusto::INDRA_MODEL_CONFIG
+    } else if model_lower.contains("v5") || model_lower.contains("ppocrv5") {
         rusto::PPV5_MODEL_CONFIG
     } else if model_lower.contains("v4") || model_lower.contains("ppocrv4") {
         rusto::PPV4_MODEL_CONFIG

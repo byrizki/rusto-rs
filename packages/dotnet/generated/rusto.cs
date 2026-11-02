@@ -1099,6 +1099,21 @@ static class _UniFFILib
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
+    RustBuffer uniffi_rusto_fn_func_create_initialize_config_indra(
+        RustBuffer @detModelPath,
+        RustBuffer @recModelPath,
+        RustBuffer @dictPath,
+        ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+#if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
     RustBuffer uniffi_rusto_fn_func_create_initialize_config_ppv6(
         RustBuffer @detModelPath,
         RustBuffer @recModelPath,
@@ -1735,6 +1750,16 @@ static class _UniFFILib
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
+    ushort uniffi_rusto_checksum_func_create_initialize_config_indra();
+
+#if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
     ushort uniffi_rusto_checksum_func_create_initialize_config_ppv6();
 
 #if NET8_0_OR_GREATER
@@ -1901,11 +1926,20 @@ static class _UniFFILib
             }
         }
         {
-            var checksum = _UniFFILib.uniffi_rusto_checksum_func_create_initialize_config_ppv6();
-            if (checksum != 12132)
+            var checksum = _UniFFILib.uniffi_rusto_checksum_func_create_initialize_config_indra();
+            if (checksum != 37620)
             {
                 throw new UniffiContractChecksumException(
-                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_create_initialize_config_ppv6` checksum `12132`, library returned `{checksum}`"
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_create_initialize_config_indra` checksum `37620`, library returned `{checksum}`"
+                );
+            }
+        }
+        {
+            var checksum = _UniFFILib.uniffi_rusto_checksum_func_create_initialize_config_ppv6();
+            if (checksum != 42085)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_create_initialize_config_ppv6` checksum `42085`, library returned `{checksum}`"
                 );
             }
         }
@@ -5619,6 +5653,31 @@ public static class RustoMethods
         );
     }
 
+    /// <summary>
+    /// Creates an `InitializeConfig` using the Indra OCR preset with `rec_batch_num = 1` default.
+    /// </summary>
+    public static InitializeConfig CreateInitializeConfigIndra(
+        string @detModelPath,
+        string @recModelPath,
+        string @dictPath
+    )
+    {
+        return FfiConverterTypeInitializeConfig.INSTANCE.Lift(
+            _UniffiHelpers.RustCall(
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_rusto_fn_func_create_initialize_config_indra(
+                        FfiConverterString.INSTANCE.Lower(@detModelPath),
+                        FfiConverterString.INSTANCE.Lower(@recModelPath),
+                        FfiConverterString.INSTANCE.Lower(@dictPath),
+                        ref _status
+                    )
+            )
+        );
+    }
+
+    /// <summary>
+    /// Creates an `InitializeConfig` using the PP-OCRv6 preset.
+    /// </summary>
     public static InitializeConfig CreateInitializeConfigPpv6(
         string @detModelPath,
         string @recModelPath,

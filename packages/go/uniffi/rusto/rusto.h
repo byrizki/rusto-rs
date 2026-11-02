@@ -430,6 +430,11 @@ RustBuffer uniffi_rusto_fn_method_rusto_version(uint64_t ptr, RustCallStatus *ou
 RustBuffer uniffi_rusto_fn_func_create_initialize_config_for_model(RustBuffer model, RustBuffer lang, RustBuffer model_path, RustCallStatus *out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_CREATE_INITIALIZE_CONFIG_INDRA
+#define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_CREATE_INITIALIZE_CONFIG_INDRA
+RustBuffer uniffi_rusto_fn_func_create_initialize_config_indra(RustBuffer det_model_path, RustBuffer rec_model_path, RustBuffer dict_path, RustCallStatus *out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_CREATE_INITIALIZE_CONFIG_PPV6
 #define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_CREATE_INITIALIZE_CONFIG_PPV6
 RustBuffer uniffi_rusto_fn_func_create_initialize_config_ppv6(RustBuffer det_model_path, RustBuffer rec_model_path, RustBuffer dict_path, RustCallStatus *out_status
@@ -720,6 +725,12 @@ void ffi_rusto_rust_future_complete_void(uint64_t handle, RustCallStatus *out_st
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_CREATE_INITIALIZE_CONFIG_FOR_MODEL
 #define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_CREATE_INITIALIZE_CONFIG_FOR_MODEL
 uint16_t uniffi_rusto_checksum_func_create_initialize_config_for_model(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_CREATE_INITIALIZE_CONFIG_INDRA
+#define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_CREATE_INITIALIZE_CONFIG_INDRA
+uint16_t uniffi_rusto_checksum_func_create_initialize_config_indra(void
     
 );
 #endif
