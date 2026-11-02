@@ -1,0 +1,82 @@
+[
+  {
+    "name": "1. PP-OCRv6 Tiny (Base Det+Rec, 1D sort)",
+    "mean_latency_ms": 1048.1,
+    "p95_latency_ms": 2003.2,
+    "mean_ned": 0.5521,
+    "accuracy_pct": 44.79,
+    "usatoday_ned": 0.7815
+  },
+  {
+    "name": "2. PP-OCRv6 Small (Base Det+Rec, 1D sort)",
+    "mean_latency_ms": 3678.2,
+    "p95_latency_ms": 6902.0,
+    "mean_ned": 0.5564,
+    "accuracy_pct": 44.36,
+    "usatoday_ned": 0.7845
+  },
+  {
+    "name": "3. Indra OCR (Base Det+Rec, 1D sort)",
+    "mean_latency_ms": 447.8,
+    "p95_latency_ms": 1135.3,
+    "mean_ned": 0.5454,
+    "accuracy_pct": 45.46,
+    "usatoday_ned": 0.7831
+  },
+  {
+    "name": "4. Hybrid: PP-OCR Tiny (Det+Rec) + Indra Order",
+    "mean_latency_ms": 1045.7,
+    "p95_latency_ms": 2053.2,
+    "mean_ned": 0.3751,
+    "accuracy_pct": 62.49,
+    "usatoday_ned": 0.0417
+  },
+  {
+    "name": "5. Hybrid: PP-OCR Small (Det+Rec) + Indra Order",
+    "mean_latency_ms": 3629.7,
+    "p95_latency_ms": 7130.1,
+    "mean_ned": 0.3766,
+    "accuracy_pct": 62.34,
+    "usatoday_ned": 0.038
+  },
+  {
+    "name": "6. Hybrid: Indra Det + PP-OCR Tiny Rec (1D sort)",
+    "mean_latency_ms": 793.9,
+    "p95_latency_ms": 2093.7,
+    "mean_ned": 0.551,
+    "accuracy_pct": 44.9,
+    "usatoday_ned": 0.7832
+  },
+  {
+    "name": "7. Hybrid: Indra Det + PP-OCR Tiny Rec + Indra Order",
+    "mean_latency_ms": 755.3,
+    "p95_latency_ms": 2057.1,
+    "mean_ned": 0.3697,
+    "accuracy_pct": 63.03,
+    "usatoday_ned": 0.0389
+  },
+  {
+    "name": "8. Hybrid: PP-OCR Tiny Det + Indra Rec (1D sort)",
+    "mean_latency_ms": 1853.7,
+    "p95_latency_ms": 6744.2,
+    "mean_ned": 0.5469,
+    "accuracy_pct": 45.31,
+    "usatoday_ned": 0.783
+  },
+  {
+    "name": "9. Hybrid: PP-OCR Tiny Det + Indra Rec + Indra Order",
+    "mean_latency_ms": 1547.9,
+    "p95_latency_ms": 5008.3,
+    "mean_ned": 0.3901,
+    "accuracy_pct": 60.99,
+    "usatoday_ned": 0.0347
+  },
+  {
+    "name": "10. Indra Native Full Pipeline (Det+Orient+Rec+Order)",
+    "mean_latency_ms": 536.3,
+    "p95_latency_ms": 1273.5,
+    "mean_ned": 0.3625,
+    "accuracy_pct": 63.75,
+    "usatoday_ned": 0.0348
+  }
+]

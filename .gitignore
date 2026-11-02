@@ -32,6 +32,13 @@ ktp.jpeg
 .codesight/
 benchmarks/engine_comparison/dump/
 benchmarks/engine_comparison/calibrated_samples/
+benchmarks/omnidocbench/dataset/
+benchmarks/omnidocbench/evaluator/
+benchmarks/omnidocbench/predictions/
+benchmarks/omnidocbench/ocrs_bin/
+benchmarks/omnidocbench/results/*
+!benchmarks/omnidocbench/results/benchmark_metrics.json
+!benchmarks/omnidocbench/results/hybrid_mixing_metrics.json
 
 # Bundled model assets (generated at build time via packages/react-native/scripts/copy-models.sh)
 packages/android/src/main/assets/*.mnn
