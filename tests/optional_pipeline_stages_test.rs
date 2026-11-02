@@ -253,3 +253,60 @@ fn test_rusto_detect_layout_api() {
         assert_eq!(regions[0].confidence, 0.97);
     }
 }
+
+#[test]
+fn test_real_layout_cdla_detection() {
+    let model_path = "models/PPOCR_v6_tiny/layout_cdla.onnx";
+    let img_path = "vendor/RapidDoc/demo/images/layout_original_image_01.png";
+
+    if !std::path::Path::new(model_path).exists() || !std::path::Path::new(img_path).exists() {
+        return;
+    }
+
+    let config = LayoutConfig::default(model_path.into());
+    let mut detector = LayoutDetector::new(config).expect("Load layout_cdla.onnx");
+
+    let img = image::open(img_path).expect("open test image");
+    let mat = rusto::image_impl::Mat::new(img);
+
+    let output = detector.detect(&mat).expect("Run layout detection");
+    println!("Detected {} layout regions in {:.2} ms:", output.regions.len(), output.elapse * 1000.0);
+    for r in &output.regions {
+        println!("  {}: score={:.4}, bbox=[{}, {}, {}, {}]", r.layout_type.name(), r.confidence, r.bbox.x_min, r.bbox.y_min, r.bbox.x_max, r.bbox.y_max);
+    }
+    assert!(!output.regions.is_empty(), "Should detect layout regions");
+
+    for r in &output.regions {
+        assert!(r.confidence >= 0.4);
+        assert!(r.bbox.x_max > r.bbox.x_min);
+        assert!(r.bbox.y_max > r.bbox.y_min);
+    }
+
+    let has_text = output.regions.iter().any(|r| matches!(r.layout_type, LayoutType::Text));
+    assert!(has_text, "Should detect text regions");
+}
+
+#[test]
+fn test_real_layout_publaynet_detection() {
+    let model_path = "models/PPOCR_v6_tiny/layout_publaynet.onnx";
+    let img_path = "vendor/RapidDoc/demo/images/layout_original_image_01.png";
+
+    if !std::path::Path::new(model_path).exists() || !std::path::Path::new(img_path).exists() {
+        return;
+    }
+
+    let config = LayoutConfig::default(model_path.into());
+    let mut detector = LayoutDetector::new(config).expect("Load layout_publaynet.onnx");
+
+    let img = image::open(img_path).expect("open test image");
+    let mat = rusto::image_impl::Mat::new(img);
+
+    let output = detector.detect(&mat).expect("Run layout detection");
+    assert!(!output.regions.is_empty(), "Should detect layout regions");
+
+    for r in &output.regions {
+        assert!(r.confidence >= 0.4);
+        assert!(r.bbox.x_max > r.bbox.x_min);
+        assert!(r.bbox.y_max > r.bbox.y_min);
+    }
+}

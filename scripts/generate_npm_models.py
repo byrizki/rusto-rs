@@ -369,32 +369,32 @@ MODEL_DEFINITIONS = [
         "is_optin": True,
     },
     {
-        "id": "layout-s",
-        "name": "@rustors/model-layout-s",
-        "title": "Document Layout Detection (Small)",
-        "description": "PP-DocLayout-S document layout model (~4.7 MB) for RustO OCR. Detects text, title, figure, table, and list regions.",
+        "id": "layout-cdla",
+        "name": "@rustors/model-layout-cdla",
+        "title": "Document Layout Detection CDLA (10-Class)",
+        "description": "PP-Structure CDLA layout model (~7.1 MB) for RustO OCR. Detects text, title, figure, table, header, footer, reference, and equation regions.",
         "preset": "pipeline",
         "tier": "optional",
         "language": "multilingual",
         "source_dirs": [""],
-        "source_files": {"layout_s.rten": "layout_s.rten", "layout_s.onnx": "layout_s.onnx"},
-        "files": ["layout_s.rten"],
-        "optional_files": ["layout_s.onnx"],
+        "source_files": {"layout_cdla.rten": "layout_cdla.rten", "layout_cdla.onnx": "layout_cdla.onnx"},
+        "files": ["layout_cdla.rten"],
+        "optional_files": ["layout_cdla.onnx"],
         "is_core": False,
         "is_optin": True,
     },
     {
-        "id": "layout-l",
-        "name": "@rustors/model-layout-l",
-        "title": "Document Layout Detection (Large)",
-        "description": "PP-DocLayout-Plus-L document layout model (~124 MB) for RustO OCR. High-precision layout detection for complex documents.",
+        "id": "layout-publaynet",
+        "name": "@rustors/model-layout-publaynet",
+        "title": "Document Layout Detection PubLayNet (5-Class)",
+        "description": "PP-Structure PubLayNet layout model (~7.1 MB) for RustO OCR. Detects text, title, list, table, and figure regions.",
         "preset": "pipeline",
         "tier": "optional",
         "language": "multilingual",
         "source_dirs": [""],
-        "source_files": {"layout_l.rten": "layout_l.rten", "layout_l.onnx": "layout_l.onnx"},
-        "files": ["layout_l.rten"],
-        "optional_files": ["layout_l.onnx"],
+        "source_files": {"layout_publaynet.rten": "layout_publaynet.rten", "layout_publaynet.onnx": "layout_publaynet.onnx"},
+        "files": ["layout_publaynet.rten"],
+        "optional_files": ["layout_publaynet.onnx"],
         "is_core": False,
         "is_optin": True,
     },
@@ -553,7 +553,7 @@ def generate_src_index_ts(definition: dict, version: str) -> str:
                 files_dict["unwarpOnnx"] = f"models/{f}"
                 if "unwarp" not in files_dict:
                     files_dict["unwarp"] = f"models/{f}"
-        elif f.startswith("layout_s.") or f.startswith("layout_l.") or f.startswith("layout."):
+        elif f.startswith("layout_cdla.") or f.startswith("layout_publaynet.") or f.startswith("layout_s.") or f.startswith("layout_l.") or f.startswith("layout."):
             if f.endswith(".rten"):
                 files_dict["layoutRten"] = f"models/{f}"
                 if "layout" not in files_dict or not files_dict["layout"].endswith(".rten"):

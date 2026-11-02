@@ -316,6 +316,10 @@ pub struct LayoutConfig {
     pub conf_thresh: Option<f32>,
     /// Target input side length for resizing.
     pub target_size: Option<i32>,
+    /// Target input height for resizing.
+    pub target_height: Option<i32>,
+    /// Target input width for resizing.
+    pub target_width: Option<i32>,
 }
 
 /// Unwarped image result with raw RGB8 pixel buffer and dimensions.

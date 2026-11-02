@@ -184,6 +184,10 @@ struct LayoutConfigJson {
     conf_thresh: Option<f32>,
     #[serde(alias = "targetSize", alias = "target_size")]
     target_size: Option<i32>,
+    #[serde(alias = "targetHeight", alias = "target_height")]
+    target_height: Option<i32>,
+    #[serde(alias = "targetWidth", alias = "target_width")]
+    target_width: Option<i32>,
     #[serde(alias = "yThresholdMultiplier", alias = "y_threshold_multiplier")]
     y_threshold_multiplier: Option<f32>,
     #[serde(alias = "xThresholdMultiplier", alias = "x_threshold_multiplier")]
@@ -348,6 +352,12 @@ impl InitializeConfig {
             }
             if let Some(target_size) = flat.layout.as_ref().and_then(|l| l.target_size) {
                 l_cfg.target_size = target_size;
+            }
+            if let Some(target_height) = flat.layout.as_ref().and_then(|l| l.target_height) {
+                l_cfg.target_height = Some(target_height);
+            }
+            if let Some(target_width) = flat.layout.as_ref().and_then(|l| l.target_width) {
+                l_cfg.target_width = Some(target_width);
             }
             config = config.with_layout_config(l_cfg);
         }

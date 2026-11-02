@@ -245,7 +245,7 @@ fn resolve_model_path(path: &Path) -> PathBuf {
         let is_cls = file_name.starts_with("cls");
         let is_orient = file_name.starts_with("orient") || file_name.starts_with("rapid_orientation") || file_name.starts_with("lcnet");
         let is_unwarp = file_name.starts_with("unwarp") || file_name.starts_with("uvdoc");
-        let is_layout = file_name.starts_with("layout") || file_name.starts_with("pp_doclayout");
+        let is_layout = file_name.starts_with("layout") || file_name.starts_with("pp_doclayout") || file_name.starts_with("pp_layout");
 
         let candidates: &[&str] = if is_det {
             &["det"]
@@ -258,7 +258,7 @@ fn resolve_model_path(path: &Path) -> PathBuf {
         } else if is_unwarp {
             &["unwarp", "uvdoc"]
         } else if is_layout {
-            &["layout", "pp_doclayout_plus_l", "pp_doclayout_s"]
+            &["layout_cdla", "layout_publaynet", "layout", "layout_s", "layout_l", "pp_doclayout_plus_l", "pp_doclayout_s"]
         } else {
             &[]
         };

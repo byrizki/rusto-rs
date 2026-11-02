@@ -451,18 +451,24 @@ pub struct LayoutConfig {
     pub conf_thresh: f32,
     pub iou_thresh: f32,
     pub target_size: i32,
+    #[serde(default)]
+    pub target_height: Option<i32>,
+    #[serde(default)]
+    pub target_width: Option<i32>,
     pub engine_cfg: EngineConfig,
 }
 
 impl LayoutConfig {
     pub fn default(model_path: PathBuf) -> Self {
         let p_str = model_path.to_string_lossy();
-        let target_size = if p_str.contains("layout_s") || p_str.contains("doclayout_s") {
-            480
-        } else if p_str.contains("layout_l") || p_str.contains("doclayout_l") || p_str.contains("doclayout_plus_l") {
-            800
+        let (target_height, target_width) = if p_str.contains("doclayout_s") {
+            (480, 480)
+        } else if p_str.contains("doclayout_l") || p_str.contains("doclayout_plus_l") {
+            (800, 800)
+        } else if p_str.contains("yolo") {
+            (640, 640)
         } else {
-            640
+            (800, 608)
         };
         Self {
             engine_type: EngineType::OnnxRuntime,
@@ -473,7 +479,9 @@ impl LayoutConfig {
             std: [0.229, 0.224, 0.225],  // ImageNet std
             conf_thresh: 0.4,
             iou_thresh: 0.5,
-            target_size,
+            target_size: target_height,
+            target_height: Some(target_height),
+            target_width: Some(target_width),
             engine_cfg: EngineConfig::default(),
         }
     }

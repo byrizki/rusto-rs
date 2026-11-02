@@ -166,6 +166,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Output projected text results.
+    let effective_results = if let Some(regions) = &layout_regions {
+        if !regions.is_empty() {
+            let img_w = results
+                .iter()
+                .map(|r| r.frame.left + r.frame.width)
+                .chain(regions.iter().map(|r| r.bbox.x_max as f32))
+                .fold(1.0f32, f32::max);
+            order_text_results_by_layout(&results, regions, img_w)
+        } else {
+            results
+        }
+    } else {
+        results
+    };
+
     match cli.format {
         OutputFormat::Json => {
             if let Some(regions) = &layout_regions {
@@ -175,20 +190,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     layout_regions: &'a [rusto::LayoutRegion],
                 }
                 println!("{}", serde_json::to_string_pretty(&OutputWithLayout {
-                    text_results: &results,
+                    text_results: &effective_results,
                     layout_regions: regions,
                 })?);
             } else {
-                println!("{}", serde_json::to_string_pretty(&results)?);
+                println!("{}", serde_json::to_string_pretty(&effective_results)?);
             }
         }
         OutputFormat::Text | OutputFormat::TextOrdered => {
-            for result in &results {
+            for result in &effective_results {
                 println!("{}", result.text);
             }
         }
         OutputFormat::Tsv => {
-            for result in &results {
+            for result in &effective_results {
                 let box_points = result.box_points;
                 println!(
                     "{}\t{:.3}\t{:.1},{:.1},{:.1},{:.1},{:.1},{:.1},{:.1},{:.1}",
@@ -207,7 +222,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         OutputFormat::Markdown => {
             println!("```");
-            for result in &results {
+            for result in &effective_results {
                 println!("{}", result.text);
             }
             println!("```");
@@ -215,4 +230,100 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+fn order_text_results_by_layout(
+    results: &[rusto::TextResult],
+    regions: &[rusto::LayoutRegion],
+    w: f32,
+) -> Vec<rusto::TextResult> {
+    if regions.is_empty() || results.is_empty() {
+        return results.to_vec();
+    }
+
+    let mut sorted_regions = regions.to_vec();
+    sorted_regions.sort_by(|a, b| {
+        a.bbox
+            .y_min
+            .cmp(&b.bbox.y_min)
+            .then_with(|| a.bbox.x_min.cmp(&b.bbox.x_min))
+    });
+
+    let mut new_res = Vec::new();
+    let mut res_left = Vec::new();
+    let mut res_right = Vec::new();
+
+    for reg in sorted_regions {
+        let x1 = reg.bbox.x_min as f32;
+        let x2 = reg.bbox.x_max as f32;
+
+        if x1 < w / 4.0 && x2 < 3.0 * w / 5.0 {
+            res_left.push(reg);
+        } else if x1 > 2.0 * w / 5.0 {
+            res_right.push(reg);
+        } else {
+            new_res.append(&mut res_left);
+            new_res.append(&mut res_right);
+            new_res.push(reg);
+        }
+    }
+    new_res.append(&mut res_left);
+    new_res.append(&mut res_right);
+
+    let mut region_buckets: Vec<Vec<rusto::TextResult>> = vec![Vec::new(); new_res.len()];
+    let mut unassigned: Vec<rusto::TextResult> = Vec::new();
+
+    for res in results {
+        let cx = res.frame.left + res.frame.width / 2.0;
+        let cy = res.frame.top + res.frame.height / 2.0;
+
+        let mut matched = false;
+        for (i, reg) in new_res.iter().enumerate() {
+            if cx >= reg.bbox.x_min as f32
+                && cx <= reg.bbox.x_max as f32
+                && cy >= reg.bbox.y_min as f32
+                && cy <= reg.bbox.y_max as f32
+            {
+                region_buckets[i].push(res.clone());
+                matched = true;
+                break;
+            }
+        }
+        if !matched {
+            unassigned.push(res.clone());
+        }
+    }
+
+    let mut ordered = Vec::with_capacity(results.len());
+    for mut bucket in region_buckets {
+        bucket.sort_by(|a, b| {
+            let y_diff = (a.frame.top - b.frame.top).abs();
+            if y_diff < 10.0 {
+                a.frame.left
+                    .partial_cmp(&b.frame.left)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            } else {
+                a.frame.top
+                    .partial_cmp(&b.frame.top)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            }
+        });
+        ordered.extend(bucket);
+    }
+
+    unassigned.sort_by(|a, b| {
+        let y_diff = (a.frame.top - b.frame.top).abs();
+        if y_diff < 10.0 {
+            a.frame.left
+                .partial_cmp(&b.frame.left)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        } else {
+            a.frame.top
+                .partial_cmp(&b.frame.top)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        }
+    });
+    ordered.extend(unassigned);
+
+    ordered
 }

@@ -283,25 +283,33 @@ download_unwarp() {
     download_file_to "$dir" "uvdoc.onnx" "https://huggingface.co/PaddlePaddle/UVDoc_onnx/resolve/main/inference.onnx"
 }
 
-download_layout_s() {
+download_layout_cdla() {
     local dir="$1"
-    echo "=== Downloading Document Layout Model Small (layout_s.onnx) ==="
-    download_file_to "$dir" "layout_s.onnx" "https://www.modelscope.cn/api/v1/models/RapidAI/RapidDoc/repo?Revision=master&FilePath=layout%2FPP-DocLayout-S%2Fpp_doclayout_s.onnx"
+    echo "=== Downloading Document Layout Model CDLA 10-Class (layout_cdla.onnx) ==="
+    download_file_to "$dir" "layout_cdla.onnx" "https://www.modelscope.cn/models/RapidAI/RapidLayout/resolve/v1.2.0/onnx/pp_layout/layout_cdla.onnx"
+}
+
+download_layout_publaynet() {
+    local dir="$1"
+    echo "=== Downloading Document Layout Model PubLayNet 5-Class (layout_publaynet.onnx) ==="
+    download_file_to "$dir" "layout_publaynet.onnx" "https://www.modelscope.cn/models/RapidAI/RapidLayout/resolve/v1.2.0/onnx/pp_layout/layout_publaynet.onnx"
+}
+
+download_layout_s() {
+    download_layout_cdla "$@"
 }
 
 download_layout_l() {
-    local dir="$1"
-    echo "=== Downloading Document Layout Model Large (layout_l.onnx) ==="
-    download_file_to "$dir" "layout_l.onnx" "https://www.modelscope.cn/api/v1/models/RapidAI/RapidDoc/repo?Revision=master&FilePath=layout%2FPP-DocLayout_plus-L%2Fpp_doclayout_plus_l.onnx"
+    download_layout_publaynet "$@"
 }
 
 download_layout() {
     local dir="$1"
-    local variant="${2:-s}"
-    if [ "$variant" = "l" ] || [ "$variant" = "large" ] || [ "$variant" = "plus-l" ]; then
-        download_layout_l "$dir"
+    local variant="${2:-cdla}"
+    if [ "$variant" = "publaynet" ] || [ "$variant" = "l" ]; then
+        download_layout_publaynet "$dir"
     else
-        download_layout_s "$dir"
+        download_layout_cdla "$dir"
     fi
 }
 
@@ -344,8 +352,8 @@ if [ "$DOWNLOAD_ALL" = true ]; then
     start_model_group download_cls      "${OUTPUT_DIR:-$REPO_ROOT/models}"
     start_model_group download_orient   "${OUTPUT_DIR:-$REPO_ROOT/models}"
     start_model_group download_unwarp   "${OUTPUT_DIR:-$REPO_ROOT/models}"
-    start_model_group download_layout_s "${OUTPUT_DIR:-$REPO_ROOT/models}"
-    start_model_group download_layout_l "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    start_model_group download_layout_cdla       "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    start_model_group download_layout_publaynet  "${OUTPUT_DIR:-$REPO_ROOT/models}"
 
     if ! wait_jobs "${tier_pids[@]}"; then
         tier_failed=1
@@ -395,8 +403,8 @@ else
         download_unwarp "$TARGET_DIR"
     fi
     if [ "$WITH_LAYOUT" = true ]; then
-        download_layout_s "$TARGET_DIR"
-        download_layout_l "$TARGET_DIR"
+        download_layout_cdla "$TARGET_DIR"
+        download_layout_publaynet "$TARGET_DIR"
     fi
 fi
 
