@@ -143,6 +143,22 @@ class RustO {
     return RustO._(generated.RustO.initializeFromJson(configJson));
   }
 
+  /// Downloads model assets for a specific OCR pipeline ahead of time.
+  static List<String> downloadModel({
+    String? model,
+    String? lang,
+    String? cacheDir,
+  }) {
+    _initBindingsIfNeeded();
+    return generated.downloadModel(model, lang, cacheDir);
+  }
+
+  /// Downloads all available canonical models to the cache directory ahead of time.
+  static List<String> downloadAllModels({String? cacheDir}) {
+    _initBindingsIfNeeded();
+    return generated.downloadAllModels(cacheDir);
+  }
+
   /// Detect text from file path with structured results.
   List<generated.TextResult> detectTextFile(String imagePath,
       [dynamic options]) {
@@ -260,6 +276,8 @@ class RustO {
         textScore: opts.textScore,
         classification: opts.classification,
         orientation: opts.orientation,
+        unwarp: opts.unwarp,
+        layout: opts.layout,
         minHeight: opts.minHeight,
         maxSideLen: opts.maxSideLen,
         minSideLen: opts.minSideLen,
@@ -268,6 +286,7 @@ class RustO {
         postprocess: opts.postprocess,
         calibration: opts.calibration,
         optimization: opts.optimization,
+        recBatchNum: opts.recBatchNum,
       );
     }
     return opts;

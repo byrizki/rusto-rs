@@ -108,17 +108,19 @@ if (result is StructuredDetectTextResult structured) {
 ### 3. Web (WASM / Browser)
 
 ```bash
-npm install @rustors/web @rustors/model-ppocrv6-tiny
+npm install @rustors/web
 ```
 
 ```typescript
 import { initialize, detectText } from '@rustors/web';
-import { getModelUrls } from '@rustors/model-ppocrv6-tiny';
 
-const urls = getModelUrls('/models/ppocrv6-tiny');
 await initialize({
   preset: 'ppv6',
-  models: { detection: urls.detection, recognition: urls.recognition, dictionary: urls.dictionary },
+  models: {
+    detection: '/models/ppocrv6-tiny/det.rten',
+    recognition: '/models/ppocrv6-tiny/rec.rten',
+    dictionary: '/models/ppocrv6-tiny/dict.txt',
+  },
 });
 
 const results = await detectText(document.querySelector('img')!);
@@ -130,14 +132,17 @@ results.forEach((r) => console.log(`${r.text} (${r.score})`));
 ### 4. React
 
 ```bash
-npm install @rustors/react @rustors/web @rustors/model-ppocrv6-tiny
+npm install @rustors/react @rustors/web
 ```
 
 ```tsx
 import { RustoProvider, useOcr } from '@rustors/react';
-import { getModelUrls } from '@rustors/model-ppocrv6-tiny';
 
-const urls = getModelUrls('/models/ppocrv6-tiny');
+const models = {
+  detection: '/models/ppocrv6-tiny/det.rten',
+  recognition: '/models/ppocrv6-tiny/rec.rten',
+  dictionary: '/models/ppocrv6-tiny/dict.txt',
+};
 
 function OcrScanner() {
   const { detect, results, isProcessing } = useOcr();
@@ -153,7 +158,7 @@ function OcrScanner() {
 
 export function App() {
   return (
-    <RustoProvider config={{ preset: 'ppv6', models: urls }}>
+    <RustoProvider config={{ preset: 'ppv6', models }}>
       <OcrScanner />
     </RustoProvider>
   );
@@ -331,7 +336,7 @@ RustO! supports PP-OCRv6 (recognizing 50+ languages simultaneously with a unifie
 | **PP-OCRv6 Medium** | ~134 MB | **~75.7 MB** | Server-grade accuracy workloads |
 | **PP-OCRv5 / v4** | ~23–28 MB (Mobile) | — | Legacy pipelines & single-language packs |
 
-Prepackaged models are available on [npm](https://www.npmjs.com/search?q=%40rustors%2Fmodel-ppocrv6) (`@rustors/model-ppocrv6-*`) and [NuGet](https://www.nuget.org/packages?q=RustODotnet.Models.PPOCRv6) (`RustODotnet.Models.PPOCRv6.*`).
+Pre-converted RTen models are distributed as standalone release assets on [GitHub Releases](https://github.com/byrizki/rusto-rs/releases) and downloaded automatically on first run by the CLI and native SDKs.
 
 👉 **[View Complete Multilingual OCR Guide & Model Matrix](https://byrizki.com/rusto-rs/en/advance-guide/multilingual-ocr)**
 
@@ -380,7 +385,8 @@ Explore deep-dive guides and comprehensive references on the [RustO! Documentati
 | **Multilingual OCR** | 50+ languages support, scripts matrix, and dedicated PP-OCRv5/v4 language packages | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/multilingual-ocr) |
 | **Spatial Layout Reconstruction** | 2D XY spatial layout reconstruction for invoices, receipts, and multi-column tables | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/spatial-layout-reconstruction) |
 | **Image Preprocessing & Tuning** | DBNet binarization thresholds, polygon unclipping, morphological dilation, and dimension limits | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/image-preprocessing-and-tuning) |
-| **Orientation & Classification** | 180° line direction classifier and 0°/90°/180°/270° document page rotation | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/classification-and-orientation) |
+| **Multi-Column, Unwarp & Orientation** | Multi-column layout, neural reading order, 3D UVDoc unwarping, and orientation | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/multi-column-unwarp-orientation) |
+| **Decoded RGB Input** | Zero-copy direct OCR from uncompressed interleaved RGB8 pixel buffers | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/use-decoded-rgb) |
 | **Performance & Benchmarks** | Latency, memory footprint, and parity benchmarks across x86-64, ARM64, and mobile | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/performance-and-benchmarks) |
 | **Troubleshooting Guide** | Resolving model paths, Android JNI linking, React Native pods, and high-resolution camera OOM | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/troubleshooting) |
 | **v0.2 → v0.3 Migration Guide** | Upgrading to pure-Rust RTen, .rten model formats, EngineSession, and @rustors scope | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/migration-guide) |
@@ -390,20 +396,24 @@ Explore deep-dive guides and comprehensive references on the [RustO! Documentati
 
 ## ⚡ Performance & Benchmarks
 
-Tested on standard document scans (A4 invoice / ID card, ~1200–1600px, 15–25 text lines) across platforms:
+Empirically evaluated against official PaddleOCR and RapidOCR (C++ ONNX Runtime) using the standard **OmniDocBench** dataset and high-resolution document scans (1600×993 px, 27 text lines).
 
-| Capability / Metric | RustO! (Pure Rust Core) | OpenCV / C++ Stacks |
-|---|:---:|:---:|
-| **CLI Binary Size (Self-Contained)** | ✅ **~5.4 MB** | ❌ ~50 MB+ (OpenCV + ONNX) |
-| **C FFI Shared Library Size** | ✅ **~304 KB** | ❌ ~15–30 MB |
-| **Android Native Size (Per-ABI)** | ✅ **~1.8 MB** | ❌ ~20 MB+ (libopencv.so + ONNX) |
-| **WebAssembly (WASM) Bundle** | ✅ **~848 KB** | ❌ ~30 MB+ (Emscripten) |
-| **Zero External C++ Dependencies** | ✅ Pure Rust (`cargo build`) | ❌ Requires CMake, OpenCV & NDK |
-| **Peak Memory Footprint (RAM)** | ✅ **~85–120 MB** | ❌ ~250 MB+ runtime overhead |
-| **Inference Latency (A4 Scan)** | ✅ **~80 ms** det / **~120 ms** rec | ✅ ~85 ms det / ~125 ms rec |
-| **PaddleOCR Accuracy Parity** | ✅ **99.3%+** parity | ✅ Baseline (100%) |
-| **Memory & Thread Safety** | ✅ Guaranteed by Rust borrow checker | ❌ Manual pointers & thread locks |
-| **Ready Multi-Platform Packages** | ✅ Cargo, npm, NuGet, CocoaPods, AAR | ⚠️ Complex manual native compilation |
+> **Benchmark Hardware**: 11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz (4 cores / 8 threads), 32 GB RAM, Linux x86_64.
+
+| Capability / Metric | RustO! (Pure Rust Core) | OpenCV / C++ Stacks (RapidOCR / PaddleOCR) | Benchmark Reference |
+|---|:---:|:---:|---|
+| **CLI Binary Size (Self-Contained)** | ✅ **5.5 MB** | ❌ ~55 MB+ (libopencv + onnxruntime) | Production Linux x86-64 release |
+| **C FFI Shared Library (`librusto.so`)** | ✅ **304 KB** | ❌ ~15–30 MB | Stripped release `.so` |
+| **Android Native Size (Per-ABI)** | ✅ **~1.8 MB** | ❌ ~20 MB+ (`libopencv.so` + ONNX) | Android release AAR |
+| **WebAssembly (WASM) Bundle** | ✅ **517 KB** (gzipped) | ❌ 3.78 MB (gzipped ONNX Runtime WASM) | Web client bundle size |
+| **Zero External C++ Dependencies** | ✅ Pure Rust (`cargo build`) | ❌ Requires CMake, OpenCV & NDK | Toolchain build dependencies |
+| **Peak Memory (OmniDocBench)** | ✅ **253.9 MB** (PP-OCRv6 Tiny) | ❌ 392.5 MB (RapidOCR) / 659.3 MB (PaddleOCR) | OmniDocBench full dataset peak RSS |
+| **Document Pipeline (1600×993 px)** | ⚡ **678.08 ms** (Det: 312 ms, Rec: 169 ms, 27 lines) | ⚡ 447.83 ms (C++ ONNX Runtime) | Base pipeline end-to-end benchmark |
+| **OmniDocBench Mean Latency** | ⚡ **439.18 ms** (Indra) / **1,104.41 ms** (Tiny) | ⚡ 605.30 ms (PaddleOCR) / 1,011.52 ms (RapidOCR) | OmniDocBench full evaluation |
+| **Transcription Parity (High-Res Scan)** | 🎯 **100% token identical** across all 27 lines | 🎯 Baseline reference | Character-for-character comparison |
+| **OmniDocBench Baseline Accuracy (1 - NED)** | 🎯 **45.34%** (PP-OCRv6 Tiny) | 🎯 45.33% (PaddleOCR Tiny) — **Δ < 0.01%** | Standard 1D reading order |
+| **Full Pipeline Accuracy (Reading Order)** | 🎯 **63.75%** (RustO Indra Full) | 🎯 63.76% (Indra Official) / 57.18% (Paddle Structure)| Graph neural reading order |
+| **Memory & Thread Safety** | ✅ Guaranteed by Rust borrow checker | ❌ Manual pointers & thread locks | Data-race free concurrency |
 
 ---
 
@@ -474,6 +484,7 @@ This project is licensed under the [MIT License](LICENSE).
 ## 🙏 Acknowledgments
 
 RustO! is inspired by and builds upon the work of:
+- **[DataLab](https://github.com/datalab-to)** — Creators of **[Indra OCR](https://github.com/datalab-to/indra-ocr)** models and the **[OmniDocBench](https://github.com/datalab-to/omnidocbench)** evaluation dataset
 - **[RapidOCR](https://github.com/RapidAI/RapidOCR)** — Architecture and OCR pipeline reference
 - **[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)** — Pretrained OCR models (PP-OCRv6, PP-OCRv5, PP-OCRv4)
 - **[RTen](https://github.com/robertknight/rten)** — Pure Rust deep learning inference engine powering RustO! v0.3+

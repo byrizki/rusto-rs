@@ -6,26 +6,45 @@ public typealias RustOError = RustoBindingError
 /// Runtime OCR options alias.
 public typealias RuntimeOptions = OcrRunOptions
 
+private let globalDownloadModel = downloadModel
+private let globalDownloadAllModels = downloadAllModels
+
 extension RustO {
     /// Library version string of the underlying RustO engine.
     public static var libraryVersion: String {
         rustoVersion()
     }
 
+    /// Downloads model assets for a specific OCR pipeline ahead of time.
+    public static func downloadModel(model: String? = nil, lang: String? = nil, cacheDir: String? = nil) throws -> [String] {
+        try globalDownloadModel(model, lang, cacheDir)
+    }
+
+    /// Downloads all available canonical models to the cache directory ahead of time.
+    public static func downloadAllModels(cacheDir: String? = nil) throws -> [String] {
+        try globalDownloadAllModels(cacheDir)
+    }
+
     /// Initialize RustO with automatic model bundle resolution for iOS.
     public static func initializeWithBundledModels(config: InitializeConfig = InitializeConfig()) throws -> RustO {
         var resolvedConfig = config
-        var det = config.detection ?? DetectionConfig()
-        let detName = det.modelPath ?? "det.rten"
-        det.modelPath = resolveModelPath(detName) ?? detName
-        resolvedConfig.detection = det
+        let hasModelDir = config.modelPath != nil || config.model != nil
 
-        var rec = config.recognition ?? RecognitionConfig()
-        let recName = rec.modelPath ?? "rec.rten"
-        let dictName = rec.dictPath ?? "dict.txt"
-        rec.modelPath = resolveModelPath(recName) ?? recName
-        rec.dictPath = resolveModelPath(dictName) ?? dictName
-        resolvedConfig.recognition = rec
+        if !hasModelDir || config.detection != nil {
+            var det = config.detection ?? DetectionConfig()
+            let detName = det.modelPath ?? "det.rten"
+            det.modelPath = resolveModelPath(detName) ?? detName
+            resolvedConfig.detection = det
+        }
+
+        if !hasModelDir || config.recognition != nil {
+            var rec = config.recognition ?? RecognitionConfig()
+            let recName = rec.modelPath ?? "rec.rten"
+            let dictName = rec.dictPath ?? "dict.txt"
+            rec.modelPath = resolveModelPath(recName) ?? recName
+            rec.dictPath = resolveModelPath(dictName) ?? dictName
+            resolvedConfig.recognition = rec
+        }
 
         if var cls = config.classification, let path = cls.modelPath {
             cls.modelPath = resolveModelPath(path) ?? path
@@ -38,6 +57,10 @@ extension RustO {
         if var unwarp = config.unwarp, let path = unwarp.modelPath {
             unwarp.modelPath = resolveModelPath(path) ?? path
             resolvedConfig.unwarp = unwarp
+        }
+        if var layout = config.layout, let path = layout.modelPath {
+            layout.modelPath = resolveModelPath(path) ?? path
+            resolvedConfig.layout = layout
         }
 
         return try RustO.initialize(config: resolvedConfig)
@@ -87,12 +110,32 @@ extension RustO {
 extension InitializeConfig {
     public init() {
         self.init(
+            model: nil,
+            modelPath: nil,
             template: nil,
+            lang: nil,
+            cacheDir: nil,
+            enableReadingOrder: nil,
+            layoutVariant: nil,
             detection: nil,
             recognition: nil,
             classification: nil,
             orientation: nil,
-            unwarp: nil
+            unwarp: nil,
+            layout: nil
+        )
+    }
+}
+
+extension LayoutConfig {
+    public init() {
+        self.init(
+            enabled: nil,
+            modelPath: nil,
+            confThresh: nil,
+            targetSize: nil,
+            targetHeight: nil,
+            targetWidth: nil
         )
     }
 }
@@ -118,7 +161,8 @@ extension RecognitionConfig {
         self.init(
             enabled: nil,
             modelPath: nil,
-            dictPath: nil
+            dictPath: nil,
+            recBatchNum: nil
         )
     }
 }
@@ -188,6 +232,8 @@ extension CalibrationOptions {
 extension OptimizationOptions {
     public init() {
         self.init(
+            enabled: nil,
+            targetMaxSide: nil,
             cropPaddingX: nil,
             cropPaddingY: nil
         )
@@ -203,6 +249,8 @@ extension OcrRunOptions {
             textScore: nil,
             classification: nil,
             orientation: nil,
+            unwarp: nil,
+            layout: nil,
             minHeight: nil,
             maxSideLen: nil,
             minSideLen: nil,
@@ -210,7 +258,8 @@ extension OcrRunOptions {
             detection: nil,
             postprocess: nil,
             calibration: nil,
-            optimization: nil
+            optimization: nil,
+            recBatchNum: nil
         )
     }
 }

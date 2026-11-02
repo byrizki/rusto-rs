@@ -315,6 +315,45 @@ def verify_model_zip(archive_path: Path) -> Tuple[bool, List[str], List[str]]:
 
     return len(errors) == 0, passed, errors
 
+def verify_model_asset(file_path: Path) -> Tuple[bool, List[str], List[str]]:
+    """Verifies a standalone OCR model asset (.rten, .txt, .json)."""
+    passed: List[str] = []
+    errors: List[str] = []
+
+    try:
+        size = file_path.stat().st_size
+        if size == 0:
+            errors.append(f"Model asset '{file_path.name}' is empty (0 bytes)")
+            return False, passed, errors
+
+        passed.append(f"Model asset '{file_path.name}' size: {size:,} bytes")
+
+        if file_path.suffix == ".rten":
+            with open(file_path, "rb") as f:
+                header = f.read(16)
+                if len(header) < 4:
+                    errors.append(f"File too small to be a valid RTen model: {file_path.name}")
+                else:
+                    passed.append("Valid non-empty RTen model file")
+        elif file_path.suffix == ".json":
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if not isinstance(data, dict):
+                    errors.append(f"JSON metadata must be an object: {file_path.name}")
+                else:
+                    passed.append(f"Valid JSON model metadata with {len(data)} root key(s)")
+        elif file_path.suffix == ".txt":
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                lines = sum(1 for _ in f)
+                if lines == 0:
+                    errors.append(f"Dictionary file is empty: {file_path.name}")
+                else:
+                    passed.append(f"Valid dictionary file with {lines:,} entries")
+    except Exception as e:
+        errors.append(f"Failed to verify model asset {file_path.name}: {e}")
+
+    return len(errors) == 0, passed, errors
+
 def verify_wheel_package(archive_path: Path) -> Tuple[bool, List[str], List[str]]:
     """Verifies a Python wheel (.whl)."""
     passed: List[str] = []
@@ -631,6 +670,8 @@ def verify_file(file_path: Path) -> bool:
         success, passed, errors = verify_model_zip(file_path)
     elif name.endswith(".zip") and ("xcframework" in name.lower() or "rusto" in name.lower()):
         success, passed, errors = verify_xcframework_zip(file_path)
+    elif name.endswith(".rten") or (name.endswith(".txt") and "dict" in name) or (name.endswith(".json") and "meta" in name):
+        success, passed, errors = verify_model_asset(file_path)
     else:
         print(f"⚠️ Unrecognized archive format: {file_path}. Skipping.")
         return True
@@ -652,7 +693,11 @@ def scan_directory(dir_path: Path) -> bool:
     all_success = True
     count = 0
 
-    patterns = ["*.tgz", "*.tar.gz", "*.nupkg", "*.aar", "*.jar", "*.whl", "*xcframework*.zip", "*RustO*.zip", "*go*.zip"]
+    patterns = [
+        "*.tgz", "*.tar.gz", "*.nupkg", "*.aar", "*.jar", "*.whl",
+        "*xcframework*.zip", "*RustO*.zip", "*go*.zip",
+        "*.rten", "*dict*.txt", "*meta*.json"
+    ]
     matched_files: Set[Path] = set()
 
     for pattern in patterns:

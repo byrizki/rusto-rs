@@ -16,30 +16,25 @@ on:
         required: false
         type: string
         default: ''
-      publish_npm:
-        description: 'Package and publish models to NPM'
-        type: boolean
-        required: false
-        default: true
-      publish_nuget:
-        description: 'Package and publish models to NuGet'
-        type: boolean
-        required: false
-        default: true
-      publish_cocoapods:
-        description: 'Package and publish model pods to CocoaPods'
-        type: boolean
-        required: false
-        default: true
       create_release:
-        description: 'Create GitHub Release for OCR models (includes Android, iOS, .NET, NPM)'
+        description: 'Create GitHub Release for OCR models'
         type: boolean
         required: false
         default: true
+      draft:
+        description: 'Create draft release'
+        type: boolean
+        required: false
+        default: false
+      prerelease:
+        description: 'Create prerelease'
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   build-and-package-models:
-    name: Build & Package OCR Models
+    name: Build & Stage OCR Models
     runs-on: ubuntu-22.04
 
     outputs:
@@ -55,26 +50,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
-      - name: Setup Java
-        if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "17"
-
-      - name: Setup .NET
-        if: github.event_name == 'push' || inputs.publish_nuget == true || inputs.create_release == true || github.event.inputs.publish_nuget == 'true' || github.event.inputs.create_release == 'true'
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
-
-      - name: Setup Node
-        if: github.event_name == 'push' || inputs.publish_npm == true || inputs.create_release == true || github.event.inputs.publish_npm == 'true' || github.event.inputs.create_release == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24.x"
-          registry-url: "https://registry.npmjs.org"
 
       - name: Determine model release tag and version
         id: release_info
@@ -123,161 +98,107 @@ jobs:
           '
           echo "✓ All models downloaded, quantized, and converted to .rten"
 
-      - name: Package iOS Model Bundles
-        if: github.event_name == 'push' || inputs.publish_cocoapods == true || inputs.create_release == true || github.event.inputs.publish_cocoapods == 'true' || github.event.inputs.create_release == 'true'
-        run: |
-          mkdir -p build
-          package_model_zip() {
-            local model_src="$1"
-            local zip_name="$2"
-            local tmp_dir="build/tmp_$zip_name"
-            mkdir -p "$tmp_dir"
-            cp -r "$model_src"/* "$tmp_dir/"
-            rm -f "$tmp_dir"/*.onnx
-            (cd "$tmp_dir" && zip -q -r "../../build/$zip_name.zip" .)
-            rm -rf "$tmp_dir"
-            echo "✓ Created build/$zip_name.zip"
-          }
-
-          package_model_zip "models/PPOCR_v6_tiny" "RustO-Models-PPOCRv6-Tiny" &
-          package_model_zip "models/PPOCR_v6_tiny_int8" "RustO-Models-PPOCRv6-Tiny-INT8" &
-          package_model_zip "models/PPOCR_v6_small" "RustO-Models-PPOCRv6-Small" &
-          package_model_zip "models/PPOCR_v6_small_int8" "RustO-Models-PPOCRv6-Small-INT8" &
-          package_model_zip "models/PPOCR_v6_medium" "RustO-Models-PPOCRv6-Medium" &
-          package_model_zip "models/PPOCR_v6_medium_int8" "RustO-Models-PPOCRv6-Medium-INT8" &
-          package_model_zip "models/PPOCR_v5_mobile" "RustO-Models-PPOCRv5-Mobile" &
-          package_model_zip "models/PPOCR_v5_server" "RustO-Models-PPOCRv5-Server" &
-          package_model_zip "models/PPOCR_v4_mobile" "RustO-Models-PPOCRv4-Mobile" &
-          package_model_zip "models/PPOCR_v4_server" "RustO-Models-PPOCRv4-Server" &
-
-          package_model_zip "models/PPOCR_v5_arabic" "RustO-Models-PPOCRv5-Arabic" &
-          package_model_zip "models/PPOCR_v5_cyrillic" "RustO-Models-PPOCRv5-Cyrillic" &
-          package_model_zip "models/PPOCR_v5_devanagari" "RustO-Models-PPOCRv5-Devanagari" &
-          package_model_zip "models/PPOCR_v5_el" "RustO-Models-PPOCRv5-Greek" &
-          package_model_zip "models/PPOCR_v5_eslav" "RustO-Models-PPOCRv5-EastSlavic" &
-          package_model_zip "models/PPOCR_v5_korean" "RustO-Models-PPOCRv5-Korean" &
-          package_model_zip "models/PPOCR_v5_latin" "RustO-Models-PPOCRv5-Latin" &
-          package_model_zip "models/PPOCR_v5_ta" "RustO-Models-PPOCRv5-Tamil" &
-          package_model_zip "models/PPOCR_v5_te" "RustO-Models-PPOCRv5-Telugu" &
-          package_model_zip "models/PPOCR_v5_th" "RustO-Models-PPOCRv5-Thai" &
-
-          package_model_zip "models/PPOCR_v4_japan" "RustO-Models-PPOCRv4-Japanese" &
-          package_model_zip "models/PPOCR_v4_chinese_cht" "RustO-Models-PPOCRv4-TraditionalChinese" &
-          package_model_zip "models/PPOCR_v4_kannada" "RustO-Models-PPOCRv4-Kannada" &
-
-          wait
-          echo "✓ All iOS model bundles packaged in parallel"
-
-      - name: Upload iOS Model Bundles Artifact
-        if: github.event_name == 'push' || inputs.publish_cocoapods == true || inputs.create_release == true || github.event.inputs.publish_cocoapods == 'true' || github.event.inputs.create_release == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: rusto-models-ios-zip
-          path: build/RustO-Models-*.zip
-
-      - name: Package Android Model AARs
-        if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
-        run: |
-          for model_dir in models/PPOCR_*; do
-            if [ -d "$model_dir" ]; then
-              base_name=$(basename "$model_dir" | tr '[:upper:]' '[:lower:]' | sed 's/ppocr_v/ppocrv/' | tr '_' '-')
-              pkg_dir="packages/android/models/rusto-models-$base_name"
-              if [ -d "$pkg_dir" ]; then
-                mkdir -p "$pkg_dir/src/main/assets"
-                cp -r "$model_dir"/* "$pkg_dir/src/main/assets/"
-                rm -f "$pkg_dir/src/main/assets/"*.onnx
-                echo "Copied $model_dir -> $pkg_dir/src/main/assets/"
-              fi
-            fi
-          done
-
-          cd packages/android
-          chmod +x gradlew || true
-          # Build all model submodules in parallel using Gradle workers
-          ./gradlew assembleRelease --parallel --max-workers=4
-
-      - name: Package .NET Model NuGet Packages
-        if: github.event_name == 'push' || inputs.publish_nuget == true || inputs.create_release == true || github.event.inputs.publish_nuget == 'true' || github.event.inputs.create_release == 'true'
-        run: |
-          for proj_dir in packages/dotnet/models/*; do
-            if [ -d "$proj_dir" ]; then
-              proj_name=$(basename "$proj_dir")
-              model_name=$(echo "$proj_name" | sed 's/RustODotnet.Models.//' | sed 's/\./_/g' | tr '[:upper:]' '[:lower:]' \
-                | sed 's/ppocrv/PPOCR_v/' \
-                | sed 's/greek/el/' | sed 's/eastslavic/eslav/' | sed 's/tamil/ta/' | sed 's/telugu/te/' | sed 's/thai/th/' \
-                | sed 's/japanese/japan/' | sed 's/traditionalchinese/chinese_cht/')
-              
-              if [ -d "models/$model_name" ]; then
-                mkdir -p "$proj_dir/models"
-                cp -r "models/$model_name"/* "$proj_dir/models/"
-                rm -f "$proj_dir/models/"*.onnx
-                echo "Copied models/$model_name -> $proj_dir/models/"
-              fi
-            fi
-          done
-
-          mkdir -p nupkg
-          for proj in packages/dotnet/models/*/*.csproj; do
-            if [ -f "$proj" ]; then
-              echo "Packing $proj..."
-              dotnet pack "$proj" -c Release -o nupkg -v minimal &
-            fi
-          done
-          wait
-          echo "✓ All .NET model packages packed in parallel"
-
-      - name: Upload .NET Model Packages Artifact
-        if: github.event_name == 'push' || inputs.publish_nuget == true || inputs.create_release == true || github.event.inputs.publish_nuget == 'true' || github.event.inputs.create_release == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: rusto-models-dotnet-nupkg
-          path: nupkg/RustODotnet.Models.*.nupkg
-
-      - name: Package NPM Model Packages
-        if: github.event_name == 'push' || inputs.publish_npm == true || inputs.create_release == true || github.event.inputs.publish_npm == 'true' || github.event.inputs.create_release == 'true'
-        run: |
-          npm install -g typescript
-          python3 scripts/generate_npm_models.py --all --copy-models --version "${{ steps.release_info.outputs.version }}"
-          mkdir -p npm-models
-          for pkg_dir in packages/models/*; do
-            if [ -d "$pkg_dir" ] && [ -f "$pkg_dir/package.json" ]; then
-              (cd "$pkg_dir" && tsc -p tsconfig.build.json && npm pack --pack-destination ../../../npm-models) &
-            fi
-          done
-          wait
-          echo "✓ All NPM model packages built and packed in parallel"
-
-      - name: Upload NPM Model Packages Artifact
-        if: github.event_name == 'push' || inputs.publish_npm == true || inputs.create_release == true || github.event.inputs.publish_npm == 'true' || github.event.inputs.create_release == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: rusto-models-npm-packages
-          path: npm-models/*model*.tgz
-
-      - name: Stage Model Release Directory
-        if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
+      - name: Stage Standalone Model Release Files
         run: |
           mkdir -p model-releases
-          cp build/RustO-Models-*.zip model-releases/ 2>/dev/null || true
-          find packages/android/models/*/build/outputs/aar -name '*-release.aar' -exec cp {} model-releases/ \; 2>/dev/null || true
-          cp nupkg/RustODotnet.Models.*.nupkg model-releases/ 2>/dev/null || true
-          cp npm-models/*model*.tgz model-releases/ 2>/dev/null || true
-          (cd model-releases && sha256sum * > SHA256SUMS 2>/dev/null || true)
 
-      - name: Verify Packed Model Release Packages
-        if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
+          stage_file() {
+            local src="$1"
+            local dest="model-releases/$2"
+            if [ -f "$src" ]; then
+              cp "$src" "$dest"
+              echo "✓ Staged $src -> $dest"
+            else
+              echo "⚠️ Missing source model file: $src" >&2
+            fi
+          }
+
+          # 1. Base Pipelines (Detection + Recognition + Dictionary)
+          stage_file "models/PPOCR_v6_tiny/det.rten"          "ppocrv6_tiny_det.rten"
+          stage_file "models/PPOCR_v6_tiny/rec.rten"          "ppocrv6_tiny_rec.rten"
+          stage_file "models/PPOCR_v6_tiny/dict.txt"          "ppocrv6_dict.txt"
+
+          stage_file "models/PPOCR_v6_tiny_int8/det.rten"     "ppocrv6_tiny_int8_det.rten"
+          stage_file "models/PPOCR_v6_tiny_int8/rec.rten"     "ppocrv6_tiny_int8_rec.rten"
+
+          stage_file "models/PPOCR_v6_small/det.rten"         "ppocrv6_small_det.rten"
+          stage_file "models/PPOCR_v6_small/rec.rten"         "ppocrv6_small_rec.rten"
+
+          stage_file "models/PPOCR_v6_small_int8/det.rten"    "ppocrv6_small_int8_det.rten"
+          stage_file "models/PPOCR_v6_small_int8/rec.rten"    "ppocrv6_small_int8_rec.rten"
+
+          stage_file "models/PPOCR_v6_medium/det.rten"        "ppocrv6_medium_det.rten"
+          stage_file "models/PPOCR_v6_medium/rec.rten"        "ppocrv6_medium_rec.rten"
+
+          stage_file "models/PPOCR_v6_medium_int8/det.rten"   "ppocrv6_medium_int8_det.rten"
+          stage_file "models/PPOCR_v6_medium_int8/rec.rten"   "ppocrv6_medium_int8_rec.rten"
+
+          stage_file "models/PPOCR_v5_mobile/det.rten"        "ppocrv5_mobile_det.rten"
+          stage_file "models/PPOCR_v5_mobile/rec.rten"        "ppocrv5_mobile_rec.rten"
+          stage_file "models/PPOCR_v5_mobile/dict.txt"        "ppocrv5_dict.txt"
+
+          stage_file "models/PPOCR_v5_server/det.rten"        "ppocrv5_server_det.rten"
+          stage_file "models/PPOCR_v5_server/rec.rten"        "ppocrv5_server_rec.rten"
+
+          stage_file "models/PPOCR_v4_mobile/det.rten"        "ppocrv4_mobile_det.rten"
+          stage_file "models/PPOCR_v4_mobile/rec.rten"        "ppocrv4_mobile_rec.rten"
+          stage_file "models/PPOCR_v4_mobile/dict.txt"        "ppocrv4_dict.txt"
+
+          stage_file "models/PPOCR_v4_server/det.rten"        "ppocrv4_server_det.rten"
+          stage_file "models/PPOCR_v4_server/rec.rten"        "ppocrv4_server_rec.rten"
+
+          stage_file "models/indra/det.rten"                  "indra_det.rten"
+          stage_file "models/indra/rec.rten"                  "indra_rec.rten"
+          stage_file "models/indra/meta.json"                 "indra_meta.json"
+
+          # 2. Multilingual Recognizers & Dictionaries
+          v5_langs=("arabic" "cyrillic" "devanagari" "el" "eslav" "korean" "latin" "ta" "te" "th")
+          for lang in "${v5_langs[@]}"; do
+            stage_file "models/PPOCR_v5_${lang}/rec.rten"     "ppocrv5_rec_${lang}.rten"
+            stage_file "models/PPOCR_v5_${lang}/dict.txt"     "ppocrv5_dict_${lang}.txt"
+          done
+
+          v4_langs=("japan" "chinese_cht" "kannada")
+          for lang in "${v4_langs[@]}"; do
+            stage_file "models/PPOCR_v4_${lang}/rec.rten"     "ppocrv4_rec_${lang}.rten"
+            stage_file "models/PPOCR_v4_${lang}/dict.txt"     "ppocrv4_dict_${lang}.txt"
+          done
+
+          # 3. Optional Pipeline Extras
+          stage_file "models/cls.rten"                        "ppocr_cls.rten"
+          stage_file "models/orient.rten"                     "ppocr_orient.rten"
+          stage_file "models/uvdoc.rten"                      "uvdoc.rten"
+          stage_file "models/layout_cdla.rten"                "layout_cdla.rten"
+          stage_file "models/layout_publaynet.rten"           "layout_publaynet.rten"
+
+          # 4. Indra OCR Extras
+          stage_file "models/indra/order.rten"                "indra_order.rten"
+          stage_file "models/indra/orient.rten"               "indra_orient.rten"
+          stage_file "models/indra/rec_cjk.rten"              "indra_rec_cjk.rten"
+          stage_file "models/indra/rec_rtl.rten"              "indra_rec_rtl.rten"
+          stage_file "models/indra/rec_world.rten"            "indra_rec_world.rten"
+          stage_file "models/indra/script.rten"               "indra_script.rten"
+          stage_file "models/indra/mathcls.rten"              "indra_mathcls.rten"
+          stage_file "models/indra/math_enc.rten"             "indra_math_enc.rten"
+          stage_file "models/indra/math_dec_init.rten"        "indra_math_dec_init.rten"
+          stage_file "models/indra/math_dec_step.rten"        "indra_math_dec_step.rten"
+          stage_file "models/indra/math_meta.json"            "indra_math_meta.json"
+
+          # 5. Checksums
+          (cd model-releases && sha256sum * > SHA256SUMS)
+          echo "✓ All model release files staged and checksummed"
+
+      - name: Verify Staged Model Release Files
         run: |
           chmod +x scripts/verify-packed-packages.py
           python3 scripts/verify-packed-packages.py --dir model-releases/
 
-      - name: Upload All Model Release Files Artifact
-        if: github.event_name == 'push' || inputs.create_release == true || github.event.inputs.create_release == 'true'
+      - name: Upload Model Release Files Artifact
         uses: actions/upload-artifact@v4
         with:
           name: rusto-models-release-files
           path: model-releases/
 
-  # Checkable Item 1: Create GitHub Release
   create-release:
     name: Create GitHub Release
     needs: [build-and-package-models]
@@ -297,120 +218,60 @@ jobs:
         with:
           tag_name: ${{ needs.build-and-package-models.outputs.tag }}
           name: RustO! OCR Models ${{ needs.build-and-package-models.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           files: model-releases/*
-          draft: false
-          prerelease: false
+          draft: ${{ inputs.draft || false }}
+          prerelease: ${{ inputs.prerelease || contains(needs.build-and-package-models.outputs.tag, '-') }}
           generate_release_notes: true
           body: |
             ## RustO! Pre-trained OCR Models ${{ needs.build-and-package-models.outputs.tag }}
 
-            Pre-trained PaddleOCR weights converted to pure-Rust RTen format.
-            Compatible with RustO! core libraries.
+            Standalone pre-trained models converted to pure-Rust RTen format.
+            Designed for auto-download and direct on-demand streaming across all RustO libraries and bindings (Python, Node.js, React Native, Android Kotlin, iOS Swift, C# .NET, Go, Dart/Flutter, and CLI).
 
-            ### Included Packages:
-            - **iOS**: Resource bundles (`RustO-Models-*.zip`)
-            - **Android**: Model AAR packages (`rusto-models-*.aar`)
-            - **.NET**: Model NuGet packages (`RustODotnet.Models.*.nupkg`)
-            - **NPM / Web**: Model NPM packages (`@rustors/model-*`)
+            ### Base OCR Pipelines (Detection + Recognition + Dictionary)
+            - **PP-OCRv6 Tiny (Default)**: `ppocrv6_tiny_det.rten`, `ppocrv6_tiny_rec.rten`, `ppocrv6_dict.txt`
+            - **PP-OCRv6 Tiny INT8**: `ppocrv6_tiny_int8_det.rten`, `ppocrv6_tiny_int8_rec.rten`
+            - **PP-OCRv6 Small**: `ppocrv6_small_det.rten`, `ppocrv6_small_rec.rten`
+            - **PP-OCRv6 Small INT8**: `ppocrv6_small_int8_det.rten`, `ppocrv6_small_int8_rec.rten`
+            - **PP-OCRv6 Medium**: `ppocrv6_medium_det.rten`, `ppocrv6_medium_rec.rten`
+            - **PP-OCRv6 Medium INT8**: `ppocrv6_medium_int8_det.rten`, `ppocrv6_medium_int8_rec.rten`
+            - **PP-OCRv5 Mobile**: `ppocrv5_mobile_det.rten`, `ppocrv5_mobile_rec.rten`, `ppocrv5_dict.txt`
+            - **PP-OCRv5 Server**: `ppocrv5_server_det.rten`, `ppocrv5_server_rec.rten`
+            - **PP-OCRv4 Mobile**: `ppocrv4_mobile_det.rten`, `ppocrv4_mobile_rec.rten`, `ppocrv4_dict.txt`
+            - **PP-OCRv4 Server**: `ppocrv4_server_det.rten`, `ppocrv4_server_rec.rten`
+            - **Indra OCR (Base)**: `indra_det.rten`, `indra_rec.rten`, `indra_meta.json`
+
+            ### Multilingual Recognition Models & Dictionaries
+            - **Arabic**: `ppocrv5_rec_arabic.rten`, `ppocrv5_dict_arabic.txt`
+            - **Cyrillic**: `ppocrv5_rec_cyrillic.rten`, `ppocrv5_dict_cyrillic.txt`
+            - **Devanagari (Hindi)**: `ppocrv5_rec_devanagari.rten`, `ppocrv5_dict_devanagari.txt`
+            - **Greek**: `ppocrv5_rec_el.rten`, `ppocrv5_dict_el.txt`
+            - **East Slavic**: `ppocrv5_rec_eslav.rten`, `ppocrv5_dict_eslav.txt`
+            - **Korean**: `ppocrv5_rec_korean.rten`, `ppocrv5_dict_korean.txt`
+            - **Latin**: `ppocrv5_rec_latin.rten`, `ppocrv5_dict_latin.txt`
+            - **Tamil**: `ppocrv5_rec_ta.rten`, `ppocrv5_dict_ta.txt`
+            - **Telugu**: `ppocrv5_rec_te.rten`, `ppocrv5_dict_te.txt`
+            - **Thai**: `ppocrv5_rec_th.rten`, `ppocrv5_dict_th.txt`
+            - **Japanese**: `ppocrv4_rec_japan.rten`, `ppocrv4_dict_japan.txt`
+            - **Traditional Chinese**: `ppocrv4_rec_chinese_cht.rten`, `ppocrv4_dict_chinese_cht.txt`
+            - **Kannada**: `ppocrv4_rec_kannada.rten`, `ppocrv4_dict_kannada.txt`
+
+            ### Pluggable Modular Extras
+            - **Text-Line Orientation Classifier**: `ppocr_cls.rten`
+            - **Document Orientation Classifier**: `ppocr_orient.rten`
+            - **Document Dewarping (UVDoc)**: `uvdoc.rten`
+            - **Layout Analysis (CDLA 10-Class)**: `layout_cdla.rten`
+            - **Layout Analysis (PubLayNet 5-Class)**: `layout_publaynet.rten`
+
+            ### Indra Modular Extras
+            - **Neural Reading Order**: `indra_order.rten`
+            - **Document Orientation**: `indra_orient.rten`
+            - **CJK Recognition**: `indra_rec_cjk.rten`
+            - **RTL Recognition**: `indra_rec_rtl.rten`
+            - **World Recognition**: `indra_rec_world.rten`
+            - **Script Detection**: `indra_script.rten`
+            - **Math Formula Classifier**: `indra_mathcls.rten`
+            - **Math Formula Recognition**: `indra_math_enc.rten`, `indra_math_dec_init.rten`, `indra_math_dec_step.rten`, `indra_math_meta.json`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # Checkable Item 2: Publish Models to NuGet
-  publish-models-nuget:
-    name: Publish Models to NuGet
-    needs: [build-and-package-models]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' || inputs.publish_nuget == true || github.event.inputs.publish_nuget == 'true'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Download .NET model packages
-        uses: actions/download-artifact@v4
-        with:
-          name: rusto-models-dotnet-nupkg
-          path: nupkg
-
-      - name: Verify .NET Model Packages
-        run: |
-          chmod +x scripts/verify-packed-packages.py
-          python3 scripts/verify-packed-packages.py --dir nupkg/
-
-      - name: Publish Models to NuGet
-        run: |
-          find nupkg -name "*.nupkg" -type f | xargs -r -P 4 -I {} sh -c '
-            echo "Publishing $(basename "{}") to NuGet..."
-            dotnet nuget push "{}" \
-              --api-key "$1" \
-              --source https://api.nuget.org/v3/index.json \
-              --skip-duplicate || true
-          ' _ "${{ secrets.NUGET_API_KEY }}"
-        continue-on-error: true
-
-  # Checkable Item 3: Publish Models to NPM
-  publish-models-npm:
-    name: Publish Models to NPM
-    needs: [build-and-package-models]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' || inputs.publish_npm == true || github.event.inputs.publish_npm == 'true'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Download NPM model packages
-        uses: actions/download-artifact@v4
-        with:
-          name: rusto-models-npm-packages
-          path: npm-models
-
-      - name: Verify NPM Model Packages
-        run: |
-          chmod +x scripts/verify-packed-packages.py
-          python3 scripts/verify-packed-packages.py --dir npm-models/
-
-      - name: Publish Models to NPM
-        run: |
-          find npm-models -name "*.tgz" -type f | xargs -r -P 4 -I {} sh -c '
-            abs_pkg="$(readlink -f "{}")"
-            echo "Publishing $(basename "$abs_pkg") to NPM..."
-            npm publish "$abs_pkg" --access public || true
-          '
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        continue-on-error: true
-
-  # Checkable Item 4: Publish Model Pods to CocoaPods
-  publish-models-cocoapods:
-    name: Publish Model Pods to CocoaPods
-    needs: [build-and-package-models]
-    runs-on: macos-latest
-    if: github.event_name == 'push' || inputs.publish_cocoapods == true || github.event.inputs.publish_cocoapods == 'true'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup CocoaPods
-        run: gem install cocoapods
-
-      - name: Validate and Publish Model CocoaPods
-        working-directory: packages/ios
-        run: |
-          echo "=== Publishing Model Pods ==="
-          for spec in models/*.podspec; do
-            if [ -f "$spec" ]; then
-              echo "Publishing $spec..."
-              pod spec lint "$spec" --allow-warnings --skip-import-validation || true
-              pod trunk push "$spec" --allow-warnings || true
-            fi
-          done
-        env:
-          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
-        continue-on-error: true

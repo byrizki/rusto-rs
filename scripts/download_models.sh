@@ -14,6 +14,11 @@ OUTPUT_DIR=""
 DOWNLOAD_ALL=false
 CONVERT_RTEN=false
 KEEP_ONNX=false
+WITH_CLS=false
+WITH_ORIENT=false
+WITH_UNWARP=false
+WITH_LAYOUT=false
+WITH_INDRA=false
 
 # Parse optional arguments
 while [[ "$#" -gt 0 ]]; do
@@ -21,6 +26,11 @@ while [[ "$#" -gt 0 ]]; do
         --all) DOWNLOAD_ALL=true ;;
         --convert-rten) CONVERT_RTEN=true ;;
         --keep-onnx) KEEP_ONNX=true ;;
+        --with-cls) WITH_CLS=true ;;
+        --with-orient) WITH_ORIENT=true ;;
+        --with-unwarp) WITH_UNWARP=true ;;
+        --with-layout) WITH_LAYOUT=true ;;
+        --with-indra|--indra) WITH_INDRA=true ;;
         --model) MODEL_TYPE="$2"; shift ;;
         --tier) TIER="$2"; shift ;;
         --lang) LANG="$2"; shift ;;
@@ -85,10 +95,17 @@ download_file_to() {
             echo "  Resuming partial transfer ($(du -h "$partial" | cut -f1))"
         fi
 
+        local url=""
+        if [[ "$ms_path" =~ ^https?:// ]]; then
+            url="$ms_path"
+        else
+            url="$MODELSCOPE_BASE$ms_path"
+        fi
+
         if curl --fail --location --silent --show-error \
             --connect-timeout "$MODEL_DOWNLOAD_CONNECT_TIMEOUT" \
             "${resume_args[@]}" \
-            "$MODELSCOPE_BASE$ms_path" \
+            "$url" \
             --output "$partial"; then
             mv "$partial" "$dest"
             echo "✓ Downloaded: $filename ($(du -h "$dest" | cut -f1))"
@@ -250,6 +267,67 @@ download_ppocrv4_lang() {
     wait_jobs "${pids[@]}"
 }
 
+download_cls() {
+    local dir="$1"
+    echo "=== Downloading Text-Line Classifier (cls.onnx) ==="
+    download_file_to "$dir" "cls.onnx" "onnx%2FPP-OCRv4%2Fcls%2Fch_ppocr_mobile_v2.0_cls_mobile.onnx"
+}
+
+download_orient() {
+    local dir="$1"
+    echo "=== Downloading Document Orientation Classifier (orient.onnx) ==="
+    download_file_to "$dir" "orient.onnx" "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/correction/PP-LCNet_x1_0_doc_ori.onnx"
+}
+
+download_unwarp() {
+    local dir="$1"
+    echo "=== Downloading Document Unwarp Model (uvdoc.onnx) ==="
+    download_file_to "$dir" "uvdoc.onnx" "https://huggingface.co/PaddlePaddle/UVDoc_onnx/resolve/main/inference.onnx"
+}
+
+download_layout_cdla() {
+    local dir="$1"
+    echo "=== Downloading Document Layout Model CDLA 10-Class (layout_cdla.onnx) ==="
+    download_file_to "$dir" "layout_cdla.onnx" "https://www.modelscope.cn/models/RapidAI/RapidLayout/resolve/v1.2.0/onnx/pp_layout/layout_cdla.onnx"
+}
+
+download_layout_publaynet() {
+    local dir="$1"
+    echo "=== Downloading Document Layout Model PubLayNet 5-Class (layout_publaynet.onnx) ==="
+    download_file_to "$dir" "layout_publaynet.onnx" "https://www.modelscope.cn/models/RapidAI/RapidLayout/resolve/v1.2.0/onnx/pp_layout/layout_publaynet.onnx"
+}
+
+download_layout() {
+    local dir="$1"
+    local variant="${2:-cdla}"
+    if [ "$variant" = "publaynet" ]; then
+        download_layout_publaynet "$dir"
+    else
+        download_layout_cdla "$dir"
+    fi
+}
+
+download_indra() {
+    local dir="$1"
+    echo "=== Downloading Indra OCR Models (Hugging Face) ==="
+    local base_url="https://huggingface.co/datalab-to/indra-ocr/resolve/main"
+    mkdir -p "$dir"
+    download_file_to "$dir" "det.onnx" "$base_url/det.onnx"
+    download_file_to "$dir" "rec.onnx" "$base_url/rec.onnx"
+    download_file_to "$dir" "orient.onnx" "$base_url/orient.onnx"
+    download_file_to "$dir" "order.onnx" "$base_url/order.onnx"
+    download_file_to "$dir" "meta.json" "$base_url/meta.json"
+    download_file_to "$dir" "rec_cjk.onnx" "$base_url/rec_cjk.onnx"
+    download_file_to "$dir" "rec_rtl.onnx" "$base_url/rec_rtl.onnx"
+    download_file_to "$dir" "rec_world.onnx" "$base_url/rec_world.onnx"
+    download_file_to "$dir" "script.onnx" "$base_url/script.onnx"
+    download_file_to "$dir" "mathcls.onnx" "$base_url/mathcls.onnx"
+    download_file_to "$dir" "math_enc.onnx" "$base_url/math_enc.onnx"
+    download_file_to "$dir" "math_dec_init.onnx" "$base_url/math_dec_init.onnx"
+    download_file_to "$dir" "math_dec_step.onnx" "$base_url/math_dec_step.onnx"
+    download_file_to "$dir" "math_meta.json" "$base_url/math_meta.json"
+}
+
 V5_LANGS=("arabic" "cyrillic" "devanagari" "el" "eslav" "korean" "latin" "ta" "te" "th")
 V4_LANGS=("japan" "chinese_cht" "kannada")
 
@@ -285,6 +363,14 @@ if [ "$DOWNLOAD_ALL" = true ]; then
         start_model_group download_ppocrv4_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$lang}"
     done
 
+    # Optional document pipeline models (both layout variants downloaded separately)
+    start_model_group download_cls      "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    start_model_group download_orient   "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    start_model_group download_unwarp   "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    start_model_group download_layout_cdla       "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    start_model_group download_layout_publaynet  "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    start_model_group download_indra             "${OUTPUT_DIR:-$REPO_ROOT/models/indra}"
+
     if ! wait_jobs "${tier_pids[@]}"; then
         tier_failed=1
     fi
@@ -293,29 +379,56 @@ if [ "$DOWNLOAD_ALL" = true ]; then
         exit 1
     fi
 else
+    TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6}"
     case "$MODEL_TYPE" in
         ppocrv6)
-            download_ppocrv6 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6}"
+            download_ppocrv6 "$TIER" "$TARGET_DIR"
             ;;
         ppocrv5)
             if [ -n "$LANG" ]; then
-                download_ppocrv5_lang "$LANG" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$LANG}"
+                TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$LANG}"
+                download_ppocrv5_lang "$LANG" "$TARGET_DIR"
             else
-                download_ppocrv5 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5}"
+                TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5}"
+                download_ppocrv5 "$TIER" "$TARGET_DIR"
             fi
             ;;
         ppocrv4)
             if [ -n "$LANG" ]; then
-                download_ppocrv4_lang "$LANG" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$LANG}"
+                TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$LANG}"
+                download_ppocrv4_lang "$LANG" "$TARGET_DIR"
             else
-                download_ppocrv4 "$TIER" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4}"
+                TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4}"
+                download_ppocrv4 "$TIER" "$TARGET_DIR"
             fi
+            ;;
+        indra)
+            TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/indra}"
+            download_indra "$TARGET_DIR"
             ;;
         *)
             echo "Unknown model type: $MODEL_TYPE"
             exit 1
             ;;
     esac
+
+    # Download requested optional models into the target model directory
+    if [ "$WITH_CLS" = true ]; then
+        download_cls "$TARGET_DIR"
+    fi
+    if [ "$WITH_ORIENT" = true ]; then
+        download_orient "$TARGET_DIR"
+    fi
+    if [ "$WITH_UNWARP" = true ]; then
+        download_unwarp "$TARGET_DIR"
+    fi
+    if [ "$WITH_LAYOUT" = true ]; then
+        download_layout_cdla "$TARGET_DIR"
+        download_layout_publaynet "$TARGET_DIR"
+    fi
+    if [ "$WITH_INDRA" = true ]; then
+        download_indra "${OUTPUT_DIR:-$REPO_ROOT/models/indra}"
+    fi
 fi
 
 echo ""
@@ -326,6 +439,8 @@ if [ "$CONVERT_RTEN" = true ]; then
     RTEN_CONVERT=""
     if command -v rten-convert &>/dev/null; then
         RTEN_CONVERT="rten-convert"
+    elif [ -f "$REPO_ROOT/benchmarks/omnidocbench/.venv/bin/rten-convert" ]; then
+        RTEN_CONVERT="$REPO_ROOT/benchmarks/omnidocbench/.venv/bin/rten-convert"
     elif [ -f "/tmp/rten-env/bin/rten-convert" ]; then
         RTEN_CONVERT="/tmp/rten-env/bin/rten-convert"
     elif [ -f "$HOME/.local/bin/rten-convert" ]; then

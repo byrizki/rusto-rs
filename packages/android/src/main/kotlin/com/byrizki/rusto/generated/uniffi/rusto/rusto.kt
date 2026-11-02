@@ -636,15 +636,29 @@ internal object IntegrityCheckingUniffiLib {
         uniffiCheckContractApiVersion(this)
         uniffiCheckApiChecksums(this)
     }
+    external fun uniffi_rusto_checksum_func_create_initialize_config_for_model(
+    ): Int
     external fun uniffi_rusto_checksum_func_create_initialize_config_ppv6(
     ): Int
     external fun uniffi_rusto_checksum_func_default_ocr_run_options(
     ): Int
+    external fun uniffi_rusto_checksum_func_download_all_models(
+    ): Int
+    external fun uniffi_rusto_checksum_func_download_model(
+    ): Int
     external fun uniffi_rusto_checksum_func_rusto_version(
+    ): Int
+    external fun uniffi_rusto_checksum_method_rusto_detect_layout(
+    ): Int
+    external fun uniffi_rusto_checksum_method_rusto_detect_layout_rgb(
     ): Int
     external fun uniffi_rusto_checksum_method_rusto_detect_text(
     ): Int
     external fun uniffi_rusto_checksum_method_rusto_detect_text_rgb(
+    ): Int
+    external fun uniffi_rusto_checksum_method_rusto_unwarp_image(
+    ): Int
+    external fun uniffi_rusto_checksum_method_rusto_unwarp_image_rgb(
     ): Int
     external fun uniffi_rusto_checksum_method_rusto_version(
     ): Int
@@ -678,15 +692,29 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_rusto_fn_constructor_rusto_initialize_from_json(`configJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
+    external fun uniffi_rusto_fn_method_rusto_detect_layout(`ptr`: Long,`source`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_rusto_fn_method_rusto_detect_layout_rgb(`ptr`: Long,`pixels`: RustBuffer.ByValue,`width`: Int,`height`: Int,`stride`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_rusto_fn_method_rusto_detect_text(`ptr`: Long,`source`: RustBuffer.ByValue,`options`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_rusto_fn_method_rusto_detect_text_rgb(`ptr`: Long,`pixels`: RustBuffer.ByValue,`width`: Int,`height`: Int,`stride`: Long,`options`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_rusto_fn_method_rusto_unwarp_image(`ptr`: Long,`source`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_rusto_fn_method_rusto_unwarp_image_rgb(`ptr`: Long,`pixels`: RustBuffer.ByValue,`width`: Int,`height`: Int,`stride`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_rusto_fn_method_rusto_version(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_rusto_fn_func_create_initialize_config_for_model(`model`: RustBuffer.ByValue,`lang`: RustBuffer.ByValue,`modelPath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_rusto_fn_func_create_initialize_config_ppv6(`detModelPath`: RustBuffer.ByValue,`recModelPath`: RustBuffer.ByValue,`dictPath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_rusto_fn_func_default_ocr_run_options(uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_rusto_fn_func_download_all_models(`cacheDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_rusto_fn_func_download_model(`model`: RustBuffer.ByValue,`lang`: RustBuffer.ByValue,`cacheDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_rusto_fn_func_rusto_version(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -809,19 +837,40 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
 }
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
+    if (lib.uniffi_rusto_checksum_func_create_initialize_config_for_model() != 37532) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 12132) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rusto_checksum_func_default_ocr_run_options() != 50314) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_rusto_checksum_func_download_all_models() != 11564) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rusto_checksum_func_download_model() != 15041) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_rusto_checksum_func_rusto_version() != 3477) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rusto_checksum_method_rusto_detect_layout() != 43417) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rusto_checksum_method_rusto_detect_layout_rgb() != 59477) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rusto_checksum_method_rusto_detect_text() != 5963) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rusto_checksum_method_rusto_detect_text_rgb() != 9991) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rusto_checksum_method_rusto_unwarp_image() != 24978) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rusto_checksum_method_rusto_unwarp_image_rgb() != 44077) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rusto_checksum_method_rusto_version() != 31217) {
@@ -1283,6 +1332,16 @@ public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
 public interface RustOInterface {
     
     /**
+     * Detects document layout regions from an image source.
+     */
+    fun `detectLayout`(`source`: ImageSource): List<LayoutRegion>
+    
+    /**
+     * Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
+     */
+    fun `detectLayoutRgb`(`pixels`: kotlin.ByteArray, `width`: kotlin.UInt, `height`: kotlin.UInt, `stride`: kotlin.ULong): List<LayoutRegion>
+    
+    /**
      * Runs text detection and recognition on an image source.
      */
     fun `detectText`(`source`: ImageSource, `options`: OcrRunOptions): DetectTextResult
@@ -1291,6 +1350,16 @@ public interface RustOInterface {
      * Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
      */
     fun `detectTextRgb`(`pixels`: kotlin.ByteArray, `width`: kotlin.UInt, `height`: kotlin.UInt, `stride`: kotlin.ULong, `options`: OcrRunOptions): DetectTextResult
+    
+    /**
+     * Unwarps a distorted or curved document image from an image source.
+     */
+    fun `unwarpImage`(`source`: ImageSource): UnwarpedImageResult
+    
+    /**
+     * Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
+     */
+    fun `unwarpImageRgb`(`pixels`: kotlin.ByteArray, `width`: kotlin.UInt, `height`: kotlin.UInt, `stride`: kotlin.ULong): UnwarpedImageResult
     
     /**
      * Returns the engine library version string.
@@ -1401,6 +1470,40 @@ open class RustO: Disposable, AutoCloseable, RustOInterface
 
     
     /**
+     * Detects document layout regions from an image source.
+     */
+    @Throws(RustoBindingException::class)override fun `detectLayout`(`source`: ImageSource): List<LayoutRegion> {
+            return FfiConverterSequenceTypeLayoutRegion.lift(
+    callWithHandle {
+    uniffiRustCallWithError(RustoBindingException) { _status ->
+    UniffiLib.uniffi_rusto_fn_method_rusto_detect_layout(
+        it,
+        FfiConverterTypeImageSource.lower(`source`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
+     */
+    @Throws(RustoBindingException::class)override fun `detectLayoutRgb`(`pixels`: kotlin.ByteArray, `width`: kotlin.UInt, `height`: kotlin.UInt, `stride`: kotlin.ULong): List<LayoutRegion> {
+            return FfiConverterSequenceTypeLayoutRegion.lift(
+    callWithHandle {
+    uniffiRustCallWithError(RustoBindingException) { _status ->
+    UniffiLib.uniffi_rusto_fn_method_rusto_detect_layout_rgb(
+        it,
+        FfiConverterByteArray.lower(`pixels`),FfiConverterUInt.lower(`width`),FfiConverterUInt.lower(`height`),FfiConverterULong.lower(`stride`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * Runs text detection and recognition on an image source.
      */
     @Throws(RustoBindingException::class)override fun `detectText`(`source`: ImageSource, `options`: OcrRunOptions): DetectTextResult {
@@ -1427,6 +1530,40 @@ open class RustO: Disposable, AutoCloseable, RustOInterface
     UniffiLib.uniffi_rusto_fn_method_rusto_detect_text_rgb(
         it,
         FfiConverterByteArray.lower(`pixels`),FfiConverterUInt.lower(`width`),FfiConverterUInt.lower(`height`),FfiConverterULong.lower(`stride`),FfiConverterTypeOcrRunOptions.lower(`options`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Unwarps a distorted or curved document image from an image source.
+     */
+    @Throws(RustoBindingException::class)override fun `unwarpImage`(`source`: ImageSource): UnwarpedImageResult {
+            return FfiConverterTypeUnwarpedImageResult.lift(
+    callWithHandle {
+    uniffiRustCallWithError(RustoBindingException) { _status ->
+    UniffiLib.uniffi_rusto_fn_method_rusto_unwarp_image(
+        it,
+        FfiConverterTypeImageSource.lower(`source`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
+     */
+    @Throws(RustoBindingException::class)override fun `unwarpImageRgb`(`pixels`: kotlin.ByteArray, `width`: kotlin.UInt, `height`: kotlin.UInt, `stride`: kotlin.ULong): UnwarpedImageResult {
+            return FfiConverterTypeUnwarpedImageResult.lift(
+    callWithHandle {
+    uniffiRustCallWithError(RustoBindingException) { _status ->
+    UniffiLib.uniffi_rusto_fn_method_rusto_unwarp_image_rgb(
+        it,
+        FfiConverterByteArray.lower(`pixels`),FfiConverterUInt.lower(`width`),FfiConverterUInt.lower(`height`),FfiConverterULong.lower(`stride`),_status)
 }
     }
     )
@@ -1849,13 +1986,43 @@ public object FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
 
 
 /**
- * Engine initialization configuration specifying model paths and template preset.
+ * Engine initialization configuration specifying model paths, preset, and optional extensions.
  */
 data class InitializeConfig (
     /**
-     * Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+     * Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+     */
+    var `model`: kotlin.String?
+    , 
+    /**
+     * Base model directory containing det, rec, and dict files.
+     */
+    var `modelPath`: kotlin.String?
+    , 
+    /**
+     * Legacy template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
      */
     var `template`: kotlin.String?
+    , 
+    /**
+     * Language code or name (e.g. "ja", "ko", "ar", "cyrillic", "devanagari", "latin").
+     */
+    var `lang`: kotlin.String?
+    , 
+    /**
+     * Custom cache directory override path.
+     */
+    var `cacheDir`: kotlin.String?
+    , 
+    /**
+     * Enable neural reading order recovery transformer.
+     */
+    var `enableReadingOrder`: kotlin.Boolean?
+    , 
+    /**
+     * Document layout variant: "cdla" (default 10-class) or "publaynet" (5-class).
+     */
+    var `layoutVariant`: kotlin.String?
     , 
     /**
      * Detection model configuration.
@@ -1881,6 +2048,11 @@ data class InitializeConfig (
      * Optional unwarp configuration.
      */
     var `unwarp`: UnwarpConfig?
+    , 
+    /**
+     * Optional layout configuration.
+     */
+    var `layout`: LayoutConfig?
     
 ){
     
@@ -1898,30 +2070,248 @@ public object FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<Initializ
     override fun read(buf: ByteBuffer): InitializeConfig {
         return InitializeConfig(
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterOptionalTypeDetectionConfig.read(buf),
             FfiConverterOptionalTypeRecognitionConfig.read(buf),
             FfiConverterOptionalTypeClassificationConfig.read(buf),
             FfiConverterOptionalTypeOrientationConfig.read(buf),
             FfiConverterOptionalTypeUnwarpConfig.read(buf),
+            FfiConverterOptionalTypeLayoutConfig.read(buf),
         )
     }
 
     override fun allocationSize(value: InitializeConfig) = (
+            FfiConverterOptionalString.allocationSize(value.`model`) +
+            FfiConverterOptionalString.allocationSize(value.`modelPath`) +
             FfiConverterOptionalString.allocationSize(value.`template`) +
+            FfiConverterOptionalString.allocationSize(value.`lang`) +
+            FfiConverterOptionalString.allocationSize(value.`cacheDir`) +
+            FfiConverterOptionalBoolean.allocationSize(value.`enableReadingOrder`) +
+            FfiConverterOptionalString.allocationSize(value.`layoutVariant`) +
             FfiConverterOptionalTypeDetectionConfig.allocationSize(value.`detection`) +
             FfiConverterOptionalTypeRecognitionConfig.allocationSize(value.`recognition`) +
             FfiConverterOptionalTypeClassificationConfig.allocationSize(value.`classification`) +
             FfiConverterOptionalTypeOrientationConfig.allocationSize(value.`orientation`) +
-            FfiConverterOptionalTypeUnwarpConfig.allocationSize(value.`unwarp`)
+            FfiConverterOptionalTypeUnwarpConfig.allocationSize(value.`unwarp`) +
+            FfiConverterOptionalTypeLayoutConfig.allocationSize(value.`layout`)
     )
 
     override fun write(value: InitializeConfig, buf: ByteBuffer) {
+            FfiConverterOptionalString.write(value.`model`, buf)
+            FfiConverterOptionalString.write(value.`modelPath`, buf)
             FfiConverterOptionalString.write(value.`template`, buf)
+            FfiConverterOptionalString.write(value.`lang`, buf)
+            FfiConverterOptionalString.write(value.`cacheDir`, buf)
+            FfiConverterOptionalBoolean.write(value.`enableReadingOrder`, buf)
+            FfiConverterOptionalString.write(value.`layoutVariant`, buf)
             FfiConverterOptionalTypeDetectionConfig.write(value.`detection`, buf)
             FfiConverterOptionalTypeRecognitionConfig.write(value.`recognition`, buf)
             FfiConverterOptionalTypeClassificationConfig.write(value.`classification`, buf)
             FfiConverterOptionalTypeOrientationConfig.write(value.`orientation`, buf)
             FfiConverterOptionalTypeUnwarpConfig.write(value.`unwarp`, buf)
+            FfiConverterOptionalTypeLayoutConfig.write(value.`layout`, buf)
+    }
+}
+
+
+
+/**
+ * Bounding box coordinates for a detected document layout region.
+ */
+data class LayoutBBox (
+    /**
+     * Minimum horizontal coordinate (left).
+     */
+    var `xMin`: kotlin.Int
+    , 
+    /**
+     * Minimum vertical coordinate (top).
+     */
+    var `yMin`: kotlin.Int
+    , 
+    /**
+     * Maximum horizontal coordinate (right).
+     */
+    var `xMax`: kotlin.Int
+    , 
+    /**
+     * Maximum vertical coordinate (bottom).
+     */
+    var `yMax`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeLayoutBBox: FfiConverterRustBuffer<LayoutBBox> {
+    override fun read(buf: ByteBuffer): LayoutBBox {
+        return LayoutBBox(
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: LayoutBBox) = (
+            FfiConverterInt.allocationSize(value.`xMin`) +
+            FfiConverterInt.allocationSize(value.`yMin`) +
+            FfiConverterInt.allocationSize(value.`xMax`) +
+            FfiConverterInt.allocationSize(value.`yMax`)
+    )
+
+    override fun write(value: LayoutBBox, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`xMin`, buf)
+            FfiConverterInt.write(value.`yMin`, buf)
+            FfiConverterInt.write(value.`xMax`, buf)
+            FfiConverterInt.write(value.`yMax`, buf)
+    }
+}
+
+
+
+/**
+ * Document layout analysis model configuration.
+ */
+data class LayoutConfig (
+    /**
+     * Whether layout stage is enabled.
+     */
+    var `enabled`: kotlin.Boolean?
+    , 
+    /**
+     * Filesystem path to layout model (.rten or .onnx).
+     */
+    var `modelPath`: kotlin.String?
+    , 
+    /**
+     * Confidence threshold.
+     */
+    var `confThresh`: kotlin.Float?
+    , 
+    /**
+     * Target input side length for resizing.
+     */
+    var `targetSize`: kotlin.Int?
+    , 
+    /**
+     * Target input height for resizing.
+     */
+    var `targetHeight`: kotlin.Int?
+    , 
+    /**
+     * Target input width for resizing.
+     */
+    var `targetWidth`: kotlin.Int?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig> {
+    override fun read(buf: ByteBuffer): LayoutConfig {
+        return LayoutConfig(
+            FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalFloat.read(buf),
+            FfiConverterOptionalInt.read(buf),
+            FfiConverterOptionalInt.read(buf),
+            FfiConverterOptionalInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: LayoutConfig) = (
+            FfiConverterOptionalBoolean.allocationSize(value.`enabled`) +
+            FfiConverterOptionalString.allocationSize(value.`modelPath`) +
+            FfiConverterOptionalFloat.allocationSize(value.`confThresh`) +
+            FfiConverterOptionalInt.allocationSize(value.`targetSize`) +
+            FfiConverterOptionalInt.allocationSize(value.`targetHeight`) +
+            FfiConverterOptionalInt.allocationSize(value.`targetWidth`)
+    )
+
+    override fun write(value: LayoutConfig, buf: ByteBuffer) {
+            FfiConverterOptionalBoolean.write(value.`enabled`, buf)
+            FfiConverterOptionalString.write(value.`modelPath`, buf)
+            FfiConverterOptionalFloat.write(value.`confThresh`, buf)
+            FfiConverterOptionalInt.write(value.`targetSize`, buf)
+            FfiConverterOptionalInt.write(value.`targetHeight`, buf)
+            FfiConverterOptionalInt.write(value.`targetWidth`, buf)
+    }
+}
+
+
+
+/**
+ * Detected document layout region with category, bounding box, and confidence score.
+ */
+data class LayoutRegion (
+    /**
+     * Axis-aligned bounding box.
+     */
+    var `bbox`: LayoutBBox
+    , 
+    /**
+     * Semantic layout category.
+     */
+    var `layoutType`: LayoutType
+    , 
+    /**
+     * Classification confidence score [0.0 - 1.0].
+     */
+    var `confidence`: kotlin.Float
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeLayoutRegion: FfiConverterRustBuffer<LayoutRegion> {
+    override fun read(buf: ByteBuffer): LayoutRegion {
+        return LayoutRegion(
+            FfiConverterTypeLayoutBBox.read(buf),
+            FfiConverterTypeLayoutType.read(buf),
+            FfiConverterFloat.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: LayoutRegion) = (
+            FfiConverterTypeLayoutBBox.allocationSize(value.`bbox`) +
+            FfiConverterTypeLayoutType.allocationSize(value.`layoutType`) +
+            FfiConverterFloat.allocationSize(value.`confidence`)
+    )
+
+    override fun write(value: LayoutRegion, buf: ByteBuffer) {
+            FfiConverterTypeLayoutBBox.write(value.`bbox`, buf)
+            FfiConverterTypeLayoutType.write(value.`layoutType`, buf)
+            FfiConverterFloat.write(value.`confidence`, buf)
     }
 }
 
@@ -1962,6 +2352,16 @@ data class OcrRunOptions (
     var `orientation`: kotlin.Boolean?
     , 
     /**
+     * Enable document unwarping stage.
+     */
+    var `unwarp`: kotlin.Boolean?
+    , 
+    /**
+     * Enable document layout analysis stage.
+     */
+    var `layout`: kotlin.Boolean?
+    , 
+    /**
      * Request-local minimum height resize override.
      */
     var `minHeight`: kotlin.Float?
@@ -2000,6 +2400,11 @@ data class OcrRunOptions (
      * Runtime crop and resolution optimization options.
      */
     var `optimization`: OptimizationOptions?
+    , 
+    /**
+     * Request-local recognition batch size override.
+     */
+    var `recBatchNum`: kotlin.Int?
     
 ){
     
@@ -2022,6 +2427,8 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterOptionalFloat.read(buf),
             FfiConverterOptionalBoolean.read(buf),
             FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalBoolean.read(buf),
             FfiConverterOptionalFloat.read(buf),
             FfiConverterOptionalFloat.read(buf),
             FfiConverterOptionalFloat.read(buf),
@@ -2030,6 +2437,7 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterOptionalTypePostprocessRunOptions.read(buf),
             FfiConverterOptionalTypeCalibrationOptions.read(buf),
             FfiConverterOptionalTypeOptimizationOptions.read(buf),
+            FfiConverterOptionalInt.read(buf),
         )
     }
 
@@ -2040,6 +2448,8 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterOptionalFloat.allocationSize(value.`textScore`) +
             FfiConverterOptionalBoolean.allocationSize(value.`classification`) +
             FfiConverterOptionalBoolean.allocationSize(value.`orientation`) +
+            FfiConverterOptionalBoolean.allocationSize(value.`unwarp`) +
+            FfiConverterOptionalBoolean.allocationSize(value.`layout`) +
             FfiConverterOptionalFloat.allocationSize(value.`minHeight`) +
             FfiConverterOptionalFloat.allocationSize(value.`maxSideLen`) +
             FfiConverterOptionalFloat.allocationSize(value.`minSideLen`) +
@@ -2047,7 +2457,8 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterOptionalTypeDetectionRunOptions.allocationSize(value.`detection`) +
             FfiConverterOptionalTypePostprocessRunOptions.allocationSize(value.`postprocess`) +
             FfiConverterOptionalTypeCalibrationOptions.allocationSize(value.`calibration`) +
-            FfiConverterOptionalTypeOptimizationOptions.allocationSize(value.`optimization`)
+            FfiConverterOptionalTypeOptimizationOptions.allocationSize(value.`optimization`) +
+            FfiConverterOptionalInt.allocationSize(value.`recBatchNum`)
     )
 
     override fun write(value: OcrRunOptions, buf: ByteBuffer) {
@@ -2057,6 +2468,8 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterOptionalFloat.write(value.`textScore`, buf)
             FfiConverterOptionalBoolean.write(value.`classification`, buf)
             FfiConverterOptionalBoolean.write(value.`orientation`, buf)
+            FfiConverterOptionalBoolean.write(value.`unwarp`, buf)
+            FfiConverterOptionalBoolean.write(value.`layout`, buf)
             FfiConverterOptionalFloat.write(value.`minHeight`, buf)
             FfiConverterOptionalFloat.write(value.`maxSideLen`, buf)
             FfiConverterOptionalFloat.write(value.`minSideLen`, buf)
@@ -2065,6 +2478,7 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterOptionalTypePostprocessRunOptions.write(value.`postprocess`, buf)
             FfiConverterOptionalTypeCalibrationOptions.write(value.`calibration`, buf)
             FfiConverterOptionalTypeOptimizationOptions.write(value.`optimization`, buf)
+            FfiConverterOptionalInt.write(value.`recBatchNum`, buf)
     }
 }
 
@@ -2074,6 +2488,16 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
  * Runtime crop and resolution optimization options.
  */
 data class OptimizationOptions (
+    /**
+     * Enable or disable image optimization.
+     */
+    var `enabled`: kotlin.Boolean?
+    , 
+    /**
+     * Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
+     */
+    var `targetMaxSide`: kotlin.UInt?
+    , 
     /**
      * Horizontal padding around bounding box crops in pixels.
      */
@@ -2099,17 +2523,23 @@ data class OptimizationOptions (
 public object FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOptions> {
     override fun read(buf: ByteBuffer): OptimizationOptions {
         return OptimizationOptions(
+            FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalUInt.read(buf),
             FfiConverterOptionalFloat.read(buf),
             FfiConverterOptionalFloat.read(buf),
         )
     }
 
     override fun allocationSize(value: OptimizationOptions) = (
+            FfiConverterOptionalBoolean.allocationSize(value.`enabled`) +
+            FfiConverterOptionalUInt.allocationSize(value.`targetMaxSide`) +
             FfiConverterOptionalFloat.allocationSize(value.`cropPaddingX`) +
             FfiConverterOptionalFloat.allocationSize(value.`cropPaddingY`)
     )
 
     override fun write(value: OptimizationOptions, buf: ByteBuffer) {
+            FfiConverterOptionalBoolean.write(value.`enabled`, buf)
+            FfiConverterOptionalUInt.write(value.`targetMaxSide`, buf)
             FfiConverterOptionalFloat.write(value.`cropPaddingX`, buf)
             FfiConverterOptionalFloat.write(value.`cropPaddingY`, buf)
     }
@@ -2316,6 +2746,11 @@ data class RecognitionConfig (
      * Filesystem path to dictionary vocabulary file (.txt).
      */
     var `dictPath`: kotlin.String?
+    , 
+    /**
+     * Recognition batch size. Default: 6.
+     */
+    var `recBatchNum`: kotlin.Int?
     
 ){
     
@@ -2335,19 +2770,22 @@ public object FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<Recognit
             FfiConverterOptionalBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalInt.read(buf),
         )
     }
 
     override fun allocationSize(value: RecognitionConfig) = (
             FfiConverterOptionalBoolean.allocationSize(value.`enabled`) +
             FfiConverterOptionalString.allocationSize(value.`modelPath`) +
-            FfiConverterOptionalString.allocationSize(value.`dictPath`)
+            FfiConverterOptionalString.allocationSize(value.`dictPath`) +
+            FfiConverterOptionalInt.allocationSize(value.`recBatchNum`)
     )
 
     override fun write(value: RecognitionConfig, buf: ByteBuffer) {
             FfiConverterOptionalBoolean.write(value.`enabled`, buf)
             FfiConverterOptionalString.write(value.`modelPath`, buf)
             FfiConverterOptionalString.write(value.`dictPath`, buf)
+            FfiConverterOptionalInt.write(value.`recBatchNum`, buf)
     }
 }
 
@@ -2458,6 +2896,61 @@ public object FfiConverterTypeUnwarpConfig: FfiConverterRustBuffer<UnwarpConfig>
     override fun write(value: UnwarpConfig, buf: ByteBuffer) {
             FfiConverterOptionalBoolean.write(value.`enabled`, buf)
             FfiConverterOptionalString.write(value.`modelPath`, buf)
+    }
+}
+
+
+
+/**
+ * Unwarped image result with raw RGB8 pixel buffer and dimensions.
+ */
+data class UnwarpedImageResult (
+    /**
+     * Interleaved 24-bit RGB pixel bytes.
+     */
+    var `pixels`: kotlin.ByteArray
+    , 
+    /**
+     * Image width in pixels.
+     */
+    var `width`: kotlin.UInt
+    , 
+    /**
+     * Image height in pixels.
+     */
+    var `height`: kotlin.UInt
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeUnwarpedImageResult: FfiConverterRustBuffer<UnwarpedImageResult> {
+    override fun read(buf: ByteBuffer): UnwarpedImageResult {
+        return UnwarpedImageResult(
+            FfiConverterByteArray.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: UnwarpedImageResult) = (
+            FfiConverterByteArray.allocationSize(value.`pixels`) +
+            FfiConverterUInt.allocationSize(value.`width`) +
+            FfiConverterUInt.allocationSize(value.`height`)
+    )
+
+    override fun write(value: UnwarpedImageResult, buf: ByteBuffer) {
+            FfiConverterByteArray.write(value.`pixels`, buf)
+            FfiConverterUInt.write(value.`width`, buf)
+            FfiConverterUInt.write(value.`height`, buf)
     }
 }
 
@@ -2640,6 +3133,51 @@ public object FfiConverterTypeImageSource : FfiConverterRustBuffer<ImageSource>{
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
+ * Category of document layout region.
+ */
+
+enum class LayoutType {
+    
+    TEXT,
+    TITLE,
+    FIGURE,
+    FIGURE_CAPTION,
+    TABLE,
+    TABLE_CAPTION,
+    HEADER,
+    FOOTER,
+    REFERENCE,
+    EQUATION;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeLayoutType: FfiConverterRustBuffer<LayoutType> {
+    override fun read(buf: ByteBuffer) = try {
+        LayoutType.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: LayoutType) = 4UL
+
+    override fun write(value: LayoutType, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
     }
 }
 
@@ -2836,6 +3374,38 @@ public object FfiConverterTypeRustoBindingError : FfiConverterRustBuffer<RustoBi
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
     }
 
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalUInt: FfiConverterRustBuffer<kotlin.UInt?> {
+    override fun read(buf: ByteBuffer): kotlin.UInt? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterUInt.read(buf)
+    }
+
+    override fun allocationSize(value: kotlin.UInt?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterUInt.allocationSize(value)
+        }
+    }
+
+    override fun write(value: kotlin.UInt?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterUInt.write(value, buf)
+        }
+    }
 }
 
 
@@ -3100,6 +3670,38 @@ public object FfiConverterOptionalTypeDetectionRunOptions: FfiConverterRustBuffe
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig?> {
+    override fun read(buf: ByteBuffer): LayoutConfig? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeLayoutConfig.read(buf)
+    }
+
+    override fun allocationSize(value: LayoutConfig?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeLayoutConfig.allocationSize(value)
+        }
+    }
+
+    override fun write(value: LayoutConfig?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeLayoutConfig.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOptions?> {
     override fun read(buf: ByteBuffer): OptimizationOptions? {
         if (buf.get().toInt() == 0) {
@@ -3320,6 +3922,62 @@ public object FfiConverterSequenceFloat: FfiConverterRustBuffer<List<kotlin.Floa
 /**
  * @suppress
  */
+public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
+    override fun read(buf: ByteBuffer): List<kotlin.String> {
+        val len = buf.getInt()
+        return List<kotlin.String>(len) {
+            FfiConverterString.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<kotlin.String>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterString.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<kotlin.String>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterString.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeLayoutRegion: FfiConverterRustBuffer<List<LayoutRegion>> {
+    override fun read(buf: ByteBuffer): List<LayoutRegion> {
+        val len = buf.getInt()
+        return List<LayoutRegion>(len) {
+            FfiConverterTypeLayoutRegion.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<LayoutRegion>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeLayoutRegion.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<LayoutRegion>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeLayoutRegion.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypePoint2D: FfiConverterRustBuffer<List<Point2D>> {
     override fun read(buf: ByteBuffer): List<Point2D> {
         val len = buf.getInt()
@@ -3368,7 +4026,17 @@ public object FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer<List<Te
             FfiConverterTypeTextResult.write(it, buf)
         }
     }
-} fun `createInitializeConfigPpv6`(`detModelPath`: kotlin.String, `recModelPath`: kotlin.String, `dictPath`: kotlin.String): InitializeConfig {
+} fun `createInitializeConfigForModel`(`model`: kotlin.String?, `lang`: kotlin.String?, `modelPath`: kotlin.String?): InitializeConfig {
+            return FfiConverterTypeInitializeConfig.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_rusto_fn_func_create_initialize_config_for_model(
+    
+        FfiConverterOptionalString.lower(`model`),FfiConverterOptionalString.lower(`lang`),FfiConverterOptionalString.lower(`modelPath`),_status)
+}
+    )
+    }
+    
+ fun `createInitializeConfigPpv6`(`detModelPath`: kotlin.String, `recModelPath`: kotlin.String, `dictPath`: kotlin.String): InitializeConfig {
             return FfiConverterTypeInitializeConfig.lift(
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_rusto_fn_func_create_initialize_config_ppv6(
@@ -3384,6 +4052,34 @@ public object FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer<List<Te
     UniffiLib.uniffi_rusto_fn_func_default_ocr_run_options(
     
         _status)
+}
+    )
+    }
+    
+
+        /**
+         * Downloads all available canonical models to the cache directory ahead of time.
+         */
+    @Throws(RustoBindingException::class) fun `downloadAllModels`(`cacheDir`: kotlin.String?): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    uniffiRustCallWithError(RustoBindingException) { _status ->
+    UniffiLib.uniffi_rusto_fn_func_download_all_models(
+    
+        FfiConverterOptionalString.lower(`cacheDir`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Downloads model assets for a specific OCR pipeline ahead of time.
+         */
+    @Throws(RustoBindingException::class) fun `downloadModel`(`model`: kotlin.String?, `lang`: kotlin.String?, `cacheDir`: kotlin.String?): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    uniffiRustCallWithError(RustoBindingException) { _status ->
+    UniffiLib.uniffi_rusto_fn_func_download_model(
+    
+        FfiConverterOptionalString.lower(`model`),FfiConverterOptionalString.lower(`lang`),FfiConverterOptionalString.lower(`cacheDir`),_status)
 }
     )
     }

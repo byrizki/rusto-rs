@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use rusto::{DetectTextResult, DetectionRunOptions, Frame, ImageSource, InitializeConfig, OcrRunOptions, OutputGranularity, PostprocessRunOptions, TextResult};
 
 #[test]
@@ -212,6 +213,9 @@ fn test_rusto_config_templates_and_presets() {
     }"#;
     let json_config_v6 = InitializeConfig::from_json(json_str_v6).expect("Parse v6 template JSON");
     assert_eq!(json_config_v6.det.box_thresh, 0.6);
+    assert_eq!(json_config_v6.det.model_path, PathBuf::from("det6.rten"));
+    assert_eq!(json_config_v6.rec.model_path, PathBuf::from("rec6.rten"));
+    assert_eq!(json_config_v6.rec.rec_keys_path, Some(PathBuf::from("dict.txt")));
 
     let json_str = r#"{
         "template": "ppv4",
@@ -225,6 +229,11 @@ fn test_rusto_config_templates_and_presets() {
     let json_config = InitializeConfig::from_json(json_str).expect("Parse template JSON");
     assert_eq!(json_config.det.limit_side_len, 960);
     assert_eq!(json_config.det.limit_type, "max");
+    assert_eq!(json_config.det.max_candidates, 2000);
+    assert_eq!(json_config.det.score_mode, "slow");
+    assert_eq!(json_config.det.model_path, PathBuf::from("det.rten"));
+    assert_eq!(json_config.rec.model_path, PathBuf::from("rec.rten"));
+    assert_eq!(json_config.rec.rec_keys_path, Some(PathBuf::from("dict.txt")));
 }
 
 #[test]

@@ -75,6 +75,8 @@ impl TextDetector {
             explicit_limit
         } else if limit_type == "min" {
             configured_limit_side_len
+        } else if self.cfg.limit_side_len > 0 {
+            self.cfg.limit_side_len
         } else if max_wh < 960 {
             960
         } else if max_wh < 1500 {

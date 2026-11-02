@@ -16,6 +16,12 @@ on:
       - '.github/workflows/docs-ci.yml'
       - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Target tag to build and validate (leave empty to use version from Cargo.toml)'
+        required: false
+        type: string
+        default: ''
 
 concurrency:
   group: library-ci-${{ github.workflow }}-${{ github.ref }}
@@ -43,6 +49,12 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Prepare test model fixtures
+        run: |
+          chmod +x scripts/download_models.sh
+          python3 -m pip install --upgrade rten-convert --break-system-packages || python3 -m pip install rten-convert || true
+          bash scripts/download_models.sh --model ppocrv6 --tier tiny --convert-rten
+
       - name: Run Cargo Tests (Workspace)
         run: cargo test --workspace
 
@@ -56,5 +68,6 @@ jobs:
     needs: [library-checks]
     uses: ./.github/workflows/build.yml
     with:
+      tag_name: ${{ inputs.tag_name || '' }}
       run-release: false
     secrets: inherit

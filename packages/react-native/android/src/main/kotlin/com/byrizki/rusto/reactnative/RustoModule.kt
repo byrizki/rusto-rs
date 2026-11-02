@@ -42,27 +42,56 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
 
     private fun parseInitializeConfig(map: ReadableMap?): InitializeConfig {
         if (map == null) return InitializeConfig()
-        requireOnlyKeys(map, setOf("preset", "models"), "InitializeConfig contains an unknown key.")
+        requireOnlyKeys(
+            map,
+            setOf("preset", "models", "recBatchNum", "model", "modelPath", "lang", "cacheDir", "enableReadingOrder", "layoutVariant"),
+            "InitializeConfig contains an unknown key."
+        )
         val template = if (map.hasKey("preset") && !map.isNull("preset")) {
             require(map.getType("preset") == ReadableType.String) { "InitializeConfig.preset must be a string." }
             map.getString("preset")!!.also { require(it in setOf("ppv6", "ppv5", "ppv4", "ppv3")) { "InitializeConfig.preset is invalid." } }
-        } else "ppv6"
+        } else null
+
+        fun optString(key: String): String? {
+            if (!map.hasKey(key) || map.isNull(key)) return null
+            require(map.getType(key) == ReadableType.String) { "InitializeConfig.$key must be a string." }
+            return map.getString(key)!!.also { require(it.isNotBlank()) { "InitializeConfig.$key must be non-empty." } }
+        }
+
+        fun optBoolean(key: String): Boolean? {
+            if (!map.hasKey(key) || map.isNull(key)) return null
+            require(map.getType(key) == ReadableType.Boolean) { "InitializeConfig.$key must be a boolean." }
+            return map.getBoolean(key)
+        }
+
         val models = if (map.hasKey("models") && !map.isNull("models")) {
             require(map.getType("models") == ReadableType.Map) { "InitializeConfig.models must be an object." }
             map.getMap("models")!!
         } else null
-        models?.let { requireOnlyKeys(it, setOf("detection", "recognition", "dictionary", "classification", "orientation"), "InitializeConfig.models contains an unknown key.") }
+        models?.let { requireOnlyKeys(it, setOf("detection", "recognition", "dictionary", "classification", "orientation", "unwarp", "layout"), "InitializeConfig.models contains an unknown key.") }
         fun model(name: String): String? {
             if (models == null || !models.hasKey(name) || models.isNull(name)) return null
             require(models.getType(name) == ReadableType.String) { "InitializeConfig.models.$name must be a string." }
             return models.getString(name)!!.also { require(it.isNotBlank()) { "InitializeConfig.models.$name must be non-empty." } }
         }
+        val detModel = model("detection")
+        val recModel = model("recognition")
+        val dictPath = model("dictionary")
+
         return InitializeConfig(
+            model = optString("model"),
+            modelPath = optString("modelPath"),
+            lang = optString("lang"),
+            cacheDir = optString("cacheDir"),
+            enableReadingOrder = optBoolean("enableReadingOrder"),
+            layoutVariant = optString("layoutVariant"),
             template = template,
-            detection = DetectionConfig(modelPath = model("detection") ?: "det.rten"),
-            recognition = RecognitionConfig(modelPath = model("recognition") ?: "rec.rten", dictPath = model("dictionary") ?: "dict.txt"),
+            detection = if (detModel != null) DetectionConfig(modelPath = detModel) else null,
+            recognition = if (recModel != null || dictPath != null) RecognitionConfig(modelPath = recModel, dictPath = dictPath) else null,
             classification = model("classification")?.let { ClassificationConfig(enabled = true, modelPath = it) },
             orientation = model("orientation")?.let { OrientationConfig(enabled = true, modelPath = it) },
+            unwarp = model("unwarp")?.let { com.byrizki.rusto.UnwarpConfig(enabled = true, modelPath = it) },
+            layout = model("layout")?.let { com.byrizki.rusto.LayoutConfig(enabled = true, modelPath = it) },
         )
     }
 
@@ -111,7 +140,7 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
 
     private fun parseOptions(options: ReadableMap?): OcrRunOptions {
         if (options == null) return OcrRunOptions()
-        requireOnlyKeys(options, setOf("output", "lineYThreshold", "wordXThreshold", "textScore", "classification", "orientation", "minHeight", "maxSideLen", "minSideLen", "widthHeightRatio", "detection", "postprocess"), "DetectTextOptions contains an unknown key.")
+        requireOnlyKeys(options, setOf("output", "lineYThreshold", "wordXThreshold", "textScore", "classification", "orientation", "unwarp", "layout", "minHeight", "maxSideLen", "minSideLen", "widthHeightRatio", "detection", "postprocess"), "DetectTextOptions contains an unknown key.")
         val output = if (options.hasKey("output") && !options.isNull("output")) {
             require(options.getType("output") == ReadableType.String) { "DetectTextOptions.output must be a string." }
             options.getString("output")!!
@@ -137,7 +166,7 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
         val ratio = if (!options.hasKey("widthHeightRatio") || options.isNull("widthHeightRatio")) null else { require(options.getType("widthHeightRatio") == ReadableType.Number) { "DetectTextOptions.widthHeightRatio must be a number." }; options.getDouble("widthHeightRatio").also { require(it.isFinite() && (it > 0 || it == -1.0)) { "DetectTextOptions.widthHeightRatio is invalid." } }.toFloat() }
         val detection = if (!options.hasKey("detection") || options.isNull("detection")) null else { require(options.getType("detection") == ReadableType.Map) { "DetectTextOptions.detection must be an object." }; parseRuntimeDetection(options.getMap("detection")!!) }
         val postprocess = if (!options.hasKey("postprocess") || options.isNull("postprocess")) null else { require(options.getType("postprocess") == ReadableType.Map) { "DetectTextOptions.postprocess must be an object." }; parseRuntimePostprocess(options.getMap("postprocess")!!) }
-        return OcrRunOptions(OutputGranularity.entries.first { it.wireValue == output }, y?.toFloat(), x?.toFloat(), score?.toFloat(), boolean("classification"), boolean("orientation"), minHeight, maxSideLen, minSideLen, ratio, detection, postprocess)
+        return OcrRunOptions(OutputGranularity.entries.first { it.wireValue == output }, y?.toFloat(), x?.toFloat(), score?.toFloat(), boolean("classification"), boolean("orientation"), minHeight, maxSideLen, minSideLen, ratio, detection, postprocess, boolean("unwarp"), boolean("layout"))
     }
 
     private fun parseRuntimeDetection(map: ReadableMap): DetectionRunOptions {

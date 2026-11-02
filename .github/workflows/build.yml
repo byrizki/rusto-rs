@@ -10,6 +10,22 @@ on:
         description: 'Release tag (e.g. v0.1.3). Leave empty to use version from Cargo.toml'
         required: false
         type: string
+        default: ''
+      create_release:
+        description: 'Create GitHub Release'
+        required: false
+        type: boolean
+        default: true
+      draft:
+        description: 'Create as draft release'
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       tag_name:
@@ -19,6 +35,16 @@ on:
         default: ''
       run-release:
         description: 'Whether to create a GitHub Release'
+        required: false
+        type: boolean
+        default: false
+      draft:
+        description: 'Create as draft release'
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Mark as pre-release'
         required: false
         type: boolean
         default: false
@@ -107,25 +133,6 @@ jobs:
           cp packages/ios/LICENSE build/
           (cd build && zip -r RustO.xcframework.zip RustO.xcframework src LICENSE)
 
-      - name: Package iOS Model Bundle for Test Fixtures
-        run: |
-          chmod +x scripts/download_models.sh
-          python3 -m pip install --upgrade rten-convert --break-system-packages || python3 -m pip install rten-convert || true
-          bash scripts/download_models.sh --model ppocrv6 --tier tiny --convert-rten
-
-          package_model_zip() {
-            local model_src="$1"
-            local zip_name="$2"
-            local tmp_dir="build/tmp_$zip_name"
-            mkdir -p "$tmp_dir"
-            cp -r "$model_src"/* "$tmp_dir/"
-            rm -f "$tmp_dir"/*.onnx
-            (cd "$tmp_dir" && zip -r "../../build/$zip_name.zip" .)
-            rm -rf "$tmp_dir"
-          }
-
-          package_model_zip "models/PPOCR_v6_tiny" "RustO-Models-PPOCRv6-Tiny"
-
       - name: Verify XCFramework exports canonical FFI ABI
         run: |
           set -euo pipefail
@@ -148,20 +155,6 @@ jobs:
         with:
           name: rusto-ios-core-xcframework
           path: build/RustO.xcframework.zip
-
-      - name: Upload each iOS model resource artifact
-        run: |
-          set -euo pipefail
-          for model_zip in build/RustO-Models-*.zip; do
-            test -f "$model_zip"
-            model_id="$(basename "$model_zip" .zip | sed 's/^RustO-Models-//' | tr '[:upper:]' '[:lower:]' | tr '_' '-')"
-            mkdir -p "artifacts/ios-models/$model_id"
-            cp "$model_zip" "artifacts/ios-models/$model_id/"
-          done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: rusto-ios-model-resources
-          path: artifacts/ios-models/
 
   # Build Android Rust Libraries (Parallel Matrix)
   build-android-libs:
@@ -264,15 +257,6 @@ jobs:
           cp artifacts/android/rusto-android-x86/librusto.so packages/android/src/main/jniLibs/x86/
           cp artifacts/android/rusto-android-x86_64/librusto.so packages/android/src/main/jniLibs/x86_64/
 
-          # Copy PP-OCRv6 Tiny model into Android model submodule for consumer validation
-          pkg_dir="packages/android/models/rusto-models-ppocrv6-tiny"
-          if [ -d "models/PPOCR_v6_tiny" ]; then
-            mkdir -p "$pkg_dir/src/main/assets"
-            cp -r models/PPOCR_v6_tiny/* "$pkg_dir/src/main/assets/"
-            rm -f "$pkg_dir/src/main/assets/"*.onnx
-            echo "Copied models/PPOCR_v6_tiny -> $pkg_dir/src/main/assets/"
-          fi
-
       - name: Make Gradle Wrapper executable
         working-directory: packages/android
         run: chmod +x gradlew || true
@@ -286,26 +270,16 @@ jobs:
             gradle assembleRelease
           fi
 
-      - name: Separate Android core and model AAR artifacts
+      - name: Stage Android core AAR artifact
         run: |
           set -euo pipefail
-          mkdir -p artifacts/android-core artifacts/android-models
+          mkdir -p artifacts/android-core
           find packages/android/build/outputs/aar -name '*-release.aar' -exec cp {} artifacts/android-core/ \;
           test "$(find artifacts/android-core -name '*.aar' | wc -l | tr -d ' ')" = 1
-          for aar in packages/android/models/*/build/outputs/aar/*-release.aar; do
-            test -f "$aar"
-            model_id="$(basename "$aar" | sed -E 's/^rusto-models-//; s/-release\.aar$//')"
-            mkdir -p "artifacts/android-models/$model_id"
-            cp "$aar" "artifacts/android-models/$model_id/"
-          done
       - uses: actions/upload-artifact@v4
         with:
           name: rusto-android-core-aar
           path: artifacts/android-core/
-      - uses: actions/upload-artifact@v4
-        with:
-          name: rusto-android-model-aars
-          path: artifacts/android-models/
 
   # Build .NET NuGet package
   build-dotnet:
@@ -408,22 +382,6 @@ jobs:
             fi
           done
 
-      - name: Download PP-OCRv6 Tiny model for test fixture
-        run: |
-          chmod +x scripts/download_models.sh
-          python3 -m pip install --upgrade rten-convert --break-system-packages || python3 -m pip install rten-convert || true
-          bash scripts/download_models.sh --model ppocrv6 --tier tiny --convert-rten
-
-      - name: Prepare test model package
-        run: |
-          pkg_dir="packages/dotnet/models/RustODotnet.Models.PPOCRv6.Tiny"
-          if [ -d "models/PPOCR_v6_tiny" ]; then
-            mkdir -p "$pkg_dir/models"
-            cp -r models/PPOCR_v6_tiny/* "$pkg_dir/models/"
-            rm -f "$pkg_dir/models/"*.onnx
-            echo "Copied models/PPOCR_v6_tiny -> $pkg_dir/models/"
-          fi
-
       - name: Build and Pack NuGet Packages
         run: |
           mkdir -p nupkg
@@ -434,36 +392,20 @@ jobs:
           dotnet pack RustODotnet.csproj -c Release -o ../../nupkg -v detailed
           cd ../..
 
-          echo "=== Packing Test Model Package ==="
-          test_proj="packages/dotnet/models/RustODotnet.Models.PPOCRv6.Tiny/RustODotnet.Models.PPOCRv6.Tiny.csproj"
-          if [ -f "$test_proj" ]; then
-            dotnet pack "$test_proj" -c Release -o nupkg -v detailed
-          fi
-
           printf '\n=== Generated Packages ===\n'
           ls -lh nupkg/*.nupkg
 
-      - name: Separate .NET core and model NuGet artifacts
+      - name: Stage .NET core NuGet artifact
         run: |
           set -euo pipefail
-          mkdir -p artifacts/dotnet-core artifacts/dotnet-models
+          mkdir -p artifacts/dotnet-core
           core="$(find nupkg -maxdepth 1 -name 'RustODotnet.[0-9]*.nupkg' -print -quit)"
           test -n "$core"
           cp "$core" artifacts/dotnet-core/
-          for nupkg in nupkg/RustODotnet.Models.*.nupkg; do
-            test -f "$nupkg"
-            model_id="$(basename "$nupkg" | sed -E 's/^RustODotnet\.Models\.//; s/\.[0-9]+\.[0-9]+\.[0-9]+\.nupkg$//' | tr '[:upper:]' '[:lower:]' | tr '.' '-')"
-            mkdir -p "artifacts/dotnet-models/$model_id"
-            cp "$nupkg" "artifacts/dotnet-models/$model_id/"
-          done
       - uses: actions/upload-artifact@v4
         with:
           name: rusto-dotnet-core-nupkg
           path: artifacts/dotnet-core/
-      - uses: actions/upload-artifact@v4
-        with:
-          name: rusto-dotnet-model-nupkgs
-          path: artifacts/dotnet-models/
 
   # Package Multi-Platform Language Packages (NPM, Python, Java, Dart, Flutter, Go)
   package-react-native:
@@ -681,7 +623,7 @@ jobs:
     name: Create GitHub Release
     if: >-
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'workflow_dispatch' && inputs.create_release != false) ||
       (github.event_name == 'workflow_call' && inputs.run-release == true)
     needs: [binding-examples, build-ios, build-android, package-dotnet, package-react-native]
     runs-on: ubuntu-22.04
@@ -711,10 +653,6 @@ jobs:
 
           if [ -d "rusto-ios-core-xcframework" ]; then
             find rusto-ios-core-xcframework -name 'RustO.xcframework.zip' -exec cp {} ../releases/ \;
-          fi
-
-          if [ -d "rusto-ios-model-resources" ]; then
-            find rusto-ios-model-resources -name "RustO-Models-*.zip" -exec cp {} ../releases/ \;
           fi
 
           if [ -d "rusto-android-core-aar" ]; then
@@ -777,9 +715,10 @@ jobs:
         with:
           tag_name: ${{ steps.release_info.outputs.tag }}
           name: RustO! Release ${{ steps.release_info.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           files: releases/*
-          draft: false
-          prerelease: false
+          draft: ${{ inputs.draft || false }}
+          prerelease: ${{ inputs.prerelease || contains(steps.release_info.outputs.tag, '-') }}
           generate_release_notes: true
           body_path: release_changelog.md
         env:

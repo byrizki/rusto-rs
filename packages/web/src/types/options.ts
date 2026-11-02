@@ -12,8 +12,9 @@ export type OutputGranularity = 'lines' | 'words' | 'spatial';
  * - 'ppv5': PP-OCRv5 model family.
  * - 'ppv4': PP-OCRv4 model family.
  * - 'ppv3': PP-OCRv3 legacy model family.
+ * - 'indra': Indra OCR Indonesian ID & Document model family (DataLab).
  */
-export type ModelPreset = 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3';
+export type ModelPreset = 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3' | 'indra';
 
 /**
  * Image detection stage options.

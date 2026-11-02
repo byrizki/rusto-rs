@@ -390,8 +390,12 @@ pub struct GlobalConfig {
     pub use_rec: bool,
     pub use_orient: bool,
     pub use_unwarp: bool,
+    pub use_layout: bool,
+    pub reading_order: bool,
+    pub reading_order_model: Option<PathBuf>,
     pub orient_config: Option<OrientConfig>,
     pub unwarp_config: Option<UnwarpConfig>,
+    pub layout_config: Option<LayoutConfig>,
     /// Enable debug images (oriented and rectified)
     pub debug_images: bool,
     pub min_height: f32,
@@ -419,8 +423,12 @@ impl Default for GlobalConfig {
             use_rec: true,
             use_orient: false,
             use_unwarp: false,
+            use_layout: false,
+            reading_order: false,
+            reading_order_model: None,
             orient_config: None,
             unwarp_config: None,
+            layout_config: None,
             debug_images: false, // Disabled by default for performance
             min_height: 30.0,
             width_height_ratio: 8.0,
@@ -447,11 +455,25 @@ pub struct LayoutConfig {
     pub conf_thresh: f32,
     pub iou_thresh: f32,
     pub target_size: i32,
+    #[serde(default)]
+    pub target_height: Option<i32>,
+    #[serde(default)]
+    pub target_width: Option<i32>,
     pub engine_cfg: EngineConfig,
 }
 
 impl LayoutConfig {
     pub fn default(model_path: PathBuf) -> Self {
+        let p_str = model_path.to_string_lossy();
+        let (target_height, target_width) = if p_str.contains("doclayout_s") {
+            (480, 480)
+        } else if p_str.contains("doclayout_l") || p_str.contains("doclayout_plus_l") {
+            (800, 800)
+        } else if p_str.contains("yolo") {
+            (640, 640)
+        } else {
+            (800, 608)
+        };
         Self {
             engine_type: EngineType::OnnxRuntime,
             model_type: ModelType::Mobile,
@@ -461,7 +483,9 @@ impl LayoutConfig {
             std: [0.229, 0.224, 0.225],  // ImageNet std
             conf_thresh: 0.4,
             iou_thresh: 0.5,
-            target_size: 640, // Default for PP-DocLayout_plus-L
+            target_size: target_height,
+            target_height: Some(target_height),
+            target_width: Some(target_width),
             engine_cfg: EngineConfig::default(),
         }
     }

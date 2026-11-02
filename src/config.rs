@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use crate::calibration::{CalibrationOptions, OptimizationOptions};
-use crate::types::{ClsConfig, DetConfig, RecConfig, OrientConfig, UnwarpConfig, GlobalConfig};
+use crate::types::{ClsConfig, DetConfig, RecConfig, OrientConfig, UnwarpConfig, LayoutConfig, GlobalConfig};
 
 /// Preset configuration for OCR model architectures
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -94,6 +94,9 @@ pub struct InitializeConfig {
     
     /// Optional: Text classification (line orientation) configuration
     pub cls: Option<ClsConfig>,
+
+    /// Optional: Document layout detection configuration
+    pub layout: Option<LayoutConfig>,
 }
 
 impl Default for InitializeConfig {
@@ -138,6 +141,8 @@ struct RecognitionConfigJson {
     return_word_box: Option<bool>,
     #[serde(alias = "returnSingleCharBox", alias = "return_single_char_box")]
     return_single_char_box: Option<bool>,
+    #[serde(alias = "recBatchNum", alias = "rec_batch_num", alias = "batchNum", alias = "batch_num")]
+    rec_batch_num: Option<i32>,
 }
 
 #[derive(Deserialize, Default, Clone, Debug)]
@@ -171,6 +176,18 @@ struct UnwarpConfigJson {
 
 #[derive(Deserialize, Default, Clone, Debug)]
 struct LayoutConfigJson {
+    #[serde(alias = "useLayout", alias = "use_layout")]
+    enabled: Option<bool>,
+    #[serde(alias = "modelPath", alias = "layoutModelPath", alias = "model_path", alias = "layout_model_path")]
+    model_path: Option<PathBuf>,
+    #[serde(alias = "confThresh", alias = "conf_thresh", alias = "threshold")]
+    conf_thresh: Option<f32>,
+    #[serde(alias = "targetSize", alias = "target_size")]
+    target_size: Option<i32>,
+    #[serde(alias = "targetHeight", alias = "target_height")]
+    target_height: Option<i32>,
+    #[serde(alias = "targetWidth", alias = "target_width")]
+    target_width: Option<i32>,
     #[serde(alias = "yThresholdMultiplier", alias = "y_threshold_multiplier")]
     y_threshold_multiplier: Option<f32>,
     #[serde(alias = "xThresholdMultiplier", alias = "x_threshold_multiplier")]
@@ -179,8 +196,72 @@ struct LayoutConfigJson {
 
 #[derive(Deserialize, Default, Clone, Debug)]
 struct FlatConfig {
-    #[serde(alias = "template")]
+    #[serde(alias = "models")]
+    model: Option<String>,
     template: Option<String>,
+    #[serde(alias = "modelPath", alias = "model_path", alias = "modelDir", alias = "model_dir")]
+    model_path: Option<PathBuf>,
+    lang: Option<String>,
+    #[serde(alias = "cacheDir", alias = "cache_dir")]
+    cache_dir: Option<PathBuf>,
+    #[serde(alias = "enableReadingOrder", alias = "enable_reading_order", alias = "reading_order")]
+    enable_reading_order: Option<bool>,
+    #[serde(alias = "layoutVariant", alias = "layout_variant")]
+    layout_variant: Option<String>,
+
+    #[serde(alias = "detModelPath", alias = "det_model_path", alias = "detPath", alias = "det_path")]
+    det_model_path: Option<PathBuf>,
+    #[serde(alias = "recModelPath", alias = "rec_model_path", alias = "recPath", alias = "rec_path")]
+    rec_model_path: Option<PathBuf>,
+    #[serde(alias = "dictPath", alias = "dict_path")]
+    dict_path: Option<PathBuf>,
+    #[serde(alias = "clsModelPath", alias = "cls_model_path", alias = "clsPath", alias = "cls_path")]
+    cls_model_path: Option<PathBuf>,
+    #[serde(alias = "orientModelPath", alias = "orient_model_path", alias = "orientPath", alias = "orient_path")]
+    orient_model_path: Option<PathBuf>,
+    #[serde(alias = "unwarpModelPath", alias = "unwarp_model_path", alias = "unwarpPath", alias = "unwarp_path")]
+    unwarp_model_path: Option<PathBuf>,
+    #[serde(alias = "layoutModelPath", alias = "layout_model_path", alias = "layoutPath", alias = "layout_path")]
+    layout_model_path: Option<PathBuf>,
+
+    #[serde(alias = "detThresh", alias = "det_thresh")]
+    det_thresh: Option<f32>,
+    #[serde(alias = "detBoxThresh", alias = "box_thresh", alias = "boxThresh", alias = "det_box_thresh")]
+    box_thresh: Option<f32>,
+    #[serde(alias = "unclipRatio", alias = "unclip_ratio")]
+    unclip_ratio: Option<f32>,
+    #[serde(alias = "limitSideLen", alias = "limit_side_len")]
+    limit_side_len: Option<i32>,
+    #[serde(alias = "limitType", alias = "limit_type")]
+    limit_type: Option<String>,
+    #[serde(alias = "useDilation", alias = "use_dilation")]
+    use_dilation: Option<bool>,
+    #[serde(alias = "scoreMode", alias = "score_mode", alias = "detScoreMode", alias = "det_score_mode")]
+    score_mode: Option<String>,
+    #[serde(alias = "maxCandidates", alias = "max_candidates")]
+    max_candidates: Option<i32>,
+
+    #[serde(alias = "textScore", alias = "scoreThresh", alias = "score_thresh", alias = "text_score")]
+    text_score: Option<f32>,
+    #[serde(alias = "returnWordBox", alias = "return_word_box")]
+    return_word_box: Option<bool>,
+    #[serde(alias = "returnSingleCharBox", alias = "return_single_char_box")]
+    return_single_char_box: Option<bool>,
+    #[serde(alias = "recBatchNum", alias = "rec_batch_num", alias = "batchNum", alias = "batch_num")]
+    rec_batch_num: Option<i32>,
+
+    #[serde(alias = "useDet", alias = "use_det")]
+    use_det: Option<bool>,
+    #[serde(alias = "useRec", alias = "use_rec")]
+    use_rec: Option<bool>,
+    #[serde(alias = "useCls", alias = "use_cls")]
+    use_cls: Option<bool>,
+    #[serde(alias = "useOrient", alias = "use_orient")]
+    use_orient: Option<bool>,
+    #[serde(alias = "useUnwarp", alias = "use_unwarp")]
+    use_unwarp: Option<bool>,
+    #[serde(alias = "useLayout", alias = "use_layout")]
+    use_layout: Option<bool>,
 
     detection: Option<DetectionConfigJson>,
     recognition: Option<RecognitionConfigJson>,
@@ -237,6 +318,7 @@ impl InitializeConfig {
             orient: None,
             unwarp: None,
             cls: None,
+            layout: None,
         }
     }
 
@@ -285,91 +367,261 @@ impl InitializeConfig {
 
         // Fall back to grouped format
         let flat: FlatConfig = serde_json::from_str(json_str)?;
-        let det_path = flat.detection.as_ref().and_then(|d| d.model_path.clone())
-            .unwrap_or_else(|| PathBuf::from("det.rten"));
-        let rec_path = flat.recognition.as_ref().and_then(|r| r.model_path.clone())
-            .unwrap_or_else(|| PathBuf::from("rec.rten"));
-        let dict_path = flat.recognition.as_ref().and_then(|r| r.dict_path.clone())
-            .unwrap_or_else(|| PathBuf::from("dict.txt"));
 
-        let preset = match flat.template.as_deref() {
-            Some("ppv5") | Some("PPOCRv5") | Some("v5") | Some("pp-ocrv5") => PPV5_MODEL_CONFIG,
-            Some("ppv4") | Some("PPOCRv4") | Some("v4") | Some("pp-ocrv4") => PPV4_MODEL_CONFIG,
-            Some("ppv3") | Some("PPOCRv3") | Some("v3") | Some("pp-ocrv3") => PPV3_MODEL_CONFIG,
-            _ => PPV6_MODEL_CONFIG,
+        let cache_dir = crate::model_manager::get_cache_dir(flat.cache_dir.as_deref());
+
+        let det_override = flat
+            .det_model_path
+            .as_deref()
+            .or_else(|| flat.detection.as_ref().and_then(|d| d.model_path.as_deref()));
+        let rec_override = flat
+            .rec_model_path
+            .as_deref()
+            .or_else(|| flat.recognition.as_ref().and_then(|r| r.model_path.as_deref()));
+        let dict_override = flat
+            .dict_path
+            .as_deref()
+            .or_else(|| flat.recognition.as_ref().and_then(|r| r.dict_path.as_deref()));
+
+        let effective_model = flat.model.as_deref().or(flat.template.as_deref());
+
+        let effective_dir = flat.model_path.as_deref().or_else(|| {
+            effective_model.and_then(|m| {
+                let p = std::path::Path::new(m);
+                if p.exists() {
+                    Some(p)
+                } else {
+                    None
+                }
+            })
+        });
+
+        let (det_path, rec_path, dict_path) = {
+            let canonical_model = crate::model_manager::normalize_model_name(effective_model);
+            let base_assets = crate::model_manager::get_base_pipeline_assets(canonical_model);
+
+            let det = if let Some(p) = det_override {
+                PathBuf::from(p)
+            } else {
+                crate::model_manager::resolve_asset_with_dir(
+                    None,
+                    effective_dir,
+                    "det",
+                    base_assets.det_filename,
+                    &cache_dir,
+                ).map_err(|e| serde::de::Error::custom(e.to_string()))?
+            };
+
+            let (default_rec, default_dict) = if let Some(l) = flat.lang.as_deref() {
+                if let Some((rec_file, dict_file)) = crate::model_manager::resolve_language_assets(l) {
+                    (rec_file, dict_file)
+                } else {
+                    (base_assets.rec_filename, base_assets.dict_filename)
+                }
+            } else {
+                (base_assets.rec_filename, base_assets.dict_filename)
+            };
+
+            let rec = if let Some(p) = rec_override {
+                PathBuf::from(p)
+            } else {
+                crate::model_manager::resolve_asset_with_dir(
+                    None,
+                    effective_dir,
+                    "rec",
+                    default_rec,
+                    &cache_dir,
+                ).map_err(|e| serde::de::Error::custom(e.to_string()))?
+            };
+
+            let dict = if let Some(p) = dict_override {
+                PathBuf::from(p)
+            } else {
+                crate::model_manager::resolve_asset_with_dir(
+                    None,
+                    effective_dir,
+                    "dict",
+                    default_dict,
+                    &cache_dir,
+                ).map_err(|e| serde::de::Error::custom(e.to_string()))?
+            };
+
+            (det, rec, dict)
+        };
+
+        let model_str = effective_model.unwrap_or("").to_ascii_lowercase();
+        let preset = if model_str.contains("v5") || model_str.contains("ppocrv5") {
+            PPV5_MODEL_CONFIG
+        } else if model_str.contains("v4") || model_str.contains("ppocrv4") {
+            PPV4_MODEL_CONFIG
+        } else if model_str.contains("v3") || model_str.contains("ppocrv3") {
+            PPV3_MODEL_CONFIG
+        } else {
+            PPV6_MODEL_CONFIG
         };
 
         let mut config = Self::from_preset(preset, det_path, rec_path, dict_path);
 
-        let orient_path = flat.orientation.as_ref().and_then(|o| o.model_path.clone());
-        let orient_thresh = flat.orientation.as_ref().and_then(|o| o.threshold);
-        if let Some(path) = orient_path {
-            if let Some(thresh) = orient_thresh {
-                config = config.with_orientation_threshold(path, thresh);
+        let orient_override = flat
+            .orient_model_path
+            .as_deref()
+            .or_else(|| flat.orientation.as_ref().and_then(|o| o.model_path.as_deref()));
+        let orient_enabled = flat
+            .use_orient
+            .or_else(|| flat.orientation.as_ref().and_then(|o| o.enabled))
+            .unwrap_or(orient_override.is_some());
+        if orient_enabled {
+            let orient_path = if let Some(p) = orient_override {
+                PathBuf::from(p)
             } else {
-                config = config.with_orientation(path);
+                let canonical = crate::model_manager::normalize_model_name(effective_model);
+                let orient_file = if canonical == "indraocr" {
+                    "indra_orient.rten"
+                } else {
+                    "ppocr_orient.rten"
+                };
+                crate::model_manager::resolve_asset_with_dir(None, effective_dir, "orient", orient_file, &cache_dir)
+                    .map_err(|e| serde::de::Error::custom(e.to_string()))?
+            };
+            if let Some(thresh) = flat.orientation.as_ref().and_then(|o| o.threshold) {
+                config = config.with_orientation_threshold(orient_path, thresh);
+            } else {
+                config = config.with_orientation(orient_path);
             }
         }
 
-        let cls_path = flat.classification.as_ref().and_then(|c| c.model_path.clone());
-        let cls_thresh = flat.classification.as_ref().and_then(|c| c.threshold);
-        if let Some(path) = cls_path {
-            if let Some(thresh) = cls_thresh {
-                config = config.with_cls_threshold(path, thresh);
+        let cls_override = flat
+            .cls_model_path
+            .as_deref()
+            .or_else(|| flat.classification.as_ref().and_then(|c| c.model_path.as_deref()));
+        let cls_enabled = flat
+            .use_cls
+            .or_else(|| flat.classification.as_ref().and_then(|c| c.enabled))
+            .unwrap_or(cls_override.is_some());
+        if cls_enabled {
+            let cls_path = if let Some(p) = cls_override {
+                PathBuf::from(p)
             } else {
-                config = config.with_cls(path);
+                crate::model_manager::resolve_asset_with_dir(None, effective_dir, "cls", "ppocr_cls.rten", &cache_dir)
+                    .map_err(|e| serde::de::Error::custom(e.to_string()))?
+            };
+            if let Some(thresh) = flat.classification.as_ref().and_then(|c| c.threshold) {
+                config = config.with_cls_threshold(cls_path, thresh);
+            } else {
+                config = config.with_cls(cls_path);
             }
         }
 
-        let unwarp_path = flat.unwarp.as_ref().and_then(|u| u.model_path.clone());
-        if let Some(path) = unwarp_path {
-            config = config.with_unwarp(path);
+        let unwarp_override = flat
+            .unwarp_model_path
+            .as_deref()
+            .or_else(|| flat.unwarp.as_ref().and_then(|u| u.model_path.as_deref()));
+        let unwarp_enabled = flat
+            .use_unwarp
+            .or_else(|| flat.unwarp.as_ref().and_then(|u| u.enabled))
+            .unwrap_or(unwarp_override.is_some());
+        if unwarp_enabled {
+            let unwarp_path = if let Some(p) = unwarp_override {
+                PathBuf::from(p)
+            } else {
+                crate::model_manager::resolve_asset_with_dir(None, effective_dir, "unwarp", "uvdoc.rten", &cache_dir)
+                    .map_err(|e| serde::de::Error::custom(e.to_string()))?
+            };
+            config = config.with_unwarp(unwarp_path);
         }
 
-        if let Some(score) = flat.recognition.as_ref().and_then(|r| r.score_thresh) {
+        let layout_override = flat
+            .layout_model_path
+            .as_deref()
+            .or_else(|| flat.layout.as_ref().and_then(|l| l.model_path.as_deref()));
+        let layout_enabled = flat
+            .use_layout
+            .or_else(|| flat.layout.as_ref().and_then(|l| l.enabled))
+            .unwrap_or(layout_override.is_some() || flat.layout_variant.is_some());
+        if layout_enabled {
+            let layout_path = if let Some(p) = layout_override {
+                PathBuf::from(p)
+            } else {
+                let layout_file = if flat.layout_variant.as_deref() == Some("publaynet") { "layout_publaynet.rten" } else { "layout_cdla.rten" };
+                crate::model_manager::resolve_asset_with_dir(None, effective_dir, "layout", layout_file, &cache_dir)
+                    .map_err(|e| serde::de::Error::custom(e.to_string()))?
+            };
+            let mut l_cfg = LayoutConfig::default(layout_path);
+            if let Some(conf) = flat.layout.as_ref().and_then(|l| l.conf_thresh) {
+                l_cfg.conf_thresh = conf;
+            }
+            if let Some(target_size) = flat.layout.as_ref().and_then(|l| l.target_size) {
+                l_cfg.target_size = target_size;
+            }
+            if let Some(target_height) = flat.layout.as_ref().and_then(|l| l.target_height) {
+                l_cfg.target_height = Some(target_height);
+            }
+            if let Some(target_width) = flat.layout.as_ref().and_then(|l| l.target_width) {
+                l_cfg.target_width = Some(target_width);
+            }
+            config = config.with_layout_config(l_cfg);
+        }
+
+        if flat.enable_reading_order.unwrap_or(false) {
+            let order_path = crate::model_manager::resolve_asset_with_dir(None, effective_dir, "order", "indra_order.rten", &cache_dir)
+                .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+            config.global.reading_order = true;
+            config.global.reading_order_model = Some(order_path);
+        }
+
+        if let Some(score) = flat.text_score.or_else(|| flat.recognition.as_ref().and_then(|r| r.score_thresh)) {
             config.global.text_score = score;
         }
-        if let Some(thresh) = flat.detection.as_ref().and_then(|d| d.thresh) {
+        if let Some(thresh) = flat.det_thresh.or_else(|| flat.detection.as_ref().and_then(|d| d.thresh)) {
             config.det.thresh = thresh;
         }
-        if let Some(box_thresh) = flat.detection.as_ref().and_then(|d| d.box_thresh) {
+        if let Some(box_thresh) = flat.box_thresh.or_else(|| flat.detection.as_ref().and_then(|d| d.box_thresh)) {
             config.det.box_thresh = box_thresh;
         }
-        if let Some(side_len) = flat.detection.as_ref().and_then(|d| d.limit_side_len) {
+        if let Some(side_len) = flat.limit_side_len.or_else(|| flat.detection.as_ref().and_then(|d| d.limit_side_len)) {
             config.det.limit_side_len = side_len;
         }
-        if let Some(limit_type) = flat.detection.as_ref().and_then(|d| d.limit_type.clone()) {
+        if let Some(limit_type) = flat.limit_type.or_else(|| flat.detection.as_ref().and_then(|d| d.limit_type.clone())) {
             config.det.limit_type = limit_type;
         }
-        if let Some(unclip) = flat.detection.as_ref().and_then(|d| d.unclip_ratio) {
+        if let Some(unclip) = flat.unclip_ratio.or_else(|| flat.detection.as_ref().and_then(|d| d.unclip_ratio)) {
             config.det.unclip_ratio = unclip;
         }
-        if let Some(dilation) = flat.detection.as_ref().and_then(|d| d.use_dilation) {
+        if let Some(max_cand) = flat.max_candidates {
+            config.det.max_candidates = max_cand;
+        }
+        if let Some(dilation) = flat.use_dilation.or_else(|| flat.detection.as_ref().and_then(|d| d.use_dilation)) {
             config.det.use_dilation = dilation;
         }
-        if let Some(score_mode) = flat.detection.as_ref().and_then(|d| d.score_mode.clone()) {
+        if let Some(score_mode) = flat.score_mode.or_else(|| flat.detection.as_ref().and_then(|d| d.score_mode.clone())) {
             config.det.score_mode = score_mode;
         }
-        if let Some(use_det) = flat.detection.as_ref().and_then(|d| d.enabled) {
+        if let Some(use_det) = flat.use_det.or_else(|| flat.detection.as_ref().and_then(|d| d.enabled)) {
             config.global.use_det = use_det;
         }
-        if let Some(use_rec) = flat.recognition.as_ref().and_then(|r| r.enabled) {
+        if let Some(use_rec) = flat.use_rec.or_else(|| flat.recognition.as_ref().and_then(|r| r.enabled)) {
             config.global.use_rec = use_rec;
         }
-        if let Some(use_cls) = flat.classification.as_ref().and_then(|c| c.enabled) {
+        if let Some(use_cls) = flat.use_cls.or_else(|| flat.classification.as_ref().and_then(|c| c.enabled)) {
             config.global.use_cls = use_cls;
         }
-        if let Some(use_orient) = flat.orientation.as_ref().and_then(|o| o.enabled) {
+        if let Some(use_orient) = flat.use_orient.or_else(|| flat.orientation.as_ref().and_then(|o| o.enabled)) {
             config.global.use_orient = use_orient;
         }
-        if let Some(use_unwarp) = flat.unwarp.as_ref().and_then(|u| u.enabled) {
+        if let Some(use_unwarp) = flat.use_unwarp.or_else(|| flat.unwarp.as_ref().and_then(|u| u.enabled)) {
             config.global.use_unwarp = use_unwarp;
         }
-        if let Some(word_box) = flat.recognition.as_ref().and_then(|r| r.return_word_box) {
+        if let Some(use_layout) = flat.use_layout.or_else(|| flat.layout.as_ref().and_then(|l| l.enabled)) {
+            config.global.use_layout = use_layout;
+        }
+        if let Some(word_box) = flat.return_word_box.or_else(|| flat.recognition.as_ref().and_then(|r| r.return_word_box)) {
             config.global.return_word_box = word_box;
         }
-        if let Some(char_box) = flat.recognition.as_ref().and_then(|r| r.return_single_char_box) {
+        if let Some(char_box) = flat.return_single_char_box.or_else(|| flat.recognition.as_ref().and_then(|r| r.return_single_char_box)) {
             config.global.return_single_char_box = char_box;
+        }
+        if let Some(batch_num) = flat.rec_batch_num.or_else(|| flat.recognition.as_ref().and_then(|r| r.rec_batch_num)) {
+            config.rec.rec_batch_num = batch_num;
         }
         if let Some(y_mult) = flat.layout.as_ref().and_then(|l| l.y_threshold_multiplier) {
             config.global.y_threshold_multiplier = Some(y_mult);
@@ -415,6 +667,7 @@ impl InitializeConfig {
     pub fn with_orientation_threshold<P: Into<PathBuf>>(mut self, model_path: P, threshold: f32) -> Self {
         let mut config = OrientConfig::default(model_path.into());
         config.confidence_threshold = threshold;
+        config.orient_thresh = threshold;
         self.orient = Some(config);
         self.global.use_orient = true;
         self
@@ -440,6 +693,20 @@ impl InitializeConfig {
         config.cls_thresh = threshold;
         self.cls = Some(config);
         self.global.use_cls = true;
+        self
+    }
+
+    /// Add document layout detection to the configuration
+    pub fn with_layout<P: Into<PathBuf>>(mut self, model_path: P) -> Self {
+        self.layout = Some(LayoutConfig::default(model_path.into()));
+        self.global.use_layout = true;
+        self
+    }
+
+    /// Add document layout detection with custom layout configuration
+    pub fn with_layout_config(mut self, layout: LayoutConfig) -> Self {
+        self.layout = Some(layout);
+        self.global.use_layout = true;
         self
     }
     
@@ -605,6 +872,26 @@ impl InitializeConfig {
     pub fn with_optimization(mut self, optimization: OptimizationOptions) -> Self {
         self.global.optimization = Some(optimization);
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_json_with_model_path_and_override() {
+        let json = r#"{
+            "modelPath": "models/PPOCR_v6_tiny",
+            "detection": {
+                "modelPath": "Cargo.toml"
+            }
+        }"#;
+
+        let config = InitializeConfig::from_json(json).unwrap();
+        assert_eq!(config.det.model_path, PathBuf::from("Cargo.toml"));
+        assert_eq!(config.rec.model_path, PathBuf::from("models/PPOCR_v6_tiny/rec.rten"));
+        assert_eq!(config.rec.rec_keys_path, Some(PathBuf::from("models/PPOCR_v6_tiny/dict.txt")));
     }
 }
 

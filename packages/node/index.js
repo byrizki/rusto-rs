@@ -50,6 +50,28 @@ class RustO {
   }
 
   /**
+   * Downloads model assets for a specific OCR pipeline ahead of time.
+   *
+   * @param {string} [model] - Canonical model name (e.g. 'indraocr', 'ppocrv6-tiny', 'ppocrv5'). Defaults to 'indraocr'.
+   * @param {string} [lang] - Optional language code.
+   * @param {string} [cacheDir] - Optional custom cache directory.
+   * @returns {string[]} Array of downloaded local file paths.
+   */
+  static downloadModel(model, lang, cacheDir) {
+    return RawRustO.downloadModel(model || null, lang || null, cacheDir || null);
+  }
+
+  /**
+   * Downloads all available canonical models to the cache directory ahead of time.
+   *
+   * @param {string} [cacheDir] - Optional custom cache directory.
+   * @returns {string[]} Array of downloaded local file paths.
+   */
+  static downloadAllModels(cacheDir) {
+    return RawRustO.downloadAllModels(cacheDir || null);
+  }
+
+  /**
    * Detects text in an image file at the given path.
    *
    * @param {string} path - Image file path.

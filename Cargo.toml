@@ -45,6 +45,10 @@ opencv = { version = "0.97.2", optional = true }
 rten = { version = "0.27.0", features = ["onnx_format", "rten_format"] }
 rten-tensor = "0.27.0"
 
+# Model auto-download and caching
+ureq = { version = "2.10", default-features = false, features = ["tls"] }
+dirs = "5.0"
+
 # UniFFI bindings
 uniffi = { version = "0.31.0", default-features = false, optional = true }
 cbindgen = { version = "0.28", default-features = false, optional = true }
@@ -108,3 +112,15 @@ strip = false
 opt-level = 1
 debug = true
 incremental = true
+
+# [patch.crates-io]
+# rten = { path = "vendor/rten" }
+# rten-tensor = { path = "vendor/rten/rten-tensor" }
+# rten-base = { path = "vendor/rten/rten-base" }
+# rten-gemm = { path = "vendor/rten/rten-gemm" }
+# rten-model-file = { path = "vendor/rten/rten-model-file" }
+# rten-onnx = { path = "vendor/rten/rten-onnx" }
+# rten-parallel = { path = "vendor/rten/rten-parallel" }
+# rten-shape-inference = { path = "vendor/rten/rten-shape-inference" }
+# rten-simd = { path = "vendor/rten/rten-simd" }
+# rten-vecmath = { path = "vendor/rten/rten-vecmath" }

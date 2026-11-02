@@ -577,6 +577,16 @@ fileprivate struct FfiConverterData: FfiConverterRustBuffer {
 public protocol RustOProtocol: AnyObject, Sendable {
     
     /**
+     * Detects document layout regions from an image source.
+     */
+    func detectLayout(source: ImageSource) throws  -> [LayoutRegion]
+    
+    /**
+     * Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
+     */
+    func detectLayoutRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64) throws  -> [LayoutRegion]
+    
+    /**
      * Runs text detection and recognition on an image source.
      */
     func detectText(source: ImageSource, options: OcrRunOptions) throws  -> DetectTextResult
@@ -585,6 +595,16 @@ public protocol RustOProtocol: AnyObject, Sendable {
      * Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
      */
     func detectTextRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64, options: OcrRunOptions) throws  -> DetectTextResult
+    
+    /**
+     * Unwarps a distorted or curved document image from an image source.
+     */
+    func unwarpImage(source: ImageSource) throws  -> UnwarpedImageResult
+    
+    /**
+     * Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
+     */
+    func unwarpImageRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64) throws  -> UnwarpedImageResult
     
     /**
      * Returns the engine library version string.
@@ -671,6 +691,33 @@ public static func initializeFromJson(configJson: String)throws  -> RustO  {
 
     
     /**
+     * Detects document layout regions from an image source.
+     */
+open func detectLayout(source: ImageSource)throws  -> [LayoutRegion]  {
+    return try  FfiConverterSequenceTypeLayoutRegion.lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
+    uniffi_rusto_fn_method_rusto_detect_layout(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeImageSource_lower(source),$0
+    )
+})
+}
+    
+    /**
+     * Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
+     */
+open func detectLayoutRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64)throws  -> [LayoutRegion]  {
+    return try  FfiConverterSequenceTypeLayoutRegion.lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
+    uniffi_rusto_fn_method_rusto_detect_layout_rgb(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(pixels),
+        FfiConverterUInt32.lower(width),
+        FfiConverterUInt32.lower(height),
+        FfiConverterUInt64.lower(stride),$0
+    )
+})
+}
+    
+    /**
      * Runs text detection and recognition on an image source.
      */
 open func detectText(source: ImageSource, options: OcrRunOptions)throws  -> DetectTextResult  {
@@ -695,6 +742,33 @@ open func detectTextRgb(pixels: Data, width: UInt32, height: UInt32, stride: UIn
         FfiConverterUInt32.lower(height),
         FfiConverterUInt64.lower(stride),
         FfiConverterTypeOcrRunOptions_lower(options),$0
+    )
+})
+}
+    
+    /**
+     * Unwarps a distorted or curved document image from an image source.
+     */
+open func unwarpImage(source: ImageSource)throws  -> UnwarpedImageResult  {
+    return try  FfiConverterTypeUnwarpedImageResult_lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
+    uniffi_rusto_fn_method_rusto_unwarp_image(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeImageSource_lower(source),$0
+    )
+})
+}
+    
+    /**
+     * Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
+     */
+open func unwarpImageRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64)throws  -> UnwarpedImageResult  {
+    return try  FfiConverterTypeUnwarpedImageResult_lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
+    uniffi_rusto_fn_method_rusto_unwarp_image_rgb(
+            self.uniffiCloneHandle(),
+        FfiConverterData.lower(pixels),
+        FfiConverterUInt32.lower(width),
+        FfiConverterUInt32.lower(height),
+        FfiConverterUInt64.lower(stride),$0
     )
 })
 }
@@ -1224,13 +1298,37 @@ public func FfiConverterTypeFrame_lower(_ value: Frame) -> RustBuffer {
 
 
 /**
- * Engine initialization configuration specifying model paths and template preset.
+ * Engine initialization configuration specifying model paths, preset, and optional extensions.
  */
 public struct InitializeConfig: Equatable, Hashable {
     /**
-     * Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+     * Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+     */
+    public var model: String?
+    /**
+     * Base model directory containing det, rec, and dict files.
+     */
+    public var modelPath: String?
+    /**
+     * Legacy template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
      */
     public var template: String?
+    /**
+     * Language code or name (e.g. "ja", "ko", "ar", "cyrillic", "devanagari", "latin").
+     */
+    public var lang: String?
+    /**
+     * Custom cache directory override path.
+     */
+    public var cacheDir: String?
+    /**
+     * Enable neural reading order recovery transformer.
+     */
+    public var enableReadingOrder: Bool?
+    /**
+     * Document layout variant: "cdla" (default 10-class) or "publaynet" (5-class).
+     */
+    public var layoutVariant: String?
     /**
      * Detection model configuration.
      */
@@ -1251,13 +1349,35 @@ public struct InitializeConfig: Equatable, Hashable {
      * Optional unwarp configuration.
      */
     public var unwarp: UnwarpConfig?
+    /**
+     * Optional layout configuration.
+     */
+    public var layout: LayoutConfig?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         /**
-         * Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+         * Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+         */model: String?, 
+        /**
+         * Base model directory containing det, rec, and dict files.
+         */modelPath: String?, 
+        /**
+         * Legacy template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
          */template: String?, 
+        /**
+         * Language code or name (e.g. "ja", "ko", "ar", "cyrillic", "devanagari", "latin").
+         */lang: String?, 
+        /**
+         * Custom cache directory override path.
+         */cacheDir: String?, 
+        /**
+         * Enable neural reading order recovery transformer.
+         */enableReadingOrder: Bool?, 
+        /**
+         * Document layout variant: "cdla" (default 10-class) or "publaynet" (5-class).
+         */layoutVariant: String?, 
         /**
          * Detection model configuration.
          */detection: DetectionConfig?, 
@@ -1272,13 +1392,23 @@ public struct InitializeConfig: Equatable, Hashable {
          */orientation: OrientationConfig?, 
         /**
          * Optional unwarp configuration.
-         */unwarp: UnwarpConfig?) {
+         */unwarp: UnwarpConfig?, 
+        /**
+         * Optional layout configuration.
+         */layout: LayoutConfig?) {
+        self.model = model
+        self.modelPath = modelPath
         self.template = template
+        self.lang = lang
+        self.cacheDir = cacheDir
+        self.enableReadingOrder = enableReadingOrder
+        self.layoutVariant = layoutVariant
         self.detection = detection
         self.recognition = recognition
         self.classification = classification
         self.orientation = orientation
         self.unwarp = unwarp
+        self.layout = layout
     }
 
     
@@ -1297,22 +1427,36 @@ public struct FfiConverterTypeInitializeConfig: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> InitializeConfig {
         return
             try InitializeConfig(
+                model: FfiConverterOptionString.read(from: &buf), 
+                modelPath: FfiConverterOptionString.read(from: &buf), 
                 template: FfiConverterOptionString.read(from: &buf), 
+                lang: FfiConverterOptionString.read(from: &buf), 
+                cacheDir: FfiConverterOptionString.read(from: &buf), 
+                enableReadingOrder: FfiConverterOptionBool.read(from: &buf), 
+                layoutVariant: FfiConverterOptionString.read(from: &buf), 
                 detection: FfiConverterOptionTypeDetectionConfig.read(from: &buf), 
                 recognition: FfiConverterOptionTypeRecognitionConfig.read(from: &buf), 
                 classification: FfiConverterOptionTypeClassificationConfig.read(from: &buf), 
                 orientation: FfiConverterOptionTypeOrientationConfig.read(from: &buf), 
-                unwarp: FfiConverterOptionTypeUnwarpConfig.read(from: &buf)
+                unwarp: FfiConverterOptionTypeUnwarpConfig.read(from: &buf), 
+                layout: FfiConverterOptionTypeLayoutConfig.read(from: &buf)
         )
     }
 
     public static func write(_ value: InitializeConfig, into buf: inout [UInt8]) {
+        FfiConverterOptionString.write(value.model, into: &buf)
+        FfiConverterOptionString.write(value.modelPath, into: &buf)
         FfiConverterOptionString.write(value.template, into: &buf)
+        FfiConverterOptionString.write(value.lang, into: &buf)
+        FfiConverterOptionString.write(value.cacheDir, into: &buf)
+        FfiConverterOptionBool.write(value.enableReadingOrder, into: &buf)
+        FfiConverterOptionString.write(value.layoutVariant, into: &buf)
         FfiConverterOptionTypeDetectionConfig.write(value.detection, into: &buf)
         FfiConverterOptionTypeRecognitionConfig.write(value.recognition, into: &buf)
         FfiConverterOptionTypeClassificationConfig.write(value.classification, into: &buf)
         FfiConverterOptionTypeOrientationConfig.write(value.orientation, into: &buf)
         FfiConverterOptionTypeUnwarpConfig.write(value.unwarp, into: &buf)
+        FfiConverterOptionTypeLayoutConfig.write(value.layout, into: &buf)
     }
 }
 
@@ -1329,6 +1473,283 @@ public func FfiConverterTypeInitializeConfig_lift(_ buf: RustBuffer) throws -> I
 #endif
 public func FfiConverterTypeInitializeConfig_lower(_ value: InitializeConfig) -> RustBuffer {
     return FfiConverterTypeInitializeConfig.lower(value)
+}
+
+
+/**
+ * Bounding box coordinates for a detected document layout region.
+ */
+public struct LayoutBBox: Equatable, Hashable {
+    /**
+     * Minimum horizontal coordinate (left).
+     */
+    public var xMin: Int32
+    /**
+     * Minimum vertical coordinate (top).
+     */
+    public var yMin: Int32
+    /**
+     * Maximum horizontal coordinate (right).
+     */
+    public var xMax: Int32
+    /**
+     * Maximum vertical coordinate (bottom).
+     */
+    public var yMax: Int32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Minimum horizontal coordinate (left).
+         */xMin: Int32, 
+        /**
+         * Minimum vertical coordinate (top).
+         */yMin: Int32, 
+        /**
+         * Maximum horizontal coordinate (right).
+         */xMax: Int32, 
+        /**
+         * Maximum vertical coordinate (bottom).
+         */yMax: Int32) {
+        self.xMin = xMin
+        self.yMin = yMin
+        self.xMax = xMax
+        self.yMax = yMax
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension LayoutBBox: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeLayoutBBox: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LayoutBBox {
+        return
+            try LayoutBBox(
+                xMin: FfiConverterInt32.read(from: &buf), 
+                yMin: FfiConverterInt32.read(from: &buf), 
+                xMax: FfiConverterInt32.read(from: &buf), 
+                yMax: FfiConverterInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LayoutBBox, into buf: inout [UInt8]) {
+        FfiConverterInt32.write(value.xMin, into: &buf)
+        FfiConverterInt32.write(value.yMin, into: &buf)
+        FfiConverterInt32.write(value.xMax, into: &buf)
+        FfiConverterInt32.write(value.yMax, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLayoutBBox_lift(_ buf: RustBuffer) throws -> LayoutBBox {
+    return try FfiConverterTypeLayoutBBox.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLayoutBBox_lower(_ value: LayoutBBox) -> RustBuffer {
+    return FfiConverterTypeLayoutBBox.lower(value)
+}
+
+
+/**
+ * Document layout analysis model configuration.
+ */
+public struct LayoutConfig: Equatable, Hashable {
+    /**
+     * Whether layout stage is enabled.
+     */
+    public var enabled: Bool?
+    /**
+     * Filesystem path to layout model (.rten or .onnx).
+     */
+    public var modelPath: String?
+    /**
+     * Confidence threshold.
+     */
+    public var confThresh: Float?
+    /**
+     * Target input side length for resizing.
+     */
+    public var targetSize: Int32?
+    /**
+     * Target input height for resizing.
+     */
+    public var targetHeight: Int32?
+    /**
+     * Target input width for resizing.
+     */
+    public var targetWidth: Int32?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Whether layout stage is enabled.
+         */enabled: Bool?, 
+        /**
+         * Filesystem path to layout model (.rten or .onnx).
+         */modelPath: String?, 
+        /**
+         * Confidence threshold.
+         */confThresh: Float?, 
+        /**
+         * Target input side length for resizing.
+         */targetSize: Int32?, 
+        /**
+         * Target input height for resizing.
+         */targetHeight: Int32?, 
+        /**
+         * Target input width for resizing.
+         */targetWidth: Int32?) {
+        self.enabled = enabled
+        self.modelPath = modelPath
+        self.confThresh = confThresh
+        self.targetSize = targetSize
+        self.targetHeight = targetHeight
+        self.targetWidth = targetWidth
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension LayoutConfig: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeLayoutConfig: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LayoutConfig {
+        return
+            try LayoutConfig(
+                enabled: FfiConverterOptionBool.read(from: &buf), 
+                modelPath: FfiConverterOptionString.read(from: &buf), 
+                confThresh: FfiConverterOptionFloat.read(from: &buf), 
+                targetSize: FfiConverterOptionInt32.read(from: &buf), 
+                targetHeight: FfiConverterOptionInt32.read(from: &buf), 
+                targetWidth: FfiConverterOptionInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LayoutConfig, into buf: inout [UInt8]) {
+        FfiConverterOptionBool.write(value.enabled, into: &buf)
+        FfiConverterOptionString.write(value.modelPath, into: &buf)
+        FfiConverterOptionFloat.write(value.confThresh, into: &buf)
+        FfiConverterOptionInt32.write(value.targetSize, into: &buf)
+        FfiConverterOptionInt32.write(value.targetHeight, into: &buf)
+        FfiConverterOptionInt32.write(value.targetWidth, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLayoutConfig_lift(_ buf: RustBuffer) throws -> LayoutConfig {
+    return try FfiConverterTypeLayoutConfig.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLayoutConfig_lower(_ value: LayoutConfig) -> RustBuffer {
+    return FfiConverterTypeLayoutConfig.lower(value)
+}
+
+
+/**
+ * Detected document layout region with category, bounding box, and confidence score.
+ */
+public struct LayoutRegion: Equatable, Hashable {
+    /**
+     * Axis-aligned bounding box.
+     */
+    public var bbox: LayoutBBox
+    /**
+     * Semantic layout category.
+     */
+    public var layoutType: LayoutType
+    /**
+     * Classification confidence score [0.0 - 1.0].
+     */
+    public var confidence: Float
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Axis-aligned bounding box.
+         */bbox: LayoutBBox, 
+        /**
+         * Semantic layout category.
+         */layoutType: LayoutType, 
+        /**
+         * Classification confidence score [0.0 - 1.0].
+         */confidence: Float) {
+        self.bbox = bbox
+        self.layoutType = layoutType
+        self.confidence = confidence
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension LayoutRegion: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeLayoutRegion: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LayoutRegion {
+        return
+            try LayoutRegion(
+                bbox: FfiConverterTypeLayoutBBox.read(from: &buf), 
+                layoutType: FfiConverterTypeLayoutType.read(from: &buf), 
+                confidence: FfiConverterFloat.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LayoutRegion, into buf: inout [UInt8]) {
+        FfiConverterTypeLayoutBBox.write(value.bbox, into: &buf)
+        FfiConverterTypeLayoutType.write(value.layoutType, into: &buf)
+        FfiConverterFloat.write(value.confidence, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLayoutRegion_lift(_ buf: RustBuffer) throws -> LayoutRegion {
+    return try FfiConverterTypeLayoutRegion.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLayoutRegion_lower(_ value: LayoutRegion) -> RustBuffer {
+    return FfiConverterTypeLayoutRegion.lower(value)
 }
 
 
@@ -1361,6 +1782,14 @@ public struct OcrRunOptions: Equatable, Hashable {
      */
     public var orientation: Bool?
     /**
+     * Enable document unwarping stage.
+     */
+    public var unwarp: Bool?
+    /**
+     * Enable document layout analysis stage.
+     */
+    public var layout: Bool?
+    /**
      * Request-local minimum height resize override.
      */
     public var minHeight: Float?
@@ -1392,6 +1821,10 @@ public struct OcrRunOptions: Equatable, Hashable {
      * Runtime crop and resolution optimization options.
      */
     public var optimization: OptimizationOptions?
+    /**
+     * Request-local recognition batch size override.
+     */
+    public var recBatchNum: Int32?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1415,6 +1848,12 @@ public struct OcrRunOptions: Equatable, Hashable {
          * Enable document orientation angle correction stage.
          */orientation: Bool?, 
         /**
+         * Enable document unwarping stage.
+         */unwarp: Bool?, 
+        /**
+         * Enable document layout analysis stage.
+         */layout: Bool?, 
+        /**
          * Request-local minimum height resize override.
          */minHeight: Float?, 
         /**
@@ -1437,13 +1876,18 @@ public struct OcrRunOptions: Equatable, Hashable {
          */calibration: CalibrationOptions?, 
         /**
          * Runtime crop and resolution optimization options.
-         */optimization: OptimizationOptions?) {
+         */optimization: OptimizationOptions?, 
+        /**
+         * Request-local recognition batch size override.
+         */recBatchNum: Int32?) {
         self.output = output
         self.lineYThreshold = lineYThreshold
         self.wordXThreshold = wordXThreshold
         self.textScore = textScore
         self.classification = classification
         self.orientation = orientation
+        self.unwarp = unwarp
+        self.layout = layout
         self.minHeight = minHeight
         self.maxSideLen = maxSideLen
         self.minSideLen = minSideLen
@@ -1452,6 +1896,7 @@ public struct OcrRunOptions: Equatable, Hashable {
         self.postprocess = postprocess
         self.calibration = calibration
         self.optimization = optimization
+        self.recBatchNum = recBatchNum
     }
 
     
@@ -1476,6 +1921,8 @@ public struct FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer {
                 textScore: FfiConverterOptionFloat.read(from: &buf), 
                 classification: FfiConverterOptionBool.read(from: &buf), 
                 orientation: FfiConverterOptionBool.read(from: &buf), 
+                unwarp: FfiConverterOptionBool.read(from: &buf), 
+                layout: FfiConverterOptionBool.read(from: &buf), 
                 minHeight: FfiConverterOptionFloat.read(from: &buf), 
                 maxSideLen: FfiConverterOptionFloat.read(from: &buf), 
                 minSideLen: FfiConverterOptionFloat.read(from: &buf), 
@@ -1483,7 +1930,8 @@ public struct FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer {
                 detection: FfiConverterOptionTypeDetectionRunOptions.read(from: &buf), 
                 postprocess: FfiConverterOptionTypePostprocessRunOptions.read(from: &buf), 
                 calibration: FfiConverterOptionTypeCalibrationOptions.read(from: &buf), 
-                optimization: FfiConverterOptionTypeOptimizationOptions.read(from: &buf)
+                optimization: FfiConverterOptionTypeOptimizationOptions.read(from: &buf), 
+                recBatchNum: FfiConverterOptionInt32.read(from: &buf)
         )
     }
 
@@ -1494,6 +1942,8 @@ public struct FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer {
         FfiConverterOptionFloat.write(value.textScore, into: &buf)
         FfiConverterOptionBool.write(value.classification, into: &buf)
         FfiConverterOptionBool.write(value.orientation, into: &buf)
+        FfiConverterOptionBool.write(value.unwarp, into: &buf)
+        FfiConverterOptionBool.write(value.layout, into: &buf)
         FfiConverterOptionFloat.write(value.minHeight, into: &buf)
         FfiConverterOptionFloat.write(value.maxSideLen, into: &buf)
         FfiConverterOptionFloat.write(value.minSideLen, into: &buf)
@@ -1502,6 +1952,7 @@ public struct FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer {
         FfiConverterOptionTypePostprocessRunOptions.write(value.postprocess, into: &buf)
         FfiConverterOptionTypeCalibrationOptions.write(value.calibration, into: &buf)
         FfiConverterOptionTypeOptimizationOptions.write(value.optimization, into: &buf)
+        FfiConverterOptionInt32.write(value.recBatchNum, into: &buf)
     }
 }
 
@@ -1526,6 +1977,14 @@ public func FfiConverterTypeOcrRunOptions_lower(_ value: OcrRunOptions) -> RustB
  */
 public struct OptimizationOptions: Equatable, Hashable {
     /**
+     * Enable or disable image optimization.
+     */
+    public var enabled: Bool?
+    /**
+     * Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
+     */
+    public var targetMaxSide: UInt32?
+    /**
      * Horizontal padding around bounding box crops in pixels.
      */
     public var cropPaddingX: Float?
@@ -1538,11 +1997,19 @@ public struct OptimizationOptions: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
+         * Enable or disable image optimization.
+         */enabled: Bool?, 
+        /**
+         * Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
+         */targetMaxSide: UInt32?, 
+        /**
          * Horizontal padding around bounding box crops in pixels.
          */cropPaddingX: Float?, 
         /**
          * Vertical padding around bounding box crops in pixels.
          */cropPaddingY: Float?) {
+        self.enabled = enabled
+        self.targetMaxSide = targetMaxSide
         self.cropPaddingX = cropPaddingX
         self.cropPaddingY = cropPaddingY
     }
@@ -1563,12 +2030,16 @@ public struct FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OptimizationOptions {
         return
             try OptimizationOptions(
+                enabled: FfiConverterOptionBool.read(from: &buf), 
+                targetMaxSide: FfiConverterOptionUInt32.read(from: &buf), 
                 cropPaddingX: FfiConverterOptionFloat.read(from: &buf), 
                 cropPaddingY: FfiConverterOptionFloat.read(from: &buf)
         )
     }
 
     public static func write(_ value: OptimizationOptions, into buf: inout [UInt8]) {
+        FfiConverterOptionBool.write(value.enabled, into: &buf)
+        FfiConverterOptionUInt32.write(value.targetMaxSide, into: &buf)
         FfiConverterOptionFloat.write(value.cropPaddingX, into: &buf)
         FfiConverterOptionFloat.write(value.cropPaddingY, into: &buf)
     }
@@ -1863,6 +2334,10 @@ public struct RecognitionConfig: Equatable, Hashable {
      * Filesystem path to dictionary vocabulary file (.txt).
      */
     public var dictPath: String?
+    /**
+     * Recognition batch size. Default: 6.
+     */
+    public var recBatchNum: Int32?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1875,10 +2350,14 @@ public struct RecognitionConfig: Equatable, Hashable {
          */modelPath: String?, 
         /**
          * Filesystem path to dictionary vocabulary file (.txt).
-         */dictPath: String?) {
+         */dictPath: String?, 
+        /**
+         * Recognition batch size. Default: 6.
+         */recBatchNum: Int32?) {
         self.enabled = enabled
         self.modelPath = modelPath
         self.dictPath = dictPath
+        self.recBatchNum = recBatchNum
     }
 
     
@@ -1899,7 +2378,8 @@ public struct FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer {
             try RecognitionConfig(
                 enabled: FfiConverterOptionBool.read(from: &buf), 
                 modelPath: FfiConverterOptionString.read(from: &buf), 
-                dictPath: FfiConverterOptionString.read(from: &buf)
+                dictPath: FfiConverterOptionString.read(from: &buf), 
+                recBatchNum: FfiConverterOptionInt32.read(from: &buf)
         )
     }
 
@@ -1907,6 +2387,7 @@ public struct FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer {
         FfiConverterOptionBool.write(value.enabled, into: &buf)
         FfiConverterOptionString.write(value.modelPath, into: &buf)
         FfiConverterOptionString.write(value.dictPath, into: &buf)
+        FfiConverterOptionInt32.write(value.recBatchNum, into: &buf)
     }
 }
 
@@ -2083,6 +2564,85 @@ public func FfiConverterTypeUnwarpConfig_lower(_ value: UnwarpConfig) -> RustBuf
     return FfiConverterTypeUnwarpConfig.lower(value)
 }
 
+
+/**
+ * Unwarped image result with raw RGB8 pixel buffer and dimensions.
+ */
+public struct UnwarpedImageResult: Equatable, Hashable {
+    /**
+     * Interleaved 24-bit RGB pixel bytes.
+     */
+    public var pixels: Data
+    /**
+     * Image width in pixels.
+     */
+    public var width: UInt32
+    /**
+     * Image height in pixels.
+     */
+    public var height: UInt32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Interleaved 24-bit RGB pixel bytes.
+         */pixels: Data, 
+        /**
+         * Image width in pixels.
+         */width: UInt32, 
+        /**
+         * Image height in pixels.
+         */height: UInt32) {
+        self.pixels = pixels
+        self.width = width
+        self.height = height
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension UnwarpedImageResult: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUnwarpedImageResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UnwarpedImageResult {
+        return
+            try UnwarpedImageResult(
+                pixels: FfiConverterData.read(from: &buf), 
+                width: FfiConverterUInt32.read(from: &buf), 
+                height: FfiConverterUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: UnwarpedImageResult, into buf: inout [UInt8]) {
+        FfiConverterData.write(value.pixels, into: &buf)
+        FfiConverterUInt32.write(value.width, into: &buf)
+        FfiConverterUInt32.write(value.height, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnwarpedImageResult_lift(_ buf: RustBuffer) throws -> UnwarpedImageResult {
+    return try FfiConverterTypeUnwarpedImageResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnwarpedImageResult_lower(_ value: UnwarpedImageResult) -> RustBuffer {
+    return FfiConverterTypeUnwarpedImageResult.lower(value)
+}
+
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
@@ -2244,6 +2804,132 @@ public func FfiConverterTypeImageSource_lift(_ buf: RustBuffer) throws -> ImageS
 #endif
 public func FfiConverterTypeImageSource_lower(_ value: ImageSource) -> RustBuffer {
     return FfiConverterTypeImageSource.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Category of document layout region.
+ */
+
+public enum LayoutType: Equatable, Hashable {
+    
+    case text
+    case title
+    case figure
+    case figureCaption
+    case table
+    case tableCaption
+    case header
+    case footer
+    case reference
+    case equation
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension LayoutType: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeLayoutType: FfiConverterRustBuffer {
+    typealias SwiftType = LayoutType
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LayoutType {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .text
+        
+        case 2: return .title
+        
+        case 3: return .figure
+        
+        case 4: return .figureCaption
+        
+        case 5: return .table
+        
+        case 6: return .tableCaption
+        
+        case 7: return .header
+        
+        case 8: return .footer
+        
+        case 9: return .reference
+        
+        case 10: return .equation
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: LayoutType, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .text:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .title:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .figure:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .figureCaption:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .table:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .tableCaption:
+            writeInt(&buf, Int32(6))
+        
+        
+        case .header:
+            writeInt(&buf, Int32(7))
+        
+        
+        case .footer:
+            writeInt(&buf, Int32(8))
+        
+        
+        case .reference:
+            writeInt(&buf, Int32(9))
+        
+        
+        case .equation:
+            writeInt(&buf, Int32(10))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLayoutType_lift(_ buf: RustBuffer) throws -> LayoutType {
+    return try FfiConverterTypeLayoutType.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLayoutType_lower(_ value: LayoutType) -> RustBuffer {
+    return FfiConverterTypeLayoutType.lower(value)
 }
 
 
@@ -2450,6 +3136,30 @@ public func FfiConverterTypeRustoBindingError_lower(_ value: RustoBindingError) 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionUInt32: FfiConverterRustBuffer {
+    typealias SwiftType = UInt32?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterUInt32.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterUInt32.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionInt32: FfiConverterRustBuffer {
     typealias SwiftType = Int32?
 
@@ -2642,6 +3352,30 @@ fileprivate struct FfiConverterOptionTypeDetectionRunOptions: FfiConverterRustBu
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeLayoutConfig: FfiConverterRustBuffer {
+    typealias SwiftType = LayoutConfig?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeLayoutConfig.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeLayoutConfig.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeOptimizationOptions: FfiConverterRustBuffer {
     typealias SwiftType = OptimizationOptions?
 
@@ -2811,6 +3545,56 @@ fileprivate struct FfiConverterSequenceFloat: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
+    typealias SwiftType = [String]
+
+    public static func write(_ value: [String], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterString.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [String] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [String]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterString.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeLayoutRegion: FfiConverterRustBuffer {
+    typealias SwiftType = [LayoutRegion]
+
+    public static func write(_ value: [LayoutRegion], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeLayoutRegion.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [LayoutRegion] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [LayoutRegion]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeLayoutRegion.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypePoint2D: FfiConverterRustBuffer {
     typealias SwiftType = [Point2D]
 
@@ -2857,6 +3641,15 @@ fileprivate struct FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer {
         return seq
     }
 }
+public func createInitializeConfigForModel(model: String?, lang: String?, modelPath: String?) -> InitializeConfig  {
+    return try!  FfiConverterTypeInitializeConfig_lift(try! rustCall() {
+    uniffi_rusto_fn_func_create_initialize_config_for_model(
+        FfiConverterOptionString.lower(model),
+        FfiConverterOptionString.lower(lang),
+        FfiConverterOptionString.lower(modelPath),$0
+    )
+})
+}
 public func createInitializeConfigPpv6(detModelPath: String, recModelPath: String, dictPath: String) -> InitializeConfig  {
     return try!  FfiConverterTypeInitializeConfig_lift(try! rustCall() {
     uniffi_rusto_fn_func_create_initialize_config_ppv6(
@@ -2869,6 +3662,28 @@ public func createInitializeConfigPpv6(detModelPath: String, recModelPath: Strin
 public func defaultOcrRunOptions() -> OcrRunOptions  {
     return try!  FfiConverterTypeOcrRunOptions_lift(try! rustCall() {
     uniffi_rusto_fn_func_default_ocr_run_options($0
+    )
+})
+}
+/**
+ * Downloads all available canonical models to the cache directory ahead of time.
+ */
+public func downloadAllModels(cacheDir: String?)throws  -> [String]  {
+    return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
+    uniffi_rusto_fn_func_download_all_models(
+        FfiConverterOptionString.lower(cacheDir),$0
+    )
+})
+}
+/**
+ * Downloads model assets for a specific OCR pipeline ahead of time.
+ */
+public func downloadModel(model: String?, lang: String?, cacheDir: String?)throws  -> [String]  {
+    return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
+    uniffi_rusto_fn_func_download_model(
+        FfiConverterOptionString.lower(model),
+        FfiConverterOptionString.lower(lang),
+        FfiConverterOptionString.lower(cacheDir),$0
     )
 })
 }
@@ -2897,19 +3712,40 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
+    if (uniffi_rusto_checksum_func_create_initialize_config_for_model() != 37532) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 12132) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_rusto_checksum_func_default_ocr_run_options() != 50314) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_rusto_checksum_func_download_all_models() != 11564) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_rusto_checksum_func_download_model() != 15041) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_rusto_checksum_func_rusto_version() != 3477) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_rusto_checksum_method_rusto_detect_layout() != 43417) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_rusto_checksum_method_rusto_detect_layout_rgb() != 59477) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_rusto_checksum_method_rusto_detect_text() != 5963) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_rusto_checksum_method_rusto_detect_text_rgb() != 9991) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_rusto_checksum_method_rusto_unwarp_image() != 24978) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_rusto_checksum_method_rusto_unwarp_image_rgb() != 44077) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_rusto_checksum_method_rusto_version() != 31217) {

@@ -13,6 +13,20 @@ public sealed class PublicContractTests
     }
 
     [Fact]
+    public void ForModelFactoryUsesCanonicalFields()
+    {
+        var config = InitializeConfig.ForModel("indraocr", "latin", "/tmp/models");
+        Assert.Equal("indraocr", config.Model);
+        Assert.Equal("latin", config.Lang);
+        Assert.Equal("/tmp/models", config.ModelPath);
+
+        var json = JsonSerializer.Serialize(config);
+        Assert.Contains("\"model\":\"indraocr\"", json);
+        Assert.Contains("\"lang\":\"latin\"", json);
+        Assert.Contains("\"model_path\":\"/tmp/models\"", json);
+    }
+
+    [Fact]
     public void RuntimeOptionsUseSharedRootCamelCaseWireContract()
     {
         var json = JsonSerializer.Serialize(new OcrRunOptions

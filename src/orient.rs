@@ -196,13 +196,16 @@ impl OrientClassifier {
             
             let mut data = vec![0.0f32; 3 * hw];
             
+            let mean = self.config.mean;
+            let std = self.config.std;
+
             for i in 0..rows {
                 for j in 0..cols {
                     let pix = resized.at_2d::<core::Vec3b>(i as i32, j as i32)?;
                     let idx = i * cols + j;
-                    data[idx] = pix[0] as f32 / 255.0;
-                    data[hw + idx] = pix[1] as f32 / 255.0;
-                    data[2 * hw + idx] = pix[2] as f32 / 255.0;
+                    data[idx] = (pix[0] as f32 / 255.0 - mean[0]) / std[0];
+                    data[hw + idx] = (pix[1] as f32 / 255.0 - mean[1]) / std[1];
+                    data[2 * hw + idx] = (pix[2] as f32 / 255.0 - mean[2]) / std[2];
                 }
             }
 
@@ -223,13 +226,16 @@ impl OrientClassifier {
             let hw = h as usize * w as usize;
             let mut data = vec![0.0f32; 3 * hw];
             
+            let mean = self.config.mean;
+            let std = self.config.std;
+
             for y in 0..h as usize {
                 for x in 0..w as usize {
                     let pixel = resized.get_pixel(x as u32, y as u32);
                     let idx = y * w as usize + x;
-                    data[idx] = pixel[0] as f32 / 255.0;
-                    data[hw + idx] = pixel[1] as f32 / 255.0;
-                    data[2 * hw + idx] = pixel[2] as f32 / 255.0;
+                    data[idx] = (pixel[0] as f32 / 255.0 - mean[0]) / std[0];
+                    data[hw + idx] = (pixel[1] as f32 / 255.0 - mean[1]) / std[1];
+                    data[2 * hw + idx] = (pixel[2] as f32 / 255.0 - mean[2]) / std[2];
                 }
             }
 

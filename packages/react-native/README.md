@@ -22,47 +22,11 @@ yarn add @rustors/react-native
 # or npm install @rustors/react-native
 ```
 
-### iOS
+### Models Setup
 
-Add matching model pod beside React Native pods:
+RustO automatically downloads required models (e.g. `indraocr` default) on demand into the app's cache directory on first run. No separate model pods or Gradle packages are needed.
 
-```ruby
-target 'YourApp' do
-  pod 'RustO-Models-PPOCRv6-Tiny' # recommended default
-  # pod 'RustO-Models-PPOCRv6-Small'
-  # pod 'RustO-Models-PPOCRv6-Medium'
-  # pod 'RustO-Models-PPOCRv5-Mobile'
-  # pod 'RustO-Models-PPOCRv4-Mobile'
-end
-```
-
-```bash
-cd ios && pod install
-```
-
-`@rustors/react-native`, `RustO`, and selected `RustO-Models-*` pod must use matching versions.
-
-### Android
-
-Enable JitPack, then add one matching model AAR:
-
-```groovy
-// android/settings.gradle or root build.gradle
-dependencyResolutionManagement {
-  repositories {
-    google()
-    mavenCentral()
-    maven { url 'https://jitpack.io' }
-  }
-}
-
-// android/app/build.gradle
-dependencies {
-  implementation 'com.github.byrizki.rusto-rs:rusto-models-ppocrv6-tiny:0.3.2'
-}
-```
-
-Use a matching model version. Custom absolute model paths need no model package.
+To bundle models directly within your application, pass local file paths to `initialize({ model: 'indraocr' })` or place models in the application storage directory.
 
 ## Complete example
 
