@@ -53,14 +53,28 @@ for model in "${!MODEL_FILES[@]}"; do
   mkdir -p "$TARGET_DIR/$model"
   read -r det_file rec_file dict_file <<< "${MODEL_FILES[$model]}"
 
+  link_flat() {
+    local src="$1"
+    local alias="$2"
+    if [ -f "$src" ]; then
+      ln -f "$src" "$TARGET_DIR/$alias" 2>/dev/null || cp -f "$src" "$TARGET_DIR/$alias" 2>/dev/null || true
+    fi
+  }
+
   if [ "$model" = "indraocr" ]; then
     download_file "$TARGET_DIR/$model/det.rten" "$det_file" "$REPO_ROOT/models/indra/det.rten"
     download_file "$TARGET_DIR/$model/rec.rten" "$rec_file" "$REPO_ROOT/models/indra/rec.rten"
     download_file "$TARGET_DIR/$model/meta.json" "$dict_file" "$REPO_ROOT/models/indra/meta.json"
+    link_flat "$TARGET_DIR/$model/det.rten" "$det_file"
+    link_flat "$TARGET_DIR/$model/rec.rten" "$rec_file"
+    link_flat "$TARGET_DIR/$model/meta.json" "$dict_file"
   else
     download_file "$TARGET_DIR/$model/det.rten" "$det_file" "$REPO_ROOT/models/PPOCR_${model//-/_}/det.rten"
     download_file "$TARGET_DIR/$model/rec.rten" "$rec_file" "$REPO_ROOT/models/PPOCR_${model//-/_}/rec.rten"
     download_file "$TARGET_DIR/$model/dict.txt" "$dict_file" "$REPO_ROOT/models/PPOCR_${model//-/_}/dict.txt"
+    link_flat "$TARGET_DIR/$model/det.rten" "$det_file"
+    link_flat "$TARGET_DIR/$model/rec.rten" "$rec_file"
+    link_flat "$TARGET_DIR/$model/dict.txt" "$dict_file"
   fi
 done
 

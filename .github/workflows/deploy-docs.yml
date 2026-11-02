@@ -132,8 +132,8 @@ jobs:
           mkdir -p /tmp/wasm-assets
           mkdir -p ../packages/web/src/wasm
           mkdir -p public/wasm
-          # Ensure models are not bundled into static GitHub Pages output
-          rm -rf public/models
+          # Populate OCR models for live demo
+          bash scripts/download-models.sh
 
           # Populate WASM bindings
           if [ "$RELEASE_TAG" = "build" ]; then
