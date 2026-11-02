@@ -6,6 +6,9 @@ public typealias RustOError = RustoBindingError
 /// Runtime OCR options alias.
 public typealias RuntimeOptions = OcrRunOptions
 
+private let globalDownloadModel = downloadModel
+private let globalDownloadAllModels = downloadAllModels
+
 extension RustO {
     /// Library version string of the underlying RustO engine.
     public static var libraryVersion: String {
@@ -14,12 +17,12 @@ extension RustO {
 
     /// Downloads model assets for a specific OCR pipeline ahead of time.
     public static func downloadModel(model: String? = nil, lang: String? = nil, cacheDir: String? = nil) throws -> [String] {
-        try rusto.downloadModel(model: model, lang: lang, cacheDir: cacheDir)
+        try globalDownloadModel(model, lang, cacheDir)
     }
 
     /// Downloads all available canonical models to the cache directory ahead of time.
     public static func downloadAllModels(cacheDir: String? = nil) throws -> [String] {
-        try rusto.downloadAllModels(cacheDir: cacheDir)
+        try globalDownloadAllModels(cacheDir)
     }
 
     /// Initialize RustO with automatic model bundle resolution for iOS.
@@ -105,35 +108,21 @@ extension RustO {
 }
 
 extension InitializeConfig {
-    public init(
-        model: String? = nil,
-        modelPath: String? = nil,
-        template: String? = nil,
-        lang: String? = nil,
-        cacheDir: String? = nil,
-        enableReadingOrder: Bool? = nil,
-        layoutVariant: String? = nil,
-        detection: DetectionConfig? = nil,
-        recognition: RecognitionConfig? = nil,
-        classification: ClassificationConfig? = nil,
-        orientation: OrientationConfig? = nil,
-        unwarp: UnwarpConfig? = nil,
-        layout: LayoutConfig? = nil
-    ) {
+    public init() {
         self.init(
-            model: model,
-            modelPath: modelPath,
-            template: template,
-            lang: lang,
-            cacheDir: cacheDir,
-            enableReadingOrder: enableReadingOrder,
-            layoutVariant: layoutVariant,
-            detection: detection,
-            recognition: recognition,
-            classification: classification,
-            orientation: orientation,
-            unwarp: unwarp,
-            layout: layout
+            model: nil,
+            modelPath: nil,
+            template: nil,
+            lang: nil,
+            cacheDir: nil,
+            enableReadingOrder: nil,
+            layoutVariant: nil,
+            detection: nil,
+            recognition: nil,
+            classification: nil,
+            orientation: nil,
+            unwarp: nil,
+            layout: nil
         )
     }
 }
@@ -144,7 +133,9 @@ extension LayoutConfig {
             enabled: nil,
             modelPath: nil,
             confThresh: nil,
-            targetSize: nil
+            targetSize: nil,
+            targetHeight: nil,
+            targetWidth: nil
         )
     }
 }
