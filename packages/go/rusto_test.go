@@ -184,3 +184,58 @@ func TestDetectLayoutAPI(t *testing.T) {
 	}
 }
 
+func TestDetectChronamDensePageWithLayout(t *testing.T) {
+	detPath := "../../models/PPOCR_v6_tiny/det.rten"
+	recPath := "../../models/PPOCR_v6_tiny/rec.rten"
+	dictPath := "../../models/PPOCR_v6_tiny/dict.txt"
+	layoutPath := "../../models/PPOCR_v6_tiny/layout_cdla.onnx"
+	imgPath := "../../tests/fixtures/chronam-ad-page.png"
+
+	if _, err := os.Stat(detPath); os.IsNotExist(err) {
+		t.Skip("Model files not found, skipping dense page test")
+	}
+	if _, err := os.Stat(imgPath); os.IsNotExist(err) {
+		t.Skip("Test image not found, skipping dense page test")
+	}
+
+	config := fmt.Sprintf(`{
+		"detection": {"modelPath": "%s", "enabled": true},
+		"recognition": {"modelPath": "%s", "dictPath": "%s", "enabled": true},
+		"layout": {"modelPath": "%s", "enabled": true}
+	}`, detPath, recPath, dictPath, layoutPath)
+
+	engine, err := New(config)
+	if err != nil {
+		t.Fatalf("Failed to initialize engine with layout: %v", err)
+	}
+	defer engine.Close()
+
+	results, err := engine.DetectTextFile(imgPath, `{"layout": true}`)
+	if err != nil {
+		t.Fatalf("DetectTextFile with layout failed: %v", err)
+	}
+
+	if len(results) != 153 {
+		t.Fatalf("Expected exactly 153 lines, got %d", len(results))
+	}
+
+	if results[0].Text != "All Orders in our" {
+		t.Fatalf("Expected first line to be 'All Orders in our', got '%s'", results[0].Text)
+	}
+	if results[0].RegionID < 0 {
+		t.Fatalf("Expected RegionID >= 0 when layout is enabled, got %d", results[0].RegionID)
+	}
+	if results[0].LayoutType < 0 {
+		t.Fatalf("Expected LayoutType >= 0 when layout is enabled, got %d", results[0].LayoutType)
+	}
+
+	regions, err := engine.DetectLayoutFile(imgPath)
+	if err != nil {
+		t.Fatalf("DetectLayoutFile failed: %v", err)
+	}
+	if len(regions) < 1 {
+		t.Fatalf("Expected at least 1 layout region, got %d", len(regions))
+	}
+}
+
+

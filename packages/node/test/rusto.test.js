@@ -72,3 +72,30 @@ test('RustO performs real OCR with Indra OCR on idcard.jpg', () => {
     `Expected passport text, got: ${joined}`
   );
 });
+
+test('RustO performs real OCR on Issue 25 chronam-ad-page.png with layout', (t) => {
+  const detPath = path.resolve(__dirname, '../../../models/PPOCR_v6_tiny/det.rten');
+  const recPath = path.resolve(__dirname, '../../../models/PPOCR_v6_tiny/rec.rten');
+  const dictPath = path.resolve(__dirname, '../../../models/PPOCR_v6_tiny/dict.txt');
+  const layoutPath = path.resolve(__dirname, '../../../models/PPOCR_v6_tiny/layout_cdla.onnx');
+  const imgPath = path.resolve(__dirname, '../../../tests/fixtures/chronam-ad-page.png');
+
+  if (!fs.existsSync(detPath) || !fs.existsSync(imgPath)) {
+    t.skip('Model files or test image not found, skipping');
+    return;
+  }
+
+  const engine = RustO.initialize({
+    detection: { model_path: detPath },
+    recognition: { model_path: recPath, dict_path: dictPath },
+    layout: { model_path: layoutPath }
+  });
+
+  const results = engine.detectTextFile(imgPath, {
+    layout: true
+  });
+  assert.strictEqual(results.length, 153, 'Expected 153 lines');
+  assert.strictEqual(results[0].text, 'All Orders in our');
+  assert.strictEqual(typeof results[0].region_id, 'number');
+  assert.strictEqual(typeof results[0].layout_type, 'string');
+});

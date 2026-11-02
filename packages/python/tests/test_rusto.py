@@ -2,6 +2,7 @@ import unittest
 import sys
 import os
 import json
+from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -118,6 +119,37 @@ class TestRustOPythonBinding(unittest.TestCase):
         self.assertTrue(callable(download_all_models))
         self.assertTrue(callable(RustO.download_model))
         self.assertTrue(callable(RustO.download_all_models))
+
+    def test_chronam_ad_page_with_layout(self):
+        root = Path(__file__).resolve().parents[3]
+        img_path = root / "tests/fixtures/chronam-ad-page.png"
+        det_path = root / "models/PPOCR_v6_tiny/det.rten"
+        rec_path = root / "models/PPOCR_v6_tiny/rec.rten"
+        dict_path = root / "models/PPOCR_v6_tiny/dict.txt"
+        layout_path = root / "models/PPOCR_v6_tiny/layout_cdla.onnx"
+
+        if not (img_path.exists() and det_path.exists() and rec_path.exists() and layout_path.exists()):
+            self.skipTest("Required fixture or model files missing")
+
+        config = {
+            "detection": {"modelPath": str(det_path), "enabled": True},
+            "recognition": {"modelPath": str(rec_path), "dictPath": str(dict_path), "enabled": True},
+            "layout": {"modelPath": str(layout_path), "enabled": True},
+        }
+        engine = RustO.initialize_from_json(json.dumps(config))
+        opts = OcrRunOptions(
+            output=OutputGranularity.LINES,
+            line_y_threshold=None, word_x_threshold=None, text_score=None,
+            classification=None, orientation=None, min_height=None, max_side_len=None,
+            min_side_len=None, width_height_ratio=None, detection=None, postprocess=None,
+            rec_batch_num=None, unwarp=None, layout=True, optimization=None, calibration=None,
+        )
+        res = engine.detect_text(ImageSource.PATH(str(img_path)), opts)
+        self.assertTrue(res.is_STRUCTURED())
+        self.assertEqual(len(res.results), 153)
+        self.assertEqual(res.results[0].text, "All Orders in our")
+        self.assertIsNotNone(res.results[0].region_id)
+        self.assertIsNotNone(res.results[0].layout_type)
 
 if __name__ == "__main__":
     unittest.main()

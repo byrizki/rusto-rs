@@ -475,3 +475,107 @@ fn test_issue25_c_ffi_layout_api_and_results() {
         rocr_free(handle);
     }
 }
+
+#[test]
+fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
+    use rusto::ffi::*;
+    use rusto::{DetectTextResult, ImageSource, OcrRunOptions, RustO};
+    use std::ffi::CString;
+    use std::path::Path;
+
+    let img_path = "tests/fixtures/chronam-ad-page.png";
+    let det_path = "models/PPOCR_v6_tiny/det.rten";
+    let rec_path = "models/PPOCR_v6_tiny/rec.rten";
+    let dict_path = "models/PPOCR_v6_tiny/dict.txt";
+    let layout_path = "models/PPOCR_v6_tiny/layout_cdla.onnx";
+
+    if !Path::new(img_path).exists()
+        || !Path::new(det_path).exists()
+        || !Path::new(rec_path).exists()
+        || !Path::new(dict_path).exists()
+        || !Path::new(layout_path).exists()
+    {
+        return;
+    }
+
+    let config_json = format!(
+        r#"{{
+            "detection": {{ "modelPath": "{}", "enabled": true }},
+            "recognition": {{ "modelPath": "{}", "dictPath": "{}", "enabled": true }},
+            "layout": {{ "modelPath": "{}", "enabled": true }}
+        }}"#,
+        det_path, rec_path, dict_path, layout_path
+    );
+
+    // 1. Rust Library API verification
+    let init_config = rusto::InitializeConfig::from_json(&config_json).expect("Parse config JSON");
+    let mut ocr = RustO::initialize(init_config).expect("Init RustO");
+
+    let options = OcrRunOptions {
+        layout: Some(true),
+        ..Default::default()
+    };
+
+    let res = ocr.detect_text(&ImageSource::Path(img_path.into()), &options)
+        .expect("detect_text on chronam-ad-page");
+    let DetectTextResult::Structured(lines) = res else {
+        panic!("Expected structured text results");
+    };
+
+    assert_eq!(lines.len(), 153, "Dense chronicling america page must detect exactly 153 lines");
+    assert_eq!(lines[0].text, "All Orders in our");
+    assert!(lines[0].region_id.is_some(), "region_id should be populated when layout is enabled");
+    assert!(lines[0].layout_type.is_some(), "layout_type should be populated when layout is enabled");
+
+    // 2. C FFI API verification
+    let c_config = CString::new(config_json).unwrap();
+    let handle = unsafe { rocr_initialize(c_config.as_ptr()) };
+    assert!(!handle.is_null(), "rocr_initialize should return valid handle");
+
+    let c_img_path = CString::new(img_path).unwrap();
+    let c_options = CString::new(r#"{"layout": true}"#).unwrap();
+
+    let mut c_results: *mut CTextResult = std::ptr::null_mut();
+    let mut c_count: usize = 0;
+
+    let ret = unsafe {
+        rocr_detect_text_file(
+            handle,
+            c_img_path.as_ptr(),
+            c_options.as_ptr(),
+            &mut c_results,
+            &mut c_count,
+        )
+    };
+    assert_eq!(ret, 0, "rocr_detect_text_file should succeed");
+    assert_eq!(c_count, 153, "C FFI must return exactly 153 lines");
+    assert!(!c_results.is_null());
+
+    unsafe {
+        let first = &*c_results;
+        let first_text = std::ffi::CStr::from_ptr(first.text).to_string_lossy();
+        assert_eq!(first_text, "All Orders in our");
+        assert!(first.region_id >= 0, "C FFI region_id should be non-negative");
+        assert!(first.layout_type >= 0, "C FFI layout_type should be non-negative");
+
+        rocr_free_results(c_results, c_count);
+    }
+
+    // 3. C FFI Layout detection API verification
+    let mut c_regions: *mut CLayoutRegion = std::ptr::null_mut();
+    let mut c_region_count: usize = 0;
+
+    let ret_layout = unsafe {
+        rocr_detect_layout_file(handle, c_img_path.as_ptr(), &mut c_regions, &mut c_region_count)
+    };
+    assert_eq!(ret_layout, 0, "rocr_detect_layout_file should succeed");
+    assert!(c_region_count >= 1, "Should detect at least 1 layout region");
+    assert!(!c_regions.is_null());
+
+    unsafe {
+        let first_region = &*c_regions;
+        assert!(first_region.confidence > 0.5);
+        rocr_free_layout_regions(c_regions, c_region_count);
+        rocr_free(handle);
+    }
+}

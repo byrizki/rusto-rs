@@ -101,5 +101,54 @@ void main() {
       expect(config.lang, equals('latin'));
       expect(config.modelPath, equals('/tmp/models'));
     });
+
+    test('Issue 25 chronam-ad-page.png dense layout OCR', () {
+      final det = File('../../models/PPOCR_v6_tiny/det.rten');
+      final rec = File('../../models/PPOCR_v6_tiny/rec.rten');
+      final dict = File('../../models/PPOCR_v6_tiny/dict.txt');
+      final layout = File('../../models/PPOCR_v6_tiny/layout_cdla.onnx');
+      final img = File('../../tests/fixtures/chronam-ad-page.png');
+
+      if (!det.existsSync() || !layout.existsSync() || !img.existsSync()) {
+        return;
+      }
+
+      final engine = RustO.initializeFromJson('''{
+        "detection": {"modelPath": "${det.absolute.path}", "enabled": true},
+        "recognition": {"modelPath": "${rec.absolute.path}", "dictPath": "${dict.absolute.path}", "enabled": true},
+        "layout": {"modelPath": "${layout.absolute.path}", "enabled": true}
+      }''');
+
+      var options = defaultOcrRunOptions();
+      options = OcrRunOptions(
+        output: options.output,
+        lineYThreshold: options.lineYThreshold,
+        wordXThreshold: options.wordXThreshold,
+        textScore: options.textScore,
+        classification: options.classification,
+        orientation: options.orientation,
+        minHeight: options.minHeight,
+        maxSideLen: options.maxSideLen,
+        minSideLen: options.minSideLen,
+        widthHeightRatio: options.widthHeightRatio,
+        detection: options.detection,
+        postprocess: options.postprocess,
+        recBatchNum: options.recBatchNum,
+        unwarp: options.unwarp,
+        layout: true,
+        optimization: options.optimization,
+        calibration: options.calibration,
+      );
+
+      final res = engine.detectText(ImageSourcePath(path: img.absolute.path), options);
+      expect(res, isA<DetectTextResultStructured>());
+      final structured = res as DetectTextResultStructured;
+      expect(structured.results.length, equals(153));
+      expect(structured.results[0].text, equals('All Orders in our'));
+      expect(structured.results[0].regionId, isNotNull);
+      expect(structured.results[0].layoutType, isNotNull);
+
+      engine.close();
+    });
   });
 }
