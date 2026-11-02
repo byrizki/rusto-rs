@@ -108,3 +108,15 @@ strip = false
 opt-level = 1
 debug = true
 incremental = true
+
+# [patch.crates-io]
+# rten = { path = "vendor/rten" }
+# rten-tensor = { path = "vendor/rten/rten-tensor" }
+# rten-base = { path = "vendor/rten/rten-base" }
+# rten-gemm = { path = "vendor/rten/rten-gemm" }
+# rten-model-file = { path = "vendor/rten/rten-model-file" }
+# rten-onnx = { path = "vendor/rten/rten-onnx" }
+# rten-parallel = { path = "vendor/rten/rten-parallel" }
+# rten-shape-inference = { path = "vendor/rten/rten-shape-inference" }
+# rten-simd = { path = "vendor/rten/rten-simd" }
+# rten-vecmath = { path = "vendor/rten/rten-vecmath" }

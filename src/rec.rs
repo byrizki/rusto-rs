@@ -3,6 +3,7 @@ use std::fs::File;
 use std::time::Instant;
 
 use ndarray::{Array3, Array4, Ix3};
+use rayon::prelude::*;
 
 #[cfg(feature = "use-opencv")]
 use opencv::{core, imgproc, prelude::*};
@@ -351,7 +352,15 @@ impl TextRecognizer {
                 wh_ratio_list.push(wh_ratio);
             }
 
+            #[cfg(not(feature = "use-opencv"))]
+            let norm_batch: Vec<Array3<f32>> = indices[beg..end]
+                .par_iter()
+                .map(|&idx| resize_norm_rec_img(&img_list[idx], img_c, img_h, max_wh_ratio))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            #[cfg(feature = "use-opencv")]
             let mut norm_batch: Vec<Array3<f32>> = Vec::with_capacity(end - beg);
+            #[cfg(feature = "use-opencv")]
             for &idx in &indices[beg..end] {
                 let norm = self.resize_norm_img(&img_list[idx], img_c, img_h, img_w, max_wh_ratio)?;
                 norm_batch.push(norm);
@@ -465,6 +474,7 @@ impl TextRecognizer {
         Ok(out)
     }
 
+    #[allow(dead_code)]
     #[cfg(not(feature = "use-opencv"))]
     fn resize_norm_img(
         &self,
@@ -477,6 +487,14 @@ impl TextRecognizer {
         resize_norm_rec_img(img, img_c, img_h, max_wh_ratio)
     }
 }
+
+static NORM_LUT: std::sync::LazyLock<[f32; 256]> = std::sync::LazyLock::new(|| {
+    let mut lut = [0.0f32; 256];
+    for (i, item) in lut.iter_mut().enumerate() {
+        *item = (i as f32 / 255.0 - 0.5) / 0.5;
+    }
+    lut
+});
 
 #[cfg(not(feature = "use-opencv"))]
 pub fn resize_norm_rec_img(
@@ -512,20 +530,40 @@ pub fn resize_norm_rec_img(
     let h2 = size.height as usize;
     let w2 = size.width as usize;
 
-    let mut out = Array3::<f32>::zeros((img_c, img_h, img_width as usize));
+    let target_w = img_width as usize;
+    let plane_size = img_h * target_w;
+    let valid_w = w2.min(target_w);
+    let valid_h = h2.min(img_h);
 
-    for y in 0..h2 {
-        for x in 0..w2.min(img_width as usize) {
-            let pix = resized.get_pixel(x as u32, y as u32);
-            // image crate uses RGB format, but model expects BGR
-            let r = pix[0] as f32 / 255.0;  // Red channel
-            let g = pix[1] as f32 / 255.0;  // Green channel
-            let b = pix[2] as f32 / 255.0;  // Blue channel
+    let mut out = Array3::<f32>::zeros((img_c, img_h, target_w));
 
-            // Store in BGR order (model expects BGR as per inference.yml)
-            out[[0, y, x]] = (b - 0.5) / 0.5;  // Blue
-            out[[1, y, x]] = (g - 0.5) / 0.5;  // Green
-            out[[2, y, x]] = (r - 0.5) / 0.5;  // Red
+    if let Some(rgb) = resized.as_dynamic().as_rgb8() {
+        let raw: &[u8] = rgb.as_raw();
+        let stride = w2 * 3;
+        let out_slice = out.as_slice_mut().expect("contiguous array");
+        let (b_plane, rest) = out_slice.split_at_mut(plane_size);
+        let (g_plane, r_plane) = rest.split_at_mut(plane_size);
+
+        for y in 0..valid_h {
+            let row = &raw[y * stride..y * stride + valid_w * 3];
+            let b_row = &mut b_plane[y * target_w..y * target_w + valid_w];
+            let g_row = &mut g_plane[y * target_w..y * target_w + valid_w];
+            let r_row = &mut r_plane[y * target_w..y * target_w + valid_w];
+
+            for x in 0..valid_w {
+                b_row[x] = NORM_LUT[row[x * 3 + 2] as usize];
+                g_row[x] = NORM_LUT[row[x * 3 + 1] as usize];
+                r_row[x] = NORM_LUT[row[x * 3] as usize];
+            }
+        }
+    } else {
+        for y in 0..valid_h {
+            for x in 0..valid_w {
+                let pix = resized.get_pixel(x as u32, y as u32);
+                out[[0, y, x]] = NORM_LUT[pix[2] as usize];
+                out[[1, y, x]] = NORM_LUT[pix[1] as usize];
+                out[[2, y, x]] = NORM_LUT[pix[0] as usize];
+            }
         }
     }
 

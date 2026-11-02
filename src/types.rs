@@ -456,6 +456,14 @@ pub struct LayoutConfig {
 
 impl LayoutConfig {
     pub fn default(model_path: PathBuf) -> Self {
+        let p_str = model_path.to_string_lossy();
+        let target_size = if p_str.contains("layout_s") || p_str.contains("doclayout_s") {
+            480
+        } else if p_str.contains("layout_l") || p_str.contains("doclayout_l") || p_str.contains("doclayout_plus_l") {
+            800
+        } else {
+            640
+        };
         Self {
             engine_type: EngineType::OnnxRuntime,
             model_type: ModelType::Mobile,
@@ -465,7 +473,7 @@ impl LayoutConfig {
             std: [0.229, 0.224, 0.225],  // ImageNet std
             conf_thresh: 0.4,
             iou_thresh: 0.5,
-            target_size: 640, // Default for PP-DocLayout_plus-L
+            target_size,
             engine_cfg: EngineConfig::default(),
         }
     }

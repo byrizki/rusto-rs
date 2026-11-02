@@ -141,6 +141,8 @@ struct RecognitionConfigJson {
     return_word_box: Option<bool>,
     #[serde(alias = "returnSingleCharBox", alias = "return_single_char_box")]
     return_single_char_box: Option<bool>,
+    #[serde(alias = "recBatchNum", alias = "rec_batch_num", alias = "batchNum", alias = "batch_num")]
+    rec_batch_num: Option<i32>,
 }
 
 #[derive(Deserialize, Default, Clone, Debug)]
@@ -397,6 +399,9 @@ impl InitializeConfig {
         }
         if let Some(char_box) = flat.recognition.as_ref().and_then(|r| r.return_single_char_box) {
             config.global.return_single_char_box = char_box;
+        }
+        if let Some(batch_num) = flat.recognition.as_ref().and_then(|r| r.rec_batch_num) {
+            config.rec.rec_batch_num = batch_num;
         }
         if let Some(y_mult) = flat.layout.as_ref().and_then(|l| l.y_threshold_multiplier) {
             config.global.y_threshold_multiplier = Some(y_mult);

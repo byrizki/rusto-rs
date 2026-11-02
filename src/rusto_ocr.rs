@@ -75,6 +75,7 @@ pub struct OcrRunOptions {
     pub postprocess: Option<PostprocessRunOptions>,
     pub calibration: Option<CalibrationOptions>,
     pub optimization: Option<OptimizationOptions>,
+    pub rec_batch_num: Option<i32>,
 }
 
 impl OcrRunOptions {
@@ -133,8 +134,18 @@ impl OcrRunOptions {
             finite("calibration.descreenStrength", calib.descreen_strength, |value| value >= 0.0)?;
         }
         if let Some(opt) = &self.optimization {
+            if let Some(target) = opt.target_max_side {
+                if target == 0 {
+                    return Err(EngineError::Preprocess("optimization.targetMaxSide must be > 0".into()));
+                }
+            }
             finite("optimization.cropPaddingX", opt.crop_padding_x, |value| (0.0..=1.0).contains(&value))?;
             finite("optimization.cropPaddingY", opt.crop_padding_y, |value| (0.0..=1.0).contains(&value))?;
+        }
+        if let Some(batch_num) = self.rec_batch_num {
+            if batch_num <= 0 {
+                return Err(EngineError::Preprocess("recBatchNum must be > 0".into()));
+            }
         }
         Ok(())
     }
@@ -682,7 +693,14 @@ impl RustO {
         if let Some(value) = options.width_height_ratio { effective.width_height_ratio = value; }
         if let Some(calib) = &options.calibration { effective.calibration = Some(calib.clone()); }
         if let Some(opt) = &options.optimization { effective.optimization = Some(opt.clone()); }
-        self.run_on_mat_with_global(img, &effective, options.detection.as_ref(), options.postprocess.as_ref())
+
+        let orig_rec_batch_num = self.rec.cfg.rec_batch_num;
+        if let Some(batch_num) = options.rec_batch_num {
+            self.rec.cfg.rec_batch_num = batch_num;
+        }
+        let result = self.run_on_mat_with_global(img, &effective, options.detection.as_ref(), options.postprocess.as_ref());
+        self.rec.cfg.rec_batch_num = orig_rec_batch_num;
+        result
     }
 
     fn run_on_mat_with_global(

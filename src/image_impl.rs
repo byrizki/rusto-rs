@@ -122,8 +122,15 @@ mod rust_impl {
     }
 
     pub fn imread<P: AsRef<Path>>(path: P) -> Result<Mat> {
-        let img = image::open(path)?;
-        Ok(Mat::new(img))
+        let path = path.as_ref();
+        let img = match image::open(path) {
+            Ok(img) => img,
+            Err(_) => {
+                let bytes = std::fs::read(path)?;
+                image::load_from_memory(&bytes)?
+            }
+        };
+        Ok(Mat::new(DynamicImage::ImageRgb8(img.into_rgb8())))
     }
 
     #[allow(dead_code)]
@@ -193,7 +200,13 @@ mod rust_impl {
     ) -> Result<()> {
         // Create output image
         let mut out_img = ImageBuffer::new(dsize.width as u32, dsize.height as u32);
-        let src_img = src.to_rgb8();
+        let fallback_rgb;
+        let src_img = if let Some(rgb) = src.image.as_rgb8() {
+            rgb
+        } else {
+            fallback_rgb = src.to_rgb8();
+            &fallback_rgb
+        };
 
         // Invert the transformation matrix for reverse mapping
         let m_inv = invert_matrix_3x3(matrix)?;

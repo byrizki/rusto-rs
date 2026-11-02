@@ -213,6 +213,7 @@ impl InferenceSession for EngineSession {
 
 pub struct RtenSession {
     model: Model,
+    thread_pool: Option<std::sync::Arc<rten::ThreadPool>>,
 }
 
 fn resolve_model_path(path: &Path) -> PathBuf {
@@ -285,7 +286,11 @@ fn convert_output_to_array(value: &rten::Value) -> Result<ArrayD<f32>, EngineErr
     match value {
         rten::Value::FloatTensor(t) => {
             let shape = t.shape().to_vec();
-            let data: Vec<f32> = t.iter().copied().collect();
+            let data: Vec<f32> = if let Some(slice) = t.data() {
+                slice.to_vec()
+            } else {
+                t.iter().copied().collect()
+            };
             let array = Array::from_shape_vec(shape, data)?;
             Ok(array.into_dyn())
         }
@@ -322,33 +327,52 @@ impl RtenSession {
         Self::from_path(&cfg.model_path, &cfg.engine_cfg)
     }
 
-    pub fn from_path(model_path: &Path, _engine_cfg: &EngineConfig) -> Result<Self, EngineError> {
+    pub fn from_path(model_path: &Path, engine_cfg: &EngineConfig) -> Result<Self, EngineError> {
         let resolved = resolve_model_path(model_path);
-        let model = Model::load_file(&resolved)?;
-        Ok(Self { model })
+        let mut model_opts = rten::ModelOptions::with_all_ops();
+        model_opts.prepack_weights(true);
+        let model = model_opts.load_file(&resolved)?;
+
+        let thread_pool = if engine_cfg.intra_op_num_threads > 0 {
+            Some(std::sync::Arc::new(rten::ThreadPool::with_num_threads(
+                engine_cfg.intra_op_num_threads as usize,
+            )))
+        } else {
+            None
+        };
+
+        Ok(Self {
+            model,
+            thread_pool,
+        })
+    }
+
+    fn run_options(&self) -> Option<rten::RunOptions> {
+        let mut opts = rten::RunOptions::default();
+        if let Some(ref tp) = self.thread_pool {
+            opts = opts.with_thread_pool(Some(tp.clone()));
+        }
+        Some(opts)
     }
 
     pub fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
         let shape: Vec<usize> = input.shape().to_vec();
-        let data: Vec<f32> = if let Some(slice) = input.as_slice() {
-            slice.to_vec()
-        } else {
-            input.iter().copied().collect()
-        };
-
-        let tensor = RtenTensor::<f32>::from_data(&shape, data);
         let in_ids = self.model.input_ids();
         if in_ids.is_empty() {
             return Err(EngineError::OutputError("Model has no inputs".into()));
         }
         let in_id = in_ids[0];
-
         let out_ids = self.model.output_ids();
-        let outputs = self.model.run(
-            vec![(in_id, tensor.view().into())],
-            out_ids,
-            None,
-        )?;
+        let run_opts = self.run_options();
+
+        let outputs = if let Some(slice) = input.as_slice() {
+            let view = rten_tensor::TensorView::from_data(&shape, slice);
+            self.model.run(vec![(in_id, view.into())], out_ids, run_opts)?
+        } else {
+            let data: Vec<f32> = input.iter().copied().collect();
+            let tensor = RtenTensor::<f32>::from_data(&shape, data);
+            self.model.run(vec![(in_id, tensor.view().into())], out_ids, run_opts)?
+        };
 
         if outputs.is_empty() {
             return Err(EngineError::OutputError("Model produced no outputs".into()));
@@ -374,10 +398,8 @@ impl RtenSession {
                     continue;
                 }
             } else {
-                return Err(EngineError::OutputError(format!(
-                    "Input node '{}' not found in model",
-                    name
-                )));
+                // Ignore inputs not present in this model variant
+                continue;
             };
 
             let shape: Vec<usize> = input.shape().to_vec();
@@ -395,7 +417,8 @@ impl RtenSession {
             .collect();
 
         let out_ids = self.model.output_ids();
-        let outputs = self.model.run(input_pairs, out_ids, None)?;
+        let run_opts = self.run_options();
+        let outputs = self.model.run(input_pairs, out_ids, run_opts)?;
 
         let mut results = HashMap::new();
         for (i, out_id) in out_ids.iter().enumerate() {
@@ -418,25 +441,21 @@ impl RtenSession {
         input: ArrayD<f32>,
     ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
         let shape: Vec<usize> = input.shape().to_vec();
-        let data: Vec<f32> = if let Some(slice) = input.as_slice() {
-            slice.to_vec()
-        } else {
-            input.iter().copied().collect()
-        };
-
-        let tensor = RtenTensor::<f32>::from_data(&shape, data);
         let in_ids = self.model.input_ids();
         if in_ids.is_empty() {
             return Err(EngineError::OutputError("Model has no inputs".into()));
         }
         let in_id = in_ids[0];
-
         let out_ids = self.model.output_ids();
-        let outputs = self.model.run(
-            vec![(in_id, tensor.view().into())],
-            out_ids,
-            None,
-        )?;
+
+        let outputs = if let Some(slice) = input.as_slice() {
+            let view = rten_tensor::TensorView::from_data(&shape, slice);
+            self.model.run(vec![(in_id, view.into())], out_ids, None)?
+        } else {
+            let data: Vec<f32> = input.iter().copied().collect();
+            let tensor = RtenTensor::<f32>::from_data(&shape, data);
+            self.model.run(vec![(in_id, tensor.view().into())], out_ids, None)?
+        };
 
         let mut results = HashMap::new();
         for (i, out_id) in out_ids.iter().enumerate() {

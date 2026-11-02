@@ -143,6 +143,10 @@ pub struct CalibrationOptions {
 #[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OptimizationOptions {
+    /// Enable or disable image optimization.
+    pub enabled: Option<bool>,
+    /// Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
+    pub target_max_side: Option<u32>,
     /// Horizontal padding around bounding box crops in pixels.
     pub crop_padding_x: Option<f32>,
     /// Vertical padding around bounding box crops in pixels.
@@ -185,6 +189,8 @@ pub struct OcrRunOptions {
     pub calibration: Option<CalibrationOptions>,
     /// Runtime crop and resolution optimization options.
     pub optimization: Option<OptimizationOptions>,
+    /// Request-local recognition batch size override.
+    pub rec_batch_num: Option<i32>,
 }
 
 /// Text detection model configuration.
@@ -221,6 +227,8 @@ pub struct RecognitionConfig {
     pub model_path: Option<String>,
     /// Filesystem path to dictionary vocabulary file (.txt).
     pub dict_path: Option<String>,
+    /// Recognition batch size. Default: 6.
+    pub rec_batch_num: Option<i32>,
 }
 
 /// Line classification configuration (180° rotation detection).
@@ -496,6 +504,7 @@ pub fn create_initialize_config_ppv6(
             enabled: Some(true),
             model_path: Some(rec_model_path),
             dict_path: Some(dict_path),
+            rec_batch_num: None,
         }),
         ..Default::default()
     }
@@ -575,9 +584,10 @@ fn convert_options(opts: &OcrRunOptions) -> Result<crate::rusto_ocr::OcrRunOptio
         ..Default::default()
     });
     let optimization = opts.optimization.as_ref().map(|o| crate::calibration::OptimizationOptions {
+        enabled: o.enabled,
+        target_max_side: o.target_max_side,
         crop_padding_x: o.crop_padding_x,
         crop_padding_y: o.crop_padding_y,
-        ..Default::default()
     });
 
     let internal = crate::rusto_ocr::OcrRunOptions {
@@ -597,6 +607,7 @@ fn convert_options(opts: &OcrRunOptions) -> Result<crate::rusto_ocr::OcrRunOptio
         postprocess,
         calibration,
         optimization,
+        rec_batch_num: opts.rec_batch_num,
     };
     internal.validate().map_err(RustoBindingError::from)?;
     Ok(internal)
@@ -705,8 +716,23 @@ mod tests {
 
     #[test]
     fn test_uniffi_binding_types() {
-        let options = default_ocr_run_options();
+        let mut options = default_ocr_run_options();
         assert_eq!(options.output, OutputGranularity::Lines);
+        options.rec_batch_num = Some(12);
+        options.optimization = Some(OptimizationOptions {
+            enabled: Some(true),
+            target_max_side: Some(960),
+            crop_padding_x: Some(0.05),
+            crop_padding_y: Some(0.08),
+        });
+        let converted = convert_options(&options).expect("convert_options should succeed");
+        assert_eq!(converted.rec_batch_num, Some(12));
+        let opt = converted.optimization.expect("optimization should be present");
+        assert_eq!(opt.enabled, Some(true));
+        assert_eq!(opt.target_max_side, Some(960));
+        assert_eq!(opt.crop_padding_x, Some(0.05));
+        assert_eq!(opt.crop_padding_y, Some(0.08));
+
         let config = create_initialize_config_ppv6(
             "models/det.rten".to_string(),
             "models/rec.rten".to_string(),

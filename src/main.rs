@@ -56,6 +56,18 @@ struct Cli {
     /// Path to document layout detection model
     #[arg(long)]
     layout_model: Option<PathBuf>,
+
+    /// Maximum detection image dimension (default: configured in model, typically 960 or 736)
+    #[arg(long)]
+    det_limit: Option<i32>,
+
+    /// Text recognition batch size (default: 6)
+    #[arg(long)]
+    rec_batch_num: Option<i32>,
+
+    /// Maximum image side length for preprocessing
+    #[arg(long)]
+    max_side_len: Option<f32>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -102,6 +114,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         config.global.use_layout = true;
     }
 
+    if let Some(batch_num) = cli.rec_batch_num {
+        config = config.with_rec_batch_num(batch_num);
+    }
+
     let mut ocr = RustO::initialize(config)?;
 
     let mut options = OcrRunOptions::default();
@@ -116,6 +132,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if cli.enable_layout {
         options.layout = Some(true);
+    }
+    if let Some(det_limit) = cli.det_limit {
+        let det_opts = options.detection.get_or_insert_with(Default::default);
+        det_opts.limit_side_len = Some(det_limit);
+        det_opts.limit_type = Some("max".to_string());
+    }
+    if let Some(max_side) = cli.max_side_len {
+        options.max_side_len = Some(max_side);
     }
 
     // Run OCR
