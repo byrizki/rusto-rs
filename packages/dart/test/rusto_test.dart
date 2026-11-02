@@ -88,5 +88,16 @@ void main() {
 
       engine.close();
     });
+
+    test('UniFFI createInitializeConfigForModel and download helpers', () {
+      final config = createInitializeConfigForModel(
+        'indraocr',
+        'latin',
+        '/tmp/models',
+      );
+      expect(config.model, equals('indraocr'));
+      expect(config.lang, equals('latin'));
+      expect(config.modelPath, equals('/tmp/models'));
+    });
   });
 }

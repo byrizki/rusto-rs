@@ -12,20 +12,36 @@ extension RustO {
         rustoVersion()
     }
 
+    /// Downloads model assets for a specific OCR pipeline ahead of time.
+    public static func downloadModel(model: String? = nil, lang: String? = nil, cacheDir: String? = nil) throws -> [String] {
+        try rusto.downloadModel(model: model, lang: lang, cacheDir: cacheDir)
+    }
+
+    /// Downloads all available canonical models to the cache directory ahead of time.
+    public static func downloadAllModels(cacheDir: String? = nil) throws -> [String] {
+        try rusto.downloadAllModels(cacheDir: cacheDir)
+    }
+
     /// Initialize RustO with automatic model bundle resolution for iOS.
     public static func initializeWithBundledModels(config: InitializeConfig = InitializeConfig()) throws -> RustO {
         var resolvedConfig = config
-        var det = config.detection ?? DetectionConfig()
-        let detName = det.modelPath ?? "det.rten"
-        det.modelPath = resolveModelPath(detName) ?? detName
-        resolvedConfig.detection = det
+        let hasModelDir = config.modelPath != nil || config.model != nil
 
-        var rec = config.recognition ?? RecognitionConfig()
-        let recName = rec.modelPath ?? "rec.rten"
-        let dictName = rec.dictPath ?? "dict.txt"
-        rec.modelPath = resolveModelPath(recName) ?? recName
-        rec.dictPath = resolveModelPath(dictName) ?? dictName
-        resolvedConfig.recognition = rec
+        if !hasModelDir || config.detection != nil {
+            var det = config.detection ?? DetectionConfig()
+            let detName = det.modelPath ?? "det.rten"
+            det.modelPath = resolveModelPath(detName) ?? detName
+            resolvedConfig.detection = det
+        }
+
+        if !hasModelDir || config.recognition != nil {
+            var rec = config.recognition ?? RecognitionConfig()
+            let recName = rec.modelPath ?? "rec.rten"
+            let dictName = rec.dictPath ?? "dict.txt"
+            rec.modelPath = resolveModelPath(recName) ?? recName
+            rec.dictPath = resolveModelPath(dictName) ?? dictName
+            resolvedConfig.recognition = rec
+        }
 
         if var cls = config.classification, let path = cls.modelPath {
             cls.modelPath = resolveModelPath(path) ?? path
@@ -89,15 +105,35 @@ extension RustO {
 }
 
 extension InitializeConfig {
-    public init() {
+    public init(
+        model: String? = nil,
+        modelPath: String? = nil,
+        template: String? = nil,
+        lang: String? = nil,
+        cacheDir: String? = nil,
+        enableReadingOrder: Bool? = nil,
+        layoutVariant: String? = nil,
+        detection: DetectionConfig? = nil,
+        recognition: RecognitionConfig? = nil,
+        classification: ClassificationConfig? = nil,
+        orientation: OrientationConfig? = nil,
+        unwarp: UnwarpConfig? = nil,
+        layout: LayoutConfig? = nil
+    ) {
         self.init(
-            template: nil,
-            detection: nil,
-            recognition: nil,
-            classification: nil,
-            orientation: nil,
-            unwarp: nil,
-            layout: nil
+            model: model,
+            modelPath: modelPath,
+            template: template,
+            lang: lang,
+            cacheDir: cacheDir,
+            enableReadingOrder: enableReadingOrder,
+            layoutVariant: layoutVariant,
+            detection: detection,
+            recognition: recognition,
+            classification: classification,
+            orientation: orientation,
+            unwarp: unwarp,
+            layout: layout
         )
     }
 }
@@ -134,7 +170,8 @@ extension RecognitionConfig {
         self.init(
             enabled: nil,
             modelPath: nil,
-            dictPath: nil
+            dictPath: nil,
+            recBatchNum: nil
         )
     }
 }
@@ -204,6 +241,8 @@ extension CalibrationOptions {
 extension OptimizationOptions {
     public init() {
         self.init(
+            enabled: nil,
+            targetMaxSide: nil,
             cropPaddingX: nil,
             cropPaddingY: nil
         )
@@ -228,7 +267,8 @@ extension OcrRunOptions {
             detection: nil,
             postprocess: nil,
             calibration: nil,
-            optimization: nil
+            optimization: nil,
+            recBatchNum: nil
         )
     }
 }

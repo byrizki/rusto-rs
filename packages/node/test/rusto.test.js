@@ -7,6 +7,8 @@ const { RustO } = require('../index');
 test('RustO N-API class is exported', () => {
   assert.strictEqual(typeof RustO, 'function');
   assert.strictEqual(typeof RustO.initialize, 'function');
+  assert.strictEqual(typeof RustO.downloadModel, 'function');
+  assert.strictEqual(typeof RustO.downloadAllModels, 'function');
 });
 
 test('RustO rejects invalid initialization JSON', () => {
@@ -30,12 +32,15 @@ test('RustO performs real OCR on example1.png', () => {
     recognition: { model_path: recPath, dict_path: dictPath }
   });
 
-  const results = engine.detectTextFile(imgPath);
+  const results = engine.detectTextFile(imgPath, {
+    recBatchNum: 8,
+    optimization: { enabled: true, targetMaxSide: 960, cropPaddingX: 0.05, cropPaddingY: 0.08 }
+  });
   assert.ok(Array.isArray(results), 'Expected results to be an array');
   assert.ok(results.length > 0, 'Expected detected text lines');
   assert.ok(results.some((r) => r.text.includes('INVOICE')), 'Expected to find INVOICE in detected text');
 
-  const spatial = engine.detectTextSpatial(imgPath);
+  const spatial = engine.detectTextSpatial(imgPath, { recBatchNum: 8 });
   assert.strictEqual(typeof spatial, 'string');
   assert.ok(spatial.includes('INVOICE'), 'Expected spatial output to contain INVOICE');
 });

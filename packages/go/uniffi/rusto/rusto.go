@@ -371,6 +371,15 @@ func uniffiCheckChecksums() {
 	}
 	{
 		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_rusto_checksum_func_create_initialize_config_for_model()
+		})
+		if checksum != 37532 {
+			// If this happens try cleaning and rebuilding your project
+			panic("rusto: uniffi_rusto_checksum_func_create_initialize_config_for_model: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
 			return C.uniffi_rusto_checksum_func_create_initialize_config_ppv6()
 		})
 		if checksum != 12132 {
@@ -385,6 +394,24 @@ func uniffiCheckChecksums() {
 		if checksum != 50314 {
 			// If this happens try cleaning and rebuilding your project
 			panic("rusto: uniffi_rusto_checksum_func_default_ocr_run_options: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_rusto_checksum_func_download_all_models()
+		})
+		if checksum != 11564 {
+			// If this happens try cleaning and rebuilding your project
+			panic("rusto: uniffi_rusto_checksum_func_download_all_models: UniFFI API checksum mismatch")
+		}
+	}
+	{
+		checksum := rustCall(func(_uniffiStatus *C.RustCallStatus) C.uint16_t {
+			return C.uniffi_rusto_checksum_func_download_model()
+		})
+		if checksum != 15041 {
+			// If this happens try cleaning and rebuilding your project
+			panic("rusto: uniffi_rusto_checksum_func_download_model: UniFFI API checksum mismatch")
 		}
 	}
 	{
@@ -1293,10 +1320,22 @@ func (_ FfiDestroyerFrame) Destroy(value Frame) {
 	value.Destroy()
 }
 
-// Engine initialization configuration specifying model paths and template preset.
+// Engine initialization configuration specifying model paths, preset, and optional extensions.
 type InitializeConfig struct {
-	// Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+	// Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+	Model *string
+	// Base model directory containing det, rec, and dict files.
+	ModelPath *string
+	// Legacy template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
 	Template *string
+	// Language code or name (e.g. "ja", "ko", "ar", "cyrillic", "devanagari", "latin").
+	Lang *string
+	// Custom cache directory override path.
+	CacheDir *string
+	// Enable neural reading order recovery transformer.
+	EnableReadingOrder *bool
+	// Document layout variant: "cdla" (default 10-class) or "publaynet" (5-class).
+	LayoutVariant *string
 	// Detection model configuration.
 	Detection *DetectionConfig
 	// Recognition model and dictionary configuration.
@@ -1312,7 +1351,13 @@ type InitializeConfig struct {
 }
 
 func (r *InitializeConfig) Destroy() {
+	FfiDestroyerOptionalString{}.Destroy(r.Model)
+	FfiDestroyerOptionalString{}.Destroy(r.ModelPath)
 	FfiDestroyerOptionalString{}.Destroy(r.Template)
+	FfiDestroyerOptionalString{}.Destroy(r.Lang)
+	FfiDestroyerOptionalString{}.Destroy(r.CacheDir)
+	FfiDestroyerOptionalBool{}.Destroy(r.EnableReadingOrder)
+	FfiDestroyerOptionalString{}.Destroy(r.LayoutVariant)
 	FfiDestroyerOptionalDetectionConfig{}.Destroy(r.Detection)
 	FfiDestroyerOptionalRecognitionConfig{}.Destroy(r.Recognition)
 	FfiDestroyerOptionalClassificationConfig{}.Destroy(r.Classification)
@@ -1332,6 +1377,12 @@ func (c FfiConverterInitializeConfig) Lift(rb RustBufferI) InitializeConfig {
 func (c FfiConverterInitializeConfig) Read(reader io.Reader) InitializeConfig {
 	return InitializeConfig{
 		FfiConverterOptionalStringINSTANCE.Read(reader),
+		FfiConverterOptionalStringINSTANCE.Read(reader),
+		FfiConverterOptionalStringINSTANCE.Read(reader),
+		FfiConverterOptionalStringINSTANCE.Read(reader),
+		FfiConverterOptionalStringINSTANCE.Read(reader),
+		FfiConverterOptionalBoolINSTANCE.Read(reader),
+		FfiConverterOptionalStringINSTANCE.Read(reader),
 		FfiConverterOptionalDetectionConfigINSTANCE.Read(reader),
 		FfiConverterOptionalRecognitionConfigINSTANCE.Read(reader),
 		FfiConverterOptionalClassificationConfigINSTANCE.Read(reader),
@@ -1350,7 +1401,13 @@ func (c FfiConverterInitializeConfig) LowerExternal(value InitializeConfig) Exte
 }
 
 func (c FfiConverterInitializeConfig) Write(writer io.Writer, value InitializeConfig) {
+	FfiConverterOptionalStringINSTANCE.Write(writer, value.Model)
+	FfiConverterOptionalStringINSTANCE.Write(writer, value.ModelPath)
 	FfiConverterOptionalStringINSTANCE.Write(writer, value.Template)
+	FfiConverterOptionalStringINSTANCE.Write(writer, value.Lang)
+	FfiConverterOptionalStringINSTANCE.Write(writer, value.CacheDir)
+	FfiConverterOptionalBoolINSTANCE.Write(writer, value.EnableReadingOrder)
+	FfiConverterOptionalStringINSTANCE.Write(writer, value.LayoutVariant)
 	FfiConverterOptionalDetectionConfigINSTANCE.Write(writer, value.Detection)
 	FfiConverterOptionalRecognitionConfigINSTANCE.Write(writer, value.Recognition)
 	FfiConverterOptionalClassificationConfigINSTANCE.Write(writer, value.Classification)
@@ -1432,6 +1489,10 @@ type LayoutConfig struct {
 	ConfThresh *float32
 	// Target input side length for resizing.
 	TargetSize *int32
+	// Target input height for resizing.
+	TargetHeight *int32
+	// Target input width for resizing.
+	TargetWidth *int32
 }
 
 func (r *LayoutConfig) Destroy() {
@@ -1439,6 +1500,8 @@ func (r *LayoutConfig) Destroy() {
 	FfiDestroyerOptionalString{}.Destroy(r.ModelPath)
 	FfiDestroyerOptionalFloat32{}.Destroy(r.ConfThresh)
 	FfiDestroyerOptionalInt32{}.Destroy(r.TargetSize)
+	FfiDestroyerOptionalInt32{}.Destroy(r.TargetHeight)
+	FfiDestroyerOptionalInt32{}.Destroy(r.TargetWidth)
 }
 
 type FfiConverterLayoutConfig struct{}
@@ -1454,6 +1517,8 @@ func (c FfiConverterLayoutConfig) Read(reader io.Reader) LayoutConfig {
 		FfiConverterOptionalBoolINSTANCE.Read(reader),
 		FfiConverterOptionalStringINSTANCE.Read(reader),
 		FfiConverterOptionalFloat32INSTANCE.Read(reader),
+		FfiConverterOptionalInt32INSTANCE.Read(reader),
+		FfiConverterOptionalInt32INSTANCE.Read(reader),
 		FfiConverterOptionalInt32INSTANCE.Read(reader),
 	}
 }
@@ -1471,6 +1536,8 @@ func (c FfiConverterLayoutConfig) Write(writer io.Writer, value LayoutConfig) {
 	FfiConverterOptionalStringINSTANCE.Write(writer, value.ModelPath)
 	FfiConverterOptionalFloat32INSTANCE.Write(writer, value.ConfThresh)
 	FfiConverterOptionalInt32INSTANCE.Write(writer, value.TargetSize)
+	FfiConverterOptionalInt32INSTANCE.Write(writer, value.TargetHeight)
+	FfiConverterOptionalInt32INSTANCE.Write(writer, value.TargetWidth)
 }
 
 type FfiDestroyerLayoutConfig struct{}
@@ -1565,6 +1632,8 @@ type OcrRunOptions struct {
 	Calibration *CalibrationOptions
 	// Runtime crop and resolution optimization options.
 	Optimization *OptimizationOptions
+	// Request-local recognition batch size override.
+	RecBatchNum *int32
 }
 
 func (r *OcrRunOptions) Destroy() {
@@ -1584,6 +1653,7 @@ func (r *OcrRunOptions) Destroy() {
 	FfiDestroyerOptionalPostprocessRunOptions{}.Destroy(r.Postprocess)
 	FfiDestroyerOptionalCalibrationOptions{}.Destroy(r.Calibration)
 	FfiDestroyerOptionalOptimizationOptions{}.Destroy(r.Optimization)
+	FfiDestroyerOptionalInt32{}.Destroy(r.RecBatchNum)
 }
 
 type FfiConverterOcrRunOptions struct{}
@@ -1612,6 +1682,7 @@ func (c FfiConverterOcrRunOptions) Read(reader io.Reader) OcrRunOptions {
 		FfiConverterOptionalPostprocessRunOptionsINSTANCE.Read(reader),
 		FfiConverterOptionalCalibrationOptionsINSTANCE.Read(reader),
 		FfiConverterOptionalOptimizationOptionsINSTANCE.Read(reader),
+		FfiConverterOptionalInt32INSTANCE.Read(reader),
 	}
 }
 
@@ -1640,6 +1711,7 @@ func (c FfiConverterOcrRunOptions) Write(writer io.Writer, value OcrRunOptions) 
 	FfiConverterOptionalPostprocessRunOptionsINSTANCE.Write(writer, value.Postprocess)
 	FfiConverterOptionalCalibrationOptionsINSTANCE.Write(writer, value.Calibration)
 	FfiConverterOptionalOptimizationOptionsINSTANCE.Write(writer, value.Optimization)
+	FfiConverterOptionalInt32INSTANCE.Write(writer, value.RecBatchNum)
 }
 
 type FfiDestroyerOcrRunOptions struct{}
@@ -1650,6 +1722,10 @@ func (_ FfiDestroyerOcrRunOptions) Destroy(value OcrRunOptions) {
 
 // Runtime crop and resolution optimization options.
 type OptimizationOptions struct {
+	// Enable or disable image optimization.
+	Enabled *bool
+	// Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
+	TargetMaxSide *uint32
 	// Horizontal padding around bounding box crops in pixels.
 	CropPaddingX *float32
 	// Vertical padding around bounding box crops in pixels.
@@ -1657,6 +1733,8 @@ type OptimizationOptions struct {
 }
 
 func (r *OptimizationOptions) Destroy() {
+	FfiDestroyerOptionalBool{}.Destroy(r.Enabled)
+	FfiDestroyerOptionalUint32{}.Destroy(r.TargetMaxSide)
 	FfiDestroyerOptionalFloat32{}.Destroy(r.CropPaddingX)
 	FfiDestroyerOptionalFloat32{}.Destroy(r.CropPaddingY)
 }
@@ -1671,6 +1749,8 @@ func (c FfiConverterOptimizationOptions) Lift(rb RustBufferI) OptimizationOption
 
 func (c FfiConverterOptimizationOptions) Read(reader io.Reader) OptimizationOptions {
 	return OptimizationOptions{
+		FfiConverterOptionalBoolINSTANCE.Read(reader),
+		FfiConverterOptionalUint32INSTANCE.Read(reader),
 		FfiConverterOptionalFloat32INSTANCE.Read(reader),
 		FfiConverterOptionalFloat32INSTANCE.Read(reader),
 	}
@@ -1685,6 +1765,8 @@ func (c FfiConverterOptimizationOptions) LowerExternal(value OptimizationOptions
 }
 
 func (c FfiConverterOptimizationOptions) Write(writer io.Writer, value OptimizationOptions) {
+	FfiConverterOptionalBoolINSTANCE.Write(writer, value.Enabled)
+	FfiConverterOptionalUint32INSTANCE.Write(writer, value.TargetMaxSide)
 	FfiConverterOptionalFloat32INSTANCE.Write(writer, value.CropPaddingX)
 	FfiConverterOptionalFloat32INSTANCE.Write(writer, value.CropPaddingY)
 }
@@ -1869,12 +1951,15 @@ type RecognitionConfig struct {
 	ModelPath *string
 	// Filesystem path to dictionary vocabulary file (.txt).
 	DictPath *string
+	// Recognition batch size. Default: 6.
+	RecBatchNum *int32
 }
 
 func (r *RecognitionConfig) Destroy() {
 	FfiDestroyerOptionalBool{}.Destroy(r.Enabled)
 	FfiDestroyerOptionalString{}.Destroy(r.ModelPath)
 	FfiDestroyerOptionalString{}.Destroy(r.DictPath)
+	FfiDestroyerOptionalInt32{}.Destroy(r.RecBatchNum)
 }
 
 type FfiConverterRecognitionConfig struct{}
@@ -1890,6 +1975,7 @@ func (c FfiConverterRecognitionConfig) Read(reader io.Reader) RecognitionConfig 
 		FfiConverterOptionalBoolINSTANCE.Read(reader),
 		FfiConverterOptionalStringINSTANCE.Read(reader),
 		FfiConverterOptionalStringINSTANCE.Read(reader),
+		FfiConverterOptionalInt32INSTANCE.Read(reader),
 	}
 }
 
@@ -1905,6 +1991,7 @@ func (c FfiConverterRecognitionConfig) Write(writer io.Writer, value Recognition
 	FfiConverterOptionalBoolINSTANCE.Write(writer, value.Enabled)
 	FfiConverterOptionalStringINSTANCE.Write(writer, value.ModelPath)
 	FfiConverterOptionalStringINSTANCE.Write(writer, value.DictPath)
+	FfiConverterOptionalInt32INSTANCE.Write(writer, value.RecBatchNum)
 }
 
 type FfiDestroyerRecognitionConfig struct{}
@@ -2558,6 +2645,47 @@ func (_ FfiDestroyerRustoBindingError) Destroy(value *RustoBindingError) {
 	default:
 		_ = variantValue
 		panic(fmt.Sprintf("invalid error value `%v` in FfiDestroyerRustoBindingError.Destroy", value))
+	}
+}
+
+type FfiConverterOptionalUint32 struct{}
+
+var FfiConverterOptionalUint32INSTANCE = FfiConverterOptionalUint32{}
+
+func (c FfiConverterOptionalUint32) Lift(rb RustBufferI) *uint32 {
+	return LiftFromRustBuffer[*uint32](c, rb)
+}
+
+func (_ FfiConverterOptionalUint32) Read(reader io.Reader) *uint32 {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterUint32INSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalUint32) Lower(value *uint32) C.RustBuffer {
+	return LowerIntoRustBuffer[*uint32](c, value)
+}
+
+func (c FfiConverterOptionalUint32) LowerExternal(value *uint32) ExternalCRustBuffer {
+	return RustBufferFromC(LowerIntoRustBuffer[*uint32](c, value))
+}
+
+func (_ FfiConverterOptionalUint32) Write(writer io.Writer, value *uint32) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterUint32INSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalUint32 struct{}
+
+func (_ FfiDestroyerOptionalUint32) Destroy(value *uint32) {
+	if value != nil {
+		FfiDestroyerUint32{}.Destroy(*value)
 	}
 }
 
@@ -3223,6 +3351,53 @@ func (FfiDestroyerSequenceFloat32) Destroy(sequence []float32) {
 	}
 }
 
+type FfiConverterSequenceString struct{}
+
+var FfiConverterSequenceStringINSTANCE = FfiConverterSequenceString{}
+
+func (c FfiConverterSequenceString) Lift(rb RustBufferI) []string {
+	return LiftFromRustBuffer[[]string](c, rb)
+}
+
+func (c FfiConverterSequenceString) Read(reader io.Reader) []string {
+	length := readInt32(reader)
+	if length == 0 {
+		return nil
+	}
+	result := make([]string, 0, length)
+	for i := int32(0); i < length; i++ {
+		result = append(result, FfiConverterStringINSTANCE.Read(reader))
+	}
+	return result
+}
+
+func (c FfiConverterSequenceString) Lower(value []string) C.RustBuffer {
+	return LowerIntoRustBuffer[[]string](c, value)
+}
+
+func (c FfiConverterSequenceString) LowerExternal(value []string) ExternalCRustBuffer {
+	return RustBufferFromC(LowerIntoRustBuffer[[]string](c, value))
+}
+
+func (c FfiConverterSequenceString) Write(writer io.Writer, value []string) {
+	if len(value) > math.MaxInt32 {
+		panic("[]string is too large to fit into Int32")
+	}
+
+	writeInt32(writer, int32(len(value)))
+	for _, item := range value {
+		FfiConverterStringINSTANCE.Write(writer, item)
+	}
+}
+
+type FfiDestroyerSequenceString struct{}
+
+func (FfiDestroyerSequenceString) Destroy(sequence []string) {
+	for _, value := range sequence {
+		FfiDestroyerString{}.Destroy(value)
+	}
+}
+
 type FfiConverterSequenceLayoutRegion struct{}
 
 var FfiConverterSequenceLayoutRegionINSTANCE = FfiConverterSequenceLayoutRegion{}
@@ -3364,6 +3539,14 @@ func (FfiDestroyerSequenceTextResult) Destroy(sequence []TextResult) {
 	}
 }
 
+func CreateInitializeConfigForModel(model *string, lang *string, modelPath *string) InitializeConfig {
+	return FfiConverterInitializeConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_rusto_fn_func_create_initialize_config_for_model(FfiConverterOptionalStringINSTANCE.Lower(model), FfiConverterOptionalStringINSTANCE.Lower(lang), FfiConverterOptionalStringINSTANCE.Lower(modelPath), _uniffiStatus),
+		}
+	}))
+}
+
 func CreateInitializeConfigPpv6(detModelPath string, recModelPath string, dictPath string) InitializeConfig {
 	return FfiConverterInitializeConfigINSTANCE.Lift(rustCall(func(_uniffiStatus *C.RustCallStatus) RustBufferI {
 		return GoRustBuffer{
@@ -3378,6 +3561,36 @@ func DefaultOcrRunOptions() OcrRunOptions {
 			inner: C.uniffi_rusto_fn_func_default_ocr_run_options(_uniffiStatus),
 		}
 	}))
+}
+
+// Downloads all available canonical models to the cache directory ahead of time.
+func DownloadAllModels(cacheDir *string) ([]string, error) {
+	_uniffiRV, _uniffiErr := rustCallWithError[*RustoBindingError](FfiConverterRustoBindingError{}, func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_rusto_fn_func_download_all_models(FfiConverterOptionalStringINSTANCE.Lower(cacheDir), _uniffiStatus),
+		}
+	})
+	if _uniffiErr != nil {
+		var _uniffiDefaultValue []string
+		return _uniffiDefaultValue, _uniffiErr
+	} else {
+		return FfiConverterSequenceStringINSTANCE.Lift(_uniffiRV), nil
+	}
+}
+
+// Downloads model assets for a specific OCR pipeline ahead of time.
+func DownloadModel(model *string, lang *string, cacheDir *string) ([]string, error) {
+	_uniffiRV, _uniffiErr := rustCallWithError[*RustoBindingError](FfiConverterRustoBindingError{}, func(_uniffiStatus *C.RustCallStatus) RustBufferI {
+		return GoRustBuffer{
+			inner: C.uniffi_rusto_fn_func_download_model(FfiConverterOptionalStringINSTANCE.Lower(model), FfiConverterOptionalStringINSTANCE.Lower(lang), FfiConverterOptionalStringINSTANCE.Lower(cacheDir), _uniffiStatus),
+		}
+	})
+	if _uniffiErr != nil {
+		var _uniffiDefaultValue []string
+		return _uniffiDefaultValue, _uniffiErr
+	} else {
+		return FfiConverterSequenceStringINSTANCE.Lift(_uniffiRV), nil
+	}
 }
 
 // Returns the engine library version string.

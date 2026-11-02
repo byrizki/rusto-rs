@@ -77,6 +77,20 @@ describe('React Native API', () => {
     );
   });
 
+  it('forwards model, modelPath, lang, and layoutVariant in initialize', async () => {
+    (NativeModules.Rusto.initialize as jest.Mock).mockResolvedValue(null);
+    const config = {
+      model: 'indraocr',
+      modelPath: 'models/PPOCR_v6_tiny',
+      lang: 'ja',
+      cacheDir: '/tmp/cache',
+      enableReadingOrder: true,
+      layoutVariant: 'publaynet' as const,
+    };
+    await initialize(config);
+    expect(NativeModules.Rusto.initialize).toHaveBeenCalledWith(config);
+  });
+
   it('forwards detectLayout request', async () => {
     const mockRegions = [
       {
@@ -89,6 +103,17 @@ describe('React Native API', () => {
     const result = await detectLayout({ uri: '/tmp/doc.png' });
     expect(result).toEqual(mockRegions);
     expect(NativeModules.Rusto.detectLayout).toHaveBeenCalledWith({ uri: '/tmp/doc.png' });
+  });
+
+  it('forwards configurable options (recBatchNum, calibration, optimization)', async () => {
+    (NativeModules.Rusto.detectText as jest.Mock).mockResolvedValue([]);
+    const options = {
+      recBatchNum: 8,
+      calibration: { descreenStrength: 0.5 },
+      optimization: { enabled: true, targetMaxSide: 960, cropPaddingX: 0.05, cropPaddingY: 0.08 },
+    };
+    await detectText({ uri: '/tmp/test.png' }, options);
+    expect(NativeModules.Rusto.detectText).toHaveBeenCalledWith({ uri: '/tmp/test.png' }, options);
   });
 
   it.each([

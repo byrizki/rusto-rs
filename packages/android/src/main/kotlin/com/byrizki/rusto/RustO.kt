@@ -61,7 +61,8 @@ data class RecognitionConfig(
     val dictPath: String? = null,
     val scoreThresh: Float? = null,
     val returnWordBox: Boolean? = null,
-    val returnSingleCharBox: Boolean? = null
+    val returnSingleCharBox: Boolean? = null,
+    val recBatchNum: Int? = null
 )
 
 /**
@@ -107,6 +108,12 @@ data class LayoutConfig(
  * Configuration options for initializing the RustO engine on Android.
  */
 data class InitializeConfig(
+    val model: String? = null,
+    val modelPath: String? = null,
+    val lang: String? = null,
+    val cacheDir: String? = null,
+    val enableReadingOrder: Boolean? = null,
+    val layoutVariant: String? = null,
     val template: String? = null,
     val detection: DetectionConfig? = null,
     val recognition: RecognitionConfig? = null,
@@ -117,30 +124,43 @@ data class InitializeConfig(
 ) {
     fun toJson(context: Context): String {
         val json = JSONObject()
+        model?.let { json.put("model", it) }
+        modelPath?.let { json.put("modelPath", it) }
+        lang?.let { json.put("lang", it) }
+        cacheDir?.let { json.put("cacheDir", it) }
+        enableReadingOrder?.let { json.put("enableReadingOrder", it) }
+        layoutVariant?.let { json.put("layoutVariant", it) }
         template?.let { json.put("template", it) }
 
-        val detObj = JSONObject()
-        val detPath = detection?.modelPath ?: "det.rten"
-        detObj.put("modelPath", resolveModel(context, detPath))
-        detection?.enabled?.let { detObj.put("enabled", it) }
-        detection?.thresh?.let { detObj.put("thresh", it.toDouble()) }
-        detection?.boxThresh?.let { detObj.put("boxThresh", it.toDouble()) }
-        detection?.unclipRatio?.let { detObj.put("unclipRatio", it.toDouble()) }
-        detection?.limitSideLen?.let { detObj.put("limitSideLen", it) }
-        detection?.limitType?.let { detObj.put("limitType", it) }
-        detection?.useDilation?.let { detObj.put("useDilation", it) }
-        json.put("detection", detObj)
+        val hasModelDir = model != null || modelPath != null
 
-        val recObj = JSONObject()
-        val recPath = recognition?.modelPath ?: "rec.rten"
-        val dictPath = recognition?.dictPath ?: "dict.txt"
-        recObj.put("modelPath", resolveModel(context, recPath))
-        recObj.put("dictPath", resolveModel(context, dictPath))
-        recognition?.enabled?.let { recObj.put("enabled", it) }
-        recognition?.scoreThresh?.let { recObj.put("scoreThresh", it.toDouble()) }
-        recognition?.returnWordBox?.let { recObj.put("returnWordBox", it) }
-        recognition?.returnSingleCharBox?.let { recObj.put("returnSingleCharBox", it) }
-        json.put("recognition", recObj)
+        if (detection != null || !hasModelDir) {
+            val detObj = JSONObject()
+            val detPath = detection?.modelPath ?: "det.rten"
+            detObj.put("modelPath", resolveModel(context, detPath))
+            detection?.enabled?.let { detObj.put("enabled", it) }
+            detection?.thresh?.let { detObj.put("thresh", it.toDouble()) }
+            detection?.boxThresh?.let { detObj.put("boxThresh", it.toDouble()) }
+            detection?.unclipRatio?.let { detObj.put("unclipRatio", it.toDouble()) }
+            detection?.limitSideLen?.let { detObj.put("limitSideLen", it) }
+            detection?.limitType?.let { detObj.put("limitType", it) }
+            detection?.useDilation?.let { detObj.put("useDilation", it) }
+            json.put("detection", detObj)
+        }
+
+        if (recognition != null || !hasModelDir) {
+            val recObj = JSONObject()
+            val recPath = recognition?.modelPath ?: "rec.rten"
+            val dictPath = recognition?.dictPath ?: "dict.txt"
+            recObj.put("modelPath", resolveModel(context, recPath))
+            recObj.put("dictPath", resolveModel(context, dictPath))
+            recognition?.enabled?.let { recObj.put("enabled", it) }
+            recognition?.scoreThresh?.let { recObj.put("scoreThresh", it.toDouble()) }
+            recognition?.returnWordBox?.let { recObj.put("returnWordBox", it) }
+            recognition?.returnSingleCharBox?.let { recObj.put("returnSingleCharBox", it) }
+            recognition?.recBatchNum?.let { recObj.put("recBatchNum", it) }
+            json.put("recognition", recObj)
+        }
 
         classification?.let { cls ->
             val clsObj = JSONObject()
@@ -222,6 +242,23 @@ data class DetectionRunOptions(
 )
 
 /**
+ * Pre-OCR image calibration options for descreening patterned backgrounds.
+ */
+data class CalibrationOptions(
+    val descreenStrength: Float? = null,
+)
+
+/**
+ * Runtime crop and resolution optimization options.
+ */
+data class OptimizationOptions(
+    val enabled: Boolean? = null,
+    val targetMaxSide: Int? = null,
+    val cropPaddingX: Float? = null,
+    val cropPaddingY: Float? = null,
+)
+
+/**
  * Request-local OCR runtime execution options.
  */
 data class OcrRunOptions(
@@ -239,6 +276,9 @@ data class OcrRunOptions(
     val postprocess: PostprocessRunOptions? = null,
     val unwarp: Boolean? = null,
     val layout: Boolean? = null,
+    val recBatchNum: Int? = null,
+    val calibration: CalibrationOptions? = null,
+    val optimization: OptimizationOptions? = null,
 ) {
     internal fun toJson(): String {
         require(lineYThreshold == null || lineYThreshold.isFinite() && lineYThreshold >= 0f) {
@@ -281,6 +321,20 @@ data class OcrRunOptions(
                     postprocess.useDilation?.let { put("useDilation", it) }
                 })
             }
+            recBatchNum?.let { put("recBatchNum", it) }
+            calibration?.let { calib ->
+                put("calibration", JSONObject().apply {
+                    calib.descreenStrength?.let { put("descreenStrength", it.toDouble()) }
+                })
+            }
+            optimization?.let { opt ->
+                put("optimization", JSONObject().apply {
+                    opt.enabled?.let { put("enabled", it) }
+                    opt.targetMaxSide?.let { put("targetMaxSide", it) }
+                    opt.cropPaddingX?.let { put("cropPaddingX", it.toDouble()) }
+                    opt.cropPaddingY?.let { put("cropPaddingY", it.toDouble()) }
+                })
+            }
         }.toString()
     }
 
@@ -289,6 +343,12 @@ data class OcrRunOptions(
         positive("minHeight", minHeight); positive("maxSideLen", maxSideLen); positive("minSideLen", minSideLen)
         require(widthHeightRatio == null || widthHeightRatio.isFinite() && (widthHeightRatio > 0f || widthHeightRatio == -1f)) { "widthHeightRatio must be positive or -1." }
         require(minSideLen == null || maxSideLen == null || minSideLen <= maxSideLen) { "minSideLen must not exceed maxSideLen." }
+        require(recBatchNum == null || recBatchNum >= 1) { "recBatchNum must be at least one." }
+        optimization?.let { opt ->
+            require(opt.targetMaxSide == null || opt.targetMaxSide >= 1) { "targetMaxSide must be at least one." }
+            require(opt.cropPaddingX == null || opt.cropPaddingX.isFinite() && opt.cropPaddingX in 0f..1f) { "cropPaddingX must be between zero and one." }
+            require(opt.cropPaddingY == null || opt.cropPaddingY.isFinite() && opt.cropPaddingY in 0f..1f) { "cropPaddingY must be between zero and one." }
+        }
         detection?.let { detection ->
             require(detection.limitSideLen == null || detection.limitSideLen in 1..32767) { "limitSideLen must be between 1 and 32767." }
             require(detection.limitType == null || detection.limitType == "min" || detection.limitType == "max") { "limitType must be min or max." }
@@ -334,6 +394,18 @@ class RustO private constructor(
 ) : AutoCloseable {
 
     companion object {
+        /**
+         * Downloads model assets for a specific OCR pipeline ahead of time.
+         */
+        fun downloadModel(model: String? = null, lang: String? = null, cacheDir: String? = null): List<String> =
+            uniffi.rusto.downloadModel(model, lang, cacheDir)
+
+        /**
+         * Downloads all available canonical models to the cache directory ahead of time.
+         */
+        fun downloadAllModels(cacheDir: String? = null): List<String> =
+            uniffi.rusto.downloadAllModels(cacheDir)
+
         /**
          * Initializes the RustO OCR engine with Android context and optional model configuration.
          *

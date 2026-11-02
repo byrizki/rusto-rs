@@ -821,6 +821,12 @@ static class _UniFFILib {
     
     
     
+    
+    
+    
+    
+    
+    
 
     static _UniFFILib() {
         _UniFFILib.uniffiCheckContractApiVersion();
@@ -957,6 +963,17 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
+     RustBuffer uniffi_rusto_fn_func_create_initialize_config_for_model(RustBuffer @model,RustBuffer @lang,RustBuffer @modelPath,ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
      RustBuffer uniffi_rusto_fn_func_create_initialize_config_ppv6(RustBuffer @detModelPath,RustBuffer @recModelPath,RustBuffer @dictPath,ref UniffiRustCallStatus _uniffi_out_err
     );
 
@@ -969,6 +986,28 @@ static class _UniFFILib {
     public static extern
 #endif
      RustBuffer uniffi_rusto_fn_func_default_ocr_run_options(ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
+     RustBuffer uniffi_rusto_fn_func_download_all_models(RustBuffer @cacheDir,ref UniffiRustCallStatus _uniffi_out_err
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
+     RustBuffer uniffi_rusto_fn_func_download_model(RustBuffer @model,RustBuffer @lang,RustBuffer @cacheDir,ref UniffiRustCallStatus _uniffi_out_err
     );
 
     #if NET8_0_OR_GREATER
@@ -1562,6 +1601,17 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
+     ushort uniffi_rusto_checksum_func_create_initialize_config_for_model(
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
      ushort uniffi_rusto_checksum_func_create_initialize_config_ppv6(
     );
 
@@ -1574,6 +1624,28 @@ static class _UniFFILib {
     public static extern
 #endif
      ushort uniffi_rusto_checksum_func_default_ocr_run_options(
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
+     ushort uniffi_rusto_checksum_func_download_all_models(
+    );
+
+    #if NET8_0_OR_GREATER
+    [LibraryImport("rusto")]
+    [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
+    public static partial
+#else
+    [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
+    public static extern
+#endif
+     ushort uniffi_rusto_checksum_func_download_model(
     );
 
     #if NET8_0_OR_GREATER
@@ -1707,6 +1779,12 @@ static class _UniFFILib {
     }
     static void uniffiCheckApiChecksums() {
         {
+            var checksum = _UniFFILib.uniffi_rusto_checksum_func_create_initialize_config_for_model();
+            if (checksum != 37532) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_create_initialize_config_for_model` checksum `37532`, library returned `{checksum}`");
+            }
+        }
+        {
             var checksum = _UniFFILib.uniffi_rusto_checksum_func_create_initialize_config_ppv6();
             if (checksum != 12132) {
                 throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_create_initialize_config_ppv6` checksum `12132`, library returned `{checksum}`");
@@ -1716,6 +1794,18 @@ static class _UniFFILib {
             var checksum = _UniFFILib.uniffi_rusto_checksum_func_default_ocr_run_options();
             if (checksum != 50314) {
                 throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_default_ocr_run_options` checksum `50314`, library returned `{checksum}`");
+            }
+        }
+        {
+            var checksum = _UniFFILib.uniffi_rusto_checksum_func_download_all_models();
+            if (checksum != 11564) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_download_all_models` checksum `11564`, library returned `{checksum}`");
+            }
+        }
+        {
+            var checksum = _UniFFILib.uniffi_rusto_checksum_func_download_model();
+            if (checksum != 15041) {
+                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_download_model` checksum `15041`, library returned `{checksum}`");
             }
         }
         {
@@ -2607,10 +2697,28 @@ class FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
 
 
 /// <summary>
-/// Engine initialization configuration specifying model paths and template preset.
+/// Engine initialization configuration specifying model paths, preset, and optional extensions.
 /// </summary>
+/// <param name="Model">
+/// Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+/// </param>
+/// <param name="ModelPath">
+/// Base model directory containing det, rec, and dict files.
+/// </param>
 /// <param name="Template">
-/// Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+/// Legacy template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+/// </param>
+/// <param name="Lang">
+/// Language code or name (e.g. "ja", "ko", "ar", "cyrillic", "devanagari", "latin").
+/// </param>
+/// <param name="CacheDir">
+/// Custom cache directory override path.
+/// </param>
+/// <param name="EnableReadingOrder">
+/// Enable neural reading order recovery transformer.
+/// </param>
+/// <param name="LayoutVariant">
+/// Document layout variant: "cdla" (default 10-class) or "publaynet" (5-class).
 /// </param>
 /// <param name="Detection">
 /// Detection model configuration.
@@ -2632,9 +2740,33 @@ class FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
 /// </param>
 public record InitializeConfig (
     /// <summary>
-    /// Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+    /// Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+    /// </summary>
+    string? Model, 
+    /// <summary>
+    /// Base model directory containing det, rec, and dict files.
+    /// </summary>
+    string? ModelPath, 
+    /// <summary>
+    /// Legacy template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
     /// </summary>
     string? Template, 
+    /// <summary>
+    /// Language code or name (e.g. "ja", "ko", "ar", "cyrillic", "devanagari", "latin").
+    /// </summary>
+    string? Lang, 
+    /// <summary>
+    /// Custom cache directory override path.
+    /// </summary>
+    string? CacheDir, 
+    /// <summary>
+    /// Enable neural reading order recovery transformer.
+    /// </summary>
+    bool? EnableReadingOrder, 
+    /// <summary>
+    /// Document layout variant: "cdla" (default 10-class) or "publaynet" (5-class).
+    /// </summary>
+    string? LayoutVariant, 
     /// <summary>
     /// Detection model configuration.
     /// </summary>
@@ -2667,7 +2799,13 @@ class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig>
 
     public override InitializeConfig Read(BigEndianStream stream) {
         return new InitializeConfig(
+            Model: FfiConverterOptionalString.INSTANCE.Read(stream),
+            ModelPath: FfiConverterOptionalString.INSTANCE.Read(stream),
             Template: FfiConverterOptionalString.INSTANCE.Read(stream),
+            Lang: FfiConverterOptionalString.INSTANCE.Read(stream),
+            CacheDir: FfiConverterOptionalString.INSTANCE.Read(stream),
+            EnableReadingOrder: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
+            LayoutVariant: FfiConverterOptionalString.INSTANCE.Read(stream),
             Detection: FfiConverterOptionalTypeDetectionConfig.INSTANCE.Read(stream),
             Recognition: FfiConverterOptionalTypeRecognitionConfig.INSTANCE.Read(stream),
             Classification: FfiConverterOptionalTypeClassificationConfig.INSTANCE.Read(stream),
@@ -2679,7 +2817,13 @@ class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig>
 
     public override int AllocationSize(InitializeConfig value) {
         return 0
+            + FfiConverterOptionalString.INSTANCE.AllocationSize(value.Model)
+            + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ModelPath)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.Template)
+            + FfiConverterOptionalString.INSTANCE.AllocationSize(value.Lang)
+            + FfiConverterOptionalString.INSTANCE.AllocationSize(value.CacheDir)
+            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.EnableReadingOrder)
+            + FfiConverterOptionalString.INSTANCE.AllocationSize(value.LayoutVariant)
             + FfiConverterOptionalTypeDetectionConfig.INSTANCE.AllocationSize(value.Detection)
             + FfiConverterOptionalTypeRecognitionConfig.INSTANCE.AllocationSize(value.Recognition)
             + FfiConverterOptionalTypeClassificationConfig.INSTANCE.AllocationSize(value.Classification)
@@ -2689,7 +2833,13 @@ class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig>
     }
 
     public override void Write(InitializeConfig value, BigEndianStream stream) {
+            FfiConverterOptionalString.INSTANCE.Write(value.Model, stream);
+            FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
             FfiConverterOptionalString.INSTANCE.Write(value.Template, stream);
+            FfiConverterOptionalString.INSTANCE.Write(value.Lang, stream);
+            FfiConverterOptionalString.INSTANCE.Write(value.CacheDir, stream);
+            FfiConverterOptionalBoolean.INSTANCE.Write(value.EnableReadingOrder, stream);
+            FfiConverterOptionalString.INSTANCE.Write(value.LayoutVariant, stream);
             FfiConverterOptionalTypeDetectionConfig.INSTANCE.Write(value.Detection, stream);
             FfiConverterOptionalTypeRecognitionConfig.INSTANCE.Write(value.Recognition, stream);
             FfiConverterOptionalTypeClassificationConfig.INSTANCE.Write(value.Classification, stream);
@@ -2781,6 +2931,12 @@ class FfiConverterTypeLayoutBBox: FfiConverterRustBuffer<LayoutBBox> {
 /// <param name="TargetSize">
 /// Target input side length for resizing.
 /// </param>
+/// <param name="TargetHeight">
+/// Target input height for resizing.
+/// </param>
+/// <param name="TargetWidth">
+/// Target input width for resizing.
+/// </param>
 public record LayoutConfig (
     /// <summary>
     /// Whether layout stage is enabled.
@@ -2797,7 +2953,15 @@ public record LayoutConfig (
     /// <summary>
     /// Target input side length for resizing.
     /// </summary>
-    int? TargetSize
+    int? TargetSize, 
+    /// <summary>
+    /// Target input height for resizing.
+    /// </summary>
+    int? TargetHeight, 
+    /// <summary>
+    /// Target input width for resizing.
+    /// </summary>
+    int? TargetWidth
 ) {
 }
 
@@ -2809,7 +2973,9 @@ class FfiConverterTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig> {
             Enabled: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             ModelPath: FfiConverterOptionalString.INSTANCE.Read(stream),
             ConfThresh: FfiConverterOptionalFloat.INSTANCE.Read(stream),
-            TargetSize: FfiConverterOptionalInt32.INSTANCE.Read(stream)
+            TargetSize: FfiConverterOptionalInt32.INSTANCE.Read(stream),
+            TargetHeight: FfiConverterOptionalInt32.INSTANCE.Read(stream),
+            TargetWidth: FfiConverterOptionalInt32.INSTANCE.Read(stream)
         );
     }
 
@@ -2818,7 +2984,9 @@ class FfiConverterTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig> {
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Enabled)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ModelPath)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.ConfThresh)
-            + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.TargetSize);
+            + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.TargetSize)
+            + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.TargetHeight)
+            + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.TargetWidth);
     }
 
     public override void Write(LayoutConfig value, BigEndianStream stream) {
@@ -2826,6 +2994,8 @@ class FfiConverterTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig> {
             FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
             FfiConverterOptionalFloat.INSTANCE.Write(value.ConfThresh, stream);
             FfiConverterOptionalInt32.INSTANCE.Write(value.TargetSize, stream);
+            FfiConverterOptionalInt32.INSTANCE.Write(value.TargetHeight, stream);
+            FfiConverterOptionalInt32.INSTANCE.Write(value.TargetWidth, stream);
     }
 }
 
@@ -2937,6 +3107,9 @@ class FfiConverterTypeLayoutRegion: FfiConverterRustBuffer<LayoutRegion> {
 /// <param name="Optimization">
 /// Runtime crop and resolution optimization options.
 /// </param>
+/// <param name="RecBatchNum">
+/// Request-local recognition batch size override.
+/// </param>
 public record OcrRunOptions (
     /// <summary>
     /// Output format granularity: Lines (default), Words, or Spatial.
@@ -3001,7 +3174,11 @@ public record OcrRunOptions (
     /// <summary>
     /// Runtime crop and resolution optimization options.
     /// </summary>
-    OptimizationOptions? Optimization
+    OptimizationOptions? Optimization, 
+    /// <summary>
+    /// Request-local recognition batch size override.
+    /// </summary>
+    int? RecBatchNum
 ) {
 }
 
@@ -3025,7 +3202,8 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
             Detection: FfiConverterOptionalTypeDetectionRunOptions.INSTANCE.Read(stream),
             Postprocess: FfiConverterOptionalTypePostprocessRunOptions.INSTANCE.Read(stream),
             Calibration: FfiConverterOptionalTypeCalibrationOptions.INSTANCE.Read(stream),
-            Optimization: FfiConverterOptionalTypeOptimizationOptions.INSTANCE.Read(stream)
+            Optimization: FfiConverterOptionalTypeOptimizationOptions.INSTANCE.Read(stream),
+            RecBatchNum: FfiConverterOptionalInt32.INSTANCE.Read(stream)
         );
     }
 
@@ -3046,7 +3224,8 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
             + FfiConverterOptionalTypeDetectionRunOptions.INSTANCE.AllocationSize(value.Detection)
             + FfiConverterOptionalTypePostprocessRunOptions.INSTANCE.AllocationSize(value.Postprocess)
             + FfiConverterOptionalTypeCalibrationOptions.INSTANCE.AllocationSize(value.Calibration)
-            + FfiConverterOptionalTypeOptimizationOptions.INSTANCE.AllocationSize(value.Optimization);
+            + FfiConverterOptionalTypeOptimizationOptions.INSTANCE.AllocationSize(value.Optimization)
+            + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.RecBatchNum);
     }
 
     public override void Write(OcrRunOptions value, BigEndianStream stream) {
@@ -3066,6 +3245,7 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
             FfiConverterOptionalTypePostprocessRunOptions.INSTANCE.Write(value.Postprocess, stream);
             FfiConverterOptionalTypeCalibrationOptions.INSTANCE.Write(value.Calibration, stream);
             FfiConverterOptionalTypeOptimizationOptions.INSTANCE.Write(value.Optimization, stream);
+            FfiConverterOptionalInt32.INSTANCE.Write(value.RecBatchNum, stream);
     }
 }
 
@@ -3074,6 +3254,12 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
 /// <summary>
 /// Runtime crop and resolution optimization options.
 /// </summary>
+/// <param name="Enabled">
+/// Enable or disable image optimization.
+/// </param>
+/// <param name="TargetMaxSide">
+/// Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
+/// </param>
 /// <param name="CropPaddingX">
 /// Horizontal padding around bounding box crops in pixels.
 /// </param>
@@ -3081,6 +3267,14 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
 /// Vertical padding around bounding box crops in pixels.
 /// </param>
 public record OptimizationOptions (
+    /// <summary>
+    /// Enable or disable image optimization.
+    /// </summary>
+    bool? Enabled, 
+    /// <summary>
+    /// Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
+    /// </summary>
+    uint? TargetMaxSide, 
     /// <summary>
     /// Horizontal padding around bounding box crops in pixels.
     /// </summary>
@@ -3097,6 +3291,8 @@ class FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOp
 
     public override OptimizationOptions Read(BigEndianStream stream) {
         return new OptimizationOptions(
+            Enabled: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
+            TargetMaxSide: FfiConverterOptionalUInt32.INSTANCE.Read(stream),
             CropPaddingX: FfiConverterOptionalFloat.INSTANCE.Read(stream),
             CropPaddingY: FfiConverterOptionalFloat.INSTANCE.Read(stream)
         );
@@ -3104,11 +3300,15 @@ class FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOp
 
     public override int AllocationSize(OptimizationOptions value) {
         return 0
+            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Enabled)
+            + FfiConverterOptionalUInt32.INSTANCE.AllocationSize(value.TargetMaxSide)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.CropPaddingX)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.CropPaddingY);
     }
 
     public override void Write(OptimizationOptions value, BigEndianStream stream) {
+            FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
+            FfiConverterOptionalUInt32.INSTANCE.Write(value.TargetMaxSide, stream);
             FfiConverterOptionalFloat.INSTANCE.Write(value.CropPaddingX, stream);
             FfiConverterOptionalFloat.INSTANCE.Write(value.CropPaddingY, stream);
     }
@@ -3313,6 +3513,9 @@ class FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<PostprocessR
 /// <param name="DictPath">
 /// Filesystem path to dictionary vocabulary file (.txt).
 /// </param>
+/// <param name="RecBatchNum">
+/// Recognition batch size. Default: 6.
+/// </param>
 public record RecognitionConfig (
     /// <summary>
     /// Whether recognition stage is enabled.
@@ -3325,7 +3528,11 @@ public record RecognitionConfig (
     /// <summary>
     /// Filesystem path to dictionary vocabulary file (.txt).
     /// </summary>
-    string? DictPath
+    string? DictPath, 
+    /// <summary>
+    /// Recognition batch size. Default: 6.
+    /// </summary>
+    int? RecBatchNum
 ) {
 }
 
@@ -3336,7 +3543,8 @@ class FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<RecognitionConfi
         return new RecognitionConfig(
             Enabled: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             ModelPath: FfiConverterOptionalString.INSTANCE.Read(stream),
-            DictPath: FfiConverterOptionalString.INSTANCE.Read(stream)
+            DictPath: FfiConverterOptionalString.INSTANCE.Read(stream),
+            RecBatchNum: FfiConverterOptionalInt32.INSTANCE.Read(stream)
         );
     }
 
@@ -3344,13 +3552,15 @@ class FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<RecognitionConfi
         return 0
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Enabled)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ModelPath)
-            + FfiConverterOptionalString.INSTANCE.AllocationSize(value.DictPath);
+            + FfiConverterOptionalString.INSTANCE.AllocationSize(value.DictPath)
+            + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.RecBatchNum);
     }
 
     public override void Write(RecognitionConfig value, BigEndianStream stream) {
             FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
             FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
             FfiConverterOptionalString.INSTANCE.Write(value.DictPath, stream);
+            FfiConverterOptionalInt32.INSTANCE.Write(value.RecBatchNum, stream);
     }
 }
 
@@ -3955,6 +4165,37 @@ class FfiConverterTypeRustoBindingError : FfiConverterRustBuffer<RustoBindingExc
 
 
 
+class FfiConverterOptionalUInt32: FfiConverterRustBuffer<uint?> {
+    public static FfiConverterOptionalUInt32 INSTANCE = new FfiConverterOptionalUInt32();
+
+    public override uint? Read(BigEndianStream stream) {
+        if (stream.ReadByte() == 0) {
+            return null;
+        }
+        return FfiConverterUInt32.INSTANCE.Read(stream);
+    }
+
+    public override int AllocationSize(uint? value) {
+        if (value == null) {
+            return 1;
+        } else {
+            return 1 + FfiConverterUInt32.INSTANCE.AllocationSize((uint)value);
+        }
+    }
+
+    public override void Write(uint? value, BigEndianStream stream) {
+        if (value == null) {
+            stream.WriteByte(0);
+        } else {
+            stream.WriteByte(1);
+            FfiConverterUInt32.INSTANCE.Write((uint)value, stream);
+        }
+    }
+}
+
+
+
+
 class FfiConverterOptionalInt32: FfiConverterRustBuffer<int?> {
     public static FfiConverterOptionalInt32 INSTANCE = new FfiConverterOptionalInt32();
 
@@ -4466,6 +4707,52 @@ class FfiConverterSequenceFloat: FfiConverterRustBuffer<float[]> {
 
 
 
+class FfiConverterSequenceString: FfiConverterRustBuffer<string[]> {
+    public static FfiConverterSequenceString INSTANCE = new FfiConverterSequenceString();
+
+    public override string[]  Read(BigEndianStream stream) {
+        var length = stream.ReadInt();
+        if (length == 0) {
+            return [];
+        }
+
+        var result = new string[length];
+        var readFn = FfiConverterString.INSTANCE.Read;
+        for (int i = 0; i < length; i++) {
+            result[i] = readFn(stream);
+        }
+        return result;
+    }
+
+    public override int AllocationSize(string[]  value) {
+        var sizeForLength = 4;
+
+        // details/1-empty-list-as-default-method-parameter.md
+        if (value == null) {
+            return sizeForLength;
+        }
+
+        var allocationSizeFn = FfiConverterString.INSTANCE.AllocationSize;
+        var sizeForItems = value.Sum(item => allocationSizeFn(item));
+        return sizeForLength + sizeForItems;
+    }
+
+    public override void Write(string[] value, BigEndianStream stream) {
+        // details/1-empty-list-as-default-method-parameter.md
+        if (value == null) {
+            stream.WriteInt(0);
+            return;
+        }
+
+        stream.WriteInt(value.Length);
+        var writerFn = FfiConverterString.INSTANCE.Write;
+        value.ForEach(item => writerFn(item, stream));
+    }
+}
+
+
+
+
 class FfiConverterSequenceTypeLayoutRegion: FfiConverterRustBuffer<LayoutRegion[]> {
     public static FfiConverterSequenceTypeLayoutRegion INSTANCE = new FfiConverterSequenceTypeLayoutRegion();
 
@@ -4602,6 +4889,14 @@ class FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer<TextResult[]> {
 }
 #pragma warning restore 8625
 public static class RustoMethods {
+    public static InitializeConfig CreateInitializeConfigForModel(string? @model, string? @lang, string? @modelPath) {
+        return FfiConverterTypeInitializeConfig.INSTANCE.Lift(
+    _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>
+    _UniFFILib.uniffi_rusto_fn_func_create_initialize_config_for_model(FfiConverterOptionalString.INSTANCE.Lower(@model), FfiConverterOptionalString.INSTANCE.Lower(@lang), FfiConverterOptionalString.INSTANCE.Lower(@modelPath), ref _status)
+));
+    }
+
+
     public static InitializeConfig CreateInitializeConfigPpv6(string @detModelPath, string @recModelPath, string @dictPath) {
         return FfiConverterTypeInitializeConfig.INSTANCE.Lift(
     _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>
@@ -4614,6 +4909,30 @@ public static class RustoMethods {
         return FfiConverterTypeOcrRunOptions.INSTANCE.Lift(
     _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>
     _UniFFILib.uniffi_rusto_fn_func_default_ocr_run_options( ref _status)
+));
+    }
+
+
+    /// <summary>
+    /// Downloads all available canonical models to the cache directory ahead of time.
+    /// </summary>
+    /// <exception cref="RustoBindingException"></exception>
+    public static string[] DownloadAllModels(string? @cacheDir) {
+        return FfiConverterSequenceString.INSTANCE.Lift(
+    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
+    _UniFFILib.uniffi_rusto_fn_func_download_all_models(FfiConverterOptionalString.INSTANCE.Lower(@cacheDir), ref _status)
+));
+    }
+
+
+    /// <summary>
+    /// Downloads model assets for a specific OCR pipeline ahead of time.
+    /// </summary>
+    /// <exception cref="RustoBindingException"></exception>
+    public static string[] DownloadModel(string? @model, string? @lang, string? @cacheDir) {
+        return FfiConverterSequenceString.INSTANCE.Lift(
+    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
+    _UniFFILib.uniffi_rusto_fn_func_download_model(FfiConverterOptionalString.INSTANCE.Lower(@model), FfiConverterOptionalString.INSTANCE.Lower(@lang), FfiConverterOptionalString.INSTANCE.Lower(@cacheDir), ref _status)
 ));
     }
 

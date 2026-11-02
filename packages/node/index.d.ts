@@ -57,6 +57,28 @@ export interface PostprocessOptions {
 }
 
 /**
+ * Pre-OCR image calibration options for descreening patterned backgrounds.
+ */
+export interface CalibrationOptions {
+  /** Descreen filtering strength (0.0 - 1.0). */
+  descreenStrength?: number;
+}
+
+/**
+ * Runtime crop and resolution optimization options.
+ */
+export interface OptimizationOptions {
+  /** Enable or disable image optimization. */
+  enabled?: boolean;
+  /** Optimal target maximum side dimension for downscaling (e.g. 960 or 1024). */
+  targetMaxSide?: number;
+  /** Horizontal crop padding expansion ratio applied to bounding boxes (e.g. 0.06 = 6%). */
+  cropPaddingX?: number;
+  /** Vertical crop padding expansion ratio applied to bounding boxes (e.g. 0.08 = 8%). */
+  cropPaddingY?: number;
+}
+
+/**
  * Request-local OCR runtime execution options.
  */
 export interface OcrRunOptions {
@@ -80,6 +102,12 @@ export interface OcrRunOptions {
   detection?: DetectionOptions;
   /** Post-processing overrides. */
   postprocess?: PostprocessOptions;
+  /** Recognition batch size override (number of text lines processed per inference batch). */
+  recBatchNum?: number;
+  /** Pre-OCR background descreening calibration options. */
+  calibration?: CalibrationOptions;
+  /** Runtime crop and resolution optimization options. */
+  optimization?: OptimizationOptions;
 }
 
 /**
@@ -88,6 +116,20 @@ export interface OcrRunOptions {
 export interface InitializeConfig {
   /** Model template preset: 'ppv6', 'ppv5', 'ppv4', or 'ppv3'. */
   preset?: 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3';
+  /** Canonical model identifier or name (e.g. 'ppocrv6-tiny', 'indraocr', 'ppocrv6-small', 'ppocrv5', 'ppocrv4'). */
+  model?: string;
+  /** Directory path containing det, rec, and dict model files. */
+  modelPath?: string;
+  /** Alias for modelPath. */
+  modelDir?: string;
+  /** Language identifier (e.g. 'latin', 'cyrillic', 'ar', 'ja', 'ko', 'devanagari'). */
+  lang?: string;
+  /** Custom cache directory override path. */
+  cacheDir?: string;
+  /** Enable neural reading order recovery transformer. */
+  enableReadingOrder?: boolean;
+  /** Document layout variant: 'cdla' (default 10-class) or 'publaynet' (5-class). */
+  layoutVariant?: string;
   /** Model asset filesystem paths. */
   models?: {
     /** Detection model path (.rten or .onnx). */
@@ -100,6 +142,52 @@ export interface InitializeConfig {
     classification?: string;
     /** Optional document orientation angle classifier model path. */
     orientation?: string;
+    /** Recognition batch size. Default: 6. */
+    recBatchNum?: number;
+  };
+  /** Explicit detection model configuration. */
+  detection?: {
+    modelPath?: string;
+    limitSideLen?: number;
+    limitType?: 'min' | 'max';
+    thresh?: number;
+    boxThresh?: number;
+    unclipRatio?: number;
+    useDilation?: boolean;
+    scoreMode?: 'fast' | 'slow';
+  };
+  /** Explicit recognition model configuration. */
+  recognition?: {
+    modelPath?: string;
+    dictPath?: string;
+    scoreThresh?: number;
+    recBatchNum?: number;
+  };
+  /** Explicit classification model configuration. */
+  classification?: {
+    enabled?: boolean;
+    modelPath?: string;
+    thresh?: number;
+  };
+  /** Explicit orientation model configuration. */
+  orientation?: {
+    enabled?: boolean;
+    modelPath?: string;
+    thresh?: number;
+  };
+  /** Explicit unwarp model configuration. */
+  unwarp?: {
+    enabled?: boolean;
+    modelPath?: string;
+  };
+  /** Explicit document layout model configuration. */
+  layout?: {
+    enabled?: boolean;
+    modelPath?: string;
+    confThresh?: number;
+    targetSize?: number;
+    targetHeight?: number;
+    targetWidth?: number;
   };
 }
 
@@ -114,6 +202,24 @@ export class RustO {
    * @returns An initialized RustO engine instance ready for OCR operations.
    */
   static initialize(config: InitializeConfig | string): RustO;
+
+  /**
+   * Downloads model assets for a specific OCR pipeline ahead of time.
+   *
+   * @param model - Canonical model name (e.g. 'ppocrv6-tiny', 'indraocr', 'ppocrv5').
+   * @param lang - Optional language identifier (e.g. 'latin', 'cyrillic', 'ar', 'ja').
+   * @param cacheDir - Optional custom cache directory.
+   * @returns Array of downloaded local file paths.
+   */
+  static downloadModel(model?: string, lang?: string, cacheDir?: string): string[];
+
+  /**
+   * Downloads all available canonical models to the cache directory ahead of time.
+   *
+   * @param cacheDir - Optional custom cache directory.
+   * @returns Array of downloaded local file paths.
+   */
+  static downloadAllModels(cacheDir?: string): string[];
 
   /**
    * Detects text in an image file located at the specified filesystem path.

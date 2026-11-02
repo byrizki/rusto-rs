@@ -10,9 +10,9 @@
 
 ```bash
 dotnet add package RustODotnet
-# Add matching language-model package when needed:
-# dotnet add package RustODotnet.Models.PPOCRv6.Tiny
 ```
+
+Models (e.g. PP-OCRv6 Tiny by default) are automatically downloaded into local cache on first use, or can be supplied locally via `InitializeConfig`.
 
 ## Complete example
 

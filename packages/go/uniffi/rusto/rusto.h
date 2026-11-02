@@ -425,6 +425,11 @@ RustBuffer uniffi_rusto_fn_method_rusto_unwarp_image_rgb(uint64_t ptr, RustBuffe
 RustBuffer uniffi_rusto_fn_method_rusto_version(uint64_t ptr, RustCallStatus *out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_CREATE_INITIALIZE_CONFIG_FOR_MODEL
+#define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_CREATE_INITIALIZE_CONFIG_FOR_MODEL
+RustBuffer uniffi_rusto_fn_func_create_initialize_config_for_model(RustBuffer model, RustBuffer lang, RustBuffer model_path, RustCallStatus *out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_CREATE_INITIALIZE_CONFIG_PPV6
 #define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_CREATE_INITIALIZE_CONFIG_PPV6
 RustBuffer uniffi_rusto_fn_func_create_initialize_config_ppv6(RustBuffer det_model_path, RustBuffer rec_model_path, RustBuffer dict_path, RustCallStatus *out_status
@@ -434,6 +439,16 @@ RustBuffer uniffi_rusto_fn_func_create_initialize_config_ppv6(RustBuffer det_mod
 #define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_DEFAULT_OCR_RUN_OPTIONS
 RustBuffer uniffi_rusto_fn_func_default_ocr_run_options(RustCallStatus *out_status
     
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_DOWNLOAD_ALL_MODELS
+#define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_DOWNLOAD_ALL_MODELS
+RustBuffer uniffi_rusto_fn_func_download_all_models(RustBuffer cache_dir, RustCallStatus *out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_DOWNLOAD_MODEL
+#define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_DOWNLOAD_MODEL
+RustBuffer uniffi_rusto_fn_func_download_model(RustBuffer model, RustBuffer lang, RustBuffer cache_dir, RustCallStatus *out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_RUSTO_VERSION
@@ -702,6 +717,12 @@ void ffi_rusto_rust_future_free_void(uint64_t handle
 void ffi_rusto_rust_future_complete_void(uint64_t handle, RustCallStatus *out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_CREATE_INITIALIZE_CONFIG_FOR_MODEL
+#define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_CREATE_INITIALIZE_CONFIG_FOR_MODEL
+uint16_t uniffi_rusto_checksum_func_create_initialize_config_for_model(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_CREATE_INITIALIZE_CONFIG_PPV6
 #define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_CREATE_INITIALIZE_CONFIG_PPV6
 uint16_t uniffi_rusto_checksum_func_create_initialize_config_ppv6(void
@@ -711,6 +732,18 @@ uint16_t uniffi_rusto_checksum_func_create_initialize_config_ppv6(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_DEFAULT_OCR_RUN_OPTIONS
 #define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_DEFAULT_OCR_RUN_OPTIONS
 uint16_t uniffi_rusto_checksum_func_default_ocr_run_options(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_DOWNLOAD_ALL_MODELS
+#define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_DOWNLOAD_ALL_MODELS
+uint16_t uniffi_rusto_checksum_func_download_all_models(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_DOWNLOAD_MODEL
+#define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_DOWNLOAD_MODEL
+uint16_t uniffi_rusto_checksum_func_download_model(void
     
 );
 #endif

@@ -91,6 +91,9 @@ namespace RustODotnet
 
         [JsonPropertyName("dict_path")]
         public string DictPath { get; set; }
+
+        [JsonPropertyName("rec_batch_num")]
+        public int? RecBatchNum { get; set; }
     }
 
     public class ClassificationConfig
@@ -128,6 +131,30 @@ namespace RustODotnet
     /// </summary>
     public class InitializeConfig
     {
+        /// <summary>Canonical model identifier (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4").</summary>
+        [JsonPropertyName("model")]
+        public string Model { get; set; }
+
+        /// <summary>Directory path containing det, rec, and dict model files.</summary>
+        [JsonPropertyName("model_path")]
+        public string ModelPath { get; set; }
+
+        /// <summary>Language identifier (e.g. "latin", "cyrillic", "ar", "ja", "ko", "devanagari").</summary>
+        [JsonPropertyName("lang")]
+        public string Lang { get; set; }
+
+        /// <summary>Custom cache directory override path.</summary>
+        [JsonPropertyName("cache_dir")]
+        public string CacheDir { get; set; }
+
+        /// <summary>Enable neural reading order recovery transformer.</summary>
+        [JsonPropertyName("enable_reading_order")]
+        public bool? EnableReadingOrder { get; set; }
+
+        /// <summary>Document layout variant: "cdla" (default 10-class) or "publaynet" (5-class).</summary>
+        [JsonPropertyName("layout_variant")]
+        public string LayoutVariant { get; set; }
+
         /// <summary>Template preset name (e.g. "ppv6", "ppv5", "ppv4", "ppv3").</summary>
         [JsonPropertyName("template")]
         public string Template { get; set; }
@@ -155,6 +182,10 @@ namespace RustODotnet
         /// <summary>Optional document layout model configuration.</summary>
         [JsonPropertyName("layout")]
         public LayoutConfig Layout { get; set; }
+
+        /// <summary>Creates a configuration for a canonical model identifier with optional language and model directory.</summary>
+        public static InitializeConfig ForModel(string model = "ppocrv6-tiny", string lang = null, string modelPath = null) =>
+            new() { Model = model, Lang = lang, ModelPath = modelPath };
 
         /// <summary>Creates a preset configuration for PP-OCRv3.</summary>
         public static InitializeConfig Ppv3() => new() { Template = "ppv3" };
@@ -185,6 +216,38 @@ namespace RustODotnet
         [JsonPropertyName("postprocess")] public PostprocessRunOptions Postprocess { get; set; }
     }
 
+    /// <summary>
+    /// Pre-OCR image calibration options for descreening patterned backgrounds.
+    /// </summary>
+    public class CalibrationOptions
+    {
+        /// <summary>Descreen filtering strength (0.0 - 1.0).</summary>
+        [JsonPropertyName("descreenStrength")]
+        public float? DescreenStrength { get; set; }
+    }
+
+    /// <summary>
+    /// Runtime crop and resolution optimization options.
+    /// </summary>
+    public class OptimizationOptions
+    {
+        /// <summary>Enable or disable image optimization.</summary>
+        [JsonPropertyName("enabled")]
+        public bool? Enabled { get; set; }
+
+        /// <summary>Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).</summary>
+        [JsonPropertyName("targetMaxSide")]
+        public uint? TargetMaxSide { get; set; }
+
+        /// <summary>Horizontal padding around bounding box crops in pixels.</summary>
+        [JsonPropertyName("cropPaddingX")]
+        public float? CropPaddingX { get; set; }
+
+        /// <summary>Vertical padding around bounding box crops in pixels.</summary>
+        [JsonPropertyName("cropPaddingY")]
+        public float? CropPaddingY { get; set; }
+    }
+
     public class OcrRunOptions
     {
         [JsonIgnore]
@@ -213,6 +276,9 @@ namespace RustODotnet
         [JsonPropertyName("widthHeightRatio")] public float? WidthHeightRatio { get; set; }
         [JsonPropertyName("detection")] public DetectionRunOptions Detection { get; set; }
         [JsonPropertyName("postprocess")] public PostprocessRunOptions Postprocess { get; set; }
+        [JsonPropertyName("recBatchNum")] public int? RecBatchNum { get; set; }
+        [JsonPropertyName("calibration")] public CalibrationOptions Calibration { get; set; }
+        [JsonPropertyName("optimization")] public OptimizationOptions Optimization { get; set; }
     }
 
     /// <summary>
@@ -334,16 +400,36 @@ namespace RustODotnet
         private RustO(InitializeConfig config)
         {
             config ??= new InitializeConfig();
-            config.Detection ??= new DetectionConfig();
-            config.Recognition ??= new RecognitionConfig();
 
-            var detName = config.Detection.ModelPath ?? "det.rten";
-            var recName = config.Recognition.ModelPath ?? "rec.rten";
-            var dictName = config.Recognition.DictPath ?? "dict.txt";
+            var hasModelOrPath = !string.IsNullOrEmpty(config.Model) || !string.IsNullOrEmpty(config.ModelPath);
 
-            config.Detection.ModelPath = ResolveModelPath(detName);
-            config.Recognition.ModelPath = ResolveModelPath(recName);
-            config.Recognition.DictPath = ResolveModelPath(dictName);
+            if (hasModelOrPath)
+            {
+                if (!string.IsNullOrEmpty(config.ModelPath))
+                    config.ModelPath = ResolveModelPath(config.ModelPath);
+
+                if (!string.IsNullOrEmpty(config.Detection?.ModelPath))
+                    config.Detection.ModelPath = ResolveModelPath(config.Detection.ModelPath);
+
+                if (!string.IsNullOrEmpty(config.Recognition?.ModelPath))
+                    config.Recognition.ModelPath = ResolveModelPath(config.Recognition.ModelPath);
+
+                if (!string.IsNullOrEmpty(config.Recognition?.DictPath))
+                    config.Recognition.DictPath = ResolveModelPath(config.Recognition.DictPath);
+            }
+            else
+            {
+                config.Detection ??= new DetectionConfig();
+                config.Recognition ??= new RecognitionConfig();
+
+                var detName = config.Detection.ModelPath ?? "det.rten";
+                var recName = config.Recognition.ModelPath ?? "rec.rten";
+                var dictName = config.Recognition.DictPath ?? "dict.txt";
+
+                config.Detection.ModelPath = ResolveModelPath(detName);
+                config.Recognition.ModelPath = ResolveModelPath(recName);
+                config.Recognition.DictPath = ResolveModelPath(dictName);
+            }
 
             if (config.Classification?.ModelPath != null)
                 config.Classification.ModelPath = ResolveModelPath(config.Classification.ModelPath);
@@ -351,6 +437,8 @@ namespace RustODotnet
                 config.Orientation.ModelPath = ResolveModelPath(config.Orientation.ModelPath);
             if (config.Unwarp?.ModelPath != null)
                 config.Unwarp.ModelPath = ResolveModelPath(config.Unwarp.ModelPath);
+            if (config.Layout?.ModelPath != null)
+                config.Layout.ModelPath = ResolveModelPath(config.Layout.ModelPath);
 
             var options = new JsonSerializerOptions
             {
@@ -366,6 +454,24 @@ namespace RustODotnet
                 throw new RustOException($"Failed to initialize RustO with config: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Downloads model assets for a specific OCR pipeline ahead of time.
+        /// </summary>
+        /// <param name="model">Canonical model name (e.g. "ppocrv6-tiny", "indraocr", "ppocrv5").</param>
+        /// <param name="lang">Optional language identifier.</param>
+        /// <param name="cacheDir">Optional custom cache directory.</param>
+        /// <returns>Array of downloaded local model paths.</returns>
+        public static string[] DownloadModel(string model = null, string lang = null, string cacheDir = null) =>
+            RustODotnet.Generated.RustoMethods.DownloadModel(model, lang, cacheDir);
+
+        /// <summary>
+        /// Downloads all available canonical models to the cache directory ahead of time.
+        /// </summary>
+        /// <param name="cacheDir">Optional custom cache directory.</param>
+        /// <returns>Array of downloaded local model paths.</returns>
+        public static string[] DownloadAllModels(string cacheDir = null) =>
+            RustODotnet.Generated.RustoMethods.DownloadAllModels(cacheDir);
 
         /// <summary>
         /// Initializes a new RustO OCR engine instance with model session configuration.

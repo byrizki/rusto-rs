@@ -636,9 +636,15 @@ internal object IntegrityCheckingUniffiLib {
         uniffiCheckContractApiVersion(this)
         uniffiCheckApiChecksums(this)
     }
+    external fun uniffi_rusto_checksum_func_create_initialize_config_for_model(
+    ): Int
     external fun uniffi_rusto_checksum_func_create_initialize_config_ppv6(
     ): Int
     external fun uniffi_rusto_checksum_func_default_ocr_run_options(
+    ): Int
+    external fun uniffi_rusto_checksum_func_download_all_models(
+    ): Int
+    external fun uniffi_rusto_checksum_func_download_model(
     ): Int
     external fun uniffi_rusto_checksum_func_rusto_version(
     ): Int
@@ -700,9 +706,15 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_rusto_fn_method_rusto_version(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_rusto_fn_func_create_initialize_config_for_model(`model`: RustBuffer.ByValue,`lang`: RustBuffer.ByValue,`modelPath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_rusto_fn_func_create_initialize_config_ppv6(`detModelPath`: RustBuffer.ByValue,`recModelPath`: RustBuffer.ByValue,`dictPath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_rusto_fn_func_default_ocr_run_options(uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_rusto_fn_func_download_all_models(`cacheDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_rusto_fn_func_download_model(`model`: RustBuffer.ByValue,`lang`: RustBuffer.ByValue,`cacheDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_rusto_fn_func_rusto_version(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -825,10 +837,19 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
 }
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
+    if (lib.uniffi_rusto_checksum_func_create_initialize_config_for_model() != 37532) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 12132) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rusto_checksum_func_default_ocr_run_options() != 50314) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rusto_checksum_func_download_all_models() != 11564) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rusto_checksum_func_download_model() != 15041) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rusto_checksum_func_rusto_version() != 3477) {
@@ -1965,13 +1986,43 @@ public object FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
 
 
 /**
- * Engine initialization configuration specifying model paths and template preset.
+ * Engine initialization configuration specifying model paths, preset, and optional extensions.
  */
 data class InitializeConfig (
     /**
-     * Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+     * Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+     */
+    var `model`: kotlin.String?
+    , 
+    /**
+     * Base model directory containing det, rec, and dict files.
+     */
+    var `modelPath`: kotlin.String?
+    , 
+    /**
+     * Legacy template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
      */
     var `template`: kotlin.String?
+    , 
+    /**
+     * Language code or name (e.g. "ja", "ko", "ar", "cyrillic", "devanagari", "latin").
+     */
+    var `lang`: kotlin.String?
+    , 
+    /**
+     * Custom cache directory override path.
+     */
+    var `cacheDir`: kotlin.String?
+    , 
+    /**
+     * Enable neural reading order recovery transformer.
+     */
+    var `enableReadingOrder`: kotlin.Boolean?
+    , 
+    /**
+     * Document layout variant: "cdla" (default 10-class) or "publaynet" (5-class).
+     */
+    var `layoutVariant`: kotlin.String?
     , 
     /**
      * Detection model configuration.
@@ -2019,6 +2070,12 @@ public object FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<Initializ
     override fun read(buf: ByteBuffer): InitializeConfig {
         return InitializeConfig(
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterOptionalTypeDetectionConfig.read(buf),
             FfiConverterOptionalTypeRecognitionConfig.read(buf),
             FfiConverterOptionalTypeClassificationConfig.read(buf),
@@ -2029,7 +2086,13 @@ public object FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<Initializ
     }
 
     override fun allocationSize(value: InitializeConfig) = (
+            FfiConverterOptionalString.allocationSize(value.`model`) +
+            FfiConverterOptionalString.allocationSize(value.`modelPath`) +
             FfiConverterOptionalString.allocationSize(value.`template`) +
+            FfiConverterOptionalString.allocationSize(value.`lang`) +
+            FfiConverterOptionalString.allocationSize(value.`cacheDir`) +
+            FfiConverterOptionalBoolean.allocationSize(value.`enableReadingOrder`) +
+            FfiConverterOptionalString.allocationSize(value.`layoutVariant`) +
             FfiConverterOptionalTypeDetectionConfig.allocationSize(value.`detection`) +
             FfiConverterOptionalTypeRecognitionConfig.allocationSize(value.`recognition`) +
             FfiConverterOptionalTypeClassificationConfig.allocationSize(value.`classification`) +
@@ -2039,7 +2102,13 @@ public object FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<Initializ
     )
 
     override fun write(value: InitializeConfig, buf: ByteBuffer) {
+            FfiConverterOptionalString.write(value.`model`, buf)
+            FfiConverterOptionalString.write(value.`modelPath`, buf)
             FfiConverterOptionalString.write(value.`template`, buf)
+            FfiConverterOptionalString.write(value.`lang`, buf)
+            FfiConverterOptionalString.write(value.`cacheDir`, buf)
+            FfiConverterOptionalBoolean.write(value.`enableReadingOrder`, buf)
+            FfiConverterOptionalString.write(value.`layoutVariant`, buf)
             FfiConverterOptionalTypeDetectionConfig.write(value.`detection`, buf)
             FfiConverterOptionalTypeRecognitionConfig.write(value.`recognition`, buf)
             FfiConverterOptionalTypeClassificationConfig.write(value.`classification`, buf)
@@ -2137,6 +2206,16 @@ data class LayoutConfig (
      * Target input side length for resizing.
      */
     var `targetSize`: kotlin.Int?
+    , 
+    /**
+     * Target input height for resizing.
+     */
+    var `targetHeight`: kotlin.Int?
+    , 
+    /**
+     * Target input width for resizing.
+     */
+    var `targetWidth`: kotlin.Int?
     
 ){
     
@@ -2157,6 +2236,8 @@ public object FfiConverterTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig>
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalFloat.read(buf),
             FfiConverterOptionalInt.read(buf),
+            FfiConverterOptionalInt.read(buf),
+            FfiConverterOptionalInt.read(buf),
         )
     }
 
@@ -2164,7 +2245,9 @@ public object FfiConverterTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig>
             FfiConverterOptionalBoolean.allocationSize(value.`enabled`) +
             FfiConverterOptionalString.allocationSize(value.`modelPath`) +
             FfiConverterOptionalFloat.allocationSize(value.`confThresh`) +
-            FfiConverterOptionalInt.allocationSize(value.`targetSize`)
+            FfiConverterOptionalInt.allocationSize(value.`targetSize`) +
+            FfiConverterOptionalInt.allocationSize(value.`targetHeight`) +
+            FfiConverterOptionalInt.allocationSize(value.`targetWidth`)
     )
 
     override fun write(value: LayoutConfig, buf: ByteBuffer) {
@@ -2172,6 +2255,8 @@ public object FfiConverterTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig>
             FfiConverterOptionalString.write(value.`modelPath`, buf)
             FfiConverterOptionalFloat.write(value.`confThresh`, buf)
             FfiConverterOptionalInt.write(value.`targetSize`, buf)
+            FfiConverterOptionalInt.write(value.`targetHeight`, buf)
+            FfiConverterOptionalInt.write(value.`targetWidth`, buf)
     }
 }
 
@@ -2315,6 +2400,11 @@ data class OcrRunOptions (
      * Runtime crop and resolution optimization options.
      */
     var `optimization`: OptimizationOptions?
+    , 
+    /**
+     * Request-local recognition batch size override.
+     */
+    var `recBatchNum`: kotlin.Int?
     
 ){
     
@@ -2347,6 +2437,7 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterOptionalTypePostprocessRunOptions.read(buf),
             FfiConverterOptionalTypeCalibrationOptions.read(buf),
             FfiConverterOptionalTypeOptimizationOptions.read(buf),
+            FfiConverterOptionalInt.read(buf),
         )
     }
 
@@ -2366,7 +2457,8 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterOptionalTypeDetectionRunOptions.allocationSize(value.`detection`) +
             FfiConverterOptionalTypePostprocessRunOptions.allocationSize(value.`postprocess`) +
             FfiConverterOptionalTypeCalibrationOptions.allocationSize(value.`calibration`) +
-            FfiConverterOptionalTypeOptimizationOptions.allocationSize(value.`optimization`)
+            FfiConverterOptionalTypeOptimizationOptions.allocationSize(value.`optimization`) +
+            FfiConverterOptionalInt.allocationSize(value.`recBatchNum`)
     )
 
     override fun write(value: OcrRunOptions, buf: ByteBuffer) {
@@ -2386,6 +2478,7 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterOptionalTypePostprocessRunOptions.write(value.`postprocess`, buf)
             FfiConverterOptionalTypeCalibrationOptions.write(value.`calibration`, buf)
             FfiConverterOptionalTypeOptimizationOptions.write(value.`optimization`, buf)
+            FfiConverterOptionalInt.write(value.`recBatchNum`, buf)
     }
 }
 
@@ -2395,6 +2488,16 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
  * Runtime crop and resolution optimization options.
  */
 data class OptimizationOptions (
+    /**
+     * Enable or disable image optimization.
+     */
+    var `enabled`: kotlin.Boolean?
+    , 
+    /**
+     * Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
+     */
+    var `targetMaxSide`: kotlin.UInt?
+    , 
     /**
      * Horizontal padding around bounding box crops in pixels.
      */
@@ -2420,17 +2523,23 @@ data class OptimizationOptions (
 public object FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOptions> {
     override fun read(buf: ByteBuffer): OptimizationOptions {
         return OptimizationOptions(
+            FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalUInt.read(buf),
             FfiConverterOptionalFloat.read(buf),
             FfiConverterOptionalFloat.read(buf),
         )
     }
 
     override fun allocationSize(value: OptimizationOptions) = (
+            FfiConverterOptionalBoolean.allocationSize(value.`enabled`) +
+            FfiConverterOptionalUInt.allocationSize(value.`targetMaxSide`) +
             FfiConverterOptionalFloat.allocationSize(value.`cropPaddingX`) +
             FfiConverterOptionalFloat.allocationSize(value.`cropPaddingY`)
     )
 
     override fun write(value: OptimizationOptions, buf: ByteBuffer) {
+            FfiConverterOptionalBoolean.write(value.`enabled`, buf)
+            FfiConverterOptionalUInt.write(value.`targetMaxSide`, buf)
             FfiConverterOptionalFloat.write(value.`cropPaddingX`, buf)
             FfiConverterOptionalFloat.write(value.`cropPaddingY`, buf)
     }
@@ -2637,6 +2746,11 @@ data class RecognitionConfig (
      * Filesystem path to dictionary vocabulary file (.txt).
      */
     var `dictPath`: kotlin.String?
+    , 
+    /**
+     * Recognition batch size. Default: 6.
+     */
+    var `recBatchNum`: kotlin.Int?
     
 ){
     
@@ -2656,19 +2770,22 @@ public object FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<Recognit
             FfiConverterOptionalBoolean.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalInt.read(buf),
         )
     }
 
     override fun allocationSize(value: RecognitionConfig) = (
             FfiConverterOptionalBoolean.allocationSize(value.`enabled`) +
             FfiConverterOptionalString.allocationSize(value.`modelPath`) +
-            FfiConverterOptionalString.allocationSize(value.`dictPath`)
+            FfiConverterOptionalString.allocationSize(value.`dictPath`) +
+            FfiConverterOptionalInt.allocationSize(value.`recBatchNum`)
     )
 
     override fun write(value: RecognitionConfig, buf: ByteBuffer) {
             FfiConverterOptionalBoolean.write(value.`enabled`, buf)
             FfiConverterOptionalString.write(value.`modelPath`, buf)
             FfiConverterOptionalString.write(value.`dictPath`, buf)
+            FfiConverterOptionalInt.write(value.`recBatchNum`, buf)
     }
 }
 
@@ -3265,6 +3382,38 @@ public object FfiConverterTypeRustoBindingError : FfiConverterRustBuffer<RustoBi
 /**
  * @suppress
  */
+public object FfiConverterOptionalUInt: FfiConverterRustBuffer<kotlin.UInt?> {
+    override fun read(buf: ByteBuffer): kotlin.UInt? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterUInt.read(buf)
+    }
+
+    override fun allocationSize(value: kotlin.UInt?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterUInt.allocationSize(value)
+        }
+    }
+
+    override fun write(value: kotlin.UInt?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterUInt.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalInt: FfiConverterRustBuffer<kotlin.Int?> {
     override fun read(buf: ByteBuffer): kotlin.Int? {
         if (buf.get().toInt() == 0) {
@@ -3773,6 +3922,34 @@ public object FfiConverterSequenceFloat: FfiConverterRustBuffer<List<kotlin.Floa
 /**
  * @suppress
  */
+public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
+    override fun read(buf: ByteBuffer): List<kotlin.String> {
+        val len = buf.getInt()
+        return List<kotlin.String>(len) {
+            FfiConverterString.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<kotlin.String>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterString.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<kotlin.String>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterString.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeLayoutRegion: FfiConverterRustBuffer<List<LayoutRegion>> {
     override fun read(buf: ByteBuffer): List<LayoutRegion> {
         val len = buf.getInt()
@@ -3849,7 +4026,17 @@ public object FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer<List<Te
             FfiConverterTypeTextResult.write(it, buf)
         }
     }
-} fun `createInitializeConfigPpv6`(`detModelPath`: kotlin.String, `recModelPath`: kotlin.String, `dictPath`: kotlin.String): InitializeConfig {
+} fun `createInitializeConfigForModel`(`model`: kotlin.String?, `lang`: kotlin.String?, `modelPath`: kotlin.String?): InitializeConfig {
+            return FfiConverterTypeInitializeConfig.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_rusto_fn_func_create_initialize_config_for_model(
+    
+        FfiConverterOptionalString.lower(`model`),FfiConverterOptionalString.lower(`lang`),FfiConverterOptionalString.lower(`modelPath`),_status)
+}
+    )
+    }
+    
+ fun `createInitializeConfigPpv6`(`detModelPath`: kotlin.String, `recModelPath`: kotlin.String, `dictPath`: kotlin.String): InitializeConfig {
             return FfiConverterTypeInitializeConfig.lift(
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_rusto_fn_func_create_initialize_config_ppv6(
@@ -3865,6 +4052,34 @@ public object FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer<List<Te
     UniffiLib.uniffi_rusto_fn_func_default_ocr_run_options(
     
         _status)
+}
+    )
+    }
+    
+
+        /**
+         * Downloads all available canonical models to the cache directory ahead of time.
+         */
+    @Throws(RustoBindingException::class) fun `downloadAllModels`(`cacheDir`: kotlin.String?): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    uniffiRustCallWithError(RustoBindingException) { _status ->
+    UniffiLib.uniffi_rusto_fn_func_download_all_models(
+    
+        FfiConverterOptionalString.lower(`cacheDir`),_status)
+}
+    )
+    }
+    
+
+        /**
+         * Downloads model assets for a specific OCR pipeline ahead of time.
+         */
+    @Throws(RustoBindingException::class) fun `downloadModel`(`model`: kotlin.String?, `lang`: kotlin.String?, `cacheDir`: kotlin.String?): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    uniffiRustCallWithError(RustoBindingException) { _status ->
+    UniffiLib.uniffi_rusto_fn_func_download_model(
+    
+        FfiConverterOptionalString.lower(`model`),FfiConverterOptionalString.lower(`lang`),FfiConverterOptionalString.lower(`cacheDir`),_status)
 }
     )
     }

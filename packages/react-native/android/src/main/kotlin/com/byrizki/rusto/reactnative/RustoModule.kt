@@ -42,11 +42,28 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
 
     private fun parseInitializeConfig(map: ReadableMap?): InitializeConfig {
         if (map == null) return InitializeConfig()
-        requireOnlyKeys(map, setOf("preset", "models"), "InitializeConfig contains an unknown key.")
+        requireOnlyKeys(
+            map,
+            setOf("preset", "models", "recBatchNum", "model", "modelPath", "lang", "cacheDir", "enableReadingOrder", "layoutVariant"),
+            "InitializeConfig contains an unknown key."
+        )
         val template = if (map.hasKey("preset") && !map.isNull("preset")) {
             require(map.getType("preset") == ReadableType.String) { "InitializeConfig.preset must be a string." }
             map.getString("preset")!!.also { require(it in setOf("ppv6", "ppv5", "ppv4", "ppv3")) { "InitializeConfig.preset is invalid." } }
-        } else "ppv6"
+        } else null
+
+        fun optString(key: String): String? {
+            if (!map.hasKey(key) || map.isNull(key)) return null
+            require(map.getType(key) == ReadableType.String) { "InitializeConfig.$key must be a string." }
+            return map.getString(key)!!.also { require(it.isNotBlank()) { "InitializeConfig.$key must be non-empty." } }
+        }
+
+        fun optBoolean(key: String): Boolean? {
+            if (!map.hasKey(key) || map.isNull(key)) return null
+            require(map.getType(key) == ReadableType.Boolean) { "InitializeConfig.$key must be a boolean." }
+            return map.getBoolean(key)
+        }
+
         val models = if (map.hasKey("models") && !map.isNull("models")) {
             require(map.getType("models") == ReadableType.Map) { "InitializeConfig.models must be an object." }
             map.getMap("models")!!
@@ -57,10 +74,20 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
             require(models.getType(name) == ReadableType.String) { "InitializeConfig.models.$name must be a string." }
             return models.getString(name)!!.also { require(it.isNotBlank()) { "InitializeConfig.models.$name must be non-empty." } }
         }
+        val detModel = model("detection")
+        val recModel = model("recognition")
+        val dictPath = model("dictionary")
+
         return InitializeConfig(
+            model = optString("model"),
+            modelPath = optString("modelPath"),
+            lang = optString("lang"),
+            cacheDir = optString("cacheDir"),
+            enableReadingOrder = optBoolean("enableReadingOrder"),
+            layoutVariant = optString("layoutVariant"),
             template = template,
-            detection = DetectionConfig(modelPath = model("detection") ?: "det.rten"),
-            recognition = RecognitionConfig(modelPath = model("recognition") ?: "rec.rten", dictPath = model("dictionary") ?: "dict.txt"),
+            detection = if (detModel != null) DetectionConfig(modelPath = detModel) else null,
+            recognition = if (recModel != null || dictPath != null) RecognitionConfig(modelPath = recModel, dictPath = dictPath) else null,
             classification = model("classification")?.let { ClassificationConfig(enabled = true, modelPath = it) },
             orientation = model("orientation")?.let { OrientationConfig(enabled = true, modelPath = it) },
             unwarp = model("unwarp")?.let { com.byrizki.rusto.UnwarpConfig(enabled = true, modelPath = it) },

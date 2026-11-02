@@ -5,7 +5,16 @@ import json
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from rusto import RustO, InitializeConfig, OcrRunOptions, RustoBindingError
+from rusto import (
+    RustO,
+    InitializeConfig,
+    OcrRunOptions,
+    OptimizationOptions,
+    RustoBindingError,
+    create_initialize_config_for_model,
+    download_model,
+    download_all_models,
+)
 from rusto.generated.rusto import ImageSource, OutputGranularity
 
 class TestRustOPythonBinding(unittest.TestCase):
@@ -56,6 +65,36 @@ class TestRustOPythonBinding(unittest.TestCase):
         spatial_res = engine.detect_text(ImageSource.PATH(img_path), opts_spatial)
         self.assertTrue(spatial_res.is_SPATIAL())
         self.assertIn("INVOICE", spatial_res.text)
+
+    def test_run_options_with_configurable_opts(self):
+        opts = OcrRunOptions(
+            text_score=0.4,
+            rec_batch_num=8,
+            optimization=OptimizationOptions(enabled=True, target_max_side=960, crop_padding_x=0.05, crop_padding_y=0.08),
+        )
+        self.assertEqual(opts.rec_batch_num, 8)
+        self.assertIsNotNone(opts.optimization)
+        self.assertTrue(opts.optimization.enabled)
+        self.assertEqual(opts.optimization.target_max_side, 960)
+
+    def test_create_initialize_config_for_model(self):
+        cfg = create_initialize_config_for_model(model="indraocr", lang="latin", model_path="/tmp/custom")
+        self.assertEqual(cfg.model, "indraocr")
+        self.assertEqual(cfg.lang, "latin")
+        self.assertEqual(cfg.model_path, "/tmp/custom")
+
+    def test_initialize_config_defaults(self):
+        cfg = InitializeConfig(model="ppocrv6-tiny", model_path="/tmp/models")
+        self.assertEqual(cfg.model, "ppocrv6-tiny")
+        self.assertEqual(cfg.model_path, "/tmp/models")
+        self.assertIsNone(cfg.template)
+        self.assertIsNone(cfg.lang)
+
+    def test_download_model_helpers_callable(self):
+        self.assertTrue(callable(download_model))
+        self.assertTrue(callable(download_all_models))
+        self.assertTrue(callable(RustO.download_model))
+        self.assertTrue(callable(RustO.download_all_models))
 
 if __name__ == "__main__":
     unittest.main()

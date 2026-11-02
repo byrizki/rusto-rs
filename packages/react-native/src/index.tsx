@@ -76,11 +76,47 @@ export interface DetectionOptions {
 }
 
 /**
+ * Pre-OCR image calibration options for descreening patterned backgrounds.
+ */
+export interface CalibrationOptions {
+  /** Descreen filtering strength (0.0 - 1.0). */
+  descreenStrength?: number;
+}
+
+/**
+ * Runtime crop and resolution optimization options.
+ */
+export interface OptimizationOptions {
+  /** Enable or disable image optimization. */
+  enabled?: boolean;
+  /** Optimal target maximum side dimension for downscaling (e.g. 960 or 1024). */
+  targetMaxSide?: number;
+  /** Horizontal crop padding expansion ratio applied to bounding boxes (e.g. 0.06 = 6%). */
+  cropPaddingX?: number;
+  /** Vertical crop padding expansion ratio applied to bounding boxes (e.g. 0.08 = 8%). */
+  cropPaddingY?: number;
+}
+
+/**
  * Configuration options for initializing the RustO engine session in React Native.
  */
 export interface InitializeConfig {
   /** Model architecture template preset. Defaults to 'ppv6'. */
   preset?: ModelPreset;
+  /** Model pipeline identifier: 'ppocrv6-tiny' (default), 'indraocr', 'ppocrv6-small', 'ppocrv5', 'ppocrv4'. */
+  model?: string;
+  /** Base model directory containing det, rec, and dict files. */
+  modelPath?: string;
+  /** Target language: 'latin' (default), 'ja', 'korean', 'ar', 'cyrillic', 'devanagari', etc. */
+  lang?: string;
+  /** Custom model cache directory path. */
+  cacheDir?: string;
+  /** Enable neural reading order recovery transformer. */
+  enableReadingOrder?: boolean;
+  /** Document layout variant: 'cdla' (default 10-class) or 'publaynet' (5-class). */
+  layoutVariant?: 'cdla' | 'publaynet';
+  /** Optional recognition batch size override. Default: 6. */
+  recBatchNum?: number;
   /** Custom model asset file paths (bundled in app or downloaded). */
   models?: {
     /** Detection model path (.rten or .onnx). */
@@ -132,6 +168,12 @@ export interface DetectTextOptions {
   detection?: DetectionOptions;
   /** Request-local detector postprocess overrides. */
   postprocess?: PostprocessOptions;
+  /** Request-local recognition batch size override. Default: 6. */
+  recBatchNum?: number;
+  /** Pre-OCR background descreening calibration options. */
+  calibration?: CalibrationOptions;
+  /** Runtime crop and resolution optimization options. */
+  optimization?: OptimizationOptions;
 }
 
 /**
@@ -219,6 +261,9 @@ const OPTION_KEYS = [
   'widthHeightRatio',
   'detection',
   'postprocess',
+  'recBatchNum',
+  'calibration',
+  'optimization',
 ] as const;
 const MODEL_KEYS = [
   'detection',
@@ -237,6 +282,13 @@ const POSTPROCESS_KEYS = [
   'unclipRatio',
   'useDilation',
   'scoreMode',
+] as const;
+const CALIBRATION_KEYS = ['descreenStrength'] as const;
+const OPTIMIZATION_KEYS = [
+  'enabled',
+  'targetMaxSide',
+  'cropPaddingX',
+  'cropPaddingY',
 ] as const;
 const PRESETS = ['ppv6', 'ppv5', 'ppv4', 'ppv3'] as const;
 
@@ -364,6 +416,43 @@ function normalizePostprocessOptions(postprocess: unknown): void {
   )
     throw new TypeError('DetectTextOptions.postprocess.scoreMode must be "fast" or "slow".');
 }
+function normalizeCalibrationOptions(calibration: unknown): void {
+  if (calibration === undefined) return;
+  if (!isObject(calibration)) throw new TypeError('DetectTextOptions.calibration must be an object.');
+  requireOnlyKeys(
+    calibration,
+    CALIBRATION_KEYS,
+    'DetectTextOptions.calibration contains an unknown key.'
+  );
+  const descreen = calibration.descreenStrength;
+  if (
+    descreen !== undefined &&
+    (typeof descreen !== 'number' || !Number.isFinite(descreen) || descreen < 0 || descreen > 1)
+  )
+    throw new TypeError('DetectTextOptions.calibration.descreenStrength must be in [0, 1].');
+}
+function normalizeOptimizationOptions(optimization: unknown): void {
+  if (optimization === undefined) return;
+  if (!isObject(optimization)) throw new TypeError('DetectTextOptions.optimization must be an object.');
+  requireOnlyKeys(
+    optimization,
+    OPTIMIZATION_KEYS,
+    'DetectTextOptions.optimization contains an unknown key.'
+  );
+  if (optimization.enabled !== undefined && typeof optimization.enabled !== 'boolean')
+    throw new TypeError('DetectTextOptions.optimization.enabled must be a boolean.');
+  const target = optimization.targetMaxSide;
+  if (
+    target !== undefined &&
+    (typeof target !== 'number' || !Number.isInteger(target) || target < 1)
+  )
+    throw new TypeError('DetectTextOptions.optimization.targetMaxSide must be an integer >= 1.');
+  for (const key of ['cropPaddingX', 'cropPaddingY'] as const) {
+    const pad = optimization[key];
+    if (pad !== undefined && (typeof pad !== 'number' || !Number.isFinite(pad) || pad < 0 || pad > 1))
+      throw new TypeError(`DetectTextOptions.optimization.${key} must be in [0, 1].`);
+  }
+}
 function normalizeOptions(options: DetectTextOptions | undefined): DetectTextOptions {
   if (options === undefined) return {};
   if (!isObject(options)) throw new TypeError('DetectTextOptions must be an object.');
@@ -402,16 +491,56 @@ function normalizeOptions(options: DetectTextOptions | undefined): DetectTextOpt
   const maxSideLen = options.maxSideLen;
   if (typeof minSideLen === 'number' && typeof maxSideLen === 'number' && minSideLen > maxSideLen)
     throw new TypeError('DetectTextOptions.minSideLen must be <= maxSideLen.');
+  const batchNum = options.recBatchNum;
+  if (
+    batchNum !== undefined &&
+    (typeof batchNum !== 'number' || !Number.isInteger(batchNum) || batchNum < 1)
+  )
+    throw new TypeError('DetectTextOptions.recBatchNum must be an integer >= 1.');
   normalizeDetectionOptions(options.detection);
   normalizePostprocessOptions(options.postprocess);
+  normalizeCalibrationOptions(options.calibration);
+  normalizeOptimizationOptions(options.optimization);
   return options;
 }
 function normalizeInitializeConfig(config: InitializeConfig | undefined): InitializeConfig {
   if (config === undefined) return {};
   if (!isObject(config)) throw new TypeError('InitializeConfig must be an object.');
-  requireOnlyKeys(config, ['preset', 'models'], 'InitializeConfig contains an unknown key.');
+  requireOnlyKeys(
+    config,
+    [
+      'preset',
+      'model',
+      'modelPath',
+      'lang',
+      'cacheDir',
+      'enableReadingOrder',
+      'layoutVariant',
+      'models',
+      'recBatchNum',
+    ],
+    'InitializeConfig contains an unknown key.'
+  );
   if (config.preset !== undefined && !PRESETS.includes(config.preset as ModelPreset))
     throw new TypeError('InitializeConfig.preset is invalid.');
+  for (const strKey of ['model', 'modelPath', 'lang', 'cacheDir'] as const) {
+    const val = config[strKey];
+    if (val !== undefined && (typeof val !== 'string' || val.trim().length === 0))
+      throw new TypeError(`InitializeConfig.${strKey} must be a non-empty string.`);
+  }
+  if (config.enableReadingOrder !== undefined && typeof config.enableReadingOrder !== 'boolean')
+    throw new TypeError('InitializeConfig.enableReadingOrder must be a boolean.');
+  if (
+    config.layoutVariant !== undefined &&
+    config.layoutVariant !== 'cdla' &&
+    config.layoutVariant !== 'publaynet'
+  )
+    throw new TypeError('InitializeConfig.layoutVariant must be "cdla" or "publaynet".');
+  if (
+    config.recBatchNum !== undefined &&
+    (typeof config.recBatchNum !== 'number' || !Number.isInteger(config.recBatchNum) || config.recBatchNum < 1)
+  )
+    throw new TypeError('InitializeConfig.recBatchNum must be an integer >= 1.');
   if (config.models !== undefined) {
     if (!isObject(config.models)) throw new TypeError('InitializeConfig.models must be an object.');
     requireOnlyKeys(config.models, MODEL_KEYS, 'InitializeConfig.models contains an unknown key.');

@@ -21,6 +21,34 @@ impl JsRustO {
     }
 
     #[napi]
+    pub fn download_model(
+        model: Option<String>,
+        lang: Option<String>,
+        cache_dir: Option<String>,
+    ) -> Result<Vec<String>> {
+        let cache_path = rusto_rs::model_manager::get_cache_dir(cache_dir.as_deref().map(std::path::Path::new));
+        let downloaded = rusto_rs::model_manager::download_model_pipeline(
+            model.as_deref(),
+            lang.as_deref(),
+            false,
+            false,
+            false,
+            None,
+            false,
+            &cache_path,
+        ).map_err(|e| Error::new(Status::GenericFailure, format!("Failed to download model: {e}")))?;
+        Ok(downloaded.into_iter().map(|p| p.to_string_lossy().to_string()).collect())
+    }
+
+    #[napi]
+    pub fn download_all_models(cache_dir: Option<String>) -> Result<Vec<String>> {
+        let cache_path = rusto_rs::model_manager::get_cache_dir(cache_dir.as_deref().map(std::path::Path::new));
+        let downloaded = rusto_rs::model_manager::download_all_models(&cache_path)
+            .map_err(|e| Error::new(Status::GenericFailure, format!("Failed to download all models: {e}")))?;
+        Ok(downloaded.into_iter().map(|p| p.to_string_lossy().to_string()).collect())
+    }
+
+    #[napi]
     pub fn detect_text_file(&mut self, path: String, options_json: Option<String>) -> Result<String> {
         let options = match options_json {
             Some(json) if !json.trim().is_empty() => serde_json::from_str::<OcrRunOptions>(&json)
