@@ -28,14 +28,15 @@ pub fn normalize_model_name(name: Option<&str>) -> &'static str {
         Some("ppocrv6-small-int8") | Some("small-int8") => "ppocrv6-small-int8",
         Some("ppocrv6-medium") | Some("v6-medium") | Some("medium") => "ppocrv6-medium",
         Some("ppocrv6-medium-int8") | Some("medium-int8") => "ppocrv6-medium-int8",
-        Some("ppocrv6") | Some("v6") | Some("ppocrv6-tiny") | Some("v6-tiny") | Some("tiny") => {
+        Some("ppocrv6") | Some("v6") | Some("ppv6") | Some("ppocrv6-tiny") | Some("v6-tiny") | Some("tiny") => {
             "ppocrv6-tiny"
         }
         Some("ppocrv6-tiny-int8") | Some("tiny-int8") => "ppocrv6-tiny-int8",
-        Some("ppocrv5") | Some("ppocrv5-mobile") | Some("v5") => "ppocrv5-mobile",
+        Some("ppocrv5") | Some("ppv5") | Some("ppocrv5-mobile") | Some("v5") => "ppocrv5-mobile",
         Some("ppocrv5-server") | Some("v5-server") => "ppocrv5-server",
-        Some("ppocrv4") | Some("ppocrv4-mobile") | Some("v4") => "ppocrv4-mobile",
+        Some("ppocrv4") | Some("ppv4") | Some("ppocrv4-mobile") | Some("v4") => "ppocrv4-mobile",
         Some("ppocrv4-server") | Some("v4-server") => "ppocrv4-server",
+        Some("ppocrv3") | Some("ppv3") | Some("ppocrv3-mobile") | Some("v3") => "ppocrv3-mobile",
         // Default flagship
         _ => "indraocr",
     }
@@ -675,9 +676,13 @@ mod tests {
         assert_eq!(normalize_model_name(None), "indraocr");
         assert_eq!(normalize_model_name(Some("")), "indraocr");
         assert_eq!(normalize_model_name(Some("ppocrv6")), "ppocrv6-tiny");
+        assert_eq!(normalize_model_name(Some("ppv6")), "ppocrv6-tiny");
         assert_eq!(normalize_model_name(Some("PP-OCRv6-Tiny")), "ppocrv6-tiny");
         assert_eq!(normalize_model_name(Some("ppocrv6_small")), "ppocrv6-small");
         assert_eq!(normalize_model_name(Some("ppocrv5")), "ppocrv5-mobile");
+        assert_eq!(normalize_model_name(Some("ppv5")), "ppocrv5-mobile");
+        assert_eq!(normalize_model_name(Some("ppv4")), "ppocrv4-mobile");
+        assert_eq!(normalize_model_name(Some("ppv3")), "ppocrv3-mobile");
         assert_eq!(normalize_model_name(Some("ppocrv4_server")), "ppocrv4-server");
         assert_eq!(normalize_model_name(Some("indraocr")), "indraocr");
         assert_eq!(normalize_model_name(Some("indra")), "indraocr");

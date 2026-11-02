@@ -209,6 +209,60 @@ struct FlatConfig {
     #[serde(alias = "layoutVariant", alias = "layout_variant")]
     layout_variant: Option<String>,
 
+    #[serde(alias = "detModelPath", alias = "det_model_path", alias = "detPath", alias = "det_path")]
+    det_model_path: Option<PathBuf>,
+    #[serde(alias = "recModelPath", alias = "rec_model_path", alias = "recPath", alias = "rec_path")]
+    rec_model_path: Option<PathBuf>,
+    #[serde(alias = "dictPath", alias = "dict_path")]
+    dict_path: Option<PathBuf>,
+    #[serde(alias = "clsModelPath", alias = "cls_model_path", alias = "clsPath", alias = "cls_path")]
+    cls_model_path: Option<PathBuf>,
+    #[serde(alias = "orientModelPath", alias = "orient_model_path", alias = "orientPath", alias = "orient_path")]
+    orient_model_path: Option<PathBuf>,
+    #[serde(alias = "unwarpModelPath", alias = "unwarp_model_path", alias = "unwarpPath", alias = "unwarp_path")]
+    unwarp_model_path: Option<PathBuf>,
+    #[serde(alias = "layoutModelPath", alias = "layout_model_path", alias = "layoutPath", alias = "layout_path")]
+    layout_model_path: Option<PathBuf>,
+
+    #[serde(alias = "detThresh", alias = "det_thresh")]
+    det_thresh: Option<f32>,
+    #[serde(alias = "detBoxThresh", alias = "box_thresh", alias = "boxThresh", alias = "det_box_thresh")]
+    box_thresh: Option<f32>,
+    #[serde(alias = "unclipRatio", alias = "unclip_ratio")]
+    unclip_ratio: Option<f32>,
+    #[serde(alias = "limitSideLen", alias = "limit_side_len")]
+    limit_side_len: Option<i32>,
+    #[serde(alias = "limitType", alias = "limit_type")]
+    limit_type: Option<String>,
+    #[serde(alias = "useDilation", alias = "use_dilation")]
+    use_dilation: Option<bool>,
+    #[serde(alias = "scoreMode", alias = "score_mode", alias = "detScoreMode", alias = "det_score_mode")]
+    score_mode: Option<String>,
+    #[serde(alias = "maxCandidates", alias = "max_candidates")]
+    max_candidates: Option<i32>,
+
+    #[serde(alias = "textScore", alias = "scoreThresh", alias = "score_thresh", alias = "text_score")]
+    text_score: Option<f32>,
+    #[serde(alias = "returnWordBox", alias = "return_word_box")]
+    return_word_box: Option<bool>,
+    #[serde(alias = "returnSingleCharBox", alias = "return_single_char_box")]
+    return_single_char_box: Option<bool>,
+    #[serde(alias = "recBatchNum", alias = "rec_batch_num", alias = "batchNum", alias = "batch_num")]
+    rec_batch_num: Option<i32>,
+
+    #[serde(alias = "useDet", alias = "use_det")]
+    use_det: Option<bool>,
+    #[serde(alias = "useRec", alias = "use_rec")]
+    use_rec: Option<bool>,
+    #[serde(alias = "useCls", alias = "use_cls")]
+    use_cls: Option<bool>,
+    #[serde(alias = "useOrient", alias = "use_orient")]
+    use_orient: Option<bool>,
+    #[serde(alias = "useUnwarp", alias = "use_unwarp")]
+    use_unwarp: Option<bool>,
+    #[serde(alias = "useLayout", alias = "use_layout")]
+    use_layout: Option<bool>,
+
     detection: Option<DetectionConfigJson>,
     recognition: Option<RecognitionConfigJson>,
     classification: Option<ClassificationConfigJson>,
@@ -316,9 +370,18 @@ impl InitializeConfig {
 
         let cache_dir = crate::model_manager::get_cache_dir(flat.cache_dir.as_deref());
 
-        let det_override = flat.detection.as_ref().and_then(|d| d.model_path.as_deref());
-        let rec_override = flat.recognition.as_ref().and_then(|r| r.model_path.as_deref());
-        let dict_override = flat.recognition.as_ref().and_then(|r| r.dict_path.as_deref());
+        let det_override = flat
+            .det_model_path
+            .as_deref()
+            .or_else(|| flat.detection.as_ref().and_then(|d| d.model_path.as_deref()));
+        let rec_override = flat
+            .rec_model_path
+            .as_deref()
+            .or_else(|| flat.recognition.as_ref().and_then(|r| r.model_path.as_deref()));
+        let dict_override = flat
+            .dict_path
+            .as_deref()
+            .or_else(|| flat.recognition.as_ref().and_then(|r| r.dict_path.as_deref()));
 
         let effective_model = flat.model.as_deref().or(flat.template.as_deref());
 
@@ -399,8 +462,14 @@ impl InitializeConfig {
 
         let mut config = Self::from_preset(preset, det_path, rec_path, dict_path);
 
-        let orient_override = flat.orientation.as_ref().and_then(|o| o.model_path.as_deref());
-        let orient_enabled = flat.orientation.as_ref().and_then(|o| o.enabled).unwrap_or(orient_override.is_some());
+        let orient_override = flat
+            .orient_model_path
+            .as_deref()
+            .or_else(|| flat.orientation.as_ref().and_then(|o| o.model_path.as_deref()));
+        let orient_enabled = flat
+            .use_orient
+            .or_else(|| flat.orientation.as_ref().and_then(|o| o.enabled))
+            .unwrap_or(orient_override.is_some());
         if orient_enabled {
             let orient_path = if let Some(p) = orient_override {
                 PathBuf::from(p)
@@ -421,8 +490,14 @@ impl InitializeConfig {
             }
         }
 
-        let cls_override = flat.classification.as_ref().and_then(|c| c.model_path.as_deref());
-        let cls_enabled = flat.classification.as_ref().and_then(|c| c.enabled).unwrap_or(cls_override.is_some());
+        let cls_override = flat
+            .cls_model_path
+            .as_deref()
+            .or_else(|| flat.classification.as_ref().and_then(|c| c.model_path.as_deref()));
+        let cls_enabled = flat
+            .use_cls
+            .or_else(|| flat.classification.as_ref().and_then(|c| c.enabled))
+            .unwrap_or(cls_override.is_some());
         if cls_enabled {
             let cls_path = if let Some(p) = cls_override {
                 PathBuf::from(p)
@@ -437,8 +512,14 @@ impl InitializeConfig {
             }
         }
 
-        let unwarp_override = flat.unwarp.as_ref().and_then(|u| u.model_path.as_deref());
-        let unwarp_enabled = flat.unwarp.as_ref().and_then(|u| u.enabled).unwrap_or(unwarp_override.is_some());
+        let unwarp_override = flat
+            .unwarp_model_path
+            .as_deref()
+            .or_else(|| flat.unwarp.as_ref().and_then(|u| u.model_path.as_deref()));
+        let unwarp_enabled = flat
+            .use_unwarp
+            .or_else(|| flat.unwarp.as_ref().and_then(|u| u.enabled))
+            .unwrap_or(unwarp_override.is_some());
         if unwarp_enabled {
             let unwarp_path = if let Some(p) = unwarp_override {
                 PathBuf::from(p)
@@ -449,8 +530,14 @@ impl InitializeConfig {
             config = config.with_unwarp(unwarp_path);
         }
 
-        let layout_override = flat.layout.as_ref().and_then(|l| l.model_path.as_deref());
-        let layout_enabled = flat.layout.as_ref().and_then(|l| l.enabled).unwrap_or(layout_override.is_some() || flat.layout_variant.is_some());
+        let layout_override = flat
+            .layout_model_path
+            .as_deref()
+            .or_else(|| flat.layout.as_ref().and_then(|l| l.model_path.as_deref()));
+        let layout_enabled = flat
+            .use_layout
+            .or_else(|| flat.layout.as_ref().and_then(|l| l.enabled))
+            .unwrap_or(layout_override.is_some() || flat.layout_variant.is_some());
         if layout_enabled {
             let layout_path = if let Some(p) = layout_override {
                 PathBuf::from(p)
@@ -482,55 +569,58 @@ impl InitializeConfig {
             config.global.reading_order_model = Some(order_path);
         }
 
-        if let Some(score) = flat.recognition.as_ref().and_then(|r| r.score_thresh) {
+        if let Some(score) = flat.text_score.or_else(|| flat.recognition.as_ref().and_then(|r| r.score_thresh)) {
             config.global.text_score = score;
         }
-        if let Some(thresh) = flat.detection.as_ref().and_then(|d| d.thresh) {
+        if let Some(thresh) = flat.det_thresh.or_else(|| flat.detection.as_ref().and_then(|d| d.thresh)) {
             config.det.thresh = thresh;
         }
-        if let Some(box_thresh) = flat.detection.as_ref().and_then(|d| d.box_thresh) {
+        if let Some(box_thresh) = flat.box_thresh.or_else(|| flat.detection.as_ref().and_then(|d| d.box_thresh)) {
             config.det.box_thresh = box_thresh;
         }
-        if let Some(side_len) = flat.detection.as_ref().and_then(|d| d.limit_side_len) {
+        if let Some(side_len) = flat.limit_side_len.or_else(|| flat.detection.as_ref().and_then(|d| d.limit_side_len)) {
             config.det.limit_side_len = side_len;
         }
-        if let Some(limit_type) = flat.detection.as_ref().and_then(|d| d.limit_type.clone()) {
+        if let Some(limit_type) = flat.limit_type.or_else(|| flat.detection.as_ref().and_then(|d| d.limit_type.clone())) {
             config.det.limit_type = limit_type;
         }
-        if let Some(unclip) = flat.detection.as_ref().and_then(|d| d.unclip_ratio) {
+        if let Some(unclip) = flat.unclip_ratio.or_else(|| flat.detection.as_ref().and_then(|d| d.unclip_ratio)) {
             config.det.unclip_ratio = unclip;
         }
-        if let Some(dilation) = flat.detection.as_ref().and_then(|d| d.use_dilation) {
+        if let Some(max_cand) = flat.max_candidates {
+            config.det.max_candidates = max_cand;
+        }
+        if let Some(dilation) = flat.use_dilation.or_else(|| flat.detection.as_ref().and_then(|d| d.use_dilation)) {
             config.det.use_dilation = dilation;
         }
-        if let Some(score_mode) = flat.detection.as_ref().and_then(|d| d.score_mode.clone()) {
+        if let Some(score_mode) = flat.score_mode.or_else(|| flat.detection.as_ref().and_then(|d| d.score_mode.clone())) {
             config.det.score_mode = score_mode;
         }
-        if let Some(use_det) = flat.detection.as_ref().and_then(|d| d.enabled) {
+        if let Some(use_det) = flat.use_det.or_else(|| flat.detection.as_ref().and_then(|d| d.enabled)) {
             config.global.use_det = use_det;
         }
-        if let Some(use_rec) = flat.recognition.as_ref().and_then(|r| r.enabled) {
+        if let Some(use_rec) = flat.use_rec.or_else(|| flat.recognition.as_ref().and_then(|r| r.enabled)) {
             config.global.use_rec = use_rec;
         }
-        if let Some(use_cls) = flat.classification.as_ref().and_then(|c| c.enabled) {
+        if let Some(use_cls) = flat.use_cls.or_else(|| flat.classification.as_ref().and_then(|c| c.enabled)) {
             config.global.use_cls = use_cls;
         }
-        if let Some(use_orient) = flat.orientation.as_ref().and_then(|o| o.enabled) {
+        if let Some(use_orient) = flat.use_orient.or_else(|| flat.orientation.as_ref().and_then(|o| o.enabled)) {
             config.global.use_orient = use_orient;
         }
-        if let Some(use_unwarp) = flat.unwarp.as_ref().and_then(|u| u.enabled) {
+        if let Some(use_unwarp) = flat.use_unwarp.or_else(|| flat.unwarp.as_ref().and_then(|u| u.enabled)) {
             config.global.use_unwarp = use_unwarp;
         }
-        if let Some(use_layout) = flat.layout.as_ref().and_then(|l| l.enabled) {
+        if let Some(use_layout) = flat.use_layout.or_else(|| flat.layout.as_ref().and_then(|l| l.enabled)) {
             config.global.use_layout = use_layout;
         }
-        if let Some(word_box) = flat.recognition.as_ref().and_then(|r| r.return_word_box) {
+        if let Some(word_box) = flat.return_word_box.or_else(|| flat.recognition.as_ref().and_then(|r| r.return_word_box)) {
             config.global.return_word_box = word_box;
         }
-        if let Some(char_box) = flat.recognition.as_ref().and_then(|r| r.return_single_char_box) {
+        if let Some(char_box) = flat.return_single_char_box.or_else(|| flat.recognition.as_ref().and_then(|r| r.return_single_char_box)) {
             config.global.return_single_char_box = char_box;
         }
-        if let Some(batch_num) = flat.recognition.as_ref().and_then(|r| r.rec_batch_num) {
+        if let Some(batch_num) = flat.rec_batch_num.or_else(|| flat.recognition.as_ref().and_then(|r| r.rec_batch_num)) {
             config.rec.rec_batch_num = batch_num;
         }
         if let Some(y_mult) = flat.layout.as_ref().and_then(|l| l.y_threshold_multiplier) {
