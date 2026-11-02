@@ -260,7 +260,7 @@ fn run_rusto_base_pipeline<E: OcrEngineBackend>(
     // Step 3: Detection Postprocessing (DBNet binarization & unclip)
     // --------------------------------------------------------
     let t_det_post0 = Instant::now();
-    let post = DBPostProcess::new(0.3, 0.6, 1000, 2.0, true);
+    let post = DBPostProcess::new(0.3, 0.6, 1000, 2.0, true, "slow");
     let (mut padded_boxes, _) = post.process(&det_preds, padded.rows(), padded.cols())?;
     sort_det_boxes(&mut padded_boxes);
     let det_post_ms = t_det_post0.elapsed().as_secs_f64() * 1000.0;
