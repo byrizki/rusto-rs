@@ -310,3 +310,168 @@ fn test_real_layout_publaynet_detection() {
         assert!(r.bbox.y_max > r.bbox.y_min);
     }
 }
+
+#[test]
+fn test_issue26_dense_page_total_order_does_not_panic() {
+    use rusto::layout::sort_lines_reading_order;
+    use rusto::{Frame, TextResult};
+
+    // Construct 153 staggered lines simulating the dense advertisement page from Issue #26.
+    // The previous non-transitive comparator (top_diff < 10.0 -> left else top) panicked
+    // with "user-provided comparison function does not correctly implement a total order"
+    // when tops cycle: 0 -> 8 -> 16 -> 0 with staggered left coordinates.
+    let mut lines = Vec::new();
+    for i in 0..153 {
+        let top = (i * 8 % 740) as f32;
+        let left = ((153 - i) * 13 % 1000) as f32;
+        let width = 60.0;
+        let height = 12.0;
+        let box_points = [
+            (left, top),
+            (left + width, top),
+            (left + width, top + height),
+            (left, top + height),
+        ];
+        lines.push(TextResult {
+            text: format!("line_{i}"),
+            score: 0.95,
+            box_points,
+            frame: Frame::new(width, height, top, left),
+            region_id: None,
+            layout_type: None,
+        });
+    }
+
+    // Must not panic on Rust's slice sort
+    sort_lines_reading_order(&mut lines);
+    assert_eq!(lines.len(), 153);
+}
+
+#[test]
+fn test_issue25_multi_column_reading_order_and_region_ids() {
+    use rusto::layout::{order_text_results_by_layout, BBox, LayoutRegion, LayoutType};
+    use rusto::{Frame, TextResult};
+
+    // Simulate 4 columns of ads side-by-side across a 1000px wide page
+    let regions = vec![
+        // Column 0: x in [0, 220], y in [100, 700]
+        LayoutRegion {
+            bbox: BBox { x_min: 10, y_min: 100, x_max: 220, y_max: 700 },
+            layout_type: LayoutType::Text,
+            confidence: 0.95,
+        },
+        // Column 1: x in [250, 470], y in [100, 700]
+        LayoutRegion {
+            bbox: BBox { x_min: 250, y_min: 100, x_max: 470, y_max: 700 },
+            layout_type: LayoutType::Text,
+            confidence: 0.95,
+        },
+        // Column 2: x in [500, 720], y in [100, 700]
+        LayoutRegion {
+            bbox: BBox { x_min: 500, y_min: 100, x_max: 720, y_max: 700 },
+            layout_type: LayoutType::Text,
+            confidence: 0.95,
+        },
+        // Column 3: x in [750, 970], y in [100, 700]
+        LayoutRegion {
+            bbox: BBox { x_min: 750, y_min: 100, x_max: 970, y_max: 700 },
+            layout_type: LayoutType::Text,
+            confidence: 0.95,
+        },
+    ];
+
+    // Create 3 lines per column
+    let mut raw_lines = Vec::new();
+    for col in 0..4 {
+        for row in 0..3 {
+            let left = (col * 250 + 20) as f32;
+            let top = (120 + row * 150) as f32;
+            let width = 180.0;
+            let height = 20.0;
+            let box_points = [
+                (left, top),
+                (left + width, top),
+                (left + width, top + height),
+                (left, top + height),
+            ];
+            raw_lines.push(TextResult {
+                text: format!("col_{col}_row_{row}"),
+                score: 0.99,
+                box_points,
+                frame: Frame::new(width, height, top, left),
+                region_id: None,
+                layout_type: None,
+            });
+        }
+    }
+
+    // Interleave lines (as det produces when scanning in top-down raster order)
+    let mut interleaved = Vec::new();
+    for row in 0..3 {
+        for col in 0..4 {
+            interleaved.push(raw_lines[col * 3 + row].clone());
+        }
+    }
+
+    let ordered = order_text_results_by_layout(&interleaved, &regions, 1000.0);
+    assert_eq!(ordered.len(), 12);
+
+    // Verify Column 0 lines come first, then Column 1, then Column 2, then Column 3
+    let ordered_texts: Vec<String> = ordered.iter().map(|r| r.text.clone()).collect();
+    assert_eq!(ordered_texts[0], "col_0_row_0");
+    assert_eq!(ordered_texts[1], "col_0_row_1");
+    assert_eq!(ordered_texts[2], "col_0_row_2");
+    assert_eq!(ordered_texts[3], "col_1_row_0");
+    assert_eq!(ordered_texts[4], "col_1_row_1");
+    assert_eq!(ordered_texts[5], "col_1_row_2");
+    assert_eq!(ordered_texts[6], "col_2_row_0");
+    assert_eq!(ordered_texts[7], "col_2_row_1");
+    assert_eq!(ordered_texts[8], "col_2_row_2");
+    assert_eq!(ordered_texts[9], "col_3_row_0");
+    assert_eq!(ordered_texts[10], "col_3_row_1");
+    assert_eq!(ordered_texts[11], "col_3_row_2");
+
+    // Verify region_id and layout_type are set on every line
+    for (i, line) in ordered.iter().enumerate() {
+        let expected_col = i / 3;
+        assert_eq!(line.region_id, Some(expected_col as i32));
+        assert_eq!(line.layout_type, Some(LayoutType::Text));
+    }
+}
+
+#[test]
+fn test_issue25_c_ffi_layout_api_and_results() {
+    use rusto::ffi::*;
+    use rusto::{InitializeConfig, RustO};
+
+    let det_path = "models/PPOCR_v6_tiny/det.rten";
+    let rec_path = "models/PPOCR_v6_tiny/rec.rten";
+    let dict_path = "models/PPOCR_v6_tiny/dict.txt";
+
+    if !std::path::Path::new(det_path).exists() {
+        return;
+    }
+
+    let config = InitializeConfig::ppv6(det_path, rec_path, dict_path);
+    let ocr = RustO::initialize(config).expect("Initialize RustO");
+    let handle = Box::into_raw(Box::new(unsafe {
+        // Construct ROCRHandle
+        std::mem::transmute::<RustO, ROCRHandle>(ocr)
+    }));
+
+    let mut regions_ptr: *mut CLayoutRegion = std::ptr::null_mut();
+    let mut count: usize = 0;
+
+    // Detect on RGB image with no layout detector attached should return error (-3) or 0
+    let pixels = vec![255u8; 100 * 100 * 3];
+    let ret = unsafe {
+        rocr_detect_layout_rgb(handle, pixels.as_ptr(), pixels.len(), 100, 100, 300, &mut regions_ptr, &mut count)
+    };
+    // No layout model configured -> error -3
+    assert_eq!(ret, -3);
+
+    unsafe {
+        rocr_free_layout_regions(regions_ptr, count);
+        rocr_free(handle);
+    }
+}

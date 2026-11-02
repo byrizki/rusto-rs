@@ -20,6 +20,8 @@ typedef struct {
     float frame_height;
     float frame_top;
     float frame_left;
+    int region_id;
+    int layout_type;
 } CTextResult;
 
 typedef void *ROCRHandle;

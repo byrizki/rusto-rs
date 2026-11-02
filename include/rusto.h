@@ -32,7 +32,23 @@ typedef struct {
     float frame_height;
     float frame_top;
     float frame_left;
+    int region_id;
+    int layout_type;
 } CTextResult;
+
+/**
+ * C-compatible detected document layout region structure
+ */
+typedef struct {
+    int x_min;
+    int y_min;
+    int x_max;
+    int y_max;
+    int layout_type;
+    float confidence;
+} CLayoutRegion;
+
+#define DEFAULT_BASE_URL DEFAULT_HF_BASE_URL
 
 #ifdef __cplusplus
 extern "C" {
@@ -155,6 +171,37 @@ void rocr_free(ROCRHandle *handle);
  * Get library version
  */
 const char *rocr_version(void);
+
+/**
+ * Detect document layout regions from an image file path.
+ *
+ * Returns 0 on success, negative error code on failure.
+ * Free returned regions with `rocr_free_layout_regions`.
+ */
+int rocr_detect_layout_file(ROCRHandle *handle,
+                            const char *image_path,
+                            CLayoutRegion **regions_out,
+                            size_t *count_out);
+
+/**
+ * Detect document layout regions from decoded, interleaved RGB8 pixels.
+ *
+ * Returns 0 on success, negative error code on failure.
+ * Free returned regions with `rocr_free_layout_regions`.
+ */
+int rocr_detect_layout_rgb(ROCRHandle *handle,
+                           const uint8_t *image_data,
+                           size_t image_len,
+                           uint32_t width,
+                           uint32_t height,
+                           size_t stride,
+                           CLayoutRegion **regions_out,
+                           size_t *count_out);
+
+/**
+ * Free layout region results returned by `rocr_detect_layout_*`.
+ */
+void rocr_free_layout_regions(CLayoutRegion *regions, size_t count);
 
 #ifdef __cplusplus
 }  // extern "C"

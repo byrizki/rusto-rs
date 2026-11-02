@@ -5,9 +5,6 @@
 
 #nullable enable
 
-
-
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,34 +12,48 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
+
 namespace RustODotnet.Generated;
-
-
 
 // This is a helper for safely working with byte buffers returned from the Rust code.
 // A rust-owned buffer is represented by its capacity, its current length, and a
 // pointer to the underlying data.
 
 [StructLayout(LayoutKind.Sequential)]
-internal struct RustBuffer {
+internal struct RustBuffer
+{
     public ulong capacity;
     public ulong len;
     public IntPtr data;
 
-    public static RustBuffer Alloc(int size) {
-        return _UniffiHelpers.RustCall((ref UniffiRustCallStatus status) => {
-            var buffer = _UniFFILib.ffi_rusto_rustbuffer_alloc(Convert.ToUInt64(size), ref status);
-            if (buffer.data == IntPtr.Zero) {
-                throw new AllocationException($"RustBuffer.Alloc() returned null data pointer (size={size})");
+    public static RustBuffer Alloc(int size)
+    {
+        return _UniffiHelpers.RustCall(
+            (ref UniffiRustCallStatus status) =>
+            {
+                var buffer = _UniFFILib.ffi_rusto_rustbuffer_alloc(
+                    Convert.ToUInt64(size),
+                    ref status
+                );
+                if (buffer.data == IntPtr.Zero)
+                {
+                    throw new AllocationException(
+                        $"RustBuffer.Alloc() returned null data pointer (size={size})"
+                    );
+                }
+                return buffer;
             }
-            return buffer;
-        });
+        );
     }
 
-    public static void Free(RustBuffer buffer) {
-        _UniffiHelpers.RustCall((ref UniffiRustCallStatus status) => {
-            _UniFFILib.ffi_rusto_rustbuffer_free(buffer, ref status);
-        });
+    public static void Free(RustBuffer buffer)
+    {
+        _UniffiHelpers.RustCall(
+            (ref UniffiRustCallStatus status) =>
+            {
+                _UniFFILib.ffi_rusto_rustbuffer_free(buffer, ref status);
+            }
+        );
     }
 
     public static BigEndianStream MemoryStream(IntPtr data, long length)
@@ -86,17 +97,18 @@ internal struct RustBuffer {
 // completeness.
 
 [StructLayout(LayoutKind.Sequential)]
-internal struct ForeignBytes {
+internal struct ForeignBytes
+{
     public int length;
     public IntPtr data;
 }
-
 
 // The FfiConverter interface handles converter types to and from the FFI
 //
 // All implementing objects should be public to support external types.  When a
 // type is external we need to import it's FfiConverter.
-internal abstract class FfiConverter<CsType, FfiType> {
+internal abstract class FfiConverter<CsType, FfiType>
+{
     // Convert an FFI type to a C# type
     public abstract CsType Lift(FfiType value);
 
@@ -125,14 +137,18 @@ internal abstract class FfiConverter<CsType, FfiType> {
     // FfiType.  It's used by the callback interface code.  Callback interface
     // returns are always serialized into a `RustBuffer` regardless of their
     // normal FFI type.
-    public RustBuffer LowerIntoRustBuffer(CsType value) {
+    public RustBuffer LowerIntoRustBuffer(CsType value)
+    {
         var rbuf = RustBuffer.Alloc(AllocationSize(value));
-        try {
+        try
+        {
             var stream = rbuf.AsWriteableStream();
             Write(value, stream);
             rbuf.len = Convert.ToUInt64(stream.Position);
             return rbuf;
-        } catch {
+        }
+        catch
+        {
             RustBuffer.Free(rbuf);
             throw;
         }
@@ -142,222 +158,295 @@ internal abstract class FfiConverter<CsType, FfiType> {
     //
     // This here mostly because of the symmetry with `lowerIntoRustBuffer()`.
     // It's currently only used by the `FfiConverterRustBuffer` class below.
-    protected CsType LiftFromRustBuffer(RustBuffer rbuf) {
+    protected CsType LiftFromRustBuffer(RustBuffer rbuf)
+    {
         var stream = rbuf.AsStream();
-        try {
-           var item = Read(stream);
-           if (stream.HasRemaining()) {
-               throw new InternalException("junk remaining in buffer after lifting, something is very wrong!!");
-           }
-           return item;
-        } finally {
+        try
+        {
+            var item = Read(stream);
+            if (stream.HasRemaining())
+            {
+                throw new InternalException(
+                    "junk remaining in buffer after lifting, something is very wrong!!"
+                );
+            }
+            return item;
+        }
+        finally
+        {
             RustBuffer.Free(rbuf);
         }
     }
 }
 
 // FfiConverter that uses `RustBuffer` as the FfiType
-internal abstract class FfiConverterRustBuffer<CsType>: FfiConverter<CsType, RustBuffer> {
-    public override CsType Lift(RustBuffer value) {
+internal abstract class FfiConverterRustBuffer<CsType> : FfiConverter<CsType, RustBuffer>
+{
+    public override CsType Lift(RustBuffer value)
+    {
         return LiftFromRustBuffer(value);
     }
-    public override RustBuffer Lower(CsType value) {
+
+    public override RustBuffer Lower(CsType value)
+    {
         return LowerIntoRustBuffer(value);
     }
 }
-
 
 // A handful of classes and functions to support the generated data structures.
 // This would be a good candidate for isolating in its own ffi-support lib.
 // Error runtime.
 [StructLayout(LayoutKind.Sequential)]
-struct UniffiRustCallStatus {
+struct UniffiRustCallStatus
+{
     public sbyte code;
     public RustBuffer error_buf;
 
-    public bool IsSuccess() {
+    public bool IsSuccess()
+    {
         return code == 0;
     }
 
-    public bool IsError() {
+    public bool IsError()
+    {
         return code == 1;
     }
 
-    public bool IsPanic() {
+    public bool IsPanic()
+    {
         return code == 2;
     }
 }
 
 // Base class for all uniffi exceptions
-public class UniffiException: System.Exception {
-    public UniffiException(): base() {}
-    public UniffiException(string message): base(message) {}
+public class UniffiException : System.Exception
+{
+    public UniffiException()
+        : base() { }
+
+    public UniffiException(string message)
+        : base(message) { }
 }
 
-public class UndeclaredErrorException: UniffiException {
-    public UndeclaredErrorException(string message): base(message) {}
+public class UndeclaredErrorException : UniffiException
+{
+    public UndeclaredErrorException(string message)
+        : base(message) { }
 }
 
-public class PanicException: UniffiException {
-    public PanicException(string message): base(message) {}
+public class PanicException : UniffiException
+{
+    public PanicException(string message)
+        : base(message) { }
 }
 
-public class AllocationException: UniffiException {
-    public AllocationException(string message): base(message) {}
+public class AllocationException : UniffiException
+{
+    public AllocationException(string message)
+        : base(message) { }
 }
 
-public class InternalException: UniffiException {
-    public InternalException(string message): base(message) {}
+public class InternalException : UniffiException
+{
+    public InternalException(string message)
+        : base(message) { }
 }
 
-public class InvalidEnumException: InternalException {
-    public InvalidEnumException(string message): base(message) {
-    }
+public class InvalidEnumException : InternalException
+{
+    public InvalidEnumException(string message)
+        : base(message) { }
 }
 
-public class UniffiContractVersionException: UniffiException {
-    public UniffiContractVersionException(string message): base(message) {
-    }
+public class UniffiContractVersionException : UniffiException
+{
+    public UniffiContractVersionException(string message)
+        : base(message) { }
 }
 
-public class UniffiContractChecksumException: UniffiException {
-    public UniffiContractChecksumException(string message): base(message) {
-    }
+public class UniffiContractChecksumException : UniffiException
+{
+    public UniffiContractChecksumException(string message)
+        : base(message) { }
 }
 
 // Each top-level error class has a companion object that can lift the error from the call status's rust buffer
-interface CallStatusErrorHandler<E> where E: System.Exception {
+interface CallStatusErrorHandler<E>
+    where E : System.Exception
+{
     E Lift(RustBuffer error_buf);
 }
 
 // CallStatusErrorHandler implementation for times when we don't expect a CALL_ERROR
-class NullCallStatusErrorHandler: CallStatusErrorHandler<UniffiException> {
+class NullCallStatusErrorHandler : CallStatusErrorHandler<UniffiException>
+{
     public static NullCallStatusErrorHandler INSTANCE = new NullCallStatusErrorHandler();
 
-    public UniffiException Lift(RustBuffer error_buf) {
+    public UniffiException Lift(RustBuffer error_buf)
+    {
         RustBuffer.Free(error_buf);
-        return new UndeclaredErrorException("library has returned an error not declared in UNIFFI interface file");
+        return new UndeclaredErrorException(
+            "library has returned an error not declared in UNIFFI interface file"
+        );
     }
 }
 
 // Helpers for calling Rust
 // In practice we usually need to be synchronized to call this safely, so it doesn't
 // synchronize itself
-class _UniffiHelpers {
+class _UniffiHelpers
+{
     public delegate void RustCallAction(ref UniffiRustCallStatus status);
     public delegate U RustCallFunc<out U>(ref UniffiRustCallStatus status);
 
     // Call a rust function that returns a Result<>.  Pass in the Error class companion that corresponds to the Err
-    public static U RustCallWithError<U, E>(CallStatusErrorHandler<E> errorHandler, RustCallFunc<U> callback)
-        where E: System.Exception
+    public static U RustCallWithError<U, E>(
+        CallStatusErrorHandler<E> errorHandler,
+        RustCallFunc<U> callback
+    )
+        where E : System.Exception
     {
         var status = new UniffiRustCallStatus();
         var return_value = callback(ref status);
-        if (status.IsSuccess()) {
+        if (status.IsSuccess())
+        {
             return return_value;
-        } else if (status.IsError()) {
+        }
+        else if (status.IsError())
+        {
             throw errorHandler.Lift(status.error_buf);
-        } else if (status.IsPanic()) {
+        }
+        else if (status.IsPanic())
+        {
             // when the rust code sees a panic, it tries to construct a rustbuffer
             // with the message.  but if that code panics, then it just sends back
             // an empty buffer.
-            if (status.error_buf.len > 0) {
+            if (status.error_buf.len > 0)
+            {
                 throw new PanicException(FfiConverterString.INSTANCE.Lift(status.error_buf));
-            } else {
+            }
+            else
+            {
                 throw new PanicException("Rust panic");
             }
-        } else {
+        }
+        else
+        {
             throw new InternalException($"Unknown rust call status: {status.code}");
         }
     }
 
     // Call a rust function that returns a Result<>.  Pass in the Error class companion that corresponds to the Err
-    public static void RustCallWithError<E>(CallStatusErrorHandler<E> errorHandler, RustCallAction callback)
-        where E: System.Exception
+    public static void RustCallWithError<E>(
+        CallStatusErrorHandler<E> errorHandler,
+        RustCallAction callback
+    )
+        where E : System.Exception
     {
-        _UniffiHelpers.RustCallWithError(errorHandler, (ref UniffiRustCallStatus status) => {
-            callback(ref status);
-            return 0;
-        });
+        _UniffiHelpers.RustCallWithError(
+            errorHandler,
+            (ref UniffiRustCallStatus status) =>
+            {
+                callback(ref status);
+                return 0;
+            }
+        );
     }
 
     // Call a rust function that returns a plain value
-    public static U RustCall<U>(RustCallFunc<U> callback) {
+    public static U RustCall<U>(RustCallFunc<U> callback)
+    {
         return _UniffiHelpers.RustCallWithError(NullCallStatusErrorHandler.INSTANCE, callback);
     }
 
     // Call a rust function that returns a plain value
-    public static void RustCall(RustCallAction callback) {
-        _UniffiHelpers.RustCall((ref UniffiRustCallStatus status) => {
-            callback(ref status);
-            return 0;
-        });
+    public static void RustCall(RustCallAction callback)
+    {
+        _UniffiHelpers.RustCall(
+            (ref UniffiRustCallStatus status) =>
+            {
+                callback(ref status);
+                return 0;
+            }
+        );
     }
 }
 
-static class FFIObjectUtil {
-    public static void DisposeAll(params Object?[] list) {
+static class FFIObjectUtil
+{
+    public static void DisposeAll(params Object?[] list)
+    {
         Dispose(list);
     }
 
     // Dispose is implemented by recursive type inspection at runtime. This is because
     // generating correct Dispose calls for recursive complex types, e.g. List<List<int>>
     // is quite cumbersome.
-   private static void Dispose(Object? obj) {
-         if (obj == null) {
-             return;
-         }
+    private static void Dispose(Object? obj)
+    {
+        if (obj == null)
+        {
+            return;
+        }
 
-         if (obj is IDisposable disposable) {
-             disposable.Dispose();
-             return;
-         }
+        if (obj is IDisposable disposable)
+        {
+            disposable.Dispose();
+            return;
+        }
 
-         var objType = obj.GetType();
-         var typeCode = Type.GetTypeCode(objType);
-         if (typeCode != TypeCode.Object) {
-             return;
-         }
+        var objType = obj.GetType();
+        var typeCode = Type.GetTypeCode(objType);
+        if (typeCode != TypeCode.Object)
+        {
+            return;
+        }
 
-         var genericArguments = objType.GetGenericArguments();
-         if (genericArguments.Length == 0 && !objType.IsArray) {
-             return;
-         }
+        var genericArguments = objType.GetGenericArguments();
+        if (genericArguments.Length == 0 && !objType.IsArray)
+        {
+            return;
+        }
 
-         if (obj is System.Collections.IDictionary objDictionary) {
-             //This extra code tests to not call "Dispose" for a Dictionary<something, double>()
-             //for all values as "double" and alike doesn't support interface "IDisposable"
-             var valuesType = objType.GetGenericArguments()[1];
-             var elementValuesTypeCode = Type.GetTypeCode(valuesType);
-             if (elementValuesTypeCode != TypeCode.Object) {
-                 return;
-             }
-             foreach (var value in objDictionary.Values) {
-                 Dispose(value);
-             }
-         }
-         else if (obj is System.Collections.IEnumerable listValues) {
-             //This extra code tests to not call "Dispose" for a List<int>()
-             //for all keys as "int" and alike doesn't support interface "IDisposable"
-             var elementType = objType.IsArray ? objType.GetElementType() : genericArguments[0];
-             var elementValuesTypeCode = Type.GetTypeCode(elementType);
-             if (elementValuesTypeCode != TypeCode.Object) {
-                 return;
-             }
-             foreach (var value in listValues) {
-                 Dispose(value);
-             }
-         }
-     }
+        if (obj is System.Collections.IDictionary objDictionary)
+        {
+            //This extra code tests to not call "Dispose" for a Dictionary<something, double>()
+            //for all values as "double" and alike doesn't support interface "IDisposable"
+            var valuesType = objType.GetGenericArguments()[1];
+            var elementValuesTypeCode = Type.GetTypeCode(valuesType);
+            if (elementValuesTypeCode != TypeCode.Object)
+            {
+                return;
+            }
+            foreach (var value in objDictionary.Values)
+            {
+                Dispose(value);
+            }
+        }
+        else if (obj is System.Collections.IEnumerable listValues)
+        {
+            //This extra code tests to not call "Dispose" for a List<int>()
+            //for all keys as "int" and alike doesn't support interface "IDisposable"
+            var elementType = objType.IsArray ? objType.GetElementType() : genericArguments[0];
+            var elementValuesTypeCode = Type.GetTypeCode(elementType);
+            if (elementValuesTypeCode != TypeCode.Object)
+            {
+                return;
+            }
+            foreach (var value in listValues)
+            {
+                Dispose(value);
+            }
+        }
+    }
 }
-
 
 // Big endian streams are not yet available in dotnet :'(
 // https://github.com/dotnet/runtime/issues/26904
 
-class StreamUnderflowException: System.Exception {
-    public StreamUnderflowException() {
-    }
+class StreamUnderflowException : System.Exception
+{
+    public StreamUnderflowException() { }
 }
 
 static class BigEndianStreamExtensions
@@ -388,10 +477,10 @@ static class BigEndianStreamExtensions
     {
         int bytesToWrite = 8;
 #if NET8_0_OR_GREATER
-         Span<byte> buffer = stackalloc byte[bytesToWrite];
- #else
-         byte[] buffer = new byte[bytesToWrite];
- #endif
+        Span<byte> buffer = stackalloc byte[bytesToWrite];
+#else
+        byte[] buffer = new byte[bytesToWrite];
+#endif
         var posByte = bytesToWrite;
         while (posByte != 0)
         {
@@ -407,11 +496,12 @@ static class BigEndianStreamExtensions
 #endif
     }
 
-    public static uint ReadUint32(this Stream stream, int bytesToRead = 4) {
+    public static uint ReadUint32(this Stream stream, int bytesToRead = 4)
+    {
         CheckRemaining(stream, bytesToRead);
 #if NET8_0_OR_GREATER
-         Span<byte> buffer = stackalloc byte[bytesToRead];
-         stream.Read(buffer);
+        Span<byte> buffer = stackalloc byte[bytesToRead];
+        stream.Read(buffer);
 #else
         byte[] buffer = new byte[bytesToRead];
         stream.Read(buffer, 0, bytesToRead);
@@ -422,19 +512,20 @@ static class BigEndianStreamExtensions
         while (posByte != 0)
         {
             posByte--;
-            result |= buffer[posByte]*digitMultiplier;
+            result |= buffer[posByte] * digitMultiplier;
             digitMultiplier <<= 8;
         }
 
         return result;
     }
 
-    public static ulong ReadUInt64(this Stream stream) {
+    public static ulong ReadUInt64(this Stream stream)
+    {
         int bytesToRead = 8;
         CheckRemaining(stream, bytesToRead);
 #if NET8_0_OR_GREATER
-         Span<byte> buffer = stackalloc byte[bytesToRead];
-         stream.Read(buffer);
+        Span<byte> buffer = stackalloc byte[bytesToRead];
+        stream.Read(buffer);
 #else
         byte[] buffer = new byte[bytesToRead];
         stream.Read(buffer, 0, bytesToRead);
@@ -445,44 +536,54 @@ static class BigEndianStreamExtensions
         while (posByte != 0)
         {
             posByte--;
-            result |= buffer[posByte]*digitMultiplier;
+            result |= buffer[posByte] * digitMultiplier;
             digitMultiplier <<= 8;
         }
 
         return result;
     }
 
-    public static void CheckRemaining(this Stream stream, int length) {
-        if (stream.Length - stream.Position < length) {
+    public static void CheckRemaining(this Stream stream, int length)
+    {
+        if (stream.Length - stream.Position < length)
+        {
             throw new StreamUnderflowException();
         }
     }
 
-    public static void ForEach<T>(this T[] items, Action<T> action){
-        foreach (var item in items) {
+    public static void ForEach<T>(this T[] items, Action<T> action)
+    {
+        foreach (var item in items)
+        {
             action(item);
         }
     }
 }
 
-class BigEndianStream {
+class BigEndianStream
+{
     Stream stream;
-    public BigEndianStream(Stream stream) {
+
+    public BigEndianStream(Stream stream)
+    {
         this.stream = stream;
     }
 
     public Stream InnerStream => stream;
 
-    public bool HasRemaining() {
+    public bool HasRemaining()
+    {
         return (stream.Length - Position) > 0;
     }
 
-    public long Position {
+    public long Position
+    {
         get => stream.Position;
         set => stream.Position = value;
     }
 
-    public void WriteBytes(byte[] buffer) {
+    public void WriteBytes(byte[] buffer)
+    {
 #if NET8_0_OR_GREATER
         stream.Write(buffer);
 #else
@@ -491,25 +592,34 @@ class BigEndianStream {
     }
 
     public void WriteByte(byte value) => stream.WriteInt32(value, bytesToWrite: 1);
+
     public void WriteSByte(sbyte value) => stream.WriteInt32(value, bytesToWrite: 1);
 
     public void WriteUShort(ushort value) => stream.WriteInt32(value, bytesToWrite: 2);
+
     public void WriteShort(short value) => stream.WriteInt32(value, bytesToWrite: 2);
 
     public void WriteUInt(uint value) => stream.WriteInt32((int)value);
+
     public void WriteInt(int value) => stream.WriteInt32(value);
 
     public void WriteULong(ulong value) => stream.WriteInt64((long)value);
+
     public void WriteLong(long value) => stream.WriteInt64(value);
 
-    public void WriteFloat(float value) {
-        unsafe {
+    public void WriteFloat(float value)
+    {
+        unsafe
+        {
             WriteInt(*((int*)&value));
         }
     }
-    public void WriteDouble(double value) => stream.WriteInt64(BitConverter.DoubleToInt64Bits(value));
 
-    public byte[] ReadBytes(int length) {
+    public void WriteDouble(double value) =>
+        stream.WriteInt64(BitConverter.DoubleToInt64Bits(value));
+
+    public byte[] ReadBytes(int length)
+    {
         stream.CheckRemaining(length);
         byte[] result = new byte[length];
         stream.Read(result, 0, length);
@@ -518,10 +628,17 @@ class BigEndianStream {
 
     // Reads a UTF-8 string of `length` bytes. Streams over RustBuffer memory
     // are decoded in place, avoiding an intermediate byte[] copy.
-    public string ReadUtf8String(int length) {
+    public string ReadUtf8String(int length)
+    {
         stream.CheckRemaining(length);
-        if (length >= 0 && stream is UnmanagedMemoryStream unmanagedStream && unmanagedStream.CanRead) {
-            unsafe {
+        if (
+            length >= 0
+            && stream is UnmanagedMemoryStream unmanagedStream
+            && unmanagedStream.CanRead
+        )
+        {
+            unsafe
+            {
                 var start = unmanagedStream.PositionPointer;
                 var result = System.Text.Encoding.UTF8.GetString(start, length);
                 unmanagedStream.PositionPointer = start + length;
@@ -534,25 +651,40 @@ class BigEndianStream {
     // Writes a big-endian length prefix followed by the UTF-8 bytes. Streams
     // over RustBuffer memory are encoded in place, avoiding an intermediate
     // byte[] copy.
-    public void WriteUtf8String(string value) {
-        if (value == null) {
+    public void WriteUtf8String(string value)
+    {
+        if (value == null)
+        {
             throw new ArgumentNullException(nameof(value));
         }
 
-        if (stream is UnmanagedMemoryStream unmanagedStream && unmanagedStream.CanWrite) {
+        if (stream is UnmanagedMemoryStream unmanagedStream && unmanagedStream.CanWrite)
+        {
             // Bytes left for the string itself, after its 4-byte length prefix.
             var available = unmanagedStream.Length - unmanagedStream.Position - 4;
 
             // UTF-8 needs at most 3 bytes per UTF-16 code unit, so the exact
             // byte count is only computed when that worst case might not fit.
-            if (available >= 0 && (available >= 3L * value.Length
-                    || available >= System.Text.Encoding.UTF8.GetByteCount(value))) {
-                unsafe {
+            if (
+                available >= 0
+                && (
+                    available >= 3L * value.Length
+                    || available >= System.Text.Encoding.UTF8.GetByteCount(value)
+                )
+            )
+            {
+                unsafe
+                {
                     var start = unmanagedStream.PositionPointer;
                     int length;
-                    fixed (char* chars = value) {
+                    fixed (char* chars = value)
+                    {
                         length = System.Text.Encoding.UTF8.GetBytes(
-                            chars, value.Length, start + 4, (int)Math.Min(available, int.MaxValue));
+                            chars,
+                            value.Length,
+                            start + 4,
+                            (int)Math.Min(available, int.MaxValue)
+                        );
                     }
                     // The length is only known after encoding, so it goes into the
                     // 4 bytes reserved before the string, big-endian like WriteInt.
@@ -572,269 +704,225 @@ class BigEndianStream {
     }
 
     public byte ReadByte() => (byte)stream.ReadUint32(bytesToRead: 1);
+
     public ushort ReadUShort() => (ushort)stream.ReadUint32(bytesToRead: 2);
+
     public uint ReadUInt() => (uint)stream.ReadUint32(bytesToRead: 4);
+
     public ulong ReadULong() => stream.ReadUInt64();
 
     public sbyte ReadSByte() => (sbyte)ReadByte();
+
     public short ReadShort() => (short)ReadUShort();
+
     public int ReadInt() => (int)ReadUInt();
 
-    public float ReadFloat() {
-        unsafe {
+    public float ReadFloat()
+    {
+        unsafe
+        {
             int value = ReadInt();
             return *((float*)&value);
         }
     }
 
     public long ReadLong() => (long)ReadULong();
+
     public double ReadDouble() => BitConverter.Int64BitsToDouble(ReadLong());
 }
 
 // Contains loading, initialization code,
 // and the FFI Function declarations in a com.sun.jna.Library.
 
-
 // This is an implementation detail that will be called internally by the public API.
 #if NET8_0_OR_GREATER
-static partial class _UniFFILib {
+static partial class _UniFFILib
+{
 #else
-static class _UniFFILib {
+static class _UniFFILib
+{
 #endif
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    public delegate void UniffiRustFutureContinuationCallback(
-        ulong @data,sbyte @pollResult
-    );
+    public delegate void UniffiRustFutureContinuationCallback(ulong @data, sbyte @pollResult);
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    public delegate void UniffiForeignFutureDroppedCallback(
-        ulong @handle
-    );
+    public delegate void UniffiForeignFutureDroppedCallback(ulong @handle);
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    public delegate void UniffiCallbackInterfaceFree(
-        ulong @handle
-    );
+    public delegate void UniffiCallbackInterfaceFree(ulong @handle);
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    public delegate ulong UniffiCallbackInterfaceClone(
-        ulong @handle
-    );
+    public delegate ulong UniffiCallbackInterfaceClone(ulong @handle);
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureDroppedCallbackStruct
     {
         public ulong @handle;
         public IntPtr @free;
     }
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureResultU8
     {
         public byte @returnValue;
         public UniffiRustCallStatus @callStatus;
     }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void UniffiForeignFutureCompleteU8(
-        ulong @callbackData,_UniFFILib.UniffiForeignFutureResultU8 @result
+        ulong @callbackData,
+        _UniFFILib.UniffiForeignFutureResultU8 @result
     );
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureResultI8
     {
         public sbyte @returnValue;
         public UniffiRustCallStatus @callStatus;
     }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void UniffiForeignFutureCompleteI8(
-        ulong @callbackData,_UniFFILib.UniffiForeignFutureResultI8 @result
+        ulong @callbackData,
+        _UniFFILib.UniffiForeignFutureResultI8 @result
     );
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureResultU16
     {
         public ushort @returnValue;
         public UniffiRustCallStatus @callStatus;
     }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void UniffiForeignFutureCompleteU16(
-        ulong @callbackData,_UniFFILib.UniffiForeignFutureResultU16 @result
+        ulong @callbackData,
+        _UniFFILib.UniffiForeignFutureResultU16 @result
     );
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureResultI16
     {
         public short @returnValue;
         public UniffiRustCallStatus @callStatus;
     }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void UniffiForeignFutureCompleteI16(
-        ulong @callbackData,_UniFFILib.UniffiForeignFutureResultI16 @result
+        ulong @callbackData,
+        _UniFFILib.UniffiForeignFutureResultI16 @result
     );
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureResultU32
     {
         public uint @returnValue;
         public UniffiRustCallStatus @callStatus;
     }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void UniffiForeignFutureCompleteU32(
-        ulong @callbackData,_UniFFILib.UniffiForeignFutureResultU32 @result
+        ulong @callbackData,
+        _UniFFILib.UniffiForeignFutureResultU32 @result
     );
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureResultI32
     {
         public int @returnValue;
         public UniffiRustCallStatus @callStatus;
     }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void UniffiForeignFutureCompleteI32(
-        ulong @callbackData,_UniFFILib.UniffiForeignFutureResultI32 @result
+        ulong @callbackData,
+        _UniFFILib.UniffiForeignFutureResultI32 @result
     );
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureResultU64
     {
         public ulong @returnValue;
         public UniffiRustCallStatus @callStatus;
     }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void UniffiForeignFutureCompleteU64(
-        ulong @callbackData,_UniFFILib.UniffiForeignFutureResultU64 @result
+        ulong @callbackData,
+        _UniFFILib.UniffiForeignFutureResultU64 @result
     );
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureResultI64
     {
         public long @returnValue;
         public UniffiRustCallStatus @callStatus;
     }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void UniffiForeignFutureCompleteI64(
-        ulong @callbackData,_UniFFILib.UniffiForeignFutureResultI64 @result
+        ulong @callbackData,
+        _UniFFILib.UniffiForeignFutureResultI64 @result
     );
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureResultF32
     {
         public float @returnValue;
         public UniffiRustCallStatus @callStatus;
     }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void UniffiForeignFutureCompleteF32(
-        ulong @callbackData,_UniFFILib.UniffiForeignFutureResultF32 @result
+        ulong @callbackData,
+        _UniFFILib.UniffiForeignFutureResultF32 @result
     );
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureResultF64
     {
         public double @returnValue;
         public UniffiRustCallStatus @callStatus;
     }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void UniffiForeignFutureCompleteF64(
-        ulong @callbackData,_UniFFILib.UniffiForeignFutureResultF64 @result
+        ulong @callbackData,
+        _UniFFILib.UniffiForeignFutureResultF64 @result
     );
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureResultRustBuffer
     {
         public RustBuffer @returnValue;
         public UniffiRustCallStatus @callStatus;
     }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void UniffiForeignFutureCompleteRustBuffer(
-        ulong @callbackData,_UniFFILib.UniffiForeignFutureResultRustBuffer @result
+        ulong @callbackData,
+        _UniFFILib.UniffiForeignFutureResultRustBuffer @result
     );
+
     [StructLayout(LayoutKind.Sequential)]
     public struct UniffiForeignFutureResultVoid
     {
         public UniffiRustCallStatus @callStatus;
     }
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate void UniffiForeignFutureCompleteVoid(
-        ulong @callbackData,_UniFFILib.UniffiForeignFutureResultVoid @result
+        ulong @callbackData,
+        _UniFFILib.UniffiForeignFutureResultVoid @result
     );
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
 
-    static _UniFFILib() {
+    static _UniFFILib()
+    {
         _UniFFILib.uniffiCheckContractApiVersion();
         _UniFFILib.uniffiCheckApiChecksums();
-        
-        }
+    }
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -842,10 +930,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ulong uniffi_rusto_fn_clone_rusto(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
-    );
+    ulong uniffi_rusto_fn_clone_rusto(ulong @handle, ref UniffiRustCallStatus _uniffi_out_err);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -853,10 +940,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void uniffi_rusto_fn_free_rusto(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
-    );
+    void uniffi_rusto_fn_free_rusto(ulong @handle, ref UniffiRustCallStatus _uniffi_out_err);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -864,10 +950,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ulong uniffi_rusto_fn_constructor_rusto_initialize(RustBuffer @config,ref UniffiRustCallStatus _uniffi_out_err
+    ulong uniffi_rusto_fn_constructor_rusto_initialize(
+        RustBuffer @config,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -875,10 +963,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ulong uniffi_rusto_fn_constructor_rusto_initialize_from_json(RustBuffer @configJson,ref UniffiRustCallStatus _uniffi_out_err
+    ulong uniffi_rusto_fn_constructor_rusto_initialize_from_json(
+        RustBuffer @configJson,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -886,10 +976,13 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_method_rusto_detect_layout(ulong @ptr,RustBuffer @source,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer uniffi_rusto_fn_method_rusto_detect_layout(
+        ulong @ptr,
+        RustBuffer @source,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -897,10 +990,16 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_method_rusto_detect_layout_rgb(ulong @ptr,RustBuffer @pixels,uint @width,uint @height,ulong @stride,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer uniffi_rusto_fn_method_rusto_detect_layout_rgb(
+        ulong @ptr,
+        RustBuffer @pixels,
+        uint @width,
+        uint @height,
+        ulong @stride,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -908,10 +1007,14 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_method_rusto_detect_text(ulong @ptr,RustBuffer @source,RustBuffer @options,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer uniffi_rusto_fn_method_rusto_detect_text(
+        ulong @ptr,
+        RustBuffer @source,
+        RustBuffer @options,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -919,10 +1022,17 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_method_rusto_detect_text_rgb(ulong @ptr,RustBuffer @pixels,uint @width,uint @height,ulong @stride,RustBuffer @options,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer uniffi_rusto_fn_method_rusto_detect_text_rgb(
+        ulong @ptr,
+        RustBuffer @pixels,
+        uint @width,
+        uint @height,
+        ulong @stride,
+        RustBuffer @options,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -930,10 +1040,13 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_method_rusto_unwarp_image(ulong @ptr,RustBuffer @source,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer uniffi_rusto_fn_method_rusto_unwarp_image(
+        ulong @ptr,
+        RustBuffer @source,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -941,10 +1054,16 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_method_rusto_unwarp_image_rgb(ulong @ptr,RustBuffer @pixels,uint @width,uint @height,ulong @stride,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer uniffi_rusto_fn_method_rusto_unwarp_image_rgb(
+        ulong @ptr,
+        RustBuffer @pixels,
+        uint @width,
+        uint @height,
+        ulong @stride,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -952,10 +1071,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_method_rusto_version(ulong @ptr,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer uniffi_rusto_fn_method_rusto_version(
+        ulong @ptr,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -963,10 +1084,14 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_func_create_initialize_config_for_model(RustBuffer @model,RustBuffer @lang,RustBuffer @modelPath,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer uniffi_rusto_fn_func_create_initialize_config_for_model(
+        RustBuffer @model,
+        RustBuffer @lang,
+        RustBuffer @modelPath,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -974,10 +1099,14 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_func_create_initialize_config_ppv6(RustBuffer @detModelPath,RustBuffer @recModelPath,RustBuffer @dictPath,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer uniffi_rusto_fn_func_create_initialize_config_ppv6(
+        RustBuffer @detModelPath,
+        RustBuffer @recModelPath,
+        RustBuffer @dictPath,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -985,10 +1114,11 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_func_default_ocr_run_options(ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer uniffi_rusto_fn_func_default_ocr_run_options(
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -996,10 +1126,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_func_download_all_models(RustBuffer @cacheDir,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer uniffi_rusto_fn_func_download_all_models(
+        RustBuffer @cacheDir,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1007,10 +1139,14 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_func_download_model(RustBuffer @model,RustBuffer @lang,RustBuffer @cacheDir,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer uniffi_rusto_fn_func_download_model(
+        RustBuffer @model,
+        RustBuffer @lang,
+        RustBuffer @cacheDir,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1018,10 +1154,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer uniffi_rusto_fn_func_rusto_version(ref UniffiRustCallStatus _uniffi_out_err
-    );
+    RustBuffer uniffi_rusto_fn_func_rusto_version(ref UniffiRustCallStatus _uniffi_out_err);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1029,10 +1164,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer ffi_rusto_rustbuffer_alloc(ulong @size,ref UniffiRustCallStatus _uniffi_out_err
-    );
+    RustBuffer ffi_rusto_rustbuffer_alloc(ulong @size, ref UniffiRustCallStatus _uniffi_out_err);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1040,10 +1174,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer ffi_rusto_rustbuffer_from_bytes(ForeignBytes @bytes,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer ffi_rusto_rustbuffer_from_bytes(
+        ForeignBytes @bytes,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1051,10 +1187,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rustbuffer_free(RustBuffer @buf,ref UniffiRustCallStatus _uniffi_out_err
-    );
+    void ffi_rusto_rustbuffer_free(RustBuffer @buf, ref UniffiRustCallStatus _uniffi_out_err);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1062,10 +1197,13 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer ffi_rusto_rustbuffer_reserve(RustBuffer @buf,ulong @additional,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer ffi_rusto_rustbuffer_reserve(
+        RustBuffer @buf,
+        ulong @additional,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1073,10 +1211,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_poll_u8(ulong @handle,IntPtr @callback,ulong @callbackData
-    );
+    void ffi_rusto_rust_future_poll_u8(ulong @handle, IntPtr @callback, ulong @callbackData);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1084,10 +1221,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_cancel_u8(ulong @handle
-    );
+    void ffi_rusto_rust_future_cancel_u8(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1095,10 +1231,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_free_u8(ulong @handle
-    );
+    void ffi_rusto_rust_future_free_u8(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1106,10 +1241,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     byte ffi_rusto_rust_future_complete_u8(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
-    );
+    byte ffi_rusto_rust_future_complete_u8(ulong @handle, ref UniffiRustCallStatus _uniffi_out_err);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1117,10 +1251,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_poll_i8(ulong @handle,IntPtr @callback,ulong @callbackData
-    );
+    void ffi_rusto_rust_future_poll_i8(ulong @handle, IntPtr @callback, ulong @callbackData);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1128,10 +1261,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_cancel_i8(ulong @handle
-    );
+    void ffi_rusto_rust_future_cancel_i8(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1139,10 +1271,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_free_i8(ulong @handle
-    );
+    void ffi_rusto_rust_future_free_i8(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1150,10 +1281,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     sbyte ffi_rusto_rust_future_complete_i8(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
+    sbyte ffi_rusto_rust_future_complete_i8(
+        ulong @handle,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1161,10 +1294,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_poll_u16(ulong @handle,IntPtr @callback,ulong @callbackData
-    );
+    void ffi_rusto_rust_future_poll_u16(ulong @handle, IntPtr @callback, ulong @callbackData);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1172,10 +1304,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_cancel_u16(ulong @handle
-    );
+    void ffi_rusto_rust_future_cancel_u16(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1183,10 +1314,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_free_u16(ulong @handle
-    );
+    void ffi_rusto_rust_future_free_u16(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1194,10 +1324,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort ffi_rusto_rust_future_complete_u16(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
+    ushort ffi_rusto_rust_future_complete_u16(
+        ulong @handle,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1205,10 +1337,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_poll_i16(ulong @handle,IntPtr @callback,ulong @callbackData
-    );
+    void ffi_rusto_rust_future_poll_i16(ulong @handle, IntPtr @callback, ulong @callbackData);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1216,10 +1347,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_cancel_i16(ulong @handle
-    );
+    void ffi_rusto_rust_future_cancel_i16(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1227,10 +1357,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_free_i16(ulong @handle
-    );
+    void ffi_rusto_rust_future_free_i16(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1238,10 +1367,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     short ffi_rusto_rust_future_complete_i16(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
+    short ffi_rusto_rust_future_complete_i16(
+        ulong @handle,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1249,10 +1380,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_poll_u32(ulong @handle,IntPtr @callback,ulong @callbackData
-    );
+    void ffi_rusto_rust_future_poll_u32(ulong @handle, IntPtr @callback, ulong @callbackData);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1260,10 +1390,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_cancel_u32(ulong @handle
-    );
+    void ffi_rusto_rust_future_cancel_u32(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1271,10 +1400,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_free_u32(ulong @handle
-    );
+    void ffi_rusto_rust_future_free_u32(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1282,10 +1410,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     uint ffi_rusto_rust_future_complete_u32(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
+    uint ffi_rusto_rust_future_complete_u32(
+        ulong @handle,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1293,10 +1423,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_poll_i32(ulong @handle,IntPtr @callback,ulong @callbackData
-    );
+    void ffi_rusto_rust_future_poll_i32(ulong @handle, IntPtr @callback, ulong @callbackData);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1304,10 +1433,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_cancel_i32(ulong @handle
-    );
+    void ffi_rusto_rust_future_cancel_i32(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1315,10 +1443,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_free_i32(ulong @handle
-    );
+    void ffi_rusto_rust_future_free_i32(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1326,10 +1453,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     int ffi_rusto_rust_future_complete_i32(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
-    );
+    int ffi_rusto_rust_future_complete_i32(ulong @handle, ref UniffiRustCallStatus _uniffi_out_err);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1337,10 +1463,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_poll_u64(ulong @handle,IntPtr @callback,ulong @callbackData
-    );
+    void ffi_rusto_rust_future_poll_u64(ulong @handle, IntPtr @callback, ulong @callbackData);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1348,10 +1473,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_cancel_u64(ulong @handle
-    );
+    void ffi_rusto_rust_future_cancel_u64(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1359,10 +1483,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_free_u64(ulong @handle
-    );
+    void ffi_rusto_rust_future_free_u64(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1370,10 +1493,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ulong ffi_rusto_rust_future_complete_u64(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
+    ulong ffi_rusto_rust_future_complete_u64(
+        ulong @handle,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1381,10 +1506,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_poll_i64(ulong @handle,IntPtr @callback,ulong @callbackData
-    );
+    void ffi_rusto_rust_future_poll_i64(ulong @handle, IntPtr @callback, ulong @callbackData);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1392,10 +1516,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_cancel_i64(ulong @handle
-    );
+    void ffi_rusto_rust_future_cancel_i64(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1403,10 +1526,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_free_i64(ulong @handle
-    );
+    void ffi_rusto_rust_future_free_i64(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1414,10 +1536,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     long ffi_rusto_rust_future_complete_i64(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
+    long ffi_rusto_rust_future_complete_i64(
+        ulong @handle,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1425,10 +1549,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_poll_f32(ulong @handle,IntPtr @callback,ulong @callbackData
-    );
+    void ffi_rusto_rust_future_poll_f32(ulong @handle, IntPtr @callback, ulong @callbackData);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1436,10 +1559,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_cancel_f32(ulong @handle
-    );
+    void ffi_rusto_rust_future_cancel_f32(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1447,10 +1569,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_free_f32(ulong @handle
-    );
+    void ffi_rusto_rust_future_free_f32(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1458,10 +1579,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     float ffi_rusto_rust_future_complete_f32(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
+    float ffi_rusto_rust_future_complete_f32(
+        ulong @handle,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1469,10 +1592,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_poll_f64(ulong @handle,IntPtr @callback,ulong @callbackData
-    );
+    void ffi_rusto_rust_future_poll_f64(ulong @handle, IntPtr @callback, ulong @callbackData);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1480,10 +1602,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_cancel_f64(ulong @handle
-    );
+    void ffi_rusto_rust_future_cancel_f64(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1491,10 +1612,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_free_f64(ulong @handle
-    );
+    void ffi_rusto_rust_future_free_f64(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1502,10 +1622,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     double ffi_rusto_rust_future_complete_f64(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
+    double ffi_rusto_rust_future_complete_f64(
+        ulong @handle,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1513,10 +1635,13 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_poll_rust_buffer(ulong @handle,IntPtr @callback,ulong @callbackData
+    void ffi_rusto_rust_future_poll_rust_buffer(
+        ulong @handle,
+        IntPtr @callback,
+        ulong @callbackData
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1524,10 +1649,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_cancel_rust_buffer(ulong @handle
-    );
+    void ffi_rusto_rust_future_cancel_rust_buffer(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1535,10 +1659,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_free_rust_buffer(ulong @handle
-    );
+    void ffi_rusto_rust_future_free_rust_buffer(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1546,10 +1669,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     RustBuffer ffi_rusto_rust_future_complete_rust_buffer(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
+    RustBuffer ffi_rusto_rust_future_complete_rust_buffer(
+        ulong @handle,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1557,10 +1682,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_poll_void(ulong @handle,IntPtr @callback,ulong @callbackData
-    );
+    void ffi_rusto_rust_future_poll_void(ulong @handle, IntPtr @callback, ulong @callbackData);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1568,10 +1692,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_cancel_void(ulong @handle
-    );
+    void ffi_rusto_rust_future_cancel_void(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1579,10 +1702,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_free_void(ulong @handle
-    );
+    void ffi_rusto_rust_future_free_void(ulong @handle);
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1590,10 +1712,12 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     void ffi_rusto_rust_future_complete_void(ulong @handle,ref UniffiRustCallStatus _uniffi_out_err
+    void ffi_rusto_rust_future_complete_void(
+        ulong @handle,
+        ref UniffiRustCallStatus _uniffi_out_err
     );
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1601,10 +1725,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_func_create_initialize_config_for_model(
-    );
+    ushort uniffi_rusto_checksum_func_create_initialize_config_for_model();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1612,10 +1735,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_func_create_initialize_config_ppv6(
-    );
+    ushort uniffi_rusto_checksum_func_create_initialize_config_ppv6();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1623,10 +1745,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_func_default_ocr_run_options(
-    );
+    ushort uniffi_rusto_checksum_func_default_ocr_run_options();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1634,10 +1755,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_func_download_all_models(
-    );
+    ushort uniffi_rusto_checksum_func_download_all_models();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1645,10 +1765,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_func_download_model(
-    );
+    ushort uniffi_rusto_checksum_func_download_model();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1656,10 +1775,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_func_rusto_version(
-    );
+    ushort uniffi_rusto_checksum_func_rusto_version();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1667,10 +1785,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_method_rusto_detect_layout(
-    );
+    ushort uniffi_rusto_checksum_method_rusto_detect_layout();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1678,10 +1795,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_method_rusto_detect_layout_rgb(
-    );
+    ushort uniffi_rusto_checksum_method_rusto_detect_layout_rgb();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1689,10 +1805,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_method_rusto_detect_text(
-    );
+    ushort uniffi_rusto_checksum_method_rusto_detect_text();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1700,10 +1815,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_method_rusto_detect_text_rgb(
-    );
+    ushort uniffi_rusto_checksum_method_rusto_detect_text_rgb();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1711,10 +1825,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_method_rusto_unwarp_image(
-    );
+    ushort uniffi_rusto_checksum_method_rusto_unwarp_image();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1722,10 +1835,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_method_rusto_unwarp_image_rgb(
-    );
+    ushort uniffi_rusto_checksum_method_rusto_unwarp_image_rgb();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1733,10 +1845,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_method_rusto_version(
-    );
+    ushort uniffi_rusto_checksum_method_rusto_version();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1744,10 +1855,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_constructor_rusto_initialize(
-    );
+    ushort uniffi_rusto_checksum_constructor_rusto_initialize();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1755,10 +1865,9 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     ushort uniffi_rusto_checksum_constructor_rusto_initialize_from_json(
-    );
+    ushort uniffi_rusto_checksum_constructor_rusto_initialize_from_json();
 
-    #if NET8_0_OR_GREATER
+#if NET8_0_OR_GREATER
     [LibraryImport("rusto")]
     [UnmanagedCallConv(CallConvs = new[] { typeof(CallConvCdecl) })]
     public static partial
@@ -1766,106 +1875,156 @@ static class _UniFFILib {
     [DllImport("rusto", CallingConvention = CallingConvention.Cdecl)]
     public static extern
 #endif
-     uint ffi_rusto_uniffi_contract_version(
-    );
-
-    
+    uint ffi_rusto_uniffi_contract_version();
 
-    static void uniffiCheckContractApiVersion() {
+    static void uniffiCheckContractApiVersion()
+    {
         var scaffolding_contract_version = _UniFFILib.ffi_rusto_uniffi_contract_version();
-        if (30 != scaffolding_contract_version) {
-            throw new UniffiContractVersionException($"RustODotnet.Generated: uniffi bindings expected version `30`, library returned `{scaffolding_contract_version}`");
+        if (30 != scaffolding_contract_version)
+        {
+            throw new UniffiContractVersionException(
+                $"RustODotnet.Generated: uniffi bindings expected version `30`, library returned `{scaffolding_contract_version}`"
+            );
         }
     }
-    static void uniffiCheckApiChecksums() {
+
+    static void uniffiCheckApiChecksums()
+    {
         {
-            var checksum = _UniFFILib.uniffi_rusto_checksum_func_create_initialize_config_for_model();
-            if (checksum != 37532) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_create_initialize_config_for_model` checksum `37532`, library returned `{checksum}`");
+            var checksum =
+                _UniFFILib.uniffi_rusto_checksum_func_create_initialize_config_for_model();
+            if (checksum != 37532)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_create_initialize_config_for_model` checksum `37532`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_func_create_initialize_config_ppv6();
-            if (checksum != 12132) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_create_initialize_config_ppv6` checksum `12132`, library returned `{checksum}`");
+            if (checksum != 12132)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_create_initialize_config_ppv6` checksum `12132`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_func_default_ocr_run_options();
-            if (checksum != 50314) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_default_ocr_run_options` checksum `50314`, library returned `{checksum}`");
+            if (checksum != 50314)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_default_ocr_run_options` checksum `50314`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_func_download_all_models();
-            if (checksum != 11564) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_download_all_models` checksum `11564`, library returned `{checksum}`");
+            if (checksum != 11564)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_download_all_models` checksum `11564`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_func_download_model();
-            if (checksum != 15041) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_download_model` checksum `15041`, library returned `{checksum}`");
+            if (checksum != 15041)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_download_model` checksum `15041`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_func_rusto_version();
-            if (checksum != 3477) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_rusto_version` checksum `3477`, library returned `{checksum}`");
+            if (checksum != 3477)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_func_rusto_version` checksum `3477`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_detect_layout();
-            if (checksum != 43417) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_layout` checksum `43417`, library returned `{checksum}`");
+            if (checksum != 43417)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_layout` checksum `43417`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_detect_layout_rgb();
-            if (checksum != 59477) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_layout_rgb` checksum `59477`, library returned `{checksum}`");
+            if (checksum != 59477)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_layout_rgb` checksum `59477`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_detect_text();
-            if (checksum != 5963) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text` checksum `5963`, library returned `{checksum}`");
+            if (checksum != 5963)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text` checksum `5963`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_detect_text_rgb();
-            if (checksum != 9991) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text_rgb` checksum `9991`, library returned `{checksum}`");
+            if (checksum != 9991)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_detect_text_rgb` checksum `9991`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_unwarp_image();
-            if (checksum != 24978) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_unwarp_image` checksum `24978`, library returned `{checksum}`");
+            if (checksum != 24978)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_unwarp_image` checksum `24978`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_unwarp_image_rgb();
-            if (checksum != 44077) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_unwarp_image_rgb` checksum `44077`, library returned `{checksum}`");
+            if (checksum != 44077)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_unwarp_image_rgb` checksum `44077`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_method_rusto_version();
-            if (checksum != 31217) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_version` checksum `31217`, library returned `{checksum}`");
+            if (checksum != 31217)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_method_rusto_version` checksum `31217`, library returned `{checksum}`"
+                );
             }
         }
         {
             var checksum = _UniFFILib.uniffi_rusto_checksum_constructor_rusto_initialize();
-            if (checksum != 41233) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_constructor_rusto_initialize` checksum `41233`, library returned `{checksum}`");
+            if (checksum != 41233)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_constructor_rusto_initialize` checksum `41233`, library returned `{checksum}`"
+                );
             }
         }
         {
-            var checksum = _UniFFILib.uniffi_rusto_checksum_constructor_rusto_initialize_from_json();
-            if (checksum != 40384) {
-                throw new UniffiContractChecksumException($"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_constructor_rusto_initialize_from_json` checksum `40384`, library returned `{checksum}`");
+            var checksum =
+                _UniFFILib.uniffi_rusto_checksum_constructor_rusto_initialize_from_json();
+            if (checksum != 40384)
+            {
+                throw new UniffiContractChecksumException(
+                    $"RustODotnet.Generated: uniffi bindings expected function `uniffi_rusto_checksum_constructor_rusto_initialize_from_json` checksum `40384`, library returned `{checksum}`"
+                );
             }
         }
     }
@@ -1875,172 +2034,208 @@ static class _UniFFILib {
 
 #pragma warning disable 8625
 
-
-
-
-class FfiConverterUInt32: FfiConverter<uint, uint> {
+class FfiConverterUInt32 : FfiConverter<uint, uint>
+{
     public static FfiConverterUInt32 INSTANCE = new FfiConverterUInt32();
 
-    public override uint Lift(uint value) {
+    public override uint Lift(uint value)
+    {
         return value;
     }
 
-    public override uint Read(BigEndianStream stream) {
+    public override uint Read(BigEndianStream stream)
+    {
         return stream.ReadUInt();
     }
 
-    public override uint Lower(uint value) {
+    public override uint Lower(uint value)
+    {
         return value;
     }
 
-    public override int AllocationSize(uint value) {
+    public override int AllocationSize(uint value)
+    {
         return 4;
     }
 
-    public override void Write(uint value, BigEndianStream stream) {
+    public override void Write(uint value, BigEndianStream stream)
+    {
         stream.WriteUInt(value);
     }
 }
 
-
-
-class FfiConverterInt32: FfiConverter<int, int> {
+class FfiConverterInt32 : FfiConverter<int, int>
+{
     public static FfiConverterInt32 INSTANCE = new FfiConverterInt32();
 
-    public override int Lift(int value) {
+    public override int Lift(int value)
+    {
         return value;
     }
 
-    public override int Read(BigEndianStream stream) {
+    public override int Read(BigEndianStream stream)
+    {
         return stream.ReadInt();
     }
 
-    public override int Lower(int value) {
+    public override int Lower(int value)
+    {
         return value;
     }
 
-    public override int AllocationSize(int value) {
+    public override int AllocationSize(int value)
+    {
         return 4;
     }
 
-    public override void Write(int value, BigEndianStream stream) {
+    public override void Write(int value, BigEndianStream stream)
+    {
         stream.WriteInt(value);
     }
 }
 
-
-
-class FfiConverterUInt64: FfiConverter<ulong, ulong> {
+class FfiConverterUInt64 : FfiConverter<ulong, ulong>
+{
     public static FfiConverterUInt64 INSTANCE = new FfiConverterUInt64();
 
-    public override ulong Lift(ulong value) {
+    public override ulong Lift(ulong value)
+    {
         return value;
     }
 
-    public override ulong Read(BigEndianStream stream) {
+    public override ulong Read(BigEndianStream stream)
+    {
         return stream.ReadULong();
     }
 
-    public override ulong Lower(ulong value) {
+    public override ulong Lower(ulong value)
+    {
         return value;
     }
 
-    public override int AllocationSize(ulong value) {
+    public override int AllocationSize(ulong value)
+    {
         return 8;
     }
 
-    public override void Write(ulong value, BigEndianStream stream) {
+    public override void Write(ulong value, BigEndianStream stream)
+    {
         stream.WriteULong(value);
     }
 }
 
-
-
-class FfiConverterFloat: FfiConverter<float, float> {
+class FfiConverterFloat : FfiConverter<float, float>
+{
     public static FfiConverterFloat INSTANCE = new FfiConverterFloat();
 
-    public override float Lift(float value) {
+    public override float Lift(float value)
+    {
         return value;
     }
 
-    public override float Read(BigEndianStream stream) {
+    public override float Read(BigEndianStream stream)
+    {
         return stream.ReadFloat();
     }
 
-    public override float Lower(float value) {
+    public override float Lower(float value)
+    {
         return value;
     }
 
-    public override int AllocationSize(float value) {
+    public override int AllocationSize(float value)
+    {
         return 4;
     }
 
-    public override void Write(float value, BigEndianStream stream) {
+    public override void Write(float value, BigEndianStream stream)
+    {
         stream.WriteFloat(value);
     }
 }
 
-
-
-class FfiConverterBoolean: FfiConverter<bool, sbyte> {
+class FfiConverterBoolean : FfiConverter<bool, sbyte>
+{
     public static FfiConverterBoolean INSTANCE = new FfiConverterBoolean();
 
-    public override bool Lift(sbyte value) {
+    public override bool Lift(sbyte value)
+    {
         return value != 0;
     }
 
-    public override bool Read(BigEndianStream stream) {
+    public override bool Read(BigEndianStream stream)
+    {
         return Lift(stream.ReadSByte());
     }
 
-    public override sbyte Lower(bool value) {
+    public override sbyte Lower(bool value)
+    {
         return value ? (sbyte)1 : (sbyte)0;
     }
 
-    public override int AllocationSize(bool value) {
+    public override int AllocationSize(bool value)
+    {
         return (sbyte)1;
     }
 
-    public override void Write(bool value, BigEndianStream stream) {
+    public override void Write(bool value, BigEndianStream stream)
+    {
         stream.WriteSByte(Lower(value));
     }
 }
 
-
-
-class FfiConverterString: FfiConverter<string, RustBuffer> {
+class FfiConverterString : FfiConverter<string, RustBuffer>
+{
     public static FfiConverterString INSTANCE = new FfiConverterString();
 
     // Note: we don't inherit from FfiConverterRustBuffer, because we use a
     // special encoding when lowering/lifting.  We can use `RustBuffer.len` to
     // store our length and avoid writing it out to the buffer.
-    public override string Lift(RustBuffer value) {
-        try {
-            unsafe {
+    public override string Lift(RustBuffer value)
+    {
+        try
+        {
+            unsafe
+            {
                 return System.Text.Encoding.UTF8.GetString(
-                    (byte*)value.data.ToPointer(), Convert.ToInt32(value.len));
+                    (byte*)value.data.ToPointer(),
+                    Convert.ToInt32(value.len)
+                );
             }
-        } finally {
+        }
+        finally
+        {
             RustBuffer.Free(value);
         }
     }
 
-    public override string Read(BigEndianStream stream) {
+    public override string Read(BigEndianStream stream)
+    {
         var length = stream.ReadInt();
         return stream.ReadUtf8String(length);
     }
 
-    public override RustBuffer Lower(string value) {
+    public override RustBuffer Lower(string value)
+    {
         var rustBuffer = RustBuffer.Alloc(System.Text.Encoding.UTF8.GetByteCount(value));
-        try {
-            unsafe {
-                fixed (char* chars = value) {
+        try
+        {
+            unsafe
+            {
+                fixed (char* chars = value)
+                {
                     System.Text.Encoding.UTF8.GetBytes(
-                        chars, value.Length, (byte*)rustBuffer.data.ToPointer(), Convert.ToInt32(rustBuffer.len));
+                        chars,
+                        value.Length,
+                        (byte*)rustBuffer.data.ToPointer(),
+                        Convert.ToInt32(rustBuffer.len)
+                    );
                 }
             }
             return rustBuffer;
-        } catch {
+        }
+        catch
+        {
             RustBuffer.Free(rustBuffer);
             throw;
         }
@@ -2050,105 +2245,131 @@ class FfiConverterString: FfiConverter<string, RustBuffer> {
     // We aren't sure exactly how many bytes our string will be once it's UTF-8
     // encoded.  Allocate 3 bytes per unicode codepoint which will always be
     // enough.
-    public override int AllocationSize(string value) {
+    public override int AllocationSize(string value)
+    {
         const int sizeForLength = 4;
         var sizeForString = System.Text.Encoding.UTF8.GetByteCount(value);
         return sizeForLength + sizeForString;
     }
 
-    public override void Write(string value, BigEndianStream stream) {
+    public override void Write(string value, BigEndianStream stream)
+    {
         stream.WriteUtf8String(value);
     }
 }
 
-
-
-
-class FfiConverterByteArray: FfiConverterRustBuffer<byte[]> {
+class FfiConverterByteArray : FfiConverterRustBuffer<byte[]>
+{
     public static FfiConverterByteArray INSTANCE = new FfiConverterByteArray();
 
-    public override byte[] Read(BigEndianStream stream) {
+    public override byte[] Read(BigEndianStream stream)
+    {
         var length = stream.ReadInt();
         return stream.ReadBytes(length);
     }
 
-    public override int AllocationSize(byte[] value) {
+    public override int AllocationSize(byte[] value)
+    {
         return 4 + value.Length;
     }
 
-    public override void Write(byte[] value, BigEndianStream stream) {
+    public override void Write(byte[] value, BigEndianStream stream)
+    {
         stream.WriteInt(value.Length);
         stream.WriteBytes(value);
     }
 }
 
-
-
 /// <summary>
 /// High-level RustO OCR Engine for multi-platform bindings.
 /// </summary>
-public interface IRustO {
+public interface IRustO
+{
     /// <summary>
     /// Detects document layout regions from an image source.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
     LayoutRegion[] DetectLayout(ImageSource @source);
+
     /// <summary>
     /// Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
     LayoutRegion[] DetectLayoutRgb(byte[] @pixels, uint @width, uint @height, ulong @stride);
+
     /// <summary>
     /// Runs text detection and recognition on an image source.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
     DetectTextResult DetectText(ImageSource @source, OcrRunOptions @options);
+
     /// <summary>
     /// Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
-    DetectTextResult DetectTextRgb(byte[] @pixels, uint @width, uint @height, ulong @stride, OcrRunOptions @options);
+    DetectTextResult DetectTextRgb(
+        byte[] @pixels,
+        uint @width,
+        uint @height,
+        ulong @stride,
+        OcrRunOptions @options
+    );
+
     /// <summary>
     /// Unwarps a distorted or curved document image from an image source.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
     UnwarpedImageResult UnwarpImage(ImageSource @source);
+
     /// <summary>
     /// Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
     UnwarpedImageResult UnwarpImageRgb(byte[] @pixels, uint @width, uint @height, ulong @stride);
+
     /// <summary>
     /// Returns the engine library version string.
     /// </summary>
     string Version();
 }
+
 /// <summary>
 /// High-level RustO OCR Engine for multi-platform bindings.
 /// </summary>
-public class RustO : IRustO, IDisposable {
+public class RustO : IRustO, IDisposable
+{
     protected ulong pointer;
     private int _wasDestroyed = 0;
     private long _callCounter = 1;
 
-    public RustO(ulong pointer) {
+    public RustO(ulong pointer)
+    {
         this.pointer = pointer;
     }
 
-    ~RustO() {
+    ~RustO()
+    {
         Destroy();
     }
 
-    protected void FreeRustArcPtr() {
-        _UniffiHelpers.RustCall((ref UniffiRustCallStatus status) => {
-            _UniFFILib.uniffi_rusto_fn_free_rusto(this.pointer, ref status);
-        });
+    protected void FreeRustArcPtr()
+    {
+        _UniffiHelpers.RustCall(
+            (ref UniffiRustCallStatus status) =>
+            {
+                _UniFFILib.uniffi_rusto_fn_free_rusto(this.pointer, ref status);
+            }
+        );
     }
 
-    protected ulong CloneRustArcPtr() {
-        return _UniffiHelpers.RustCall((ref UniffiRustCallStatus status) => {
-            return _UniFFILib.uniffi_rusto_fn_clone_rusto(this.pointer, ref status);
-        });
+    protected ulong CloneRustArcPtr()
+    {
+        return _UniffiHelpers.RustCall(
+            (ref UniffiRustCallStatus status) =>
+            {
+                return _UniFFILib.uniffi_rusto_fn_clone_rusto(this.pointer, ref status);
+            }
+        );
     }
 
     public void Destroy()
@@ -2170,7 +2391,7 @@ public class RustO : IRustO, IDisposable {
         GC.SuppressFinalize(this); // Suppress finalization to avoid unnecessary GC overhead.
     }
 
-    private void IncrementCallCounter() 
+    private void IncrementCallCounter()
     {
         // Check and increment the call counter, to keep the object alive.
         // This needs a compare-and-set retry loop in case of concurrent updates.
@@ -2178,16 +2399,22 @@ public class RustO : IRustO, IDisposable {
         do
         {
             count = Interlocked.Read(ref _callCounter);
-            if (count == 0L) throw new System.ObjectDisposedException(String.Format("'{0}' object has already been destroyed", this.GetType().Name));
-            if (count == long.MaxValue) throw new System.OverflowException(String.Format("'{0}' call counter would overflow", this.GetType().Name));
-
+            if (count == 0L)
+                throw new System.ObjectDisposedException(
+                    String.Format("'{0}' object has already been destroyed", this.GetType().Name)
+                );
+            if (count == long.MaxValue)
+                throw new System.OverflowException(
+                    String.Format("'{0}' call counter would overflow", this.GetType().Name)
+                );
         } while (Interlocked.CompareExchange(ref _callCounter, count + 1, count) != count);
     }
 
-    private void DecrementCallCounter() 
+    private void DecrementCallCounter()
     {
         // This decrement always matches the increment we performed above.
-        if (Interlocked.Decrement(ref _callCounter) == 0) {
+        if (Interlocked.Decrement(ref _callCounter) == 0)
+        {
             FreeRustArcPtr();
         }
     }
@@ -2195,161 +2422,258 @@ public class RustO : IRustO, IDisposable {
     internal void CallWithPointer(Action<ulong> action)
     {
         IncrementCallCounter();
-        try {
+        try
+        {
             action(CloneRustArcPtr());
         }
-        finally {
+        finally
+        {
             DecrementCallCounter();
         }
     }
 
     internal T CallWithPointer<T>(Func<ulong, T> func)
-    {   
+    {
         IncrementCallCounter();
-        try {
+        try
+        {
             return func(CloneRustArcPtr());
         }
-        finally {
+        finally
+        {
             DecrementCallCounter();
         }
     }
 
-    
     /// <summary>
     /// Detects document layout regions from an image source.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
-    public LayoutRegion[] DetectLayout(ImageSource @source) {
-        return CallWithPointer(thisPtr => FfiConverterSequenceTypeLayoutRegion.INSTANCE.Lift(
-    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_method_rusto_detect_layout(thisPtr, FfiConverterTypeImageSource.INSTANCE.Lower(@source), ref _status)
-)));
+    public LayoutRegion[] DetectLayout(ImageSource @source)
+    {
+        return CallWithPointer(thisPtr =>
+            FfiConverterSequenceTypeLayoutRegion.INSTANCE.Lift(
+                _UniffiHelpers.RustCallWithError(
+                    FfiConverterTypeRustoBindingError.INSTANCE,
+                    (ref UniffiRustCallStatus _status) =>
+                        _UniFFILib.uniffi_rusto_fn_method_rusto_detect_layout(
+                            thisPtr,
+                            FfiConverterTypeImageSource.INSTANCE.Lower(@source),
+                            ref _status
+                        )
+                )
+            )
+        );
     }
-    
-    
+
     /// <summary>
     /// Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
-    public LayoutRegion[] DetectLayoutRgb(byte[] @pixels, uint @width, uint @height, ulong @stride) {
-        return CallWithPointer(thisPtr => FfiConverterSequenceTypeLayoutRegion.INSTANCE.Lift(
-    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_method_rusto_detect_layout_rgb(thisPtr, FfiConverterByteArray.INSTANCE.Lower(@pixels), FfiConverterUInt32.INSTANCE.Lower(@width), FfiConverterUInt32.INSTANCE.Lower(@height), FfiConverterUInt64.INSTANCE.Lower(@stride), ref _status)
-)));
+    public LayoutRegion[] DetectLayoutRgb(byte[] @pixels, uint @width, uint @height, ulong @stride)
+    {
+        return CallWithPointer(thisPtr =>
+            FfiConverterSequenceTypeLayoutRegion.INSTANCE.Lift(
+                _UniffiHelpers.RustCallWithError(
+                    FfiConverterTypeRustoBindingError.INSTANCE,
+                    (ref UniffiRustCallStatus _status) =>
+                        _UniFFILib.uniffi_rusto_fn_method_rusto_detect_layout_rgb(
+                            thisPtr,
+                            FfiConverterByteArray.INSTANCE.Lower(@pixels),
+                            FfiConverterUInt32.INSTANCE.Lower(@width),
+                            FfiConverterUInt32.INSTANCE.Lower(@height),
+                            FfiConverterUInt64.INSTANCE.Lower(@stride),
+                            ref _status
+                        )
+                )
+            )
+        );
     }
-    
-    
+
     /// <summary>
     /// Runs text detection and recognition on an image source.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
-    public DetectTextResult DetectText(ImageSource @source, OcrRunOptions @options) {
-        return CallWithPointer(thisPtr => FfiConverterTypeDetectTextResult.INSTANCE.Lift(
-    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_method_rusto_detect_text(thisPtr, FfiConverterTypeImageSource.INSTANCE.Lower(@source), FfiConverterTypeOcrRunOptions.INSTANCE.Lower(@options), ref _status)
-)));
+    public DetectTextResult DetectText(ImageSource @source, OcrRunOptions @options)
+    {
+        return CallWithPointer(thisPtr =>
+            FfiConverterTypeDetectTextResult.INSTANCE.Lift(
+                _UniffiHelpers.RustCallWithError(
+                    FfiConverterTypeRustoBindingError.INSTANCE,
+                    (ref UniffiRustCallStatus _status) =>
+                        _UniFFILib.uniffi_rusto_fn_method_rusto_detect_text(
+                            thisPtr,
+                            FfiConverterTypeImageSource.INSTANCE.Lower(@source),
+                            FfiConverterTypeOcrRunOptions.INSTANCE.Lower(@options),
+                            ref _status
+                        )
+                )
+            )
+        );
     }
-    
-    
+
     /// <summary>
     /// Runs text detection and recognition on raw decoded interleaved 24-bit RGB pixel bytes.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
-    public DetectTextResult DetectTextRgb(byte[] @pixels, uint @width, uint @height, ulong @stride, OcrRunOptions @options) {
-        return CallWithPointer(thisPtr => FfiConverterTypeDetectTextResult.INSTANCE.Lift(
-    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_method_rusto_detect_text_rgb(thisPtr, FfiConverterByteArray.INSTANCE.Lower(@pixels), FfiConverterUInt32.INSTANCE.Lower(@width), FfiConverterUInt32.INSTANCE.Lower(@height), FfiConverterUInt64.INSTANCE.Lower(@stride), FfiConverterTypeOcrRunOptions.INSTANCE.Lower(@options), ref _status)
-)));
+    public DetectTextResult DetectTextRgb(
+        byte[] @pixels,
+        uint @width,
+        uint @height,
+        ulong @stride,
+        OcrRunOptions @options
+    )
+    {
+        return CallWithPointer(thisPtr =>
+            FfiConverterTypeDetectTextResult.INSTANCE.Lift(
+                _UniffiHelpers.RustCallWithError(
+                    FfiConverterTypeRustoBindingError.INSTANCE,
+                    (ref UniffiRustCallStatus _status) =>
+                        _UniFFILib.uniffi_rusto_fn_method_rusto_detect_text_rgb(
+                            thisPtr,
+                            FfiConverterByteArray.INSTANCE.Lower(@pixels),
+                            FfiConverterUInt32.INSTANCE.Lower(@width),
+                            FfiConverterUInt32.INSTANCE.Lower(@height),
+                            FfiConverterUInt64.INSTANCE.Lower(@stride),
+                            FfiConverterTypeOcrRunOptions.INSTANCE.Lower(@options),
+                            ref _status
+                        )
+                )
+            )
+        );
     }
-    
-    
+
     /// <summary>
     /// Unwarps a distorted or curved document image from an image source.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
-    public UnwarpedImageResult UnwarpImage(ImageSource @source) {
-        return CallWithPointer(thisPtr => FfiConverterTypeUnwarpedImageResult.INSTANCE.Lift(
-    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_method_rusto_unwarp_image(thisPtr, FfiConverterTypeImageSource.INSTANCE.Lower(@source), ref _status)
-)));
+    public UnwarpedImageResult UnwarpImage(ImageSource @source)
+    {
+        return CallWithPointer(thisPtr =>
+            FfiConverterTypeUnwarpedImageResult.INSTANCE.Lift(
+                _UniffiHelpers.RustCallWithError(
+                    FfiConverterTypeRustoBindingError.INSTANCE,
+                    (ref UniffiRustCallStatus _status) =>
+                        _UniFFILib.uniffi_rusto_fn_method_rusto_unwarp_image(
+                            thisPtr,
+                            FfiConverterTypeImageSource.INSTANCE.Lower(@source),
+                            ref _status
+                        )
+                )
+            )
+        );
     }
-    
-    
+
     /// <summary>
     /// Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
-    public UnwarpedImageResult UnwarpImageRgb(byte[] @pixels, uint @width, uint @height, ulong @stride) {
-        return CallWithPointer(thisPtr => FfiConverterTypeUnwarpedImageResult.INSTANCE.Lift(
-    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_method_rusto_unwarp_image_rgb(thisPtr, FfiConverterByteArray.INSTANCE.Lower(@pixels), FfiConverterUInt32.INSTANCE.Lower(@width), FfiConverterUInt32.INSTANCE.Lower(@height), FfiConverterUInt64.INSTANCE.Lower(@stride), ref _status)
-)));
+    public UnwarpedImageResult UnwarpImageRgb(
+        byte[] @pixels,
+        uint @width,
+        uint @height,
+        ulong @stride
+    )
+    {
+        return CallWithPointer(thisPtr =>
+            FfiConverterTypeUnwarpedImageResult.INSTANCE.Lift(
+                _UniffiHelpers.RustCallWithError(
+                    FfiConverterTypeRustoBindingError.INSTANCE,
+                    (ref UniffiRustCallStatus _status) =>
+                        _UniFFILib.uniffi_rusto_fn_method_rusto_unwarp_image_rgb(
+                            thisPtr,
+                            FfiConverterByteArray.INSTANCE.Lower(@pixels),
+                            FfiConverterUInt32.INSTANCE.Lower(@width),
+                            FfiConverterUInt32.INSTANCE.Lower(@height),
+                            FfiConverterUInt64.INSTANCE.Lower(@stride),
+                            ref _status
+                        )
+                )
+            )
+        );
     }
-    
-    
+
     /// <summary>
     /// Returns the engine library version string.
     /// </summary>
-    public string Version() {
-        return CallWithPointer(thisPtr => FfiConverterString.INSTANCE.Lift(
-    _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_method_rusto_version(thisPtr,  ref _status)
-)));
+    public string Version()
+    {
+        return CallWithPointer(thisPtr =>
+            FfiConverterString.INSTANCE.Lift(
+                _UniffiHelpers.RustCall(
+                    (ref UniffiRustCallStatus _status) =>
+                        _UniFFILib.uniffi_rusto_fn_method_rusto_version(thisPtr, ref _status)
+                )
+            )
+        );
     }
-    
-    
 
-    
     /// <summary>
     /// Initializes an OCR engine instance with structured InitializeConfig.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
-    public static RustO Initialize(InitializeConfig @config) {
+    public static RustO Initialize(InitializeConfig @config)
+    {
         return new RustO(
-    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_constructor_rusto_initialize(FfiConverterTypeInitializeConfig.INSTANCE.Lower(@config), ref _status)
-));
+            _UniffiHelpers.RustCallWithError(
+                FfiConverterTypeRustoBindingError.INSTANCE,
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_rusto_fn_constructor_rusto_initialize(
+                        FfiConverterTypeInitializeConfig.INSTANCE.Lower(@config),
+                        ref _status
+                    )
+            )
+        );
     }
-    
+
     /// <summary>
     /// Initializes an OCR engine instance from a JSON configuration string.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
-    public static RustO InitializeFromJson(string @configJson) {
+    public static RustO InitializeFromJson(string @configJson)
+    {
         return new RustO(
-    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_constructor_rusto_initialize_from_json(FfiConverterString.INSTANCE.Lower(@configJson), ref _status)
-));
+            _UniffiHelpers.RustCallWithError(
+                FfiConverterTypeRustoBindingError.INSTANCE,
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_rusto_fn_constructor_rusto_initialize_from_json(
+                        FfiConverterString.INSTANCE.Lower(@configJson),
+                        ref _status
+                    )
+            )
+        );
     }
-    
-    
 }
-class FfiConverterTypeRustO: FfiConverter<RustO, ulong> {
+
+class FfiConverterTypeRustO : FfiConverter<RustO, ulong>
+{
     public static FfiConverterTypeRustO INSTANCE = new FfiConverterTypeRustO();
 
-
-    public override ulong Lower(RustO value) {
+    public override ulong Lower(RustO value)
+    {
         return value.CallWithPointer(thisPtr => thisPtr);
     }
 
-    public override RustO Lift(ulong value) {
+    public override RustO Lift(ulong value)
+    {
         return new RustO(value);
     }
 
-    public override RustO Read(BigEndianStream stream) {
+    public override RustO Read(BigEndianStream stream)
+    {
         return Lift(stream.ReadULong());
     }
 
-    public override int AllocationSize(RustO value) {
+    public override int AllocationSize(RustO value)
+    {
         return 8;
     }
 
-    public override void Write(RustO value, BigEndianStream stream) {
+    public override void Write(RustO value, BigEndianStream stream)
+    {
         stream.WriteULong(Lower(value));
     }
 }
-
-
 
 /// <summary>
 /// Pre-OCR image calibration options for descreening patterned backgrounds.
@@ -2357,34 +2681,35 @@ class FfiConverterTypeRustO: FfiConverter<RustO, ulong> {
 /// <param name="DescreenStrength">
 /// Descreen filtering strength (0.0 - 1.0).
 /// </param>
-public record CalibrationOptions (
+public record CalibrationOptions(
     /// <summary>
     /// Descreen filtering strength (0.0 - 1.0).
     /// </summary>
     float? DescreenStrength
-) {
-}
+) { }
 
-class FfiConverterTypeCalibrationOptions: FfiConverterRustBuffer<CalibrationOptions> {
-    public static FfiConverterTypeCalibrationOptions INSTANCE = new FfiConverterTypeCalibrationOptions();
+class FfiConverterTypeCalibrationOptions : FfiConverterRustBuffer<CalibrationOptions>
+{
+    public static FfiConverterTypeCalibrationOptions INSTANCE =
+        new FfiConverterTypeCalibrationOptions();
 
-    public override CalibrationOptions Read(BigEndianStream stream) {
+    public override CalibrationOptions Read(BigEndianStream stream)
+    {
         return new CalibrationOptions(
             DescreenStrength: FfiConverterOptionalFloat.INSTANCE.Read(stream)
         );
     }
 
-    public override int AllocationSize(CalibrationOptions value) {
-        return 0
-            + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.DescreenStrength);
+    public override int AllocationSize(CalibrationOptions value)
+    {
+        return 0 + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.DescreenStrength);
     }
 
-    public override void Write(CalibrationOptions value, BigEndianStream stream) {
-            FfiConverterOptionalFloat.INSTANCE.Write(value.DescreenStrength, stream);
+    public override void Write(CalibrationOptions value, BigEndianStream stream)
+    {
+        FfiConverterOptionalFloat.INSTANCE.Write(value.DescreenStrength, stream);
     }
 }
-
-
 
 /// <summary>
 /// Line classification configuration (180° rotation detection).
@@ -2398,26 +2723,28 @@ class FfiConverterTypeCalibrationOptions: FfiConverterRustBuffer<CalibrationOpti
 /// <param name="Thresh">
 /// Confidence threshold.
 /// </param>
-public record ClassificationConfig (
+public record ClassificationConfig(
     /// <summary>
     /// Whether classification stage is enabled.
     /// </summary>
-    bool? Enabled, 
+    bool? Enabled,
     /// <summary>
     /// Filesystem path to classification model.
     /// </summary>
-    string? ModelPath, 
+    string? ModelPath,
     /// <summary>
     /// Confidence threshold.
     /// </summary>
     float? Thresh
-) {
-}
+) { }
 
-class FfiConverterTypeClassificationConfig: FfiConverterRustBuffer<ClassificationConfig> {
-    public static FfiConverterTypeClassificationConfig INSTANCE = new FfiConverterTypeClassificationConfig();
+class FfiConverterTypeClassificationConfig : FfiConverterRustBuffer<ClassificationConfig>
+{
+    public static FfiConverterTypeClassificationConfig INSTANCE =
+        new FfiConverterTypeClassificationConfig();
 
-    public override ClassificationConfig Read(BigEndianStream stream) {
+    public override ClassificationConfig Read(BigEndianStream stream)
+    {
         return new ClassificationConfig(
             Enabled: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             ModelPath: FfiConverterOptionalString.INSTANCE.Read(stream),
@@ -2425,21 +2752,21 @@ class FfiConverterTypeClassificationConfig: FfiConverterRustBuffer<Classificatio
         );
     }
 
-    public override int AllocationSize(ClassificationConfig value) {
+    public override int AllocationSize(ClassificationConfig value)
+    {
         return 0
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Enabled)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ModelPath)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.Thresh);
     }
 
-    public override void Write(ClassificationConfig value, BigEndianStream stream) {
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.Thresh, stream);
+    public override void Write(ClassificationConfig value, BigEndianStream stream)
+    {
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.Thresh, stream);
     }
 }
-
-
 
 /// <summary>
 /// Text detection model configuration.
@@ -2471,50 +2798,51 @@ class FfiConverterTypeClassificationConfig: FfiConverterRustBuffer<Classificatio
 /// <param name="ScoreMode">
 /// DB score calculation mode: "fast" or "slow".
 /// </param>
-public record DetectionConfig (
+public record DetectionConfig(
     /// <summary>
     /// Whether detection stage is enabled.
     /// </summary>
-    bool? Enabled, 
+    bool? Enabled,
     /// <summary>
     /// Filesystem path to detection model (.rten or .onnx).
     /// </summary>
-    string? ModelPath, 
+    string? ModelPath,
     /// <summary>
     /// Segmentation binarization threshold.
     /// </summary>
-    float? Thresh, 
+    float? Thresh,
     /// <summary>
     /// Box candidate confidence score threshold.
     /// </summary>
-    float? BoxThresh, 
+    float? BoxThresh,
     /// <summary>
     /// Polygon unclip expansion ratio.
     /// </summary>
-    float? UnclipRatio, 
+    float? UnclipRatio,
     /// <summary>
     /// Maximum side length resize target.
     /// </summary>
-    int? LimitSideLen, 
+    int? LimitSideLen,
     /// <summary>
     /// Limit type: "min" or "max".
     /// </summary>
-    string? LimitType, 
+    string? LimitType,
     /// <summary>
     /// Enable morphological dilation.
     /// </summary>
-    bool? UseDilation, 
+    bool? UseDilation,
     /// <summary>
     /// DB score calculation mode: "fast" or "slow".
     /// </summary>
     string? ScoreMode
-) {
-}
+) { }
 
-class FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionConfig> {
+class FfiConverterTypeDetectionConfig : FfiConverterRustBuffer<DetectionConfig>
+{
     public static FfiConverterTypeDetectionConfig INSTANCE = new FfiConverterTypeDetectionConfig();
 
-    public override DetectionConfig Read(BigEndianStream stream) {
+    public override DetectionConfig Read(BigEndianStream stream)
+    {
         return new DetectionConfig(
             Enabled: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             ModelPath: FfiConverterOptionalString.INSTANCE.Read(stream),
@@ -2528,7 +2856,8 @@ class FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionConfig> {
         );
     }
 
-    public override int AllocationSize(DetectionConfig value) {
+    public override int AllocationSize(DetectionConfig value)
+    {
         return 0
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Enabled)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ModelPath)
@@ -2541,20 +2870,19 @@ class FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionConfig> {
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ScoreMode);
     }
 
-    public override void Write(DetectionConfig value, BigEndianStream stream) {
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.Thresh, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.BoxThresh, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.UnclipRatio, stream);
-            FfiConverterOptionalInt32.INSTANCE.Write(value.LimitSideLen, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.LimitType, stream);
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.UseDilation, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.ScoreMode, stream);
+    public override void Write(DetectionConfig value, BigEndianStream stream)
+    {
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.Thresh, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.BoxThresh, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.UnclipRatio, stream);
+        FfiConverterOptionalInt32.INSTANCE.Write(value.LimitSideLen, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.LimitType, stream);
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.UseDilation, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.ScoreMode, stream);
     }
 }
-
-
 
 /// <summary>
 /// Image detection stage options.
@@ -2574,34 +2902,36 @@ class FfiConverterTypeDetectionConfig: FfiConverterRustBuffer<DetectionConfig> {
 /// <param name="Postprocess">
 /// Post-processing options for detection.
 /// </param>
-public record DetectionRunOptions (
+public record DetectionRunOptions(
     /// <summary>
     /// Target side length constraint for image resizing. Default: 960.
     /// </summary>
-    int? LimitSideLen, 
+    int? LimitSideLen,
     /// <summary>
     /// Side length limit behavior: "min" or "max".
     /// </summary>
-    string? LimitType, 
+    string? LimitType,
     /// <summary>
     /// Mean RGB normalization values. Default: [0.485, 0.456, 0.406].
     /// </summary>
-    float[]? Mean, 
+    float[]? Mean,
     /// <summary>
     /// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
     /// </summary>
-    float[]? Std, 
+    float[]? Std,
     /// <summary>
     /// Post-processing options for detection.
     /// </summary>
     PostprocessRunOptions? Postprocess
-) {
-}
+) { }
 
-class FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer<DetectionRunOptions> {
-    public static FfiConverterTypeDetectionRunOptions INSTANCE = new FfiConverterTypeDetectionRunOptions();
+class FfiConverterTypeDetectionRunOptions : FfiConverterRustBuffer<DetectionRunOptions>
+{
+    public static FfiConverterTypeDetectionRunOptions INSTANCE =
+        new FfiConverterTypeDetectionRunOptions();
 
-    public override DetectionRunOptions Read(BigEndianStream stream) {
+    public override DetectionRunOptions Read(BigEndianStream stream)
+    {
         return new DetectionRunOptions(
             LimitSideLen: FfiConverterOptionalInt32.INSTANCE.Read(stream),
             LimitType: FfiConverterOptionalString.INSTANCE.Read(stream),
@@ -2611,25 +2941,27 @@ class FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer<DetectionRunOp
         );
     }
 
-    public override int AllocationSize(DetectionRunOptions value) {
+    public override int AllocationSize(DetectionRunOptions value)
+    {
         return 0
             + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.LimitSideLen)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.LimitType)
             + FfiConverterOptionalSequenceFloat.INSTANCE.AllocationSize(value.Mean)
             + FfiConverterOptionalSequenceFloat.INSTANCE.AllocationSize(value.Std)
-            + FfiConverterOptionalTypePostprocessRunOptions.INSTANCE.AllocationSize(value.Postprocess);
+            + FfiConverterOptionalTypePostprocessRunOptions.INSTANCE.AllocationSize(
+                value.Postprocess
+            );
     }
 
-    public override void Write(DetectionRunOptions value, BigEndianStream stream) {
-            FfiConverterOptionalInt32.INSTANCE.Write(value.LimitSideLen, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.LimitType, stream);
-            FfiConverterOptionalSequenceFloat.INSTANCE.Write(value.Mean, stream);
-            FfiConverterOptionalSequenceFloat.INSTANCE.Write(value.Std, stream);
-            FfiConverterOptionalTypePostprocessRunOptions.INSTANCE.Write(value.Postprocess, stream);
+    public override void Write(DetectionRunOptions value, BigEndianStream stream)
+    {
+        FfiConverterOptionalInt32.INSTANCE.Write(value.LimitSideLen, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.LimitType, stream);
+        FfiConverterOptionalSequenceFloat.INSTANCE.Write(value.Mean, stream);
+        FfiConverterOptionalSequenceFloat.INSTANCE.Write(value.Std, stream);
+        FfiConverterOptionalTypePostprocessRunOptions.INSTANCE.Write(value.Postprocess, stream);
     }
 }
-
-
 
 /// <summary>
 /// Axis-aligned bounding box frame with position and size in pixels.
@@ -2646,30 +2978,31 @@ class FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer<DetectionRunOp
 /// <param name="Left">
 /// Left horizontal coordinate (X).
 /// </param>
-public record Frame (
+public record Frame(
     /// <summary>
     /// Width of the bounding box.
     /// </summary>
-    float Width, 
+    float Width,
     /// <summary>
     /// Height of the bounding box.
     /// </summary>
-    float Height, 
+    float Height,
     /// <summary>
     /// Top vertical coordinate (Y).
     /// </summary>
-    float Top, 
+    float Top,
     /// <summary>
     /// Left horizontal coordinate (X).
     /// </summary>
     float Left
-) {
-}
+) { }
 
-class FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
+class FfiConverterTypeFrame : FfiConverterRustBuffer<Frame>
+{
     public static FfiConverterTypeFrame INSTANCE = new FfiConverterTypeFrame();
 
-    public override Frame Read(BigEndianStream stream) {
+    public override Frame Read(BigEndianStream stream)
+    {
         return new Frame(
             Width: FfiConverterFloat.INSTANCE.Read(stream),
             Height: FfiConverterFloat.INSTANCE.Read(stream),
@@ -2678,7 +3011,8 @@ class FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
         );
     }
 
-    public override int AllocationSize(Frame value) {
+    public override int AllocationSize(Frame value)
+    {
         return 0
             + FfiConverterFloat.INSTANCE.AllocationSize(value.Width)
             + FfiConverterFloat.INSTANCE.AllocationSize(value.Height)
@@ -2686,21 +3020,20 @@ class FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
             + FfiConverterFloat.INSTANCE.AllocationSize(value.Left);
     }
 
-    public override void Write(Frame value, BigEndianStream stream) {
-            FfiConverterFloat.INSTANCE.Write(value.Width, stream);
-            FfiConverterFloat.INSTANCE.Write(value.Height, stream);
-            FfiConverterFloat.INSTANCE.Write(value.Top, stream);
-            FfiConverterFloat.INSTANCE.Write(value.Left, stream);
+    public override void Write(Frame value, BigEndianStream stream)
+    {
+        FfiConverterFloat.INSTANCE.Write(value.Width, stream);
+        FfiConverterFloat.INSTANCE.Write(value.Height, stream);
+        FfiConverterFloat.INSTANCE.Write(value.Top, stream);
+        FfiConverterFloat.INSTANCE.Write(value.Left, stream);
     }
 }
-
-
 
 /// <summary>
 /// Engine initialization configuration specifying model paths, preset, and optional extensions.
 /// </summary>
 /// <param name="Model">
-/// Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+/// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
 /// </param>
 /// <param name="ModelPath">
 /// Base model directory containing det, rec, and dict files.
@@ -2738,66 +3071,68 @@ class FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
 /// <param name="Layout">
 /// Optional layout configuration.
 /// </param>
-public record InitializeConfig (
+public record InitializeConfig(
     /// <summary>
-    /// Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+    /// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
     /// </summary>
-    string? Model, 
+    string? Model,
     /// <summary>
     /// Base model directory containing det, rec, and dict files.
     /// </summary>
-    string? ModelPath, 
+    string? ModelPath,
     /// <summary>
     /// Legacy template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
     /// </summary>
-    string? Template, 
+    string? Template,
     /// <summary>
     /// Language code or name (e.g. "ja", "ko", "ar", "cyrillic", "devanagari", "latin").
     /// </summary>
-    string? Lang, 
+    string? Lang,
     /// <summary>
     /// Custom cache directory override path.
     /// </summary>
-    string? CacheDir, 
+    string? CacheDir,
     /// <summary>
     /// Enable neural reading order recovery transformer.
     /// </summary>
-    bool? EnableReadingOrder, 
+    bool? EnableReadingOrder,
     /// <summary>
     /// Document layout variant: "cdla" (default 10-class) or "publaynet" (5-class).
     /// </summary>
-    string? LayoutVariant, 
+    string? LayoutVariant,
     /// <summary>
     /// Detection model configuration.
     /// </summary>
-    DetectionConfig? Detection, 
+    DetectionConfig? Detection,
     /// <summary>
     /// Recognition model and dictionary configuration.
     /// </summary>
-    RecognitionConfig? Recognition, 
+    RecognitionConfig? Recognition,
     /// <summary>
     /// Optional classification configuration.
     /// </summary>
-    ClassificationConfig? Classification, 
+    ClassificationConfig? Classification,
     /// <summary>
     /// Optional orientation configuration.
     /// </summary>
-    OrientationConfig? Orientation, 
+    OrientationConfig? Orientation,
     /// <summary>
     /// Optional unwarp configuration.
     /// </summary>
-    UnwarpConfig? Unwarp, 
+    UnwarpConfig? Unwarp,
     /// <summary>
     /// Optional layout configuration.
     /// </summary>
     LayoutConfig? Layout
-) {
-}
+) { }
 
-class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig> {
-    public static FfiConverterTypeInitializeConfig INSTANCE = new FfiConverterTypeInitializeConfig();
+class FfiConverterTypeInitializeConfig : FfiConverterRustBuffer<InitializeConfig>
+{
+    public static FfiConverterTypeInitializeConfig INSTANCE =
+        new FfiConverterTypeInitializeConfig();
 
-    public override InitializeConfig Read(BigEndianStream stream) {
+    public override InitializeConfig Read(BigEndianStream stream)
+    {
         return new InitializeConfig(
             Model: FfiConverterOptionalString.INSTANCE.Read(stream),
             ModelPath: FfiConverterOptionalString.INSTANCE.Read(stream),
@@ -2815,7 +3150,8 @@ class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig>
         );
     }
 
-    public override int AllocationSize(InitializeConfig value) {
+    public override int AllocationSize(InitializeConfig value)
+    {
         return 0
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.Model)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ModelPath)
@@ -2826,30 +3162,31 @@ class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig>
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.LayoutVariant)
             + FfiConverterOptionalTypeDetectionConfig.INSTANCE.AllocationSize(value.Detection)
             + FfiConverterOptionalTypeRecognitionConfig.INSTANCE.AllocationSize(value.Recognition)
-            + FfiConverterOptionalTypeClassificationConfig.INSTANCE.AllocationSize(value.Classification)
+            + FfiConverterOptionalTypeClassificationConfig.INSTANCE.AllocationSize(
+                value.Classification
+            )
             + FfiConverterOptionalTypeOrientationConfig.INSTANCE.AllocationSize(value.Orientation)
             + FfiConverterOptionalTypeUnwarpConfig.INSTANCE.AllocationSize(value.Unwarp)
             + FfiConverterOptionalTypeLayoutConfig.INSTANCE.AllocationSize(value.Layout);
     }
 
-    public override void Write(InitializeConfig value, BigEndianStream stream) {
-            FfiConverterOptionalString.INSTANCE.Write(value.Model, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.Template, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.Lang, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.CacheDir, stream);
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.EnableReadingOrder, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.LayoutVariant, stream);
-            FfiConverterOptionalTypeDetectionConfig.INSTANCE.Write(value.Detection, stream);
-            FfiConverterOptionalTypeRecognitionConfig.INSTANCE.Write(value.Recognition, stream);
-            FfiConverterOptionalTypeClassificationConfig.INSTANCE.Write(value.Classification, stream);
-            FfiConverterOptionalTypeOrientationConfig.INSTANCE.Write(value.Orientation, stream);
-            FfiConverterOptionalTypeUnwarpConfig.INSTANCE.Write(value.Unwarp, stream);
-            FfiConverterOptionalTypeLayoutConfig.INSTANCE.Write(value.Layout, stream);
+    public override void Write(InitializeConfig value, BigEndianStream stream)
+    {
+        FfiConverterOptionalString.INSTANCE.Write(value.Model, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.Template, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.Lang, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.CacheDir, stream);
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.EnableReadingOrder, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.LayoutVariant, stream);
+        FfiConverterOptionalTypeDetectionConfig.INSTANCE.Write(value.Detection, stream);
+        FfiConverterOptionalTypeRecognitionConfig.INSTANCE.Write(value.Recognition, stream);
+        FfiConverterOptionalTypeClassificationConfig.INSTANCE.Write(value.Classification, stream);
+        FfiConverterOptionalTypeOrientationConfig.INSTANCE.Write(value.Orientation, stream);
+        FfiConverterOptionalTypeUnwarpConfig.INSTANCE.Write(value.Unwarp, stream);
+        FfiConverterOptionalTypeLayoutConfig.INSTANCE.Write(value.Layout, stream);
     }
 }
-
-
 
 /// <summary>
 /// Bounding box coordinates for a detected document layout region.
@@ -2866,30 +3203,31 @@ class FfiConverterTypeInitializeConfig: FfiConverterRustBuffer<InitializeConfig>
 /// <param name="YMax">
 /// Maximum vertical coordinate (bottom).
 /// </param>
-public record LayoutBBox (
+public record LayoutBBox(
     /// <summary>
     /// Minimum horizontal coordinate (left).
     /// </summary>
-    int XMin, 
+    int XMin,
     /// <summary>
     /// Minimum vertical coordinate (top).
     /// </summary>
-    int YMin, 
+    int YMin,
     /// <summary>
     /// Maximum horizontal coordinate (right).
     /// </summary>
-    int XMax, 
+    int XMax,
     /// <summary>
     /// Maximum vertical coordinate (bottom).
     /// </summary>
     int YMax
-) {
-}
+) { }
 
-class FfiConverterTypeLayoutBBox: FfiConverterRustBuffer<LayoutBBox> {
+class FfiConverterTypeLayoutBBox : FfiConverterRustBuffer<LayoutBBox>
+{
     public static FfiConverterTypeLayoutBBox INSTANCE = new FfiConverterTypeLayoutBBox();
 
-    public override LayoutBBox Read(BigEndianStream stream) {
+    public override LayoutBBox Read(BigEndianStream stream)
+    {
         return new LayoutBBox(
             XMin: FfiConverterInt32.INSTANCE.Read(stream),
             YMin: FfiConverterInt32.INSTANCE.Read(stream),
@@ -2898,7 +3236,8 @@ class FfiConverterTypeLayoutBBox: FfiConverterRustBuffer<LayoutBBox> {
         );
     }
 
-    public override int AllocationSize(LayoutBBox value) {
+    public override int AllocationSize(LayoutBBox value)
+    {
         return 0
             + FfiConverterInt32.INSTANCE.AllocationSize(value.XMin)
             + FfiConverterInt32.INSTANCE.AllocationSize(value.YMin)
@@ -2906,15 +3245,14 @@ class FfiConverterTypeLayoutBBox: FfiConverterRustBuffer<LayoutBBox> {
             + FfiConverterInt32.INSTANCE.AllocationSize(value.YMax);
     }
 
-    public override void Write(LayoutBBox value, BigEndianStream stream) {
-            FfiConverterInt32.INSTANCE.Write(value.XMin, stream);
-            FfiConverterInt32.INSTANCE.Write(value.YMin, stream);
-            FfiConverterInt32.INSTANCE.Write(value.XMax, stream);
-            FfiConverterInt32.INSTANCE.Write(value.YMax, stream);
+    public override void Write(LayoutBBox value, BigEndianStream stream)
+    {
+        FfiConverterInt32.INSTANCE.Write(value.XMin, stream);
+        FfiConverterInt32.INSTANCE.Write(value.YMin, stream);
+        FfiConverterInt32.INSTANCE.Write(value.XMax, stream);
+        FfiConverterInt32.INSTANCE.Write(value.YMax, stream);
     }
 }
-
-
 
 /// <summary>
 /// Document layout analysis model configuration.
@@ -2937,38 +3275,39 @@ class FfiConverterTypeLayoutBBox: FfiConverterRustBuffer<LayoutBBox> {
 /// <param name="TargetWidth">
 /// Target input width for resizing.
 /// </param>
-public record LayoutConfig (
+public record LayoutConfig(
     /// <summary>
     /// Whether layout stage is enabled.
     /// </summary>
-    bool? Enabled, 
+    bool? Enabled,
     /// <summary>
     /// Filesystem path to layout model (.rten or .onnx).
     /// </summary>
-    string? ModelPath, 
+    string? ModelPath,
     /// <summary>
     /// Confidence threshold.
     /// </summary>
-    float? ConfThresh, 
+    float? ConfThresh,
     /// <summary>
     /// Target input side length for resizing.
     /// </summary>
-    int? TargetSize, 
+    int? TargetSize,
     /// <summary>
     /// Target input height for resizing.
     /// </summary>
-    int? TargetHeight, 
+    int? TargetHeight,
     /// <summary>
     /// Target input width for resizing.
     /// </summary>
     int? TargetWidth
-) {
-}
+) { }
 
-class FfiConverterTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig> {
+class FfiConverterTypeLayoutConfig : FfiConverterRustBuffer<LayoutConfig>
+{
     public static FfiConverterTypeLayoutConfig INSTANCE = new FfiConverterTypeLayoutConfig();
 
-    public override LayoutConfig Read(BigEndianStream stream) {
+    public override LayoutConfig Read(BigEndianStream stream)
+    {
         return new LayoutConfig(
             Enabled: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             ModelPath: FfiConverterOptionalString.INSTANCE.Read(stream),
@@ -2979,7 +3318,8 @@ class FfiConverterTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig> {
         );
     }
 
-    public override int AllocationSize(LayoutConfig value) {
+    public override int AllocationSize(LayoutConfig value)
+    {
         return 0
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Enabled)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ModelPath)
@@ -2989,17 +3329,16 @@ class FfiConverterTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig> {
             + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.TargetWidth);
     }
 
-    public override void Write(LayoutConfig value, BigEndianStream stream) {
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.ConfThresh, stream);
-            FfiConverterOptionalInt32.INSTANCE.Write(value.TargetSize, stream);
-            FfiConverterOptionalInt32.INSTANCE.Write(value.TargetHeight, stream);
-            FfiConverterOptionalInt32.INSTANCE.Write(value.TargetWidth, stream);
+    public override void Write(LayoutConfig value, BigEndianStream stream)
+    {
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.ConfThresh, stream);
+        FfiConverterOptionalInt32.INSTANCE.Write(value.TargetSize, stream);
+        FfiConverterOptionalInt32.INSTANCE.Write(value.TargetHeight, stream);
+        FfiConverterOptionalInt32.INSTANCE.Write(value.TargetWidth, stream);
     }
 }
-
-
 
 /// <summary>
 /// Detected document layout region with category, bounding box, and confidence score.
@@ -3013,26 +3352,27 @@ class FfiConverterTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig> {
 /// <param name="Confidence">
 /// Classification confidence score [0.0 - 1.0].
 /// </param>
-public record LayoutRegion (
+public record LayoutRegion(
     /// <summary>
     /// Axis-aligned bounding box.
     /// </summary>
-    LayoutBBox Bbox, 
+    LayoutBBox Bbox,
     /// <summary>
     /// Semantic layout category.
     /// </summary>
-    LayoutType LayoutType, 
+    LayoutType LayoutType,
     /// <summary>
     /// Classification confidence score [0.0 - 1.0].
     /// </summary>
     float Confidence
-) {
-}
+) { }
 
-class FfiConverterTypeLayoutRegion: FfiConverterRustBuffer<LayoutRegion> {
+class FfiConverterTypeLayoutRegion : FfiConverterRustBuffer<LayoutRegion>
+{
     public static FfiConverterTypeLayoutRegion INSTANCE = new FfiConverterTypeLayoutRegion();
 
-    public override LayoutRegion Read(BigEndianStream stream) {
+    public override LayoutRegion Read(BigEndianStream stream)
+    {
         return new LayoutRegion(
             Bbox: FfiConverterTypeLayoutBBox.INSTANCE.Read(stream),
             LayoutType: FfiConverterTypeLayoutType.INSTANCE.Read(stream),
@@ -3040,21 +3380,21 @@ class FfiConverterTypeLayoutRegion: FfiConverterRustBuffer<LayoutRegion> {
         );
     }
 
-    public override int AllocationSize(LayoutRegion value) {
+    public override int AllocationSize(LayoutRegion value)
+    {
         return 0
             + FfiConverterTypeLayoutBBox.INSTANCE.AllocationSize(value.Bbox)
             + FfiConverterTypeLayoutType.INSTANCE.AllocationSize(value.LayoutType)
             + FfiConverterFloat.INSTANCE.AllocationSize(value.Confidence);
     }
 
-    public override void Write(LayoutRegion value, BigEndianStream stream) {
-            FfiConverterTypeLayoutBBox.INSTANCE.Write(value.Bbox, stream);
-            FfiConverterTypeLayoutType.INSTANCE.Write(value.LayoutType, stream);
-            FfiConverterFloat.INSTANCE.Write(value.Confidence, stream);
+    public override void Write(LayoutRegion value, BigEndianStream stream)
+    {
+        FfiConverterTypeLayoutBBox.INSTANCE.Write(value.Bbox, stream);
+        FfiConverterTypeLayoutType.INSTANCE.Write(value.LayoutType, stream);
+        FfiConverterFloat.INSTANCE.Write(value.Confidence, stream);
     }
 }
-
-
 
 /// <summary>
 /// Per-request execution options for text detection.
@@ -3110,82 +3450,83 @@ class FfiConverterTypeLayoutRegion: FfiConverterRustBuffer<LayoutRegion> {
 /// <param name="RecBatchNum">
 /// Request-local recognition batch size override.
 /// </param>
-public record OcrRunOptions (
+public record OcrRunOptions(
     /// <summary>
     /// Output format granularity: Lines (default), Words, or Spatial.
     /// </summary>
-    OutputGranularity Output, 
+    OutputGranularity Output,
     /// <summary>
     /// Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
     /// </summary>
-    float? LineYThreshold, 
+    float? LineYThreshold,
     /// <summary>
     /// Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
     /// </summary>
-    float? WordXThreshold, 
+    float? WordXThreshold,
     /// <summary>
     /// Minimum recognition confidence score threshold [0.0 - 1.0].
     /// </summary>
-    float? TextScore, 
+    float? TextScore,
     /// <summary>
     /// Enable text line orientation classifier stage.
     /// </summary>
-    bool? Classification, 
+    bool? Classification,
     /// <summary>
     /// Enable document orientation angle correction stage.
     /// </summary>
-    bool? Orientation, 
+    bool? Orientation,
     /// <summary>
     /// Enable document unwarping stage.
     /// </summary>
-    bool? Unwarp, 
+    bool? Unwarp,
     /// <summary>
     /// Enable document layout analysis stage.
     /// </summary>
-    bool? Layout, 
+    bool? Layout,
     /// <summary>
     /// Request-local minimum height resize override.
     /// </summary>
-    float? MinHeight, 
+    float? MinHeight,
     /// <summary>
     /// Request-local maximum side length resize override.
     /// </summary>
-    float? MaxSideLen, 
+    float? MaxSideLen,
     /// <summary>
     /// Request-local minimum side length resize override.
     /// </summary>
-    float? MinSideLen, 
+    float? MinSideLen,
     /// <summary>
     /// Width-to-height aspect ratio padding override.
     /// </summary>
-    float? WidthHeightRatio, 
+    float? WidthHeightRatio,
     /// <summary>
     /// Detection stage options.
     /// </summary>
-    DetectionRunOptions? Detection, 
+    DetectionRunOptions? Detection,
     /// <summary>
     /// Post-processing options.
     /// </summary>
-    PostprocessRunOptions? Postprocess, 
+    PostprocessRunOptions? Postprocess,
     /// <summary>
     /// Pre-OCR background descreening calibration options.
     /// </summary>
-    CalibrationOptions? Calibration, 
+    CalibrationOptions? Calibration,
     /// <summary>
     /// Runtime crop and resolution optimization options.
     /// </summary>
-    OptimizationOptions? Optimization, 
+    OptimizationOptions? Optimization,
     /// <summary>
     /// Request-local recognition batch size override.
     /// </summary>
     int? RecBatchNum
-) {
-}
+) { }
 
-class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
+class FfiConverterTypeOcrRunOptions : FfiConverterRustBuffer<OcrRunOptions>
+{
     public static FfiConverterTypeOcrRunOptions INSTANCE = new FfiConverterTypeOcrRunOptions();
 
-    public override OcrRunOptions Read(BigEndianStream stream) {
+    public override OcrRunOptions Read(BigEndianStream stream)
+    {
         return new OcrRunOptions(
             Output: FfiConverterTypeOutputGranularity.INSTANCE.Read(stream),
             LineYThreshold: FfiConverterOptionalFloat.INSTANCE.Read(stream),
@@ -3207,7 +3548,8 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
         );
     }
 
-    public override int AllocationSize(OcrRunOptions value) {
+    public override int AllocationSize(OcrRunOptions value)
+    {
         return 0
             + FfiConverterTypeOutputGranularity.INSTANCE.AllocationSize(value.Output)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.LineYThreshold)
@@ -3222,34 +3564,37 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.MinSideLen)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.WidthHeightRatio)
             + FfiConverterOptionalTypeDetectionRunOptions.INSTANCE.AllocationSize(value.Detection)
-            + FfiConverterOptionalTypePostprocessRunOptions.INSTANCE.AllocationSize(value.Postprocess)
+            + FfiConverterOptionalTypePostprocessRunOptions.INSTANCE.AllocationSize(
+                value.Postprocess
+            )
             + FfiConverterOptionalTypeCalibrationOptions.INSTANCE.AllocationSize(value.Calibration)
-            + FfiConverterOptionalTypeOptimizationOptions.INSTANCE.AllocationSize(value.Optimization)
+            + FfiConverterOptionalTypeOptimizationOptions.INSTANCE.AllocationSize(
+                value.Optimization
+            )
             + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.RecBatchNum);
     }
 
-    public override void Write(OcrRunOptions value, BigEndianStream stream) {
-            FfiConverterTypeOutputGranularity.INSTANCE.Write(value.Output, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.LineYThreshold, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.WordXThreshold, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.TextScore, stream);
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.Classification, stream);
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.Orientation, stream);
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.Unwarp, stream);
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.Layout, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.MinHeight, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.MaxSideLen, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.MinSideLen, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.WidthHeightRatio, stream);
-            FfiConverterOptionalTypeDetectionRunOptions.INSTANCE.Write(value.Detection, stream);
-            FfiConverterOptionalTypePostprocessRunOptions.INSTANCE.Write(value.Postprocess, stream);
-            FfiConverterOptionalTypeCalibrationOptions.INSTANCE.Write(value.Calibration, stream);
-            FfiConverterOptionalTypeOptimizationOptions.INSTANCE.Write(value.Optimization, stream);
-            FfiConverterOptionalInt32.INSTANCE.Write(value.RecBatchNum, stream);
+    public override void Write(OcrRunOptions value, BigEndianStream stream)
+    {
+        FfiConverterTypeOutputGranularity.INSTANCE.Write(value.Output, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.LineYThreshold, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.WordXThreshold, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.TextScore, stream);
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.Classification, stream);
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.Orientation, stream);
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.Unwarp, stream);
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.Layout, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.MinHeight, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.MaxSideLen, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.MinSideLen, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.WidthHeightRatio, stream);
+        FfiConverterOptionalTypeDetectionRunOptions.INSTANCE.Write(value.Detection, stream);
+        FfiConverterOptionalTypePostprocessRunOptions.INSTANCE.Write(value.Postprocess, stream);
+        FfiConverterOptionalTypeCalibrationOptions.INSTANCE.Write(value.Calibration, stream);
+        FfiConverterOptionalTypeOptimizationOptions.INSTANCE.Write(value.Optimization, stream);
+        FfiConverterOptionalInt32.INSTANCE.Write(value.RecBatchNum, stream);
     }
 }
-
-
 
 /// <summary>
 /// Runtime crop and resolution optimization options.
@@ -3266,30 +3611,32 @@ class FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOptions> {
 /// <param name="CropPaddingY">
 /// Vertical padding around bounding box crops in pixels.
 /// </param>
-public record OptimizationOptions (
+public record OptimizationOptions(
     /// <summary>
     /// Enable or disable image optimization.
     /// </summary>
-    bool? Enabled, 
+    bool? Enabled,
     /// <summary>
     /// Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
     /// </summary>
-    uint? TargetMaxSide, 
+    uint? TargetMaxSide,
     /// <summary>
     /// Horizontal padding around bounding box crops in pixels.
     /// </summary>
-    float? CropPaddingX, 
+    float? CropPaddingX,
     /// <summary>
     /// Vertical padding around bounding box crops in pixels.
     /// </summary>
     float? CropPaddingY
-) {
-}
+) { }
 
-class FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOptions> {
-    public static FfiConverterTypeOptimizationOptions INSTANCE = new FfiConverterTypeOptimizationOptions();
+class FfiConverterTypeOptimizationOptions : FfiConverterRustBuffer<OptimizationOptions>
+{
+    public static FfiConverterTypeOptimizationOptions INSTANCE =
+        new FfiConverterTypeOptimizationOptions();
 
-    public override OptimizationOptions Read(BigEndianStream stream) {
+    public override OptimizationOptions Read(BigEndianStream stream)
+    {
         return new OptimizationOptions(
             Enabled: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             TargetMaxSide: FfiConverterOptionalUInt32.INSTANCE.Read(stream),
@@ -3298,7 +3645,8 @@ class FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOp
         );
     }
 
-    public override int AllocationSize(OptimizationOptions value) {
+    public override int AllocationSize(OptimizationOptions value)
+    {
         return 0
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Enabled)
             + FfiConverterOptionalUInt32.INSTANCE.AllocationSize(value.TargetMaxSide)
@@ -3306,15 +3654,14 @@ class FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOp
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.CropPaddingY);
     }
 
-    public override void Write(OptimizationOptions value, BigEndianStream stream) {
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
-            FfiConverterOptionalUInt32.INSTANCE.Write(value.TargetMaxSide, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.CropPaddingX, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.CropPaddingY, stream);
+    public override void Write(OptimizationOptions value, BigEndianStream stream)
+    {
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
+        FfiConverterOptionalUInt32.INSTANCE.Write(value.TargetMaxSide, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.CropPaddingX, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.CropPaddingY, stream);
     }
 }
-
-
 
 /// <summary>
 /// Document orientation angle configuration (0°, 90°, 180°, 270°).
@@ -3328,26 +3675,28 @@ class FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOp
 /// <param name="Thresh">
 /// Confidence threshold.
 /// </param>
-public record OrientationConfig (
+public record OrientationConfig(
     /// <summary>
     /// Whether orientation stage is enabled.
     /// </summary>
-    bool? Enabled, 
+    bool? Enabled,
     /// <summary>
     /// Filesystem path to orientation model.
     /// </summary>
-    string? ModelPath, 
+    string? ModelPath,
     /// <summary>
     /// Confidence threshold.
     /// </summary>
     float? Thresh
-) {
-}
+) { }
 
-class FfiConverterTypeOrientationConfig: FfiConverterRustBuffer<OrientationConfig> {
-    public static FfiConverterTypeOrientationConfig INSTANCE = new FfiConverterTypeOrientationConfig();
+class FfiConverterTypeOrientationConfig : FfiConverterRustBuffer<OrientationConfig>
+{
+    public static FfiConverterTypeOrientationConfig INSTANCE =
+        new FfiConverterTypeOrientationConfig();
 
-    public override OrientationConfig Read(BigEndianStream stream) {
+    public override OrientationConfig Read(BigEndianStream stream)
+    {
         return new OrientationConfig(
             Enabled: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             ModelPath: FfiConverterOptionalString.INSTANCE.Read(stream),
@@ -3355,21 +3704,21 @@ class FfiConverterTypeOrientationConfig: FfiConverterRustBuffer<OrientationConfi
         );
     }
 
-    public override int AllocationSize(OrientationConfig value) {
+    public override int AllocationSize(OrientationConfig value)
+    {
         return 0
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Enabled)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ModelPath)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.Thresh);
     }
 
-    public override void Write(OrientationConfig value, BigEndianStream stream) {
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.Thresh, stream);
+    public override void Write(OrientationConfig value, BigEndianStream stream)
+    {
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.Thresh, stream);
     }
 }
-
-
 
 /// <summary>
 /// 2D coordinate point representing vertex location in pixels.
@@ -3380,41 +3729,42 @@ class FfiConverterTypeOrientationConfig: FfiConverterRustBuffer<OrientationConfi
 /// <param name="Y">
 /// Vertical coordinate (Y).
 /// </param>
-public record Point2D (
+public record Point2D(
     /// <summary>
     /// Horizontal coordinate (X).
     /// </summary>
-    float X, 
+    float X,
     /// <summary>
     /// Vertical coordinate (Y).
     /// </summary>
     float Y
-) {
-}
+) { }
 
-class FfiConverterTypePoint2D: FfiConverterRustBuffer<Point2D> {
+class FfiConverterTypePoint2D : FfiConverterRustBuffer<Point2D>
+{
     public static FfiConverterTypePoint2D INSTANCE = new FfiConverterTypePoint2D();
 
-    public override Point2D Read(BigEndianStream stream) {
+    public override Point2D Read(BigEndianStream stream)
+    {
         return new Point2D(
             X: FfiConverterFloat.INSTANCE.Read(stream),
             Y: FfiConverterFloat.INSTANCE.Read(stream)
         );
     }
 
-    public override int AllocationSize(Point2D value) {
+    public override int AllocationSize(Point2D value)
+    {
         return 0
             + FfiConverterFloat.INSTANCE.AllocationSize(value.X)
             + FfiConverterFloat.INSTANCE.AllocationSize(value.Y);
     }
 
-    public override void Write(Point2D value, BigEndianStream stream) {
-            FfiConverterFloat.INSTANCE.Write(value.X, stream);
-            FfiConverterFloat.INSTANCE.Write(value.Y, stream);
+    public override void Write(Point2D value, BigEndianStream stream)
+    {
+        FfiConverterFloat.INSTANCE.Write(value.X, stream);
+        FfiConverterFloat.INSTANCE.Write(value.Y, stream);
     }
 }
-
-
 
 /// <summary>
 /// Post-processing options for DBNet polygon detection and binarization.
@@ -3437,38 +3787,40 @@ class FfiConverterTypePoint2D: FfiConverterRustBuffer<Point2D> {
 /// <param name="ScoreMode">
 /// DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
 /// </param>
-public record PostprocessRunOptions (
+public record PostprocessRunOptions(
     /// <summary>
     /// Binarization probability cutoff threshold. Default: 0.3.
     /// </summary>
-    float? Threshold, 
+    float? Threshold,
     /// <summary>
     /// Polygon contour score confidence threshold. Default: 0.6.
     /// </summary>
-    float? BoxThreshold, 
+    float? BoxThreshold,
     /// <summary>
     /// Maximum candidate text boxes to detect per image. Default: 1000.
     /// </summary>
-    int? MaxCandidates, 
+    int? MaxCandidates,
     /// <summary>
     /// Polygon unclip expansion ratio. Default: 1.5 - 2.0.
     /// </summary>
-    float? UnclipRatio, 
+    float? UnclipRatio,
     /// <summary>
     /// Enable morphological dilation to connect broken text strokes.
     /// </summary>
-    bool? UseDilation, 
+    bool? UseDilation,
     /// <summary>
     /// DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
     /// </summary>
     string? ScoreMode
-) {
-}
+) { }
 
-class FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<PostprocessRunOptions> {
-    public static FfiConverterTypePostprocessRunOptions INSTANCE = new FfiConverterTypePostprocessRunOptions();
+class FfiConverterTypePostprocessRunOptions : FfiConverterRustBuffer<PostprocessRunOptions>
+{
+    public static FfiConverterTypePostprocessRunOptions INSTANCE =
+        new FfiConverterTypePostprocessRunOptions();
 
-    public override PostprocessRunOptions Read(BigEndianStream stream) {
+    public override PostprocessRunOptions Read(BigEndianStream stream)
+    {
         return new PostprocessRunOptions(
             Threshold: FfiConverterOptionalFloat.INSTANCE.Read(stream),
             BoxThreshold: FfiConverterOptionalFloat.INSTANCE.Read(stream),
@@ -3479,7 +3831,8 @@ class FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<PostprocessR
         );
     }
 
-    public override int AllocationSize(PostprocessRunOptions value) {
+    public override int AllocationSize(PostprocessRunOptions value)
+    {
         return 0
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.Threshold)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.BoxThreshold)
@@ -3489,17 +3842,16 @@ class FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<PostprocessR
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ScoreMode);
     }
 
-    public override void Write(PostprocessRunOptions value, BigEndianStream stream) {
-            FfiConverterOptionalFloat.INSTANCE.Write(value.Threshold, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.BoxThreshold, stream);
-            FfiConverterOptionalInt32.INSTANCE.Write(value.MaxCandidates, stream);
-            FfiConverterOptionalFloat.INSTANCE.Write(value.UnclipRatio, stream);
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.UseDilation, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.ScoreMode, stream);
+    public override void Write(PostprocessRunOptions value, BigEndianStream stream)
+    {
+        FfiConverterOptionalFloat.INSTANCE.Write(value.Threshold, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.BoxThreshold, stream);
+        FfiConverterOptionalInt32.INSTANCE.Write(value.MaxCandidates, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.UnclipRatio, stream);
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.UseDilation, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.ScoreMode, stream);
     }
 }
-
-
 
 /// <summary>
 /// Text recognition model configuration.
@@ -3516,30 +3868,32 @@ class FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer<PostprocessR
 /// <param name="RecBatchNum">
 /// Recognition batch size. Default: 6.
 /// </param>
-public record RecognitionConfig (
+public record RecognitionConfig(
     /// <summary>
     /// Whether recognition stage is enabled.
     /// </summary>
-    bool? Enabled, 
+    bool? Enabled,
     /// <summary>
     /// Filesystem path to recognition model (.rten or .onnx).
     /// </summary>
-    string? ModelPath, 
+    string? ModelPath,
     /// <summary>
     /// Filesystem path to dictionary vocabulary file (.txt).
     /// </summary>
-    string? DictPath, 
+    string? DictPath,
     /// <summary>
     /// Recognition batch size. Default: 6.
     /// </summary>
     int? RecBatchNum
-) {
-}
+) { }
 
-class FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<RecognitionConfig> {
-    public static FfiConverterTypeRecognitionConfig INSTANCE = new FfiConverterTypeRecognitionConfig();
+class FfiConverterTypeRecognitionConfig : FfiConverterRustBuffer<RecognitionConfig>
+{
+    public static FfiConverterTypeRecognitionConfig INSTANCE =
+        new FfiConverterTypeRecognitionConfig();
 
-    public override RecognitionConfig Read(BigEndianStream stream) {
+    public override RecognitionConfig Read(BigEndianStream stream)
+    {
         return new RecognitionConfig(
             Enabled: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             ModelPath: FfiConverterOptionalString.INSTANCE.Read(stream),
@@ -3548,7 +3902,8 @@ class FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<RecognitionConfi
         );
     }
 
-    public override int AllocationSize(RecognitionConfig value) {
+    public override int AllocationSize(RecognitionConfig value)
+    {
         return 0
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Enabled)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ModelPath)
@@ -3556,15 +3911,14 @@ class FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<RecognitionConfi
             + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.RecBatchNum);
     }
 
-    public override void Write(RecognitionConfig value, BigEndianStream stream) {
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.DictPath, stream);
-            FfiConverterOptionalInt32.INSTANCE.Write(value.RecBatchNum, stream);
+    public override void Write(RecognitionConfig value, BigEndianStream stream)
+    {
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.DictPath, stream);
+        FfiConverterOptionalInt32.INSTANCE.Write(value.RecBatchNum, stream);
     }
 }
-
-
 
 /// <summary>
 /// Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
@@ -3581,55 +3935,76 @@ class FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<RecognitionConfi
 /// <param name="Frame">
 /// Axis-aligned bounding box frame.
 /// </param>
-public record TextResult (
+/// <param name="RegionId">
+/// Detected document layout region index (if layout analysis enabled).
+/// </param>
+/// <param name="LayoutType">
+/// Detected semantic layout category (if layout analysis enabled).
+/// </param>
+public record TextResult(
     /// <summary>
     /// Recognized text string.
     /// </summary>
-    string Text, 
+    string Text,
     /// <summary>
     /// Confidence score between 0.0 and 1.0.
     /// </summary>
-    float Score, 
+    float Score,
     /// <summary>
     /// Polygon vertex coordinates [top-left, top-right, bottom-right, bottom-left].
     /// </summary>
-    Point2D[] BoxPoints, 
+    Point2D[] BoxPoints,
     /// <summary>
     /// Axis-aligned bounding box frame.
     /// </summary>
-    Frame Frame
-) {
-}
+    Frame Frame,
+    /// <summary>
+    /// Detected document layout region index (if layout analysis enabled).
+    /// </summary>
+    int? RegionId,
+    /// <summary>
+    /// Detected semantic layout category (if layout analysis enabled).
+    /// </summary>
+    LayoutType? LayoutType
+) { }
 
-class FfiConverterTypeTextResult: FfiConverterRustBuffer<TextResult> {
+class FfiConverterTypeTextResult : FfiConverterRustBuffer<TextResult>
+{
     public static FfiConverterTypeTextResult INSTANCE = new FfiConverterTypeTextResult();
 
-    public override TextResult Read(BigEndianStream stream) {
+    public override TextResult Read(BigEndianStream stream)
+    {
         return new TextResult(
             Text: FfiConverterString.INSTANCE.Read(stream),
             Score: FfiConverterFloat.INSTANCE.Read(stream),
             BoxPoints: FfiConverterSequenceTypePoint2D.INSTANCE.Read(stream),
-            Frame: FfiConverterTypeFrame.INSTANCE.Read(stream)
+            Frame: FfiConverterTypeFrame.INSTANCE.Read(stream),
+            RegionId: FfiConverterOptionalInt32.INSTANCE.Read(stream),
+            LayoutType: FfiConverterOptionalTypeLayoutType.INSTANCE.Read(stream)
         );
     }
 
-    public override int AllocationSize(TextResult value) {
+    public override int AllocationSize(TextResult value)
+    {
         return 0
             + FfiConverterString.INSTANCE.AllocationSize(value.Text)
             + FfiConverterFloat.INSTANCE.AllocationSize(value.Score)
             + FfiConverterSequenceTypePoint2D.INSTANCE.AllocationSize(value.BoxPoints)
-            + FfiConverterTypeFrame.INSTANCE.AllocationSize(value.Frame);
+            + FfiConverterTypeFrame.INSTANCE.AllocationSize(value.Frame)
+            + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.RegionId)
+            + FfiConverterOptionalTypeLayoutType.INSTANCE.AllocationSize(value.LayoutType);
     }
 
-    public override void Write(TextResult value, BigEndianStream stream) {
-            FfiConverterString.INSTANCE.Write(value.Text, stream);
-            FfiConverterFloat.INSTANCE.Write(value.Score, stream);
-            FfiConverterSequenceTypePoint2D.INSTANCE.Write(value.BoxPoints, stream);
-            FfiConverterTypeFrame.INSTANCE.Write(value.Frame, stream);
+    public override void Write(TextResult value, BigEndianStream stream)
+    {
+        FfiConverterString.INSTANCE.Write(value.Text, stream);
+        FfiConverterFloat.INSTANCE.Write(value.Score, stream);
+        FfiConverterSequenceTypePoint2D.INSTANCE.Write(value.BoxPoints, stream);
+        FfiConverterTypeFrame.INSTANCE.Write(value.Frame, stream);
+        FfiConverterOptionalInt32.INSTANCE.Write(value.RegionId, stream);
+        FfiConverterOptionalTypeLayoutType.INSTANCE.Write(value.LayoutType, stream);
     }
 }
-
-
 
 /// <summary>
 /// Document dewarping model configuration.
@@ -3640,41 +4015,42 @@ class FfiConverterTypeTextResult: FfiConverterRustBuffer<TextResult> {
 /// <param name="ModelPath">
 /// Filesystem path to unwarp model.
 /// </param>
-public record UnwarpConfig (
+public record UnwarpConfig(
     /// <summary>
     /// Whether unwarp stage is enabled.
     /// </summary>
-    bool? Enabled, 
+    bool? Enabled,
     /// <summary>
     /// Filesystem path to unwarp model.
     /// </summary>
     string? ModelPath
-) {
-}
+) { }
 
-class FfiConverterTypeUnwarpConfig: FfiConverterRustBuffer<UnwarpConfig> {
+class FfiConverterTypeUnwarpConfig : FfiConverterRustBuffer<UnwarpConfig>
+{
     public static FfiConverterTypeUnwarpConfig INSTANCE = new FfiConverterTypeUnwarpConfig();
 
-    public override UnwarpConfig Read(BigEndianStream stream) {
+    public override UnwarpConfig Read(BigEndianStream stream)
+    {
         return new UnwarpConfig(
             Enabled: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             ModelPath: FfiConverterOptionalString.INSTANCE.Read(stream)
         );
     }
 
-    public override int AllocationSize(UnwarpConfig value) {
+    public override int AllocationSize(UnwarpConfig value)
+    {
         return 0
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Enabled)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ModelPath);
     }
 
-    public override void Write(UnwarpConfig value, BigEndianStream stream) {
-            FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
-            FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
+    public override void Write(UnwarpConfig value, BigEndianStream stream)
+    {
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.Enabled, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
     }
 }
-
-
 
 /// <summary>
 /// Unwarped image result with raw RGB8 pixel buffer and dimensions.
@@ -3688,26 +4064,28 @@ class FfiConverterTypeUnwarpConfig: FfiConverterRustBuffer<UnwarpConfig> {
 /// <param name="Height">
 /// Image height in pixels.
 /// </param>
-public record UnwarpedImageResult (
+public record UnwarpedImageResult(
     /// <summary>
     /// Interleaved 24-bit RGB pixel bytes.
     /// </summary>
-    byte[] Pixels, 
+    byte[] Pixels,
     /// <summary>
     /// Image width in pixels.
     /// </summary>
-    uint Width, 
+    uint Width,
     /// <summary>
     /// Image height in pixels.
     /// </summary>
     uint Height
-) {
-}
+) { }
 
-class FfiConverterTypeUnwarpedImageResult: FfiConverterRustBuffer<UnwarpedImageResult> {
-    public static FfiConverterTypeUnwarpedImageResult INSTANCE = new FfiConverterTypeUnwarpedImageResult();
+class FfiConverterTypeUnwarpedImageResult : FfiConverterRustBuffer<UnwarpedImageResult>
+{
+    public static FfiConverterTypeUnwarpedImageResult INSTANCE =
+        new FfiConverterTypeUnwarpedImageResult();
 
-    public override UnwarpedImageResult Read(BigEndianStream stream) {
+    public override UnwarpedImageResult Read(BigEndianStream stream)
+    {
         return new UnwarpedImageResult(
             Pixels: FfiConverterByteArray.INSTANCE.Read(stream),
             Width: FfiConverterUInt32.INSTANCE.Read(stream),
@@ -3715,81 +4093,89 @@ class FfiConverterTypeUnwarpedImageResult: FfiConverterRustBuffer<UnwarpedImageR
         );
     }
 
-    public override int AllocationSize(UnwarpedImageResult value) {
+    public override int AllocationSize(UnwarpedImageResult value)
+    {
         return 0
             + FfiConverterByteArray.INSTANCE.AllocationSize(value.Pixels)
             + FfiConverterUInt32.INSTANCE.AllocationSize(value.Width)
             + FfiConverterUInt32.INSTANCE.AllocationSize(value.Height);
     }
 
-    public override void Write(UnwarpedImageResult value, BigEndianStream stream) {
-            FfiConverterByteArray.INSTANCE.Write(value.Pixels, stream);
-            FfiConverterUInt32.INSTANCE.Write(value.Width, stream);
-            FfiConverterUInt32.INSTANCE.Write(value.Height, stream);
+    public override void Write(UnwarpedImageResult value, BigEndianStream stream)
+    {
+        FfiConverterByteArray.INSTANCE.Write(value.Pixels, stream);
+        FfiConverterUInt32.INSTANCE.Write(value.Width, stream);
+        FfiConverterUInt32.INSTANCE.Write(value.Height, stream);
     }
 }
-
-
-
-
 
 /// <summary>
 /// Detection result: structured text items or formatted 2D spatial text string.
 /// </summary>
-public record DetectTextResult {
-    
+public record DetectTextResult
+{
     /// <summary>
     /// Structured list of recognized text lines or words.
     /// </summary>
-    public record Structured (
-        TextResult[] Results
-    ) : DetectTextResult {}
-    
+    public record Structured(TextResult[] Results) : DetectTextResult { }
+
     /// <summary>
     /// Formatted 2D spatial layout text string.
     /// </summary>
-    public record Spatial (
-        string Text
-    ) : DetectTextResult {}
-    
-
-    
+    public record Spatial(string Text) : DetectTextResult { }
 }
 
-class FfiConverterTypeDetectTextResult : FfiConverterRustBuffer<DetectTextResult>{
-    public static FfiConverterRustBuffer<DetectTextResult> INSTANCE = new FfiConverterTypeDetectTextResult();
+class FfiConverterTypeDetectTextResult : FfiConverterRustBuffer<DetectTextResult>
+{
+    public static FfiConverterRustBuffer<DetectTextResult> INSTANCE =
+        new FfiConverterTypeDetectTextResult();
 
-    public override DetectTextResult Read(BigEndianStream stream) {
+    public override DetectTextResult Read(BigEndianStream stream)
+    {
         var value = stream.ReadInt();
-        switch (value) {
+        switch (value)
+        {
             case 1:
                 return new DetectTextResult.Structured(
                     FfiConverterSequenceTypeTextResult.INSTANCE.Read(stream)
                 );
             case 2:
-                return new DetectTextResult.Spatial(
-                    FfiConverterString.INSTANCE.Read(stream)
-                );
+                return new DetectTextResult.Spatial(FfiConverterString.INSTANCE.Read(stream));
             default:
-                throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeDetectTextResult.Read()", value));
+                throw new InternalException(
+                    String.Format(
+                        "invalid enum value '{0}' in FfiConverterTypeDetectTextResult.Read()",
+                        value
+                    )
+                );
         }
     }
 
-    public override int AllocationSize(DetectTextResult value) {
-        switch (value) {
+    public override int AllocationSize(DetectTextResult value)
+    {
+        switch (value)
+        {
             case DetectTextResult.Structured variant_value:
                 return 4
-                    + FfiConverterSequenceTypeTextResult.INSTANCE.AllocationSize(variant_value.Results);
+                    + FfiConverterSequenceTypeTextResult.INSTANCE.AllocationSize(
+                        variant_value.Results
+                    );
             case DetectTextResult.Spatial variant_value:
-                return 4
-                    + FfiConverterString.INSTANCE.AllocationSize(variant_value.Text);
+                return 4 + FfiConverterString.INSTANCE.AllocationSize(variant_value.Text);
             default:
-                throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeDetectTextResult.AllocationSize()", value));
+                throw new InternalException(
+                    String.Format(
+                        "invalid enum value '{0}' in FfiConverterTypeDetectTextResult.AllocationSize()",
+                        value
+                    )
+                );
         }
     }
 
-    public override void Write(DetectTextResult value, BigEndianStream stream) {
-        switch (value) {
+    public override void Write(DetectTextResult value, BigEndianStream stream)
+    {
+        switch (value)
+        {
             case DetectTextResult.Structured variant_value:
                 stream.WriteInt(1);
                 FfiConverterSequenceTypeTextResult.INSTANCE.Write(variant_value.Results, stream);
@@ -3799,74 +4185,77 @@ class FfiConverterTypeDetectTextResult : FfiConverterRustBuffer<DetectTextResult
                 FfiConverterString.INSTANCE.Write(variant_value.Text, stream);
                 break;
             default:
-                throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeDetectTextResult.Write()", value));
+                throw new InternalException(
+                    String.Format(
+                        "invalid enum value '{0}' in FfiConverterTypeDetectTextResult.Write()",
+                        value
+                    )
+                );
         }
     }
 }
-
-
-
-
-
-
 
 /// <summary>
 /// Universal image input source for OCR detection.
 /// </summary>
-public record ImageSource {
-    
+public record ImageSource
+{
     /// <summary>
     /// Filesystem path to an image file.
     /// </summary>
-    public record Path (
-        string PathValue
-    ) : ImageSource {}
-    
+    public record Path(string PathValue) : ImageSource { }
+
     /// <summary>
     /// Raw encoded image file bytes (e.g. JPEG, PNG).
     /// </summary>
-    public record Bytes (
-        byte[] Data
-    ) : ImageSource {}
-    
-
-    
+    public record Bytes(byte[] Data) : ImageSource { }
 }
 
-class FfiConverterTypeImageSource : FfiConverterRustBuffer<ImageSource>{
+class FfiConverterTypeImageSource : FfiConverterRustBuffer<ImageSource>
+{
     public static FfiConverterRustBuffer<ImageSource> INSTANCE = new FfiConverterTypeImageSource();
 
-    public override ImageSource Read(BigEndianStream stream) {
+    public override ImageSource Read(BigEndianStream stream)
+    {
         var value = stream.ReadInt();
-        switch (value) {
+        switch (value)
+        {
             case 1:
-                return new ImageSource.Path(
-                    FfiConverterString.INSTANCE.Read(stream)
-                );
+                return new ImageSource.Path(FfiConverterString.INSTANCE.Read(stream));
             case 2:
-                return new ImageSource.Bytes(
-                    FfiConverterByteArray.INSTANCE.Read(stream)
+                return new ImageSource.Bytes(FfiConverterByteArray.INSTANCE.Read(stream));
+            default:
+                throw new InternalException(
+                    String.Format(
+                        "invalid enum value '{0}' in FfiConverterTypeImageSource.Read()",
+                        value
+                    )
                 );
-            default:
-                throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeImageSource.Read()", value));
         }
     }
 
-    public override int AllocationSize(ImageSource value) {
-        switch (value) {
+    public override int AllocationSize(ImageSource value)
+    {
+        switch (value)
+        {
             case ImageSource.Path variant_value:
-                return 4
-                    + FfiConverterString.INSTANCE.AllocationSize(variant_value.PathValue);
+                return 4 + FfiConverterString.INSTANCE.AllocationSize(variant_value.PathValue);
             case ImageSource.Bytes variant_value:
-                return 4
-                    + FfiConverterByteArray.INSTANCE.AllocationSize(variant_value.Data);
+                return 4 + FfiConverterByteArray.INSTANCE.AllocationSize(variant_value.Data);
             default:
-                throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeImageSource.AllocationSize()", value));
+                throw new InternalException(
+                    String.Format(
+                        "invalid enum value '{0}' in FfiConverterTypeImageSource.AllocationSize()",
+                        value
+                    )
+                );
         }
     }
 
-    public override void Write(ImageSource value, BigEndianStream stream) {
-        switch (value) {
+    public override void Write(ImageSource value, BigEndianStream stream)
+    {
+        switch (value)
+        {
             case ImageSource.Path variant_value:
                 stream.WriteInt(1);
                 FfiConverterString.INSTANCE.Write(variant_value.PathValue, stream);
@@ -3876,21 +4265,21 @@ class FfiConverterTypeImageSource : FfiConverterRustBuffer<ImageSource>{
                 FfiConverterByteArray.INSTANCE.Write(variant_value.Data, stream);
                 break;
             default:
-                throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeImageSource.Write()", value));
+                throw new InternalException(
+                    String.Format(
+                        "invalid enum value '{0}' in FfiConverterTypeImageSource.Write()",
+                        value
+                    )
+                );
         }
     }
 }
 
-
-
-
-
-
-
 /// <summary>
 /// Category of document layout region.
 /// </summary>
-public enum LayoutType: int {
+public enum LayoutType : int
+{
     Text,
     Title,
     Figure,
@@ -3900,242 +4289,324 @@ public enum LayoutType: int {
     Header,
     Footer,
     Reference,
-    Equation
+    Equation,
 }
 
-class FfiConverterTypeLayoutType: FfiConverterRustBuffer<LayoutType> {
+class FfiConverterTypeLayoutType : FfiConverterRustBuffer<LayoutType>
+{
     public static FfiConverterTypeLayoutType INSTANCE = new FfiConverterTypeLayoutType();
 
-    public override LayoutType Read(BigEndianStream stream) {
+    public override LayoutType Read(BigEndianStream stream)
+    {
         var value = stream.ReadInt();
-        switch (value) {
-            case 1: return LayoutType.Text;
-            case 2: return LayoutType.Title;
-            case 3: return LayoutType.Figure;
-            case 4: return LayoutType.FigureCaption;
-            case 5: return LayoutType.Table;
-            case 6: return LayoutType.TableCaption;
-            case 7: return LayoutType.Header;
-            case 8: return LayoutType.Footer;
-            case 9: return LayoutType.Reference;
-            case 10: return LayoutType.Equation;
-            default: throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeLayoutType.Read()", value));
+        switch (value)
+        {
+            case 1:
+                return LayoutType.Text;
+            case 2:
+                return LayoutType.Title;
+            case 3:
+                return LayoutType.Figure;
+            case 4:
+                return LayoutType.FigureCaption;
+            case 5:
+                return LayoutType.Table;
+            case 6:
+                return LayoutType.TableCaption;
+            case 7:
+                return LayoutType.Header;
+            case 8:
+                return LayoutType.Footer;
+            case 9:
+                return LayoutType.Reference;
+            case 10:
+                return LayoutType.Equation;
+            default:
+                throw new InternalException(
+                    String.Format(
+                        "invalid enum value '{0}' in FfiConverterTypeLayoutType.Read()",
+                        value
+                    )
+                );
         }
     }
 
-    public override int AllocationSize(LayoutType value) {
+    public override int AllocationSize(LayoutType value)
+    {
         return 4;
     }
 
-    public override void Write(LayoutType value, BigEndianStream stream) {
-        switch (value) {
-            case LayoutType.Text: stream.WriteInt(1); break;
-            case LayoutType.Title: stream.WriteInt(2); break;
-            case LayoutType.Figure: stream.WriteInt(3); break;
-            case LayoutType.FigureCaption: stream.WriteInt(4); break;
-            case LayoutType.Table: stream.WriteInt(5); break;
-            case LayoutType.TableCaption: stream.WriteInt(6); break;
-            case LayoutType.Header: stream.WriteInt(7); break;
-            case LayoutType.Footer: stream.WriteInt(8); break;
-            case LayoutType.Reference: stream.WriteInt(9); break;
-            case LayoutType.Equation: stream.WriteInt(10); break;
-            default: throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeLayoutType.Write()", value));
+    public override void Write(LayoutType value, BigEndianStream stream)
+    {
+        switch (value)
+        {
+            case LayoutType.Text:
+                stream.WriteInt(1);
+                break;
+            case LayoutType.Title:
+                stream.WriteInt(2);
+                break;
+            case LayoutType.Figure:
+                stream.WriteInt(3);
+                break;
+            case LayoutType.FigureCaption:
+                stream.WriteInt(4);
+                break;
+            case LayoutType.Table:
+                stream.WriteInt(5);
+                break;
+            case LayoutType.TableCaption:
+                stream.WriteInt(6);
+                break;
+            case LayoutType.Header:
+                stream.WriteInt(7);
+                break;
+            case LayoutType.Footer:
+                stream.WriteInt(8);
+                break;
+            case LayoutType.Reference:
+                stream.WriteInt(9);
+                break;
+            case LayoutType.Equation:
+                stream.WriteInt(10);
+                break;
+            default:
+                throw new InternalException(
+                    String.Format(
+                        "invalid enum value '{0}' in FfiConverterTypeLayoutType.Write()",
+                        value
+                    )
+                );
         }
     }
 }
-
-
-
-
-
-
 
 /// <summary>
 /// Output format granularity for text detection.
 /// </summary>
-public enum OutputGranularity: int {
+public enum OutputGranularity : int
+{
     /// <summary>
     /// Group recognized tokens into lines (default).
     /// </summary>
     Lines,
+
     /// <summary>
     /// Return individual word-level tokens.
     /// </summary>
     Words,
+
     /// <summary>
     /// Reconstruct a 2D spatial text layout preserving visual arrangement.
     /// </summary>
-    Spatial
+    Spatial,
 }
 
-class FfiConverterTypeOutputGranularity: FfiConverterRustBuffer<OutputGranularity> {
-    public static FfiConverterTypeOutputGranularity INSTANCE = new FfiConverterTypeOutputGranularity();
+class FfiConverterTypeOutputGranularity : FfiConverterRustBuffer<OutputGranularity>
+{
+    public static FfiConverterTypeOutputGranularity INSTANCE =
+        new FfiConverterTypeOutputGranularity();
 
-    public override OutputGranularity Read(BigEndianStream stream) {
+    public override OutputGranularity Read(BigEndianStream stream)
+    {
         var value = stream.ReadInt();
-        switch (value) {
-            case 1: return OutputGranularity.Lines;
-            case 2: return OutputGranularity.Words;
-            case 3: return OutputGranularity.Spatial;
-            default: throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeOutputGranularity.Read()", value));
+        switch (value)
+        {
+            case 1:
+                return OutputGranularity.Lines;
+            case 2:
+                return OutputGranularity.Words;
+            case 3:
+                return OutputGranularity.Spatial;
+            default:
+                throw new InternalException(
+                    String.Format(
+                        "invalid enum value '{0}' in FfiConverterTypeOutputGranularity.Read()",
+                        value
+                    )
+                );
         }
     }
 
-    public override int AllocationSize(OutputGranularity value) {
+    public override int AllocationSize(OutputGranularity value)
+    {
         return 4;
     }
 
-    public override void Write(OutputGranularity value, BigEndianStream stream) {
-        switch (value) {
-            case OutputGranularity.Lines: stream.WriteInt(1); break;
-            case OutputGranularity.Words: stream.WriteInt(2); break;
-            case OutputGranularity.Spatial: stream.WriteInt(3); break;
-            default: throw new InternalException(String.Format("invalid enum value '{0}' in FfiConverterTypeOutputGranularity.Write()", value));
+    public override void Write(OutputGranularity value, BigEndianStream stream)
+    {
+        switch (value)
+        {
+            case OutputGranularity.Lines:
+                stream.WriteInt(1);
+                break;
+            case OutputGranularity.Words:
+                stream.WriteInt(2);
+                break;
+            case OutputGranularity.Spatial:
+                stream.WriteInt(3);
+                break;
+            default:
+                throw new InternalException(
+                    String.Format(
+                        "invalid enum value '{0}' in FfiConverterTypeOutputGranularity.Write()",
+                        value
+                    )
+                );
         }
     }
 }
 
+public class RustoBindingException : UniffiException
+{
+    RustoBindingException()
+        : base() { }
 
-
-
-
-
-
-public class RustoBindingException: UniffiException {
-    RustoBindingException() : base() {}
-    RustoBindingException(String @Message) : base(@Message) {}
+    RustoBindingException(String @Message)
+        : base(@Message) { }
 
     // Each variant is a nested class
-    
-    
-    public class Initialization : RustoBindingException {
+
+    public class Initialization : RustoBindingException
+    {
         // Members
         public string @msg;
 
         // Constructor
-        public Initialization(
-                string @msg) : base(
-                "@msg" + "=" + @msg) {
-
+        public Initialization(string @msg)
+            : base("@msg" + "=" + @msg)
+        {
             this.@msg = @msg;
         }
     }
-    
-    
-    public class Preprocess : RustoBindingException {
+
+    public class Preprocess : RustoBindingException
+    {
         // Members
         public string @msg;
 
         // Constructor
-        public Preprocess(
-                string @msg) : base(
-                "@msg" + "=" + @msg) {
-
+        public Preprocess(string @msg)
+            : base("@msg" + "=" + @msg)
+        {
             this.@msg = @msg;
         }
     }
-    
-    
-    public class Inference : RustoBindingException {
+
+    public class Inference : RustoBindingException
+    {
         // Members
         public string @msg;
 
         // Constructor
-        public Inference(
-                string @msg) : base(
-                "@msg" + "=" + @msg) {
-
+        public Inference(string @msg)
+            : base("@msg" + "=" + @msg)
+        {
             this.@msg = @msg;
         }
     }
-    
-    
-    public class Postprocess : RustoBindingException {
+
+    public class Postprocess : RustoBindingException
+    {
         // Members
         public string @msg;
 
         // Constructor
-        public Postprocess(
-                string @msg) : base(
-                "@msg" + "=" + @msg) {
-
+        public Postprocess(string @msg)
+            : base("@msg" + "=" + @msg)
+        {
             this.@msg = @msg;
         }
     }
-    
-    
-    public class InvalidInput : RustoBindingException {
+
+    public class InvalidInput : RustoBindingException
+    {
         // Members
         public string @msg;
 
         // Constructor
-        public InvalidInput(
-                string @msg) : base(
-                "@msg" + "=" + @msg) {
-
+        public InvalidInput(string @msg)
+            : base("@msg" + "=" + @msg)
+        {
             this.@msg = @msg;
         }
     }
-    
-
-    
 }
 
-class FfiConverterTypeRustoBindingError : FfiConverterRustBuffer<RustoBindingException>, CallStatusErrorHandler<RustoBindingException> {
-    public static FfiConverterTypeRustoBindingError INSTANCE = new FfiConverterTypeRustoBindingError();
+class FfiConverterTypeRustoBindingError
+    : FfiConverterRustBuffer<RustoBindingException>,
+        CallStatusErrorHandler<RustoBindingException>
+{
+    public static FfiConverterTypeRustoBindingError INSTANCE =
+        new FfiConverterTypeRustoBindingError();
 
-    public override RustoBindingException Read(BigEndianStream stream) {
+    public override RustoBindingException Read(BigEndianStream stream)
+    {
         var value = stream.ReadInt();
-        switch (value) {
+        switch (value)
+        {
             case 1:
                 return new RustoBindingException.Initialization(
-                    FfiConverterString.INSTANCE.Read(stream));
+                    FfiConverterString.INSTANCE.Read(stream)
+                );
             case 2:
                 return new RustoBindingException.Preprocess(
-                    FfiConverterString.INSTANCE.Read(stream));
+                    FfiConverterString.INSTANCE.Read(stream)
+                );
             case 3:
                 return new RustoBindingException.Inference(
-                    FfiConverterString.INSTANCE.Read(stream));
+                    FfiConverterString.INSTANCE.Read(stream)
+                );
             case 4:
                 return new RustoBindingException.Postprocess(
-                    FfiConverterString.INSTANCE.Read(stream));
+                    FfiConverterString.INSTANCE.Read(stream)
+                );
             case 5:
                 return new RustoBindingException.InvalidInput(
-                    FfiConverterString.INSTANCE.Read(stream));
+                    FfiConverterString.INSTANCE.Read(stream)
+                );
             default:
-                throw new InternalException(String.Format("invalid error value '{0}' in FfiConverterTypeRustoBindingError.Read()", value));
+                throw new InternalException(
+                    String.Format(
+                        "invalid error value '{0}' in FfiConverterTypeRustoBindingError.Read()",
+                        value
+                    )
+                );
         }
     }
 
-    public override int AllocationSize(RustoBindingException value) {
-        switch (value) {
-
+    public override int AllocationSize(RustoBindingException value)
+    {
+        switch (value)
+        {
             case RustoBindingException.Initialization variant_value:
-                return 4
-                    + FfiConverterString.INSTANCE.AllocationSize(variant_value.@msg);
+                return 4 + FfiConverterString.INSTANCE.AllocationSize(variant_value.@msg);
 
             case RustoBindingException.Preprocess variant_value:
-                return 4
-                    + FfiConverterString.INSTANCE.AllocationSize(variant_value.@msg);
+                return 4 + FfiConverterString.INSTANCE.AllocationSize(variant_value.@msg);
 
             case RustoBindingException.Inference variant_value:
-                return 4
-                    + FfiConverterString.INSTANCE.AllocationSize(variant_value.@msg);
+                return 4 + FfiConverterString.INSTANCE.AllocationSize(variant_value.@msg);
 
             case RustoBindingException.Postprocess variant_value:
-                return 4
-                    + FfiConverterString.INSTANCE.AllocationSize(variant_value.@msg);
+                return 4 + FfiConverterString.INSTANCE.AllocationSize(variant_value.@msg);
 
             case RustoBindingException.InvalidInput variant_value:
-                return 4
-                    + FfiConverterString.INSTANCE.AllocationSize(variant_value.@msg);
+                return 4 + FfiConverterString.INSTANCE.AllocationSize(variant_value.@msg);
             default:
-                throw new InternalException(String.Format("invalid error value '{0}' in FfiConverterTypeRustoBindingError.AllocationSize()", value));
+                throw new InternalException(
+                    String.Format(
+                        "invalid error value '{0}' in FfiConverterTypeRustoBindingError.AllocationSize()",
+                        value
+                    )
+                );
         }
     }
 
-    public override void Write(RustoBindingException value, BigEndianStream stream) {
-        switch (value) {
+    public override void Write(RustoBindingException value, BigEndianStream stream)
+    {
+        switch (value)
+        {
             case RustoBindingException.Initialization variant_value:
                 stream.WriteInt(1);
                 FfiConverterString.INSTANCE.Write(variant_value.@msg, stream);
@@ -4157,532 +4628,747 @@ class FfiConverterTypeRustoBindingError : FfiConverterRustBuffer<RustoBindingExc
                 FfiConverterString.INSTANCE.Write(variant_value.@msg, stream);
                 break;
             default:
-                throw new InternalException(String.Format("invalid error value '{0}' in FfiConverterTypeRustoBindingError.Write()", value));
+                throw new InternalException(
+                    String.Format(
+                        "invalid error value '{0}' in FfiConverterTypeRustoBindingError.Write()",
+                        value
+                    )
+                );
         }
     }
 }
 
-
-
-
-class FfiConverterOptionalUInt32: FfiConverterRustBuffer<uint?> {
+class FfiConverterOptionalUInt32 : FfiConverterRustBuffer<uint?>
+{
     public static FfiConverterOptionalUInt32 INSTANCE = new FfiConverterOptionalUInt32();
 
-    public override uint? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override uint? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterUInt32.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(uint? value) {
-        if (value == null) {
+    public override int AllocationSize(uint? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
+        }
+        else
+        {
             return 1 + FfiConverterUInt32.INSTANCE.AllocationSize((uint)value);
         }
     }
 
-    public override void Write(uint? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(uint? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterUInt32.INSTANCE.Write((uint)value, stream);
         }
     }
 }
 
-
-
-
-class FfiConverterOptionalInt32: FfiConverterRustBuffer<int?> {
+class FfiConverterOptionalInt32 : FfiConverterRustBuffer<int?>
+{
     public static FfiConverterOptionalInt32 INSTANCE = new FfiConverterOptionalInt32();
 
-    public override int? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override int? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterInt32.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(int? value) {
-        if (value == null) {
+    public override int AllocationSize(int? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
+        }
+        else
+        {
             return 1 + FfiConverterInt32.INSTANCE.AllocationSize((int)value);
         }
     }
 
-    public override void Write(int? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(int? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterInt32.INSTANCE.Write((int)value, stream);
         }
     }
 }
 
-
-
-
-class FfiConverterOptionalFloat: FfiConverterRustBuffer<float?> {
+class FfiConverterOptionalFloat : FfiConverterRustBuffer<float?>
+{
     public static FfiConverterOptionalFloat INSTANCE = new FfiConverterOptionalFloat();
 
-    public override float? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override float? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterFloat.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(float? value) {
-        if (value == null) {
+    public override int AllocationSize(float? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
+        }
+        else
+        {
             return 1 + FfiConverterFloat.INSTANCE.AllocationSize((float)value);
         }
     }
 
-    public override void Write(float? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(float? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterFloat.INSTANCE.Write((float)value, stream);
         }
     }
 }
 
-
-
-
-class FfiConverterOptionalBoolean: FfiConverterRustBuffer<bool?> {
+class FfiConverterOptionalBoolean : FfiConverterRustBuffer<bool?>
+{
     public static FfiConverterOptionalBoolean INSTANCE = new FfiConverterOptionalBoolean();
 
-    public override bool? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override bool? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterBoolean.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(bool? value) {
-        if (value == null) {
+    public override int AllocationSize(bool? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
+        }
+        else
+        {
             return 1 + FfiConverterBoolean.INSTANCE.AllocationSize((bool)value);
         }
     }
 
-    public override void Write(bool? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(bool? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterBoolean.INSTANCE.Write((bool)value, stream);
         }
     }
 }
 
-
-
-
-class FfiConverterOptionalString: FfiConverterRustBuffer<string?> {
+class FfiConverterOptionalString : FfiConverterRustBuffer<string?>
+{
     public static FfiConverterOptionalString INSTANCE = new FfiConverterOptionalString();
 
-    public override string? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override string? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterString.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(string? value) {
-        if (value == null) {
+    public override int AllocationSize(string? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
+        }
+        else
+        {
             return 1 + FfiConverterString.INSTANCE.AllocationSize((string)value);
         }
     }
 
-    public override void Write(string? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(string? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterString.INSTANCE.Write((string)value, stream);
         }
     }
 }
 
+class FfiConverterOptionalTypeCalibrationOptions : FfiConverterRustBuffer<CalibrationOptions?>
+{
+    public static FfiConverterOptionalTypeCalibrationOptions INSTANCE =
+        new FfiConverterOptionalTypeCalibrationOptions();
 
-
-
-class FfiConverterOptionalTypeCalibrationOptions: FfiConverterRustBuffer<CalibrationOptions?> {
-    public static FfiConverterOptionalTypeCalibrationOptions INSTANCE = new FfiConverterOptionalTypeCalibrationOptions();
-
-    public override CalibrationOptions? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override CalibrationOptions? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterTypeCalibrationOptions.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(CalibrationOptions? value) {
-        if (value == null) {
+    public override int AllocationSize(CalibrationOptions? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
-            return 1 + FfiConverterTypeCalibrationOptions.INSTANCE.AllocationSize((CalibrationOptions)value);
+        }
+        else
+        {
+            return 1
+                + FfiConverterTypeCalibrationOptions.INSTANCE.AllocationSize(
+                    (CalibrationOptions)value
+                );
         }
     }
 
-    public override void Write(CalibrationOptions? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(CalibrationOptions? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterTypeCalibrationOptions.INSTANCE.Write((CalibrationOptions)value, stream);
         }
     }
 }
 
+class FfiConverterOptionalTypeClassificationConfig : FfiConverterRustBuffer<ClassificationConfig?>
+{
+    public static FfiConverterOptionalTypeClassificationConfig INSTANCE =
+        new FfiConverterOptionalTypeClassificationConfig();
 
-
-
-class FfiConverterOptionalTypeClassificationConfig: FfiConverterRustBuffer<ClassificationConfig?> {
-    public static FfiConverterOptionalTypeClassificationConfig INSTANCE = new FfiConverterOptionalTypeClassificationConfig();
-
-    public override ClassificationConfig? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override ClassificationConfig? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterTypeClassificationConfig.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(ClassificationConfig? value) {
-        if (value == null) {
+    public override int AllocationSize(ClassificationConfig? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
-            return 1 + FfiConverterTypeClassificationConfig.INSTANCE.AllocationSize((ClassificationConfig)value);
+        }
+        else
+        {
+            return 1
+                + FfiConverterTypeClassificationConfig.INSTANCE.AllocationSize(
+                    (ClassificationConfig)value
+                );
         }
     }
 
-    public override void Write(ClassificationConfig? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(ClassificationConfig? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
-            FfiConverterTypeClassificationConfig.INSTANCE.Write((ClassificationConfig)value, stream);
+            FfiConverterTypeClassificationConfig.INSTANCE.Write(
+                (ClassificationConfig)value,
+                stream
+            );
         }
     }
 }
 
+class FfiConverterOptionalTypeDetectionConfig : FfiConverterRustBuffer<DetectionConfig?>
+{
+    public static FfiConverterOptionalTypeDetectionConfig INSTANCE =
+        new FfiConverterOptionalTypeDetectionConfig();
 
-
-
-class FfiConverterOptionalTypeDetectionConfig: FfiConverterRustBuffer<DetectionConfig?> {
-    public static FfiConverterOptionalTypeDetectionConfig INSTANCE = new FfiConverterOptionalTypeDetectionConfig();
-
-    public override DetectionConfig? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override DetectionConfig? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterTypeDetectionConfig.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(DetectionConfig? value) {
-        if (value == null) {
+    public override int AllocationSize(DetectionConfig? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
-            return 1 + FfiConverterTypeDetectionConfig.INSTANCE.AllocationSize((DetectionConfig)value);
+        }
+        else
+        {
+            return 1
+                + FfiConverterTypeDetectionConfig.INSTANCE.AllocationSize((DetectionConfig)value);
         }
     }
 
-    public override void Write(DetectionConfig? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(DetectionConfig? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterTypeDetectionConfig.INSTANCE.Write((DetectionConfig)value, stream);
         }
     }
 }
 
+class FfiConverterOptionalTypeDetectionRunOptions : FfiConverterRustBuffer<DetectionRunOptions?>
+{
+    public static FfiConverterOptionalTypeDetectionRunOptions INSTANCE =
+        new FfiConverterOptionalTypeDetectionRunOptions();
 
-
-
-class FfiConverterOptionalTypeDetectionRunOptions: FfiConverterRustBuffer<DetectionRunOptions?> {
-    public static FfiConverterOptionalTypeDetectionRunOptions INSTANCE = new FfiConverterOptionalTypeDetectionRunOptions();
-
-    public override DetectionRunOptions? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override DetectionRunOptions? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterTypeDetectionRunOptions.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(DetectionRunOptions? value) {
-        if (value == null) {
+    public override int AllocationSize(DetectionRunOptions? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
-            return 1 + FfiConverterTypeDetectionRunOptions.INSTANCE.AllocationSize((DetectionRunOptions)value);
+        }
+        else
+        {
+            return 1
+                + FfiConverterTypeDetectionRunOptions.INSTANCE.AllocationSize(
+                    (DetectionRunOptions)value
+                );
         }
     }
 
-    public override void Write(DetectionRunOptions? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(DetectionRunOptions? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterTypeDetectionRunOptions.INSTANCE.Write((DetectionRunOptions)value, stream);
         }
     }
 }
 
+class FfiConverterOptionalTypeLayoutConfig : FfiConverterRustBuffer<LayoutConfig?>
+{
+    public static FfiConverterOptionalTypeLayoutConfig INSTANCE =
+        new FfiConverterOptionalTypeLayoutConfig();
 
-
-
-class FfiConverterOptionalTypeLayoutConfig: FfiConverterRustBuffer<LayoutConfig?> {
-    public static FfiConverterOptionalTypeLayoutConfig INSTANCE = new FfiConverterOptionalTypeLayoutConfig();
-
-    public override LayoutConfig? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override LayoutConfig? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterTypeLayoutConfig.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(LayoutConfig? value) {
-        if (value == null) {
+    public override int AllocationSize(LayoutConfig? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
+        }
+        else
+        {
             return 1 + FfiConverterTypeLayoutConfig.INSTANCE.AllocationSize((LayoutConfig)value);
         }
     }
 
-    public override void Write(LayoutConfig? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(LayoutConfig? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterTypeLayoutConfig.INSTANCE.Write((LayoutConfig)value, stream);
         }
     }
 }
 
+class FfiConverterOptionalTypeOptimizationOptions : FfiConverterRustBuffer<OptimizationOptions?>
+{
+    public static FfiConverterOptionalTypeOptimizationOptions INSTANCE =
+        new FfiConverterOptionalTypeOptimizationOptions();
 
-
-
-class FfiConverterOptionalTypeOptimizationOptions: FfiConverterRustBuffer<OptimizationOptions?> {
-    public static FfiConverterOptionalTypeOptimizationOptions INSTANCE = new FfiConverterOptionalTypeOptimizationOptions();
-
-    public override OptimizationOptions? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override OptimizationOptions? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterTypeOptimizationOptions.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(OptimizationOptions? value) {
-        if (value == null) {
+    public override int AllocationSize(OptimizationOptions? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
-            return 1 + FfiConverterTypeOptimizationOptions.INSTANCE.AllocationSize((OptimizationOptions)value);
+        }
+        else
+        {
+            return 1
+                + FfiConverterTypeOptimizationOptions.INSTANCE.AllocationSize(
+                    (OptimizationOptions)value
+                );
         }
     }
 
-    public override void Write(OptimizationOptions? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(OptimizationOptions? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterTypeOptimizationOptions.INSTANCE.Write((OptimizationOptions)value, stream);
         }
     }
 }
 
+class FfiConverterOptionalTypeOrientationConfig : FfiConverterRustBuffer<OrientationConfig?>
+{
+    public static FfiConverterOptionalTypeOrientationConfig INSTANCE =
+        new FfiConverterOptionalTypeOrientationConfig();
 
-
-
-class FfiConverterOptionalTypeOrientationConfig: FfiConverterRustBuffer<OrientationConfig?> {
-    public static FfiConverterOptionalTypeOrientationConfig INSTANCE = new FfiConverterOptionalTypeOrientationConfig();
-
-    public override OrientationConfig? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override OrientationConfig? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterTypeOrientationConfig.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(OrientationConfig? value) {
-        if (value == null) {
+    public override int AllocationSize(OrientationConfig? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
-            return 1 + FfiConverterTypeOrientationConfig.INSTANCE.AllocationSize((OrientationConfig)value);
+        }
+        else
+        {
+            return 1
+                + FfiConverterTypeOrientationConfig.INSTANCE.AllocationSize(
+                    (OrientationConfig)value
+                );
         }
     }
 
-    public override void Write(OrientationConfig? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(OrientationConfig? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterTypeOrientationConfig.INSTANCE.Write((OrientationConfig)value, stream);
         }
     }
 }
 
+class FfiConverterOptionalTypePostprocessRunOptions : FfiConverterRustBuffer<PostprocessRunOptions?>
+{
+    public static FfiConverterOptionalTypePostprocessRunOptions INSTANCE =
+        new FfiConverterOptionalTypePostprocessRunOptions();
 
-
-
-class FfiConverterOptionalTypePostprocessRunOptions: FfiConverterRustBuffer<PostprocessRunOptions?> {
-    public static FfiConverterOptionalTypePostprocessRunOptions INSTANCE = new FfiConverterOptionalTypePostprocessRunOptions();
-
-    public override PostprocessRunOptions? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override PostprocessRunOptions? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterTypePostprocessRunOptions.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(PostprocessRunOptions? value) {
-        if (value == null) {
+    public override int AllocationSize(PostprocessRunOptions? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
-            return 1 + FfiConverterTypePostprocessRunOptions.INSTANCE.AllocationSize((PostprocessRunOptions)value);
+        }
+        else
+        {
+            return 1
+                + FfiConverterTypePostprocessRunOptions.INSTANCE.AllocationSize(
+                    (PostprocessRunOptions)value
+                );
         }
     }
 
-    public override void Write(PostprocessRunOptions? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(PostprocessRunOptions? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
-            FfiConverterTypePostprocessRunOptions.INSTANCE.Write((PostprocessRunOptions)value, stream);
+            FfiConverterTypePostprocessRunOptions.INSTANCE.Write(
+                (PostprocessRunOptions)value,
+                stream
+            );
         }
     }
 }
 
+class FfiConverterOptionalTypeRecognitionConfig : FfiConverterRustBuffer<RecognitionConfig?>
+{
+    public static FfiConverterOptionalTypeRecognitionConfig INSTANCE =
+        new FfiConverterOptionalTypeRecognitionConfig();
 
-
-
-class FfiConverterOptionalTypeRecognitionConfig: FfiConverterRustBuffer<RecognitionConfig?> {
-    public static FfiConverterOptionalTypeRecognitionConfig INSTANCE = new FfiConverterOptionalTypeRecognitionConfig();
-
-    public override RecognitionConfig? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override RecognitionConfig? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterTypeRecognitionConfig.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(RecognitionConfig? value) {
-        if (value == null) {
+    public override int AllocationSize(RecognitionConfig? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
-            return 1 + FfiConverterTypeRecognitionConfig.INSTANCE.AllocationSize((RecognitionConfig)value);
+        }
+        else
+        {
+            return 1
+                + FfiConverterTypeRecognitionConfig.INSTANCE.AllocationSize(
+                    (RecognitionConfig)value
+                );
         }
     }
 
-    public override void Write(RecognitionConfig? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(RecognitionConfig? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterTypeRecognitionConfig.INSTANCE.Write((RecognitionConfig)value, stream);
         }
     }
 }
 
+class FfiConverterOptionalTypeUnwarpConfig : FfiConverterRustBuffer<UnwarpConfig?>
+{
+    public static FfiConverterOptionalTypeUnwarpConfig INSTANCE =
+        new FfiConverterOptionalTypeUnwarpConfig();
 
-
-
-class FfiConverterOptionalTypeUnwarpConfig: FfiConverterRustBuffer<UnwarpConfig?> {
-    public static FfiConverterOptionalTypeUnwarpConfig INSTANCE = new FfiConverterOptionalTypeUnwarpConfig();
-
-    public override UnwarpConfig? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+    public override UnwarpConfig? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterTypeUnwarpConfig.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(UnwarpConfig? value) {
-        if (value == null) {
+    public override int AllocationSize(UnwarpConfig? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
+        }
+        else
+        {
             return 1 + FfiConverterTypeUnwarpConfig.INSTANCE.AllocationSize((UnwarpConfig)value);
         }
     }
 
-    public override void Write(UnwarpConfig? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(UnwarpConfig? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterTypeUnwarpConfig.INSTANCE.Write((UnwarpConfig)value, stream);
         }
     }
 }
 
+class FfiConverterOptionalTypeLayoutType : FfiConverterRustBuffer<LayoutType?>
+{
+    public static FfiConverterOptionalTypeLayoutType INSTANCE =
+        new FfiConverterOptionalTypeLayoutType();
 
+    public override LayoutType? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
+            return null;
+        }
+        return FfiConverterTypeLayoutType.INSTANCE.Read(stream);
+    }
 
+    public override int AllocationSize(LayoutType? value)
+    {
+        if (value == null)
+        {
+            return 1;
+        }
+        else
+        {
+            return 1 + FfiConverterTypeLayoutType.INSTANCE.AllocationSize((LayoutType)value);
+        }
+    }
 
-class FfiConverterOptionalSequenceFloat: FfiConverterRustBuffer<float[]?> {
-    public static FfiConverterOptionalSequenceFloat INSTANCE = new FfiConverterOptionalSequenceFloat();
+    public override void Write(LayoutType? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
+            stream.WriteByte(0);
+        }
+        else
+        {
+            stream.WriteByte(1);
+            FfiConverterTypeLayoutType.INSTANCE.Write((LayoutType)value, stream);
+        }
+    }
+}
 
-    public override float[]? Read(BigEndianStream stream) {
-        if (stream.ReadByte() == 0) {
+class FfiConverterOptionalSequenceFloat : FfiConverterRustBuffer<float[]?>
+{
+    public static FfiConverterOptionalSequenceFloat INSTANCE =
+        new FfiConverterOptionalSequenceFloat();
+
+    public override float[]? Read(BigEndianStream stream)
+    {
+        if (stream.ReadByte() == 0)
+        {
             return null;
         }
         return FfiConverterSequenceFloat.INSTANCE.Read(stream);
     }
 
-    public override int AllocationSize(float[]? value) {
-        if (value == null) {
+    public override int AllocationSize(float[]? value)
+    {
+        if (value == null)
+        {
             return 1;
-        } else {
+        }
+        else
+        {
             return 1 + FfiConverterSequenceFloat.INSTANCE.AllocationSize((float[])value);
         }
     }
 
-    public override void Write(float[]? value, BigEndianStream stream) {
-        if (value == null) {
+    public override void Write(float[]? value, BigEndianStream stream)
+    {
+        if (value == null)
+        {
             stream.WriteByte(0);
-        } else {
+        }
+        else
+        {
             stream.WriteByte(1);
             FfiConverterSequenceFloat.INSTANCE.Write((float[])value, stream);
         }
     }
 }
 
-
-
-
-class FfiConverterSequenceFloat: FfiConverterRustBuffer<float[]> {
+class FfiConverterSequenceFloat : FfiConverterRustBuffer<float[]>
+{
     public static FfiConverterSequenceFloat INSTANCE = new FfiConverterSequenceFloat();
 
-    public override float[]  Read(BigEndianStream stream) {
+    public override float[] Read(BigEndianStream stream)
+    {
         var length = stream.ReadInt();
-        if (length == 0) {
+        if (length == 0)
+        {
             return [];
         }
 
         var result = new float[length];
         var readFn = FfiConverterFloat.INSTANCE.Read;
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++)
+        {
             result[i] = readFn(stream);
         }
         return result;
     }
 
-    public override int AllocationSize(float[]  value) {
+    public override int AllocationSize(float[] value)
+    {
         var sizeForLength = 4;
 
         // details/1-empty-list-as-default-method-parameter.md
-        if (value == null) {
+        if (value == null)
+        {
             return sizeForLength;
         }
 
@@ -4691,9 +5377,11 @@ class FfiConverterSequenceFloat: FfiConverterRustBuffer<float[]> {
         return sizeForLength + sizeForItems;
     }
 
-    public override void Write(float[] value, BigEndianStream stream) {
+    public override void Write(float[] value, BigEndianStream stream)
+    {
         // details/1-empty-list-as-default-method-parameter.md
-        if (value == null) {
+        if (value == null)
+        {
             stream.WriteInt(0);
             return;
         }
@@ -4704,31 +5392,34 @@ class FfiConverterSequenceFloat: FfiConverterRustBuffer<float[]> {
     }
 }
 
-
-
-
-class FfiConverterSequenceString: FfiConverterRustBuffer<string[]> {
+class FfiConverterSequenceString : FfiConverterRustBuffer<string[]>
+{
     public static FfiConverterSequenceString INSTANCE = new FfiConverterSequenceString();
 
-    public override string[]  Read(BigEndianStream stream) {
+    public override string[] Read(BigEndianStream stream)
+    {
         var length = stream.ReadInt();
-        if (length == 0) {
+        if (length == 0)
+        {
             return [];
         }
 
         var result = new string[length];
         var readFn = FfiConverterString.INSTANCE.Read;
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++)
+        {
             result[i] = readFn(stream);
         }
         return result;
     }
 
-    public override int AllocationSize(string[]  value) {
+    public override int AllocationSize(string[] value)
+    {
         var sizeForLength = 4;
 
         // details/1-empty-list-as-default-method-parameter.md
-        if (value == null) {
+        if (value == null)
+        {
             return sizeForLength;
         }
 
@@ -4737,9 +5428,11 @@ class FfiConverterSequenceString: FfiConverterRustBuffer<string[]> {
         return sizeForLength + sizeForItems;
     }
 
-    public override void Write(string[] value, BigEndianStream stream) {
+    public override void Write(string[] value, BigEndianStream stream)
+    {
         // details/1-empty-list-as-default-method-parameter.md
-        if (value == null) {
+        if (value == null)
+        {
             stream.WriteInt(0);
             return;
         }
@@ -4750,31 +5443,35 @@ class FfiConverterSequenceString: FfiConverterRustBuffer<string[]> {
     }
 }
 
+class FfiConverterSequenceTypeLayoutRegion : FfiConverterRustBuffer<LayoutRegion[]>
+{
+    public static FfiConverterSequenceTypeLayoutRegion INSTANCE =
+        new FfiConverterSequenceTypeLayoutRegion();
 
-
-
-class FfiConverterSequenceTypeLayoutRegion: FfiConverterRustBuffer<LayoutRegion[]> {
-    public static FfiConverterSequenceTypeLayoutRegion INSTANCE = new FfiConverterSequenceTypeLayoutRegion();
-
-    public override LayoutRegion[]  Read(BigEndianStream stream) {
+    public override LayoutRegion[] Read(BigEndianStream stream)
+    {
         var length = stream.ReadInt();
-        if (length == 0) {
+        if (length == 0)
+        {
             return [];
         }
 
         var result = new LayoutRegion[length];
         var readFn = FfiConverterTypeLayoutRegion.INSTANCE.Read;
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++)
+        {
             result[i] = readFn(stream);
         }
         return result;
     }
 
-    public override int AllocationSize(LayoutRegion[]  value) {
+    public override int AllocationSize(LayoutRegion[] value)
+    {
         var sizeForLength = 4;
 
         // details/1-empty-list-as-default-method-parameter.md
-        if (value == null) {
+        if (value == null)
+        {
             return sizeForLength;
         }
 
@@ -4783,9 +5480,11 @@ class FfiConverterSequenceTypeLayoutRegion: FfiConverterRustBuffer<LayoutRegion[
         return sizeForLength + sizeForItems;
     }
 
-    public override void Write(LayoutRegion[] value, BigEndianStream stream) {
+    public override void Write(LayoutRegion[] value, BigEndianStream stream)
+    {
         // details/1-empty-list-as-default-method-parameter.md
-        if (value == null) {
+        if (value == null)
+        {
             stream.WriteInt(0);
             return;
         }
@@ -4796,31 +5495,34 @@ class FfiConverterSequenceTypeLayoutRegion: FfiConverterRustBuffer<LayoutRegion[
     }
 }
 
-
-
-
-class FfiConverterSequenceTypePoint2D: FfiConverterRustBuffer<Point2D[]> {
+class FfiConverterSequenceTypePoint2D : FfiConverterRustBuffer<Point2D[]>
+{
     public static FfiConverterSequenceTypePoint2D INSTANCE = new FfiConverterSequenceTypePoint2D();
 
-    public override Point2D[]  Read(BigEndianStream stream) {
+    public override Point2D[] Read(BigEndianStream stream)
+    {
         var length = stream.ReadInt();
-        if (length == 0) {
+        if (length == 0)
+        {
             return [];
         }
 
         var result = new Point2D[length];
         var readFn = FfiConverterTypePoint2D.INSTANCE.Read;
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++)
+        {
             result[i] = readFn(stream);
         }
         return result;
     }
 
-    public override int AllocationSize(Point2D[]  value) {
+    public override int AllocationSize(Point2D[] value)
+    {
         var sizeForLength = 4;
 
         // details/1-empty-list-as-default-method-parameter.md
-        if (value == null) {
+        if (value == null)
+        {
             return sizeForLength;
         }
 
@@ -4829,9 +5531,11 @@ class FfiConverterSequenceTypePoint2D: FfiConverterRustBuffer<Point2D[]> {
         return sizeForLength + sizeForItems;
     }
 
-    public override void Write(Point2D[] value, BigEndianStream stream) {
+    public override void Write(Point2D[] value, BigEndianStream stream)
+    {
         // details/1-empty-list-as-default-method-parameter.md
-        if (value == null) {
+        if (value == null)
+        {
             stream.WriteInt(0);
             return;
         }
@@ -4842,31 +5546,35 @@ class FfiConverterSequenceTypePoint2D: FfiConverterRustBuffer<Point2D[]> {
     }
 }
 
+class FfiConverterSequenceTypeTextResult : FfiConverterRustBuffer<TextResult[]>
+{
+    public static FfiConverterSequenceTypeTextResult INSTANCE =
+        new FfiConverterSequenceTypeTextResult();
 
-
-
-class FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer<TextResult[]> {
-    public static FfiConverterSequenceTypeTextResult INSTANCE = new FfiConverterSequenceTypeTextResult();
-
-    public override TextResult[]  Read(BigEndianStream stream) {
+    public override TextResult[] Read(BigEndianStream stream)
+    {
         var length = stream.ReadInt();
-        if (length == 0) {
+        if (length == 0)
+        {
             return [];
         }
 
         var result = new TextResult[length];
         var readFn = FfiConverterTypeTextResult.INSTANCE.Read;
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++)
+        {
             result[i] = readFn(stream);
         }
         return result;
     }
 
-    public override int AllocationSize(TextResult[]  value) {
+    public override int AllocationSize(TextResult[] value)
+    {
         var sizeForLength = 4;
 
         // details/1-empty-list-as-default-method-parameter.md
-        if (value == null) {
+        if (value == null)
+        {
             return sizeForLength;
         }
 
@@ -4875,9 +5583,11 @@ class FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer<TextResult[]> {
         return sizeForLength + sizeForItems;
     }
 
-    public override void Write(TextResult[] value, BigEndianStream stream) {
+    public override void Write(TextResult[] value, BigEndianStream stream)
+    {
         // details/1-empty-list-as-default-method-parameter.md
-        if (value == null) {
+        if (value == null)
+        {
             stream.WriteInt(0);
             return;
         }
@@ -4888,65 +5598,104 @@ class FfiConverterSequenceTypeTextResult: FfiConverterRustBuffer<TextResult[]> {
     }
 }
 #pragma warning restore 8625
-public static class RustoMethods {
-    public static InitializeConfig CreateInitializeConfigForModel(string? @model, string? @lang, string? @modelPath) {
+public static class RustoMethods
+{
+    public static InitializeConfig CreateInitializeConfigForModel(
+        string? @model,
+        string? @lang,
+        string? @modelPath
+    )
+    {
         return FfiConverterTypeInitializeConfig.INSTANCE.Lift(
-    _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_func_create_initialize_config_for_model(FfiConverterOptionalString.INSTANCE.Lower(@model), FfiConverterOptionalString.INSTANCE.Lower(@lang), FfiConverterOptionalString.INSTANCE.Lower(@modelPath), ref _status)
-));
+            _UniffiHelpers.RustCall(
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_rusto_fn_func_create_initialize_config_for_model(
+                        FfiConverterOptionalString.INSTANCE.Lower(@model),
+                        FfiConverterOptionalString.INSTANCE.Lower(@lang),
+                        FfiConverterOptionalString.INSTANCE.Lower(@modelPath),
+                        ref _status
+                    )
+            )
+        );
     }
 
-
-    public static InitializeConfig CreateInitializeConfigPpv6(string @detModelPath, string @recModelPath, string @dictPath) {
+    public static InitializeConfig CreateInitializeConfigPpv6(
+        string @detModelPath,
+        string @recModelPath,
+        string @dictPath
+    )
+    {
         return FfiConverterTypeInitializeConfig.INSTANCE.Lift(
-    _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_func_create_initialize_config_ppv6(FfiConverterString.INSTANCE.Lower(@detModelPath), FfiConverterString.INSTANCE.Lower(@recModelPath), FfiConverterString.INSTANCE.Lower(@dictPath), ref _status)
-));
+            _UniffiHelpers.RustCall(
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_rusto_fn_func_create_initialize_config_ppv6(
+                        FfiConverterString.INSTANCE.Lower(@detModelPath),
+                        FfiConverterString.INSTANCE.Lower(@recModelPath),
+                        FfiConverterString.INSTANCE.Lower(@dictPath),
+                        ref _status
+                    )
+            )
+        );
     }
 
-
-    public static OcrRunOptions DefaultOcrRunOptions() {
+    public static OcrRunOptions DefaultOcrRunOptions()
+    {
         return FfiConverterTypeOcrRunOptions.INSTANCE.Lift(
-    _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_func_default_ocr_run_options( ref _status)
-));
+            _UniffiHelpers.RustCall(
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_rusto_fn_func_default_ocr_run_options(ref _status)
+            )
+        );
     }
-
 
     /// <summary>
     /// Downloads all available canonical models to the cache directory ahead of time.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
-    public static string[] DownloadAllModels(string? @cacheDir) {
+    public static string[] DownloadAllModels(string? @cacheDir)
+    {
         return FfiConverterSequenceString.INSTANCE.Lift(
-    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_func_download_all_models(FfiConverterOptionalString.INSTANCE.Lower(@cacheDir), ref _status)
-));
+            _UniffiHelpers.RustCallWithError(
+                FfiConverterTypeRustoBindingError.INSTANCE,
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_rusto_fn_func_download_all_models(
+                        FfiConverterOptionalString.INSTANCE.Lower(@cacheDir),
+                        ref _status
+                    )
+            )
+        );
     }
-
 
     /// <summary>
     /// Downloads model assets for a specific OCR pipeline ahead of time.
     /// </summary>
     /// <exception cref="RustoBindingException"></exception>
-    public static string[] DownloadModel(string? @model, string? @lang, string? @cacheDir) {
+    public static string[] DownloadModel(string? @model, string? @lang, string? @cacheDir)
+    {
         return FfiConverterSequenceString.INSTANCE.Lift(
-    _UniffiHelpers.RustCallWithError(FfiConverterTypeRustoBindingError.INSTANCE, (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_func_download_model(FfiConverterOptionalString.INSTANCE.Lower(@model), FfiConverterOptionalString.INSTANCE.Lower(@lang), FfiConverterOptionalString.INSTANCE.Lower(@cacheDir), ref _status)
-));
+            _UniffiHelpers.RustCallWithError(
+                FfiConverterTypeRustoBindingError.INSTANCE,
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_rusto_fn_func_download_model(
+                        FfiConverterOptionalString.INSTANCE.Lower(@model),
+                        FfiConverterOptionalString.INSTANCE.Lower(@lang),
+                        FfiConverterOptionalString.INSTANCE.Lower(@cacheDir),
+                        ref _status
+                    )
+            )
+        );
     }
-
 
     /// <summary>
     /// Returns the engine library version string.
     /// </summary>
-    public static string RustoVersion() {
+    public static string RustoVersion()
+    {
         return FfiConverterString.INSTANCE.Lift(
-    _UniffiHelpers.RustCall( (ref UniffiRustCallStatus _status) =>
-    _UniFFILib.uniffi_rusto_fn_func_rusto_version( ref _status)
-));
+            _UniffiHelpers.RustCall(
+                (ref UniffiRustCallStatus _status) =>
+                    _UniFFILib.uniffi_rusto_fn_func_rusto_version(ref _status)
+            )
+        );
     }
-
-
 }
-

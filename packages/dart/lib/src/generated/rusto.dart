@@ -438,7 +438,7 @@ class Frame {
 /// Engine initialization configuration specifying model paths, preset, and optional extensions.
 class InitializeConfig {
   const InitializeConfig({
-    /// Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+    /// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
     required this.model,
     /// Base model directory containing det, rec, and dict files.
     required this.modelPath,
@@ -466,7 +466,7 @@ class InitializeConfig {
     required this.layout,
   });
 
-  /// Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+  /// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
   final String? model;
   /// Base model directory containing det, rec, and dict files.
   final String? modelPath;
@@ -1302,6 +1302,10 @@ class TextResult {
     required this.boxPoints,
     /// Axis-aligned bounding box frame.
     required this.frame,
+    /// Detected document layout region index (if layout analysis enabled).
+    required this.regionId,
+    /// Detected semantic layout category (if layout analysis enabled).
+    required this.layoutType,
   });
 
   /// Recognized text string.
@@ -1312,6 +1316,10 @@ class TextResult {
   final List<Point2D> boxPoints;
   /// Axis-aligned bounding box frame.
   final Frame frame;
+  /// Detected document layout region index (if layout analysis enabled).
+  final int? regionId;
+  /// Detected semantic layout category (if layout analysis enabled).
+  final LayoutType? layoutType;
 
   Map<String, dynamic> toJson() {
     return {
@@ -1319,6 +1327,8 @@ class TextResult {
       'score': this.score,
       'boxPoints': this.boxPoints.map((item) => item.toJson()).toList(),
       'frame': this.frame.toJson(),
+      'regionId': this.regionId,
+      'layoutType': this.layoutType == null ? null : (() { final __tmp = this.layoutType!; return LayoutTypeFfiCodec.encode(__tmp); })(),
     };
   }
 
@@ -1328,6 +1338,8 @@ class TextResult {
       score: (json['score'] as num).toDouble(),
       boxPoints: (json['boxPoints'] as List).map((item) => Point2D.fromJson(item as Map<String, dynamic>)).toList(),
       frame: Frame.fromJson(json['frame'] as Map<String, dynamic>),
+      regionId: json['regionId'] == null ? null : (json['regionId'] as num).toInt(),
+      layoutType: json['layoutType'] == null ? null : (() { final __tmp = json['layoutType']; return LayoutTypeFfiCodec.decode(__tmp as String); })(),
     );
   }
 
@@ -1336,27 +1348,31 @@ class TextResult {
     double? score,
     List<Point2D>? boxPoints,
     Frame? frame,
+    Object? regionId = _sentinel,
+    Object? layoutType = _sentinel,
   }) {
     return TextResult(
       text: text ?? this.text,
       score: score ?? this.score,
       boxPoints: boxPoints ?? this.boxPoints,
       frame: frame ?? this.frame,
+      regionId: regionId == _sentinel ? this.regionId : regionId as int?,
+      layoutType: layoutType == _sentinel ? this.layoutType : layoutType as LayoutType?,
     );
   }
 
   @override
   String toString() {
-    return 'TextResult(text: $text, score: $score, boxPoints: $boxPoints, frame: $frame)';
+    return 'TextResult(text: $text, score: $score, boxPoints: $boxPoints, frame: $frame, regionId: $regionId, layoutType: $layoutType)';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is TextResult && text == other.text && score == other.score && boxPoints == other.boxPoints && frame == other.frame;
+      other is TextResult && text == other.text && score == other.score && boxPoints == other.boxPoints && frame == other.frame && regionId == other.regionId && layoutType == other.layoutType;
 
   @override
-  int get hashCode => Object.hash(text, score, boxPoints, frame);
+  int get hashCode => Object.hash(text, score, boxPoints, frame, regionId, layoutType);
 }
 
 /// Document dewarping model configuration.
@@ -3049,6 +3065,18 @@ void _uniffiWriteTextResult(TextResult value, _UniFfiBinaryWriter writer) {
     _uniffiWritePoint2D(item, writer);
   }
   _uniffiWriteFrame(value.frame, writer);
+  if (value.regionId == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeI32(value.regionId!);
+  }
+  if (value.layoutType == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    _uniffiWriteLayoutType(value.layoutType!, writer);
+  }
 }
 
 Uint8List _uniffiEncodeTextResult(TextResult value) {
@@ -3063,6 +3091,8 @@ TextResult _uniffiReadTextResult(_UniFfiBinaryReader reader) {
     score: reader.readF32(),
     boxPoints: (() { final int __len = reader.readI32(); final out = <Point2D>[]; for (var i = 0; i < __len; i++) { out.add(_uniffiReadPoint2D(reader)); } return out; })(),
     frame: _uniffiReadFrame(reader),
+    regionId: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readI32(); })(),
+    layoutType: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadLayoutType(reader); })(),
   );
 }
 

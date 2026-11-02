@@ -43,6 +43,19 @@ pub struct CTextResult {
     pub frame_height: c_float,
     pub frame_top: c_float,
     pub frame_left: c_float,
+    pub region_id: c_int,
+    pub layout_type: c_int,
+}
+
+/// C-compatible detected document layout region structure
+#[repr(C)]
+pub struct CLayoutRegion {
+    pub x_min: c_int,
+    pub y_min: c_int,
+    pub x_max: c_int,
+    pub y_max: c_int,
+    pub layout_type: c_int,
+    pub confidence: c_float,
 }
 
 /// Create a new RustO instance with JSON configuration
@@ -343,7 +356,7 @@ pub unsafe extern "C" fn rocr_free_results(results: *mut CTextResult, count: usi
         return;
     }
 
-    let slice = std::slice::from_raw_parts_mut(results, count);
+    let slice = std::ptr::slice_from_raw_parts_mut(results, count);
     let boxed = Box::from_raw(slice);
     for result in boxed.iter() {
         if !result.text.is_null() {
@@ -391,7 +404,101 @@ fn text_results_to_c(results: &[crate::TextResult]) -> Box<[CTextResult]> {
             frame_height: result.frame.height,
             frame_top: result.frame.top,
             frame_left: result.frame.left,
+            region_id: result.region_id.unwrap_or(-1),
+            layout_type: result
+                .layout_type
+                .map(|t| t as c_int)
+                .unwrap_or(-1),
         })
         .collect::<Vec<_>>()
         .into_boxed_slice()
+}
+
+/// Detect document layout regions from an image file path.
+///
+/// Returns 0 on success, negative error code on failure.
+/// Free returned regions with `rocr_free_layout_regions`.
+#[no_mangle]
+pub unsafe extern "C" fn rocr_detect_layout_file(
+    handle: *mut ROCRHandle,
+    image_path: *const c_char,
+    regions_out: *mut *mut CLayoutRegion,
+    count_out: *mut usize,
+) -> c_int {
+    if handle.is_null() || image_path.is_null() || regions_out.is_null() || count_out.is_null() {
+        return -1;
+    }
+    let path = match CStr::from_ptr(image_path).to_str() {
+        Ok(value) => value,
+        Err(_) => return -2,
+    };
+    let regions = match (*handle).inner.detect_layout(&ImageSource::Path(path.into())) {
+        Ok(value) => value,
+        Err(_) => return -3,
+    };
+    let c_regions: Vec<CLayoutRegion> = regions
+        .into_iter()
+        .map(|r| CLayoutRegion {
+            x_min: r.bbox.x_min,
+            y_min: r.bbox.y_min,
+            x_max: r.bbox.x_max,
+            y_max: r.bbox.y_max,
+            layout_type: r.layout_type as c_int,
+            confidence: r.confidence,
+        })
+        .collect();
+    *count_out = c_regions.len();
+    *regions_out = Box::into_raw(c_regions.into_boxed_slice()) as *mut CLayoutRegion;
+    0
+}
+
+/// Detect document layout regions from decoded, interleaved RGB8 pixels.
+///
+/// Returns 0 on success, negative error code on failure.
+/// Free returned regions with `rocr_free_layout_regions`.
+#[no_mangle]
+pub unsafe extern "C" fn rocr_detect_layout_rgb(
+    handle: *mut ROCRHandle,
+    image_data: *const u8,
+    image_len: usize,
+    width: u32,
+    height: u32,
+    stride: usize,
+    regions_out: *mut *mut CLayoutRegion,
+    count_out: *mut usize,
+) -> c_int {
+    if handle.is_null() || image_data.is_null() || regions_out.is_null() || count_out.is_null() {
+        return -1;
+    }
+    let (_, required) = match crate::rusto_ocr::rgb_layout(width, height, stride) {
+        Ok(layout) if image_len >= layout.1 => layout,
+        _ => return -2,
+    };
+    let pixels = slice::from_raw_parts(image_data, required);
+    let regions = match (*handle).inner.detect_layout_rgb(pixels, width, height, stride) {
+        Ok(value) => value,
+        Err(_) => return -3,
+    };
+    let c_regions: Vec<CLayoutRegion> = regions
+        .into_iter()
+        .map(|r| CLayoutRegion {
+            x_min: r.bbox.x_min,
+            y_min: r.bbox.y_min,
+            x_max: r.bbox.x_max,
+            y_max: r.bbox.y_max,
+            layout_type: r.layout_type as c_int,
+            confidence: r.confidence,
+        })
+        .collect();
+    *count_out = c_regions.len();
+    *regions_out = Box::into_raw(c_regions.into_boxed_slice()) as *mut CLayoutRegion;
+    0
+}
+
+/// Free layout region results returned by `rocr_detect_layout_*`.
+#[no_mangle]
+pub unsafe extern "C" fn rocr_free_layout_regions(regions: *mut CLayoutRegion, count: usize) {
+    if !regions.is_null() && count > 0 {
+        let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(regions, count));
+    }
 }

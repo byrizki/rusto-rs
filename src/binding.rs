@@ -65,6 +65,10 @@ pub struct TextResult {
     pub box_points: Vec<Point2D>,
     /// Axis-aligned bounding box frame.
     pub frame: Frame,
+    /// Detected document layout region index (if layout analysis enabled).
+    pub region_id: Option<i32>,
+    /// Detected semantic layout category (if layout analysis enabled).
+    pub layout_type: Option<LayoutType>,
 }
 
 /// Output format granularity for text detection.
@@ -695,6 +699,8 @@ fn convert_result(res: crate::rusto_ocr::DetectTextResult) -> DetectTextResult {
                             top: r.frame.top,
                             left: r.frame.left,
                         },
+                        region_id: r.region_id,
+                        layout_type: r.layout_type.map(convert_layout_type),
                     })
                     .collect(),
             }

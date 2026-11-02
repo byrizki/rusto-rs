@@ -150,3 +150,37 @@ func TestDetectIndraOCRIdCard(t *testing.T) {
 	}
 }
 
+func TestDetectLayoutAPI(t *testing.T) {
+	detPath := "../../models/PPOCR_v6/det.rten"
+	recPath := "../../models/PPOCR_v6/rec.rten"
+	dictPath := "../../models/PPOCR_v6/dict.txt"
+
+	if _, err := os.Stat(detPath); os.IsNotExist(err) {
+		t.Skip("Model files not found, skipping layout test")
+	}
+
+	config := fmt.Sprintf(`{
+		"detection": {"model_path": "%s"},
+		"recognition": {"model_path": "%s", "dict_path": "%s"}
+	}`, detPath, recPath, dictPath)
+
+	engine, err := New(config)
+	if err != nil {
+		t.Fatalf("Failed to initialize engine: %v", err)
+	}
+	defer engine.Close()
+
+	// Calling DetectLayoutFile without layout model configured should return an error
+	_, err = engine.DetectLayoutFile("../../models/test_images/example1.png")
+	if err == nil {
+		t.Fatal("expected error when layout model is not configured, got nil")
+	}
+
+	// Calling DetectLayoutRGB without layout model configured should return an error
+	pixels := make([]byte, 100*100*3)
+	_, err = engine.DetectLayoutRGB(pixels, 100, 100, 300)
+	if err == nil {
+		t.Fatal("expected error when layout model is not configured, got nil")
+	}
+}
+

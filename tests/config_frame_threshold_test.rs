@@ -32,6 +32,8 @@ fn test_text_result_serde() {
         score: 0.98,
         box_points: [(10.0, 20.0), (110.0, 20.0), (110.0, 50.0), (10.0, 50.0)],
         frame,
+        region_id: None,
+        layout_type: None,
     };
 
     let json = serde_json::to_string(&result).expect("Serialize TextResult");

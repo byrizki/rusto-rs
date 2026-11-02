@@ -2583,22 +2583,49 @@ class _UniffiFfiConverterSequenceTypePoint2D(_UniffiConverterRustBuffer):
             _UniffiFfiConverterTypePoint2D.read(buf) for i in range(count)
         ]
 
+class _UniffiFfiConverterOptionalTypeLayoutType(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        if value is not None:
+            _UniffiFfiConverterTypeLayoutType.check_lower(value)
+
+    @classmethod
+    def write(cls, value, buf):
+        if value is None:
+            buf.write_u8(0)
+            return
+
+        buf.write_u8(1)
+        _UniffiFfiConverterTypeLayoutType.write(value, buf)
+
+    @classmethod
+    def read(cls, buf):
+        flag = buf.read_u8()
+        if flag == 0:
+            return None
+        elif flag == 1:
+            return _UniffiFfiConverterTypeLayoutType.read(buf)
+        else:
+            raise InternalError("Unexpected flag byte for optional type")
+
 @dataclass
 class TextResult:
     """
     Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
 """
-    def __init__(self, *, text:str, score:float, box_points:typing.List[Point2D], frame:Frame):
+    def __init__(self, *, text:str, score:float, box_points:typing.List[Point2D], frame:Frame, region_id:typing.Optional[int], layout_type:typing.Optional[LayoutType]):
         self.text = text
         self.score = score
         self.box_points = box_points
         self.frame = frame
+        self.region_id = region_id
+        self.layout_type = layout_type
         
         
 
     
     def __str__(self):
-        return "TextResult(text={}, score={}, box_points={}, frame={})".format(self.text, self.score, self.box_points, self.frame)
+        return "TextResult(text={}, score={}, box_points={}, frame={}, region_id={}, layout_type={})".format(self.text, self.score, self.box_points, self.frame, self.region_id, self.layout_type)
     def __eq__(self, other):
         if self.text != other.text:
             return False
@@ -2607,6 +2634,10 @@ class TextResult:
         if self.box_points != other.box_points:
             return False
         if self.frame != other.frame:
+            return False
+        if self.region_id != other.region_id:
+            return False
+        if self.layout_type != other.layout_type:
             return False
         return True
 
@@ -2618,6 +2649,8 @@ class _UniffiFfiConverterTypeTextResult(_UniffiConverterRustBuffer):
             score=_UniffiFfiConverterFloat32.read(buf),
             box_points=_UniffiFfiConverterSequenceTypePoint2D.read(buf),
             frame=_UniffiFfiConverterTypeFrame.read(buf),
+            region_id=_UniffiFfiConverterOptionalInt32.read(buf),
+            layout_type=_UniffiFfiConverterOptionalTypeLayoutType.read(buf),
         )
 
     @staticmethod
@@ -2626,6 +2659,8 @@ class _UniffiFfiConverterTypeTextResult(_UniffiConverterRustBuffer):
         _UniffiFfiConverterFloat32.check_lower(value.score)
         _UniffiFfiConverterSequenceTypePoint2D.check_lower(value.box_points)
         _UniffiFfiConverterTypeFrame.check_lower(value.frame)
+        _UniffiFfiConverterOptionalInt32.check_lower(value.region_id)
+        _UniffiFfiConverterOptionalTypeLayoutType.check_lower(value.layout_type)
 
     @staticmethod
     def write(value, buf):
@@ -2633,6 +2668,8 @@ class _UniffiFfiConverterTypeTextResult(_UniffiConverterRustBuffer):
         _UniffiFfiConverterFloat32.write(value.score, buf)
         _UniffiFfiConverterSequenceTypePoint2D.write(value.box_points, buf)
         _UniffiFfiConverterTypeFrame.write(value.frame, buf)
+        _UniffiFfiConverterOptionalInt32.write(value.region_id, buf)
+        _UniffiFfiConverterOptionalTypeLayoutType.write(value.layout_type, buf)
 
 class _UniffiFfiConverterBytes(_UniffiConverterRustBuffer):
     @staticmethod

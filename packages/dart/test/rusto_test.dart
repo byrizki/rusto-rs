@@ -28,6 +28,8 @@ void main() {
           Point2D(x: 20, y: 34),
         ],
         frame: frame,
+        regionId: null,
+        layoutType: null,
       );
 
       expect(result.text, equals('PaddleOCR RustO'));

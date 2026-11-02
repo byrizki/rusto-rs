@@ -32,6 +32,8 @@ public class RustO implements AutoCloseable {
         public float frame_height;
         public float frame_top;
         public float frame_left;
+        public int region_id;
+        public int layout_type;
 
         public CTextResult() {
             super();
@@ -51,7 +53,8 @@ public class RustO implements AutoCloseable {
                 "box_x3", "box_y3",
                 "box_x4", "box_y4",
                 "frame_width", "frame_height",
-                "frame_top", "frame_left"
+                "frame_top", "frame_left",
+                "region_id", "layout_type"
             );
         }
     }

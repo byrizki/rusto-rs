@@ -92,4 +92,8 @@ pub struct TextResult {
     pub box_points: [(f32, f32); 4],
     /// Axis-aligned bounding box frame
     pub frame: Frame,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region_id: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout_type: Option<crate::layout::LayoutType>,
 }

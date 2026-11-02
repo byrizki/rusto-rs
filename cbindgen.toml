@@ -9,6 +9,7 @@ usize_is_size_t = true
 [export]
 include = [
     "CTextResult",
+    "CLayoutRegion",
     "ROCRHandle",
     "rocr_initialize",
     "rocr_free",
@@ -19,6 +20,9 @@ include = [
     "rocr_detect_text_data_spatial",
     "rocr_detect_text_rgb",
     "rocr_detect_text_rgb_spatial",
+    "rocr_detect_layout_file",
+    "rocr_detect_layout_rgb",
+    "rocr_free_layout_regions",
     "rocr_free_results",
     "rocr_free_string",
 ]

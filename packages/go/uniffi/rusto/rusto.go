@@ -1322,7 +1322,7 @@ func (_ FfiDestroyerFrame) Destroy(value Frame) {
 
 // Engine initialization configuration specifying model paths, preset, and optional extensions.
 type InitializeConfig struct {
-	// Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+	// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
 	Model *string
 	// Base model directory containing det, rec, and dict files.
 	ModelPath *string
@@ -2010,6 +2010,10 @@ type TextResult struct {
 	BoxPoints []Point2D
 	// Axis-aligned bounding box frame.
 	Frame Frame
+	// Detected document layout region index (if layout analysis enabled).
+	RegionId *int32
+	// Detected semantic layout category (if layout analysis enabled).
+	LayoutType *LayoutType
 }
 
 func (r *TextResult) Destroy() {
@@ -2017,6 +2021,8 @@ func (r *TextResult) Destroy() {
 	FfiDestroyerFloat32{}.Destroy(r.Score)
 	FfiDestroyerSequencePoint2D{}.Destroy(r.BoxPoints)
 	FfiDestroyerFrame{}.Destroy(r.Frame)
+	FfiDestroyerOptionalInt32{}.Destroy(r.RegionId)
+	FfiDestroyerOptionalLayoutType{}.Destroy(r.LayoutType)
 }
 
 type FfiConverterTextResult struct{}
@@ -2033,6 +2039,8 @@ func (c FfiConverterTextResult) Read(reader io.Reader) TextResult {
 		FfiConverterFloat32INSTANCE.Read(reader),
 		FfiConverterSequencePoint2DINSTANCE.Read(reader),
 		FfiConverterFrameINSTANCE.Read(reader),
+		FfiConverterOptionalInt32INSTANCE.Read(reader),
+		FfiConverterOptionalLayoutTypeINSTANCE.Read(reader),
 	}
 }
 
@@ -2049,6 +2057,8 @@ func (c FfiConverterTextResult) Write(writer io.Writer, value TextResult) {
 	FfiConverterFloat32INSTANCE.Write(writer, value.Score)
 	FfiConverterSequencePoint2DINSTANCE.Write(writer, value.BoxPoints)
 	FfiConverterFrameINSTANCE.Write(writer, value.Frame)
+	FfiConverterOptionalInt32INSTANCE.Write(writer, value.RegionId)
+	FfiConverterOptionalLayoutTypeINSTANCE.Write(writer, value.LayoutType)
 }
 
 type FfiDestroyerTextResult struct{}
@@ -3260,6 +3270,47 @@ type FfiDestroyerOptionalUnwarpConfig struct{}
 func (_ FfiDestroyerOptionalUnwarpConfig) Destroy(value *UnwarpConfig) {
 	if value != nil {
 		FfiDestroyerUnwarpConfig{}.Destroy(*value)
+	}
+}
+
+type FfiConverterOptionalLayoutType struct{}
+
+var FfiConverterOptionalLayoutTypeINSTANCE = FfiConverterOptionalLayoutType{}
+
+func (c FfiConverterOptionalLayoutType) Lift(rb RustBufferI) *LayoutType {
+	return LiftFromRustBuffer[*LayoutType](c, rb)
+}
+
+func (_ FfiConverterOptionalLayoutType) Read(reader io.Reader) *LayoutType {
+	if readInt8(reader) == 0 {
+		return nil
+	}
+	temp := FfiConverterLayoutTypeINSTANCE.Read(reader)
+	return &temp
+}
+
+func (c FfiConverterOptionalLayoutType) Lower(value *LayoutType) C.RustBuffer {
+	return LowerIntoRustBuffer[*LayoutType](c, value)
+}
+
+func (c FfiConverterOptionalLayoutType) LowerExternal(value *LayoutType) ExternalCRustBuffer {
+	return RustBufferFromC(LowerIntoRustBuffer[*LayoutType](c, value))
+}
+
+func (_ FfiConverterOptionalLayoutType) Write(writer io.Writer, value *LayoutType) {
+	if value == nil {
+		writeInt8(writer, 0)
+	} else {
+		writeInt8(writer, 1)
+		FfiConverterLayoutTypeINSTANCE.Write(writer, *value)
+	}
+}
+
+type FfiDestroyerOptionalLayoutType struct{}
+
+func (_ FfiDestroyerOptionalLayoutType) Destroy(value *LayoutType) {
+	if value != nil {
+		FfiDestroyerLayoutType{}.Destroy(*value)
 	}
 }
 

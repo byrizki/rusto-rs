@@ -225,6 +225,8 @@ pub(crate) struct RustOOutput {
     pub layout_regions: Option<Vec<crate::LayoutRegion>>,
     pub y_threshold_multiplier: Option<f32>,
     pub x_threshold_multiplier: Option<f32>,
+    pub img_w: f32,
+    pub img_h: f32,
 }
 
 pub struct RustO {
@@ -805,6 +807,12 @@ impl RustO {
             global.min_height,
         )?;
 
+        let working_size = working_img.size()?;
+        let working_h = working_size.height;
+        let working_w = working_size.width;
+        let working_w_f32 = working_w as f32;
+        let working_h_f32 = working_h as f32;
+
         // Detection (boxes are in padded-image coordinates here)
         // IMPORTANT: Pass padded image dimensions, not original!
         let det_res = self.det.run_with_options(&padded, detection, postprocess)?;
@@ -826,13 +834,11 @@ impl RustO {
                     layout_regions,
                     y_threshold_multiplier: global.y_threshold_multiplier,
                     x_threshold_multiplier: global.x_threshold_multiplier,
+                    img_w: working_w_f32,
+                    img_h: working_h_f32,
                 });
             }
         };
-
-        let working_size = working_img.size()?;
-        let working_h = working_size.height;
-        let working_w = working_size.width;
 
         // Map boxes back to working image coords for high-fidelity cropping and final output
         let mut boxes = padded_boxes.clone();
@@ -995,6 +1001,8 @@ impl RustO {
             layout_regions,
             y_threshold_multiplier: global.y_threshold_multiplier,
             x_threshold_multiplier: global.x_threshold_multiplier,
+            img_w: working_w_f32,
+            img_h: working_h_f32,
         })
     }
 
@@ -1128,11 +1136,15 @@ fn merge_text_results(mut entries: Vec<crate::TextResult>, separator: &str) -> c
         .map(|item| item.frame.top + item.frame.height)
         .fold(f32::NEG_INFINITY, f32::max);
     let box_points = [(left, top), (right, top), (right, bottom), (left, bottom)];
+    let region_id = entries.first().and_then(|e| e.region_id);
+    let layout_type = entries.first().and_then(|e| e.layout_type);
     crate::TextResult {
         text,
         score,
         box_points,
         frame: crate::Frame::from_points(&box_points),
+        region_id,
+        layout_type,
     }
 }
 
@@ -1157,6 +1169,8 @@ impl RustOOutput {
                 score: self.scores[i],
                 box_points,
                 frame,
+                region_id: None,
+                layout_type: None,
             });
         }
         results
@@ -1182,16 +1196,24 @@ impl RustOOutput {
                                 score: *score,
                                 box_points,
                                 frame: crate::Frame::from_points(&box_points),
+                                region_id: None,
+                                layout_type: None,
                             }
                         })
                         .collect()
                 })
                 .collect();
-            return group_words(
+            let grouped = group_words(
                 word_lines,
                 options.line_y_threshold.unwrap_or(0.5),
                 options.word_x_threshold.unwrap_or(0.4),
             );
+            if let Some(regions) = &self.layout_regions {
+                if !regions.is_empty() {
+                    return crate::layout::order_text_results_by_layout(&grouped, regions, self.img_w);
+                }
+            }
+            return grouped;
         }
         let mut entries = self.to_text_results();
         if entries.is_empty() {
@@ -1227,7 +1249,7 @@ impl RustOOutput {
             }
             lines.push(vec![entry]);
         }
-        lines
+        let segments: Vec<crate::TextResult> = lines
             .into_iter()
             .flat_map(|mut line| {
                 if line.len() == 1 {
@@ -1265,7 +1287,15 @@ impl RustOOutput {
                 }
                 segments
             })
-            .collect()
+            .collect();
+
+        if let Some(regions) = &self.layout_regions {
+            if !regions.is_empty() {
+                return crate::layout::order_text_results_by_layout(&segments, regions, self.img_w);
+            }
+        }
+
+        segments
     }
 
     /// Export raw OCR results as ASCII format
@@ -1456,11 +1486,9 @@ impl RustOOutput {
             let ax = (a.0[0].x + a.0[2].x) / 2.0;
             let bx = (b.0[0].x + b.0[2].x) / 2.0;
 
-            if (ay - by).abs() < 20.0 {
-                ax.partial_cmp(&bx).unwrap()
-            } else {
-                ay.partial_cmp(&by).unwrap()
-            }
+            ay.partial_cmp(&by)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| ax.partial_cmp(&bx).unwrap_or(std::cmp::Ordering::Equal))
         });
 
         for (bbox, text, score) in &indexed {

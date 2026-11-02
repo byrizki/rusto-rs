@@ -1302,7 +1302,7 @@ public func FfiConverterTypeFrame_lower(_ value: Frame) -> RustBuffer {
  */
 public struct InitializeConfig: Equatable, Hashable {
     /**
-     * Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+     * Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
      */
     public var model: String?
     /**
@@ -1358,7 +1358,7 @@ public struct InitializeConfig: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
-         * Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+         * Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
          */model: String?, 
         /**
          * Base model directory containing det, rec, and dict files.
@@ -2427,6 +2427,14 @@ public struct TextResult: Equatable, Hashable {
      * Axis-aligned bounding box frame.
      */
     public var frame: Frame
+    /**
+     * Detected document layout region index (if layout analysis enabled).
+     */
+    public var regionId: Int32?
+    /**
+     * Detected semantic layout category (if layout analysis enabled).
+     */
+    public var layoutType: LayoutType?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -2442,11 +2450,19 @@ public struct TextResult: Equatable, Hashable {
          */boxPoints: [Point2D], 
         /**
          * Axis-aligned bounding box frame.
-         */frame: Frame) {
+         */frame: Frame, 
+        /**
+         * Detected document layout region index (if layout analysis enabled).
+         */regionId: Int32?, 
+        /**
+         * Detected semantic layout category (if layout analysis enabled).
+         */layoutType: LayoutType?) {
         self.text = text
         self.score = score
         self.boxPoints = boxPoints
         self.frame = frame
+        self.regionId = regionId
+        self.layoutType = layoutType
     }
 
     
@@ -2468,7 +2484,9 @@ public struct FfiConverterTypeTextResult: FfiConverterRustBuffer {
                 text: FfiConverterString.read(from: &buf), 
                 score: FfiConverterFloat.read(from: &buf), 
                 boxPoints: FfiConverterSequenceTypePoint2D.read(from: &buf), 
-                frame: FfiConverterTypeFrame.read(from: &buf)
+                frame: FfiConverterTypeFrame.read(from: &buf), 
+                regionId: FfiConverterOptionInt32.read(from: &buf), 
+                layoutType: FfiConverterOptionTypeLayoutType.read(from: &buf)
         )
     }
 
@@ -2477,6 +2495,8 @@ public struct FfiConverterTypeTextResult: FfiConverterRustBuffer {
         FfiConverterFloat.write(value.score, into: &buf)
         FfiConverterSequenceTypePoint2D.write(value.boxPoints, into: &buf)
         FfiConverterTypeFrame.write(value.frame, into: &buf)
+        FfiConverterOptionInt32.write(value.regionId, into: &buf)
+        FfiConverterOptionTypeLayoutType.write(value.layoutType, into: &buf)
     }
 }
 
@@ -3488,6 +3508,30 @@ fileprivate struct FfiConverterOptionTypeUnwarpConfig: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeUnwarpConfig.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeLayoutType: FfiConverterRustBuffer {
+    typealias SwiftType = LayoutType?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeLayoutType.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeLayoutType.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }

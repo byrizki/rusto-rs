@@ -1990,7 +1990,7 @@ public object FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
  */
 data class InitializeConfig (
     /**
-     * Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+     * Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
      */
     var `model`: kotlin.String?
     , 
@@ -2814,6 +2814,16 @@ data class TextResult (
      * Axis-aligned bounding box frame.
      */
     var `frame`: Frame
+    , 
+    /**
+     * Detected document layout region index (if layout analysis enabled).
+     */
+    var `regionId`: kotlin.Int?
+    , 
+    /**
+     * Detected semantic layout category (if layout analysis enabled).
+     */
+    var `layoutType`: LayoutType?
     
 ){
     
@@ -2834,6 +2844,8 @@ public object FfiConverterTypeTextResult: FfiConverterRustBuffer<TextResult> {
             FfiConverterFloat.read(buf),
             FfiConverterSequenceTypePoint2D.read(buf),
             FfiConverterTypeFrame.read(buf),
+            FfiConverterOptionalInt.read(buf),
+            FfiConverterOptionalTypeLayoutType.read(buf),
         )
     }
 
@@ -2841,7 +2853,9 @@ public object FfiConverterTypeTextResult: FfiConverterRustBuffer<TextResult> {
             FfiConverterString.allocationSize(value.`text`) +
             FfiConverterFloat.allocationSize(value.`score`) +
             FfiConverterSequenceTypePoint2D.allocationSize(value.`boxPoints`) +
-            FfiConverterTypeFrame.allocationSize(value.`frame`)
+            FfiConverterTypeFrame.allocationSize(value.`frame`) +
+            FfiConverterOptionalInt.allocationSize(value.`regionId`) +
+            FfiConverterOptionalTypeLayoutType.allocationSize(value.`layoutType`)
     )
 
     override fun write(value: TextResult, buf: ByteBuffer) {
@@ -2849,6 +2863,8 @@ public object FfiConverterTypeTextResult: FfiConverterRustBuffer<TextResult> {
             FfiConverterFloat.write(value.`score`, buf)
             FfiConverterSequenceTypePoint2D.write(value.`boxPoints`, buf)
             FfiConverterTypeFrame.write(value.`frame`, buf)
+            FfiConverterOptionalInt.write(value.`regionId`, buf)
+            FfiConverterOptionalTypeLayoutType.write(value.`layoutType`, buf)
     }
 }
 
@@ -3852,6 +3868,38 @@ public object FfiConverterOptionalTypeUnwarpConfig: FfiConverterRustBuffer<Unwar
         } else {
             buf.put(1)
             FfiConverterTypeUnwarpConfig.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeLayoutType: FfiConverterRustBuffer<LayoutType?> {
+    override fun read(buf: ByteBuffer): LayoutType? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeLayoutType.read(buf)
+    }
+
+    override fun allocationSize(value: LayoutType?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeLayoutType.allocationSize(value)
+        }
+    }
+
+    override fun write(value: LayoutType?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeLayoutType.write(value, buf)
         }
     }
 }
