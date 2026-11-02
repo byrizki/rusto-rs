@@ -66,6 +66,29 @@ class TestRustOPythonBinding(unittest.TestCase):
         self.assertTrue(spatial_res.is_SPATIAL())
         self.assertIn("INVOICE", spatial_res.text)
 
+    def test_real_ocr_indra_idcard_image(self):
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+        det_path = os.path.join(base_dir, "models/indra/det.rten")
+        rec_path = os.path.join(base_dir, "models/indra/rec.rten")
+        dict_path = os.path.join(base_dir, "models/indra/meta.json")
+        img_path = os.path.join(base_dir, "models/test_images/idcard.jpg")
+
+        if not os.path.exists(det_path) or not os.path.exists(img_path):
+            self.skipTest("Indra models or test image not present")
+
+        config_json = json.dumps({
+            "detection": {"model_path": det_path},
+            "recognition": {"model_path": rec_path, "dict_path": dict_path}
+        })
+        engine = RustO.initialize_from_json(config_json)
+
+        opts = OcrRunOptions(output=OutputGranularity.LINES, text_score=0.3)
+        res = engine.detect_text(ImageSource.PATH(img_path), opts)
+        self.assertTrue(res.is_STRUCTURED())
+        self.assertGreater(len(res.results), 0)
+        joined = " ".join([r.text for r in res.results])
+        self.assertTrue("UNITED" in joined or "PASSPORT" in joined or "BRITAIN" in joined)
+
     def test_run_options_with_configurable_opts(self):
         opts = OcrRunOptions(
             text_score=0.4,

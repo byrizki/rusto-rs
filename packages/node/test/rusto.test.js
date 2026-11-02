@@ -44,3 +44,31 @@ test('RustO performs real OCR on example1.png', () => {
   assert.strictEqual(typeof spatial, 'string');
   assert.ok(spatial.includes('INVOICE'), 'Expected spatial output to contain INVOICE');
 });
+
+test('RustO performs real OCR with Indra OCR on idcard.jpg', () => {
+  const detPath = path.resolve(__dirname, '../../../models/indra/det.rten');
+  const recPath = path.resolve(__dirname, '../../../models/indra/rec.rten');
+  const dictPath = path.resolve(__dirname, '../../../models/indra/meta.json');
+  const imgPath = path.resolve(__dirname, '../../../models/test_images/idcard.jpg');
+
+  if (!fs.existsSync(detPath) || !fs.existsSync(imgPath)) {
+    return;
+  }
+
+  const engine = RustO.initialize({
+    detection: { model_path: detPath },
+    recognition: { model_path: recPath, dict_path: dictPath }
+  });
+
+  const results = engine.detectTextFile(imgPath, {
+    recBatchNum: 8,
+    textScore: 0.3
+  });
+  assert.ok(Array.isArray(results), 'Expected results to be an array');
+  assert.ok(results.length > 0, 'Expected detected text lines');
+  const joined = results.map((r) => r.text).join(' ');
+  assert.ok(
+    joined.includes('UNITED') || joined.includes('PASSPORT') || joined.includes('BRITAIN'),
+    `Expected passport text, got: ${joined}`
+  );
+});

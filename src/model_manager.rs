@@ -411,7 +411,7 @@ pub fn resolve_asset(
 }
 
 /// Maps a model asset filename to its organized path in the Hugging Face repository.
-pub fn resolve_hf_asset_path<'a>(asset_filename: &'a str) -> &'a str {
+pub fn resolve_hf_asset_path(asset_filename: &str) -> &str {
     match asset_filename {
         "indra_det.rten" => "indraocr/det.rten",
         "indra_rec.rten" => "indraocr/rec.rten",

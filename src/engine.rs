@@ -45,6 +45,8 @@ impl From<Box<dyn std::error::Error>> for EngineError {
     }
 }
 
+pub type LineNetRecOutput = (Vec<Vec<i32>>, Vec<Vec<f32>>);
+
 /// Abstract inference session interface allowing alternative backends
 /// (e.g. RTen, ONNX Runtime, Tract, Candle, or custom hardware accelerators).
 pub trait InferenceSession: Send {
@@ -68,6 +70,11 @@ pub trait InferenceSession: Send {
     /// Check if metadata key exists.
     fn have_key(&self, _key: &str) -> bool {
         false
+    }
+
+    /// Model input channels (1 for grayscale ink map, 3 for RGB/BGR).
+    fn input_channels(&self) -> usize {
+        3
     }
 }
 
@@ -93,6 +100,10 @@ impl InferenceSession for Box<dyn InferenceSession> {
 
     fn have_key(&self, key: &str) -> bool {
         (**self).have_key(key)
+    }
+
+    fn input_channels(&self) -> usize {
+        (**self).input_channels()
     }
 }
 
@@ -184,6 +195,30 @@ impl EngineSession {
             Self::Custom(s) => s.have_key(key),
         }
     }
+
+    pub fn input_channels(&self) -> usize {
+        match self {
+            Self::Rten(s) => s.input_channels(),
+            Self::Custom(s) => s.input_channels(),
+        }
+    }
+
+    pub fn is_linenet(&self) -> bool {
+        self.input_channels() == 1
+    }
+
+    pub fn run_linenet_rec(
+        &mut self,
+        x: ndarray::Array4<f32>,
+        widths: Vec<i32>,
+    ) -> Result<LineNetRecOutput, EngineError> {
+        match self {
+            Self::Rten(s) => s.run_linenet_rec(x, widths),
+            Self::Custom(_) => Err(EngineError::Engine(
+                "Custom sessions do not support LineNet multi-input recognition".into(),
+            )),
+        }
+    }
 }
 
 impl InferenceSession for EngineSession {
@@ -208,6 +243,10 @@ impl InferenceSession for EngineSession {
 
     fn have_key(&self, key: &str) -> bool {
         self.have_key(key)
+    }
+
+    fn input_channels(&self) -> usize {
+        self.input_channels()
     }
 }
 
@@ -353,6 +392,91 @@ impl RtenSession {
             opts = opts.with_thread_pool(Some(tp.clone()));
         }
         Some(opts)
+    }
+
+    pub fn input_channels(&self) -> usize {
+        self.model
+            .input_shape(0)
+            .and_then(|dims| dims.get(1).cloned())
+            .map(|d| match d {
+                rten::Dimension::Fixed(c) => c,
+                _ => 3,
+            })
+            .unwrap_or(3)
+    }
+
+    pub fn run_linenet_rec(
+        &mut self,
+        x: ndarray::Array4<f32>,
+        widths: Vec<i32>,
+    ) -> Result<LineNetRecOutput, EngineError> {
+        let in_ids = self.model.input_ids();
+        if in_ids.len() < 2 {
+            return Err(EngineError::Engine(
+                "LineNet rec model expects at least 2 inputs (x and widths)".into(),
+            ));
+        }
+
+        let x_shape: Vec<usize> = x.shape().to_vec();
+        let x_data: Vec<f32> = if let Some(slice) = x.as_slice() {
+            slice.to_vec()
+        } else {
+            x.iter().copied().collect()
+        };
+        let x_tensor = RtenTensor::<f32>::from_data(&x_shape, x_data);
+        let widths_tensor = RtenTensor::<i32>::from_data(&[widths.len()], widths);
+
+        let out_ids = self.model.output_ids();
+        let run_opts = self.run_options();
+        let outputs = self.model.run(
+            vec![
+                (in_ids[0], x_tensor.view().into()),
+                (in_ids[1], widths_tensor.view().into()),
+            ],
+            out_ids,
+            run_opts,
+        )?;
+
+        if outputs.len() < 3 {
+            return Err(EngineError::OutputError(
+                "LineNet rec model produced fewer than 3 outputs".into(),
+            ));
+        }
+
+        let (ids_vec, ids_shape) = match &outputs[0] {
+            rten::Value::Int32Tensor(t) => (t.to_vec(), t.shape().to_vec()),
+            _ => return Err(EngineError::OutputError("Expected Int32Tensor for ids".into())),
+        };
+        let (conf_vec, _) = match &outputs[1] {
+            rten::Value::FloatTensor(t) => (t.to_vec(), t.shape().to_vec()),
+            _ => return Err(EngineError::OutputError("Expected FloatTensor for conf".into())),
+        };
+        let lengths_vec = match &outputs[2] {
+            rten::Value::Int32Tensor(t) => t.to_vec(),
+            _ => return Err(EngineError::OutputError("Expected Int32Tensor for lengths".into())),
+        };
+
+        let batch_size = lengths_vec.len();
+        let max_len = if ids_shape.len() >= 2 {
+            ids_shape[1]
+        } else {
+            ids_vec.len() / batch_size.max(1)
+        };
+
+        let mut batch_ids = Vec::with_capacity(batch_size);
+        let mut batch_confs = Vec::with_capacity(batch_size);
+
+        for (b, &len_val) in lengths_vec.iter().enumerate().take(batch_size) {
+            let len = len_val.max(0) as usize;
+            let start = b * max_len;
+            let actual_len = len.min(max_len);
+            let b_ids = ids_vec[start..start + actual_len].to_vec();
+            let b_confs = conf_vec[start..start + actual_len].to_vec();
+            batch_ids.push(b_ids);
+            batch_confs.push(b_confs);
+        }
+
+        Ok((batch_ids, batch_confs))
     }
 
     pub fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {

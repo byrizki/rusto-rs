@@ -325,6 +325,10 @@ impl TextRecognizer {
         Ok(Self { cfg, session, decoder })
     }
 
+    pub fn is_linenet(&self) -> bool {
+        self.session.input_channels() == 1
+    }
+
     pub fn run(&mut self, imgs: &[Mat], return_word_box: bool) -> Result<TextRecOutput, EngineError> {
         let start = Instant::now();
 
@@ -339,6 +343,82 @@ impl TextRecognizer {
         }
 
         let img_list: Vec<Mat> = imgs.to_vec();
+
+        if self.is_linenet() {
+            let img_num = img_list.len();
+            let batch_num = (self.cfg.rec_batch_num as usize).max(1);
+            let mut all_texts: Vec<(String, f32)> = vec![(String::new(), 0.0); img_num];
+            let all_word_infos: Vec<Option<WordInfo>> = vec![None; img_num];
+
+            let rec_h = 96usize;
+            let mut beg = 0usize;
+            while beg < img_num {
+                let end = (beg + batch_num).min(img_num);
+                let current_batch = &img_list[beg..end];
+
+                let mut target_widths = Vec::with_capacity(current_batch.len());
+                for img in current_batch {
+                    let h = img.rows() as f32;
+                    let w = img.cols() as f32;
+                    let target_w = if h > 0.0 {
+                        (96.0 * (w / h)).round() as usize
+                    } else {
+                        96
+                    };
+                    let aligned_w = (target_w.div_ceil(8) * 8).clamp(8, 4096);
+                    target_widths.push(aligned_w);
+                }
+
+                let max_w = *target_widths.iter().max().unwrap_or(&96);
+                let n = current_batch.len();
+                let mut batch_tensor = Array4::<f32>::zeros((n, 1, rec_h, max_w));
+                let mut widths = Vec::with_capacity(n);
+
+                for (i, img) in current_batch.iter().enumerate() {
+                    let w = target_widths[i];
+                    widths.push(w as i32);
+                    let ink_crop = prepare_linenet_rec_crop(img, rec_h, w)?;
+                    for y in 0..rec_h {
+                        for x in 0..w {
+                            batch_tensor[[i, 0, y, x]] = ink_crop[[y, x]];
+                        }
+                    }
+                }
+
+                let (batch_ids, batch_confs) = self.session.run_linenet_rec(batch_tensor, widths)?;
+                for (local_idx, (tokens, confs)) in batch_ids.into_iter().zip(batch_confs.into_iter()).enumerate() {
+                    let actual_idx = beg + local_idx;
+                    let mut chars = Vec::new();
+                    let mut scores = Vec::new();
+                    for (token_id, conf) in tokens.into_iter().zip(confs.into_iter()) {
+                        let idx = token_id as usize;
+                        if idx > 0 && idx < self.decoder.chars.len() {
+                            chars.push(self.decoder.chars[idx].clone());
+                            scores.push(conf);
+                        }
+                    }
+                    let text = chars.concat();
+                    let score = if scores.is_empty() {
+                        0.0
+                    } else {
+                        scores.iter().sum::<f32>() / scores.len() as f32
+                    };
+                    all_texts[actual_idx] = (text, score);
+                }
+
+                beg = end;
+            }
+
+            let (txts, scores): (Vec<String>, Vec<f32>) = all_texts.into_iter().unzip();
+            let elapse = start.elapsed().as_secs_f64();
+            return Ok(TextRecOutput {
+                imgs: img_list,
+                txts,
+                scores,
+                word_infos: all_word_infos,
+                elapse,
+            });
+        }
 
         let mut width_list = Vec::with_capacity(img_list.len());
         for img in &img_list {
@@ -603,4 +683,87 @@ fn has_chinese_char(text: &str) -> bool {
         }
     }
     false
+}
+
+fn prepare_linenet_rec_crop(
+    img: &Mat,
+    target_h: usize,
+    target_w: usize,
+) -> Result<ndarray::Array2<f32>, EngineError> {
+    let mut out = ndarray::Array2::<f32>::zeros((target_h, target_w));
+    let orig_w = img.cols() as f32;
+    let orig_h = img.rows() as f32;
+    if orig_w <= 0.0 || orig_h <= 0.0 {
+        return Ok(out);
+    }
+    let scale_w = target_w as f32 / orig_w;
+    let scale_h = target_h as f32 / orig_h;
+
+    #[cfg(feature = "use-opencv")]
+    {
+        for ty in 0..target_h {
+            let sy = ((ty as f32 + 0.5) / scale_h - 0.5).clamp(0.0, orig_h - 1.0);
+            let y0 = sy.floor() as i32;
+            let y1 = (y0 + 1).min(img.rows() - 1);
+            let fy = sy - y0 as f32;
+
+            for tx in 0..target_w {
+                let sx = ((tx as f32 + 0.5) / scale_w - 0.5).clamp(0.0, orig_w - 1.0);
+                let x0 = sx.floor() as i32;
+                let x1 = (x0 + 1).min(img.cols() - 1);
+                let fx = sx - x0 as f32;
+
+                let p00 = img.at_2d::<opencv::core::Vec3b>(y0, x0)?;
+                let p10 = img.at_2d::<opencv::core::Vec3b>(y0, x1)?;
+                let p01 = img.at_2d::<opencv::core::Vec3b>(y1, x0)?;
+                let p11 = img.at_2d::<opencv::core::Vec3b>(y1, x1)?;
+
+                let b = (p00[0] as f32 * (1.0 - fx) + p10[0] as f32 * fx) * (1.0 - fy)
+                    + (p01[0] as f32 * (1.0 - fx) + p11[0] as f32 * fx) * fy;
+                let g = (p00[1] as f32 * (1.0 - fx) + p10[1] as f32 * fx) * (1.0 - fy)
+                    + (p01[1] as f32 * (1.0 - fx) + p11[1] as f32 * fx) * fy;
+                let r = (p00[2] as f32 * (1.0 - fx) + p10[2] as f32 * fx) * (1.0 - fy)
+                    + (p01[2] as f32 * (1.0 - fx) + p11[2] as f32 * fx) * fy;
+
+                let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                let ink = (1.0 - gray / 255.0).clamp(0.0, 1.0);
+                out[[ty, tx]] = ink;
+            }
+        }
+    }
+
+    #[cfg(not(feature = "use-opencv"))]
+    {
+        for ty in 0..target_h {
+            let sy = ((ty as f32 + 0.5) / scale_h - 0.5).clamp(0.0, orig_h - 1.0);
+            let y0 = sy.floor() as u32;
+            let y1 = (y0 + 1).min(img.rows() as u32 - 1);
+            let fy = sy - y0 as f32;
+
+            for tx in 0..target_w {
+                let sx = ((tx as f32 + 0.5) / scale_w - 0.5).clamp(0.0, orig_w - 1.0);
+                let x0 = sx.floor() as u32;
+                let x1 = (x0 + 1).min(img.cols() as u32 - 1);
+                let fx = sx - x0 as f32;
+
+                let p00 = img.get_pixel(x0, y0);
+                let p10 = img.get_pixel(x1, y0);
+                let p01 = img.get_pixel(x0, y1);
+                let p11 = img.get_pixel(x1, y1);
+
+                let r = (p00[0] as f32 * (1.0 - fx) + p10[0] as f32 * fx) * (1.0 - fy)
+                    + (p01[0] as f32 * (1.0 - fx) + p11[0] as f32 * fx) * fy;
+                let g = (p00[1] as f32 * (1.0 - fx) + p10[1] as f32 * fx) * (1.0 - fy)
+                    + (p01[1] as f32 * (1.0 - fx) + p11[1] as f32 * fx) * fy;
+                let b = (p00[2] as f32 * (1.0 - fx) + p10[2] as f32 * fx) * (1.0 - fy)
+                    + (p01[2] as f32 * (1.0 - fx) + p11[2] as f32 * fx) * fy;
+
+                let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                let ink = (1.0 - gray / 255.0).clamp(0.0, 1.0);
+                out[[ty, tx]] = ink;
+            }
+        }
+    }
+
+    Ok(out)
 }

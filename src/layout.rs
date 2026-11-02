@@ -271,6 +271,7 @@ impl LayoutDetector {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn postprocess(
         &self,
         outputs: std::collections::HashMap<String, ndarray::ArrayD<f32>>,
@@ -355,6 +356,7 @@ impl LayoutDetector {
         self.postprocess_picodet(outputs, orig_w, orig_h, new_w, new_h, scale_w, scale_h)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn postprocess_picodet(
         &self,
         outputs: std::collections::HashMap<String, ndarray::ArrayD<f32>>,
@@ -386,7 +388,7 @@ impl LayoutDetector {
             let mut matched_scores: Option<(std::borrow::Cow<'_, [f32]>, usize)> = None;
             let mut matched_boxes: Option<std::borrow::Cow<'_, [f32]>> = None;
 
-            for (_name, tensor) in &outputs {
+            for tensor in outputs.values() {
                 let shape = tensor.shape();
                 let (points, last_dim) = match shape.len() {
                     2 => (shape[0], shape[1]),
@@ -458,7 +460,7 @@ impl LayoutDetector {
 
                 // Softmax DFL for 4 coordinates (left, top, right, bottom)
                 let mut d = [0.0f32; 4];
-                for side in 0..4 {
+                for (side, d_side) in d.iter_mut().enumerate() {
                     let base = p * 32 + side * 8;
                     let mut max_val = f32::NEG_INFINITY;
                     for k in 0..8 {
@@ -469,17 +471,17 @@ impl LayoutDetector {
                     }
                     let mut exp_vals = [0.0f32; 8];
                     let mut sum_exp = 0.0f32;
-                    for k in 0..8 {
+                    for (k, exp_val) in exp_vals.iter_mut().enumerate() {
                         let ev = (data.boxes[base + k] - max_val).exp();
-                        exp_vals[k] = ev;
+                        *exp_val = ev;
                         sum_exp += ev;
                     }
                     let inv_sum = 1.0 / (sum_exp + 1e-9);
                     let mut expected = 0.0f32;
-                    for k in 0..8 {
-                        expected += (k as f32) * (exp_vals[k] * inv_sum);
+                    for (k, &ev) in exp_vals.iter().enumerate() {
+                        expected += (k as f32) * (ev * inv_sum);
                     }
-                    d[side] = expected * s;
+                    *d_side = expected * s;
                 }
 
                 let x1 = cx - d[0];

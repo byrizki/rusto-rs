@@ -164,7 +164,7 @@ impl InferenceSession for MockUnwarpSession {
     fn run(&mut self, _input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
         // Mock UVDoc 2D displacement field mesh [1, 2, 45, 31]
         let shape = IxDyn(&[1, 2, 45, 31]);
-        let total = 1 * 2 * 45 * 31;
+        let total = 2 * 45 * 31;
         let mut grid_data = Vec::with_capacity(total);
         for c in 0..2 {
             for y in 0..45 {

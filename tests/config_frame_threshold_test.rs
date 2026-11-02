@@ -347,3 +347,37 @@ fn test_ppv6_invoice_ocr() {
         text_results.len()
     );
 }
+
+#[test]
+fn test_indraocr_inference() {
+    use rusto::RustO;
+    use std::path::Path;
+
+    let det_path = "models/indra/det.rten";
+    let rec_path = "models/indra/rec.rten";
+    let dict_path = "models/indra/meta.json";
+    let img_path = "models/test_images/idcard.jpg";
+
+    if !Path::new(det_path).exists()
+        || !Path::new(rec_path).exists()
+        || !Path::new(dict_path).exists()
+        || !Path::new(img_path).exists()
+    {
+        return;
+    }
+
+    let config = InitializeConfig::new(det_path, rec_path, dict_path);
+    let mut ocr = RustO::initialize(config).expect("Initialize Indra OCR");
+
+    let DetectTextResult::Structured(text_results) = ocr
+        .detect_text(&ImageSource::Path(img_path.into()), &OcrRunOptions::default())
+        .expect("Run Indra OCR on idcard")
+    else {
+        panic!("default OCR result must be structured")
+    };
+
+    assert!(!text_results.is_empty(), "Should detect text regions with Indra OCR");
+    let joined = text_results.iter().map(|r| r.text.as_str()).collect::<Vec<_>>().join(" ");
+    assert!(joined.contains("UNITED") || joined.contains("PASSPORT") || joined.contains("GREAT BRITAIN"),
+        "Recognized text should contain passport keywords, got: {}", joined);
+}

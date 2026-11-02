@@ -5,20 +5,22 @@ use rusto::{
 
 #[test]
 fn test_postprocess_options_merge_and_validation() {
-    let mut opts = OcrRunOptions::default();
-    opts.postprocess = Some(PostprocessRunOptions {
-        score_mode: Some("slow".into()),
-        box_threshold: Some(0.5),
-        ..Default::default()
-    });
-    opts.detection = Some(DetectionRunOptions {
+    let opts = OcrRunOptions {
         postprocess: Some(PostprocessRunOptions {
-            threshold: Some(0.25),
-            score_mode: Some("fast".into()),
+            score_mode: Some("slow".into()),
+            box_threshold: Some(0.5),
+            ..Default::default()
+        }),
+        detection: Some(DetectionRunOptions {
+            postprocess: Some(PostprocessRunOptions {
+                threshold: Some(0.25),
+                score_mode: Some("fast".into()),
+                ..Default::default()
+            }),
             ..Default::default()
         }),
         ..Default::default()
-    });
+    };
 
     // Valid options must pass validation
     assert!(opts.validate().is_ok());

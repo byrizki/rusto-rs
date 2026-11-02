@@ -109,3 +109,44 @@ func TestDetectExample1Image(t *testing.T) {
 	}
 }
 
+func TestDetectIndraOCRIdCard(t *testing.T) {
+	detPath := "../../models/indra/det.rten"
+	recPath := "../../models/indra/rec.rten"
+	dictPath := "../../models/indra/meta.json"
+	imgPath := "../../models/test_images/idcard.jpg"
+
+	if _, err := os.Stat(detPath); os.IsNotExist(err) {
+		t.Skip("Indra model files not found, skipping real OCR test")
+	}
+
+	config := fmt.Sprintf(`{
+		"detection": {"model_path": "%s"},
+		"recognition": {"model_path": "%s", "dict_path": "%s"}
+	}`, detPath, recPath, dictPath)
+
+	engine, err := New(config)
+	if err != nil {
+		t.Fatalf("Failed to initialize engine with Indra OCR: %v", err)
+	}
+	defer engine.Close()
+
+	results, err := engine.DetectTextFile(imgPath, "{}")
+	if err != nil {
+		t.Fatalf("DetectTextFile with Indra OCR failed: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatalf("Expected non-empty text results on idcard.jpg")
+	}
+
+	foundPassport := false
+	for _, res := range results {
+		if strings.Contains(res.Text, "PASSPORT") || strings.Contains(res.Text, "UNITED") || strings.Contains(res.Text, "BRITAIN") {
+			foundPassport = true
+			break
+		}
+	}
+	if !foundPassport {
+		t.Fatalf("Expected detected text to include passport keywords, got %v", results)
+	}
+}
+

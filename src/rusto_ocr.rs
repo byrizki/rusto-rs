@@ -839,6 +839,7 @@ impl RustO {
         map_boxes_to_original(&mut boxes, &op_record, working_h, working_w);
 
         // Step 4: Crop text regions from high-resolution working image (preserves character fidelity)
+        let is_linenet = self.rec.is_linenet();
         let (pad_x, pad_y) = if let Some(opt) = &global.optimization {
             if opt.enabled.unwrap_or(true) {
                 (opt.crop_padding_x.unwrap_or(0.0), opt.crop_padding_y.unwrap_or(0.0))
@@ -851,7 +852,52 @@ impl RustO {
 
         let mut crop_imgs: Vec<Mat> = Vec::with_capacity(boxes.len());
         for b in &boxes {
-            let crop_box = if pad_x > 0.0 || pad_y > 0.0 {
+            let crop_box = if is_linenet {
+                let vx = b[1].x - b[0].x;
+                let vy = b[1].y - b[0].y;
+                let w = vx.hypot(vy);
+
+                let hx = b[3].x - b[0].x;
+                let hy = b[3].y - b[0].y;
+                let h = hx.hypot(hy);
+
+                if w < 1e-4 || h < 1e-4 {
+                    *b
+                } else {
+                    let u_wx = vx / w;
+                    let u_wy = vy / w;
+                    let u_hx = hx / h;
+                    let u_hy = hy / h;
+
+                    let (pad_x_factor, pad_y_factor) = if let Some(opt) = &global.optimization {
+                        (opt.crop_padding_x.unwrap_or(0.3), opt.crop_padding_y.unwrap_or(1.6))
+                    } else {
+                        (0.3, 1.6)
+                    };
+
+                    let dx = h * pad_x_factor;
+                    let dy = h * pad_y_factor;
+
+                    let off_x0 = -dx * u_wx - dy * u_hx;
+                    let off_y0 = -dx * u_wy - dy * u_hy;
+                    let off_x1 = dx * u_wx - dy * u_hx;
+                    let off_y1 = dx * u_wy - dy * u_hy;
+                    let off_x2 = dx * u_wx + dy * u_hx;
+                    let off_y2 = dx * u_wy + dy * u_hy;
+                    let off_x3 = -dx * u_wx + dy * u_hx;
+                    let off_y3 = -dx * u_wy + dy * u_hy;
+
+                    let max_w = working_w as f32;
+                    let max_h = working_h as f32;
+
+                    [
+                        Point2f::new((b[0].x + off_x0).clamp(0.0, max_w), (b[0].y + off_y0).clamp(0.0, max_h)),
+                        Point2f::new((b[1].x + off_x1).clamp(0.0, max_w), (b[1].y + off_y1).clamp(0.0, max_h)),
+                        Point2f::new((b[2].x + off_x2).clamp(0.0, max_w), (b[2].y + off_y2).clamp(0.0, max_h)),
+                        Point2f::new((b[3].x + off_x3).clamp(0.0, max_w), (b[3].y + off_y3).clamp(0.0, max_h)),
+                    ]
+                }
+            } else if pad_x > 0.0 || pad_y > 0.0 {
                 crate::calibration::expand_box_padding(
                     b,
                     pad_x,
