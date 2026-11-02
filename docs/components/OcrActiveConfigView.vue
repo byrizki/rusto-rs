@@ -232,6 +232,12 @@ async function copyJson() {
           </span>
         </div>
         <div class="flex justify-between items-center">
+          <span class="text-neutral-500 dark:text-neutral-400">Recog Batch Size:</span>
+          <span class="font-mono font-medium text-neutral-800 dark:text-neutral-200">
+            {{ displayConfig.rawConfig.recBatchNum ?? 1 }}
+          </span>
+        </div>
+        <div class="flex justify-between items-center">
           <span class="text-neutral-500 dark:text-neutral-400">Orientation Classifier:</span>
           <span class="font-mono font-medium text-neutral-800 dark:text-neutral-200">
             {{ displayConfig.options.classification ? 'Enabled' : 'Disabled' }}

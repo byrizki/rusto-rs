@@ -1,5 +1,5 @@
 import { type ModelSourceConfig, initialize } from '@rustors/web';
-import { type OcrModelOption } from '../types/ocrConfig';
+import { type OcrModelOption } from '../types/ocrModels';
 import { getModelCandidateUrls } from './ocrReleaseModels';
 
 export interface ModelDownloadProgress {
@@ -14,31 +14,6 @@ export interface LoadedModelAssets extends ModelSourceConfig {
   dictionary: string;
   [key: string]: string | Uint8Array | ArrayBuffer | undefined;
 }
-
-// Re-export result and UI helpers
-export {
-  processOcrOutput,
-  formatResultsCsv,
-  formatActiveConfigJson,
-  buildActiveConfigJson,
-  buildActiveRunConfig,
-  isRunConfigModified,
-  getImageDimensions,
-} from './ocrResultFormatter';
-
-// Re-export release asset helpers
-export {
-  DEFAULT_MODELS_TAG,
-  GITHUB_RELEASE_BASE,
-  GITHUB_API_BASE,
-  JSDELIVR_CDN_BASE,
-  MODEL_RELEASE_ASSETS,
-  type ModelAssetFiles,
-  type ReleaseAssetInfo,
-  getModelCandidateUrls,
-  getModelCdnUrls,
-  fetchGitHubReleaseModelIndex,
-} from './ocrReleaseModels';
 
 /* oxlint-disable eslint(no-await-in-loop) */
 /* eslint-disable no-await-in-loop */

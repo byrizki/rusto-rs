@@ -5,26 +5,34 @@ import { detectText, isInitialized, type TextResult } from '@rustors/web';
 import {
   availableModels,
   defaultModel,
-  defaultProgressState,
-  getSampleImages,
-  buildDetectTextOptions,
-  ocrProfilePresets,
+  modelCategories,
   type OcrModelOption,
+} from '../../types/ocrModels';
+import { ocrProfilePresets } from '../../types/ocrPresets';
+import { getSampleImages } from '../../types/ocrSamples';
+import {
+  defaultProgressState,
+  buildDetectTextOptions,
   type ActiveRunConfig,
   type ProgressState,
   type ProgressStep,
 } from '../../types/ocrConfig';
 import { useWebOcrSettings } from '../../composables/useWebOcrSettings';
+import { loadAndInitModel } from '../../utils/ocrModelLoader';
 import {
-  loadAndInitModel,
+  fetchHuggingFaceModelIndex,
+  getModelCandidateUrls,
+  HUGGINGFACE_REPO,
+  HUGGINGFACE_BASE,
+} from '../../utils/ocrReleaseModels';
+import {
   formatResultsCsv,
   buildActiveConfigJson,
   buildActiveRunConfig,
   processOcrOutput,
   isRunConfigModified,
   getImageDimensions,
-  fetchGitHubReleaseModelIndex,
-} from '../../utils/ocrModelLoader';
+} from '../../utils/ocrResultFormatter';
 import OcrActiveConfigView from '../OcrActiveConfigView.vue';
 import OcrLoadingOverlay from '../OcrLoadingOverlay.vue';
 
@@ -45,40 +53,28 @@ const {
 } = useWebOcrSettings();
 
 const progress = ref<ProgressState>({ ...defaultProgressState });
-
-// Reactive state
 const selectedModel = ref<string>('indraocr');
 const activeLoadedModel = ref<string | null>(null);
 const currentModel = computed<OcrModelOption>(
   () => availableModels.find((m) => m.id === selectedModel.value) ?? defaultModel
 );
-
 const selectedSample = ref<string>('invoice');
 const imageSrc = ref<string>(defaultSample.url);
 const status = ref<'idle' | 'initializing' | 'ready' | 'error'>('idle');
 const statusMessage = ref<string>('Indra OCR selected (click Run OCR to load)');
 const isScanning = ref<boolean>(false);
 const durationMs = ref<number | null>(null);
-
-// Configuration state
 const outputMode = ref<'lines' | 'words'>('lines');
 const activeTab = ref<'structured' | 'spatial' | 'csv' | 'json' | 'config'>('structured');
 const copied = ref<boolean>(false);
-
-// Active OCR Run state
 const activeRunConfig = ref<ActiveRunConfig | null>(null);
-
 const isConfigModifiedSinceRun = computed(() =>
   isRunConfigModified(activeRunConfig.value, selectedModel.value, outputMode.value, ocrConfig.value)
 );
-
-// Results state
 const results = ref<TextResult[]>([]);
 const spatialText = ref<string>('');
 const hoveredIndex = ref<number | null>(null);
 const ocrError = ref<string | null>(null);
-
-// Image scaling state
 const imgRef = ref<HTMLImageElement | null>(null);
 const imgDims = ref({ naturalW: 1, naturalH: 1, renderW: 1, renderH: 1 });
 const scaleX = computed(() => imgDims.value.renderW / imgDims.value.naturalW || 1);
@@ -148,6 +144,8 @@ async function initEngine(
 // Switch active OCR model without downloading immediately
 function switchModel(modelId: string) {
   selectedModel.value = modelId;
+  const modelMeta = availableModels.find((m) => m.id === modelId) ?? defaultModel;
+  ocrConfig.value.recBatchNum = modelMeta.recommendedBatchSize;
   resetResults();
   const isLoaded = activeLoadedModel.value === modelId;
   status.value = isLoaded ? 'ready' : 'idle';
@@ -295,7 +293,7 @@ const activeConfigJson = computed(() =>
 onMounted(() => {
   status.value = 'idle';
   statusMessage.value = `${currentModel.value.name} selected (click Run OCR to load)`;
-  fetchGitHubReleaseModelIndex().catch(() => {});
+  fetchHuggingFaceModelIndex().catch(() => {});
 });
 </script>
 
@@ -335,7 +333,7 @@ onMounted(() => {
 
         <span class="text-neutral-300 dark:text-neutral-700 hidden sm:inline">|</span>
 
-        <!-- Consolidated Model Picker Select -->
+        <!-- Consolidated Model Picker Select with Category Optgroups -->
         <div class="inline-flex items-center gap-2">
           <label
             for="ocr-model-select"
@@ -351,9 +349,15 @@ onMounted(() => {
               @change="switchModel(selectedModel)"
               class="appearance-none pl-2.5 pr-7 py-1 text-xs font-semibold rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed shadow-xs transition-all enabled:cursor-pointer"
             >
-              <option v-for="model in availableModels" :key="model.id" :value="model.id">
-                {{ model.name }} ({{ model.size }})
-              </option>
+              <optgroup v-for="cat in modelCategories" :key="cat.id" :label="cat.name">
+                <option
+                  v-for="model in availableModels.filter((m) => m.category === cat.id)"
+                  :key="model.id"
+                  :value="model.id"
+                >
+                  {{ model.name }} ({{ model.size }})
+                </option>
+              </optgroup>
             </select>
             <div
               class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-neutral-400"
@@ -374,6 +378,24 @@ onMounted(() => {
           >
             {{ currentModel.trait }}
           </span>
+
+          <!-- Hugging Face Source Link Pill -->
+          <a
+            :href="`https://huggingface.co/${HUGGINGFACE_REPO}/tree/main`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hidden md:inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-300 hover:opacity-80 transition-opacity"
+            title="Model weights hosted on Hugging Face Hub (byrizki/rten-models)"
+          >
+            <span>HF Hub</span>
+            <svg class="w-3 h-3 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fill-rule="evenodd"
+                d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h4a.75.75 0 0 1 0 1.5h-4Zm6.75-2a.75.75 0 0 1 .75-.75h5.5c.414 0 .75.336.75.75v5.5a.75.75 0 0 1-1.5 0V4.56l-6.72 6.72a.75.75 0 1 1-1.06-1.06l6.72-6.72h-4.44a.75.75 0 0 1-.75-.75Z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </a>
         </div>
       </div>
 
@@ -413,7 +435,7 @@ onMounted(() => {
           <!-- Floating Popover Modal -->
           <div
             v-if="isConfigOpen"
-            class="absolute right-0 top-full mt-2 w-84 sm:w-105 max-h-[85vh] flex flex-col rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-50 text-xs overflow-hidden"
+            class="absolute right-0 top-full mt-2 w-84 sm:w-115 max-h-[85vh] flex flex-col rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-50 text-xs overflow-hidden"
           >
             <!-- Popover Header -->
             <div
@@ -475,12 +497,12 @@ onMounted(() => {
               class="px-3.5 pt-2.5 pb-1 border-b border-neutral-100 dark:border-neutral-800 shrink-0"
             >
               <div
-                class="flex items-center gap-1 p-1 bg-neutral-100 dark:bg-neutral-800/80 rounded-lg"
+                class="flex items-center gap-1 p-1 bg-neutral-100 dark:bg-neutral-800/80 rounded-lg overflow-x-auto"
               >
                 <button
                   type="button"
                   @click="configTab = 'detection'"
-                  class="flex-1 py-1 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center"
+                  class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
                   :class="
                     configTab === 'detection'
                       ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
@@ -492,19 +514,19 @@ onMounted(() => {
                 <button
                   type="button"
                   @click="configTab = 'layout'"
-                  class="flex-1 py-1 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center"
+                  class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
                   :class="
                     configTab === 'layout'
                       ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
                       : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200'
                   "
                 >
-                  Layout
+                  Recognition
                 </button>
                 <button
                   type="button"
                   @click="configTab = 'resizing'"
-                  class="flex-1 py-1 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center"
+                  class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
                   :class="
                     configTab === 'resizing'
                       ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
@@ -516,7 +538,7 @@ onMounted(() => {
                 <button
                   type="button"
                   @click="configTab = 'preprocess'"
-                  class="flex-1 py-1 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center"
+                  class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
                   :class="
                     configTab === 'preprocess'
                       ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
@@ -524,6 +546,18 @@ onMounted(() => {
                   "
                 >
                   Preprocess
+                </button>
+                <button
+                  type="button"
+                  @click="configTab = 'models'"
+                  class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
+                  :class="
+                    configTab === 'models'
+                      ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
+                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200'
+                  "
+                >
+                  HF Models
                 </button>
               </div>
             </div>
@@ -674,12 +708,60 @@ onMounted(() => {
                     >
                   </label>
                 </div>
+
+                <!-- Quick Side Presets -->
+                <div
+                  class="flex items-center gap-1.5 pt-1.5 border-t border-neutral-100 dark:border-neutral-800"
+                >
+                  <span class="text-[10px] text-neutral-400">Quick limit:</span>
+                  <button
+                    v-for="side in [640, 960, 1280, 1920]"
+                    :key="side"
+                    type="button"
+                    @click="ocrConfig.detectionLimitSideLen = side"
+                    class="px-1.5 py-0.5 text-[10px] rounded border transition-colors cursor-pointer"
+                    :class="
+                      ocrConfig.detectionLimitSideLen === side
+                        ? 'bg-primary text-white border-primary font-semibold'
+                        : 'border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:border-neutral-400'
+                    "
+                  >
+                    {{ side }}px
+                  </button>
+                </div>
               </template>
 
-              <!-- Tab 2: Layout & Pipeline Stages -->
+              <!-- Tab 2: Layout & Recognition Pipeline -->
               <template v-else-if="configTab === 'layout'">
-                <!-- lineYThreshold -->
+                <!-- Recognition Batch Size -->
                 <div class="space-y-1">
+                  <div class="flex justify-between items-center">
+                    <label class="font-medium text-neutral-700 dark:text-neutral-300">
+                      Recognition Batch Size (rec_batch_num)
+                    </label>
+                    <span class="font-mono text-[11px] text-primary font-semibold">
+                      {{ ocrConfig.recBatchNum }}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="16"
+                    step="1"
+                    v-model.number="ocrConfig.recBatchNum"
+                    class="w-full accent-primary cursor-pointer"
+                  />
+                  <p class="text-[10px] text-neutral-400">
+                    {{
+                      currentModel.preset === 'indra'
+                        ? 'Indra Linenet: default batch size 1 eliminates padding overhead and gives ~28.5% faster recognition.'
+                        : 'PP-OCR: recommended batch size 4–6 balances vectorization and memory.'
+                    }}
+                  </p>
+                </div>
+
+                <!-- lineYThreshold -->
+                <div class="space-y-1 pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
                   <div class="flex justify-between items-center">
                     <label class="font-medium text-neutral-700 dark:text-neutral-300">
                       Row Center Tolerance (lineYThreshold)
@@ -934,6 +1016,101 @@ onMounted(() => {
                           v-model.number="ocrConfig.cropPaddingX"
                           class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
                         />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Tab 5: Model Weights & Hugging Face Hub -->
+              <template v-else-if="configTab === 'models'">
+                <div class="space-y-3">
+                  <!-- Selected Model Details Card -->
+                  <div
+                    class="p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 space-y-1.5"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="font-semibold text-neutral-900 dark:text-neutral-100 text-xs">
+                        {{ currentModel.name }}
+                      </span>
+                      <span
+                        class="text-[10px] font-mono px-2 py-0.5 rounded bg-primary/10 text-primary font-semibold"
+                      >
+                        {{ currentModel.size }}
+                      </span>
+                    </div>
+                    <p class="text-[11px] text-neutral-500 dark:text-neutral-400">
+                      {{ currentModel.description }}
+                    </p>
+                    <div class="flex items-center gap-2 pt-1 text-[10px]">
+                      <span class="text-neutral-400">Architecture:</span>
+                      <code
+                        class="px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 font-mono"
+                        >{{ currentModel.preset }}</code
+                      >
+                      <span class="text-neutral-400">Rec Batch:</span>
+                      <code
+                        class="px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 font-mono"
+                        >{{ currentModel.recommendedBatchSize }}</code
+                      >
+                    </div>
+                  </div>
+
+                  <!-- Hugging Face Hub Info & Links -->
+                  <div
+                    class="p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 space-y-2"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span
+                        class="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300"
+                      >
+                        Hugging Face Hub Repository
+                      </span>
+                      <a
+                        :href="`https://huggingface.co/${HUGGINGFACE_REPO}`"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-[10px] text-primary hover:underline font-mono inline-flex items-center gap-1"
+                      >
+                        <span>{{ HUGGINGFACE_REPO }}</span>
+                        <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                          <path
+                            fill-rule="evenodd"
+                            d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h4a.75.75 0 0 1 0 1.5h-4Zm6.75-2a.75.75 0 0 1 .75-.75h5.5c.414 0 .75.336.75.75v5.5a.75.75 0 0 1-1.5 0V4.56l-6.72 6.72a.75.75 0 1 1-1.06-1.06l6.72-6.72h-4.44a.75.75 0 0 1-.75-.75Z"
+                            clip-rule="evenodd"
+                          />
+                        </svg>
+                      </a>
+                    </div>
+                    <div
+                      class="text-[10px] font-mono space-y-1.5 text-neutral-600 dark:text-neutral-400"
+                    >
+                      <div>
+                        <span
+                          class="text-neutral-400 block text-[9px] uppercase tracking-wider font-semibold"
+                          >Detection Weight URL</span
+                        >
+                        <span class="break-all select-all text-neutral-800 dark:text-neutral-200">{{
+                          getModelCandidateUrls(selectedModel, baseURL).detection[0]
+                        }}</span>
+                      </div>
+                      <div>
+                        <span
+                          class="text-neutral-400 block text-[9px] uppercase tracking-wider font-semibold"
+                          >Recognition Weight URL</span
+                        >
+                        <span class="break-all select-all text-neutral-800 dark:text-neutral-200">{{
+                          getModelCandidateUrls(selectedModel, baseURL).recognition[0]
+                        }}</span>
+                      </div>
+                      <div>
+                        <span
+                          class="text-neutral-400 block text-[9px] uppercase tracking-wider font-semibold"
+                          >Vocabulary / Dictionary URL</span
+                        >
+                        <span class="break-all select-all text-neutral-800 dark:text-neutral-200">{{
+                          getModelCandidateUrls(selectedModel, baseURL).dictionary[0]
+                        }}</span>
                       </div>
                     </div>
                   </div>

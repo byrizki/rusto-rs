@@ -1,125 +1,5 @@
 import type { DetectTextOptions, ModelPreset, OutputGranularity } from '@rustors/web';
 
-export interface OcrModelOption {
-  id: string;
-  name: string;
-  preset: ModelPreset;
-  size: string;
-  trait: string;
-}
-
-export const availableModels: OcrModelOption[] = [
-  {
-    id: 'indraocr',
-    name: 'Indra OCR',
-    preset: 'indra',
-    size: '~5.5 MB',
-    trait: 'Flagship Default (DataLab)',
-  },
-  {
-    id: 'ppocrv6-tiny',
-    name: 'PP-OCRv6 Tiny',
-    preset: 'ppv6',
-    size: '~6 MB',
-    trait: 'Ultra-lightweight',
-  },
-  {
-    id: 'ppocrv6-tiny-int8',
-    name: 'PP-OCRv6 Tiny (INT8)',
-    preset: 'ppv6',
-    size: '~3.4 MB',
-    trait: 'Ultra-lightweight INT8',
-  },
-  {
-    id: 'ppocrv6-small',
-    name: 'PP-OCRv6 Small',
-    preset: 'ppv6',
-    size: '~30 MB',
-    trait: 'Balanced speed & quality',
-  },
-  {
-    id: 'ppocrv6-small-int8',
-    name: 'PP-OCRv6 Small (INT8)',
-    preset: 'ppv6',
-    size: '~16 MB',
-    trait: 'Balanced INT8',
-  },
-  {
-    id: 'ppocrv6-medium',
-    name: 'PP-OCRv6 Medium',
-    preset: 'ppv6',
-    size: '~138 MB',
-    trait: 'Highest accuracy',
-  },
-  {
-    id: 'ppocrv6-medium-int8',
-    name: 'PP-OCRv6 Medium (INT8)',
-    preset: 'ppv6',
-    size: '~76 MB',
-    trait: 'Highest accuracy INT8',
-  },
-  {
-    id: 'ppocrv5-mobile',
-    name: 'PP-OCRv5 Mobile',
-    preset: 'ppv5',
-    size: '~12 MB',
-    trait: 'Multi-lingual',
-  },
-  {
-    id: 'ppocrv5-server',
-    name: 'PP-OCRv5 Server',
-    preset: 'ppv5',
-    size: '~166 MB',
-    trait: 'Server high accuracy',
-  },
-  {
-    id: 'ppocrv4-mobile',
-    name: 'PP-OCRv4 Mobile',
-    preset: 'ppv4',
-    size: '~16 MB',
-    trait: 'Fast & compact',
-  },
-  {
-    id: 'ppocrv4-server',
-    name: 'PP-OCRv4 Server',
-    preset: 'ppv4',
-    size: '~196 MB',
-    trait: 'Server high accuracy',
-  },
-];
-
-export const defaultModel: OcrModelOption = availableModels[0] as OcrModelOption;
-
-export interface SampleImage {
-  id: string;
-  name: string;
-  description: string;
-  url: string;
-}
-
-export function getSampleImages(baseURL: string): SampleImage[] {
-  return [
-    {
-      id: 'invoice',
-      name: 'Invoice',
-      description: 'Structured layout with numbers & tables',
-      url: `${baseURL}samples/example1.png`,
-    },
-    {
-      id: 'idcard',
-      name: 'Passport',
-      description: 'Identity document with personal details & MRZ',
-      url: `${baseURL}samples/idcard.jpg`,
-    },
-    {
-      id: 'handwritten',
-      name: 'Handwritten',
-      description: 'Vintage cursive handwriting receipt',
-      url: `${baseURL}samples/invoice1.jpg`,
-    },
-  ];
-}
-
 export interface ProgressStep {
   current: number;
   total: number;
@@ -148,6 +28,8 @@ export interface OcrConfig {
   // Layout & line grouping
   lineYThreshold: number;
   wordXThreshold: number;
+  // Recognition batching
+  recBatchNum: number;
   // Stages
   classification: boolean;
   orientation: boolean;
@@ -181,6 +63,7 @@ export const defaultOcrConfig: OcrConfig = {
   textScore: 0.5,
   lineYThreshold: 0.5,
   wordXThreshold: 0.4,
+  recBatchNum: 1,
   classification: false,
   orientation: false,
   enableResize: false,
@@ -203,8 +86,6 @@ export const defaultOcrConfig: OcrConfig = {
   cropPaddingX: 0,
   cropPaddingY: 0.02,
 };
-
-export { type OcrProfilePreset, ocrProfilePresets } from './ocrPresets';
 
 export interface ActiveRunConfig {
   modelId: string;

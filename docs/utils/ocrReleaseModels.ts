@@ -1,174 +1,112 @@
-export interface ModelAssetFiles {
-  detection: string;
-  recognition: string;
-  dictionary: string;
-}
+import { MODEL_RELEASE_ASSETS } from './models/ocrModelAssets';
 
-export interface ReleaseAssetInfo {
+export { type ModelAssetFiles, MODEL_RELEASE_ASSETS } from './models/ocrModelAssets';
+
+export interface HfModelAssetInfo {
+  path: string;
   name: string;
   size: number;
-  browser_download_url: string;
+  type: 'file' | 'directory';
+  downloadUrl: string;
 }
 
-export const DEFAULT_MODELS_TAG = 'models-rten-v0.4.0';
 export const HUGGINGFACE_REPO = 'byrizki/rten-models';
 export const HUGGINGFACE_BASE = 'https://huggingface.co/byrizki/rten-models/resolve/main';
-export const GITHUB_RELEASE_BASE = 'https://github.com/byrizki/rusto-rs/releases/download';
-export const GITHUB_API_BASE = 'https://api.github.com/repos/byrizki/rusto-rs';
+export const HUGGINGFACE_API_BASE = 'https://huggingface.co/api/models/byrizki/rten-models';
 export const JSDELIVR_CDN_BASE = 'https://cdn.jsdelivr.net/npm';
 
-export const MODEL_RELEASE_ASSETS: Record<string, ModelAssetFiles> = {
-  indraocr: {
-    detection: 'indra_det.rten',
-    recognition: 'indra_rec.rten',
-    dictionary: 'indra_meta.json',
-  },
-  'ppocrv6-tiny': {
-    detection: 'ppocrv6_tiny_det.rten',
-    recognition: 'ppocrv6_tiny_rec.rten',
-    dictionary: 'ppocrv6_dict.txt',
-  },
-  'ppocrv6-tiny-int8': {
-    detection: 'ppocrv6_tiny_int8_det.rten',
-    recognition: 'ppocrv6_tiny_int8_rec.rten',
-    dictionary: 'ppocrv6_dict.txt',
-  },
-  'ppocrv6-small': {
-    detection: 'ppocrv6_small_det.rten',
-    recognition: 'ppocrv6_small_rec.rten',
-    dictionary: 'ppocrv6_dict.txt',
-  },
-  'ppocrv6-small-int8': {
-    detection: 'ppocrv6_small_int8_det.rten',
-    recognition: 'ppocrv6_small_int8_rec.rten',
-    dictionary: 'ppocrv6_dict.txt',
-  },
-  'ppocrv6-medium': {
-    detection: 'ppocrv6_medium_det.rten',
-    recognition: 'ppocrv6_medium_rec.rten',
-    dictionary: 'ppocrv6_dict.txt',
-  },
-  'ppocrv6-medium-int8': {
-    detection: 'ppocrv6_medium_int8_det.rten',
-    recognition: 'ppocrv6_medium_int8_rec.rten',
-    dictionary: 'ppocrv6_dict.txt',
-  },
-  'ppocrv5-mobile': {
-    detection: 'ppocrv5_mobile_det.rten',
-    recognition: 'ppocrv5_mobile_rec.rten',
-    dictionary: 'ppocrv5_dict.txt',
-  },
-  'ppocrv5-server': {
-    detection: 'ppocrv5_server_det.rten',
-    recognition: 'ppocrv5_server_rec.rten',
-    dictionary: 'ppocrv5_dict.txt',
-  },
-  'ppocrv4-mobile': {
-    detection: 'ppocrv4_mobile_det.rten',
-    recognition: 'ppocrv4_mobile_rec.rten',
-    dictionary: 'ppocrv4_dict.txt',
-  },
-  'ppocrv4-server': {
-    detection: 'ppocrv4_server_det.rten',
-    recognition: 'ppocrv4_server_rec.rten',
-    dictionary: 'ppocrv4_dict.txt',
-  },
-};
+function dedupeStrings(items: (string | undefined)[]): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (item && !seen.has(item)) {
+      seen.add(item);
+      result.push(item);
+    }
+  }
+  return result;
+}
 
 export function getModelCandidateUrls(
   modelId: string,
-  baseURL: string = '/',
-  tag: string = DEFAULT_MODELS_TAG
+  baseURL: string = '/'
 ): {
   detection: string[];
   recognition: string[];
   dictionary: string[];
 } {
-  const asset = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['indraocr']!;
+  const assetItem = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['indraocr']!;
   const cleanBase = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
-  const isIndra = modelId === 'indraocr' || modelId === 'indra';
-  const dictFile = isIndra ? 'meta.json' : 'dict.txt';
+  const isIndra = modelId.startsWith('indra');
+  const defaultDict = isIndra ? 'meta.json' : 'dict.txt';
 
   return {
-    detection: [
+    detection: dedupeStrings([
+      `${HUGGINGFACE_BASE}/${assetItem.detection}`,
       `${HUGGINGFACE_BASE}/${modelId}/det.rten`,
-      `${HUGGINGFACE_BASE}/${modelId}/${asset.detection}`,
+      `${cleanBase}/models/${assetItem.detection}`,
       `${cleanBase}/models/${modelId}/det.rten`,
-      `${cleanBase}/models/${asset.detection}`,
-      `${GITHUB_RELEASE_BASE}/${tag}/${asset.detection}`,
-    ],
-    recognition: [
+      assetItem.legacyDetection ? `${cleanBase}/models/${assetItem.legacyDetection}` : undefined,
+    ]),
+    recognition: dedupeStrings([
+      `${HUGGINGFACE_BASE}/${assetItem.recognition}`,
       `${HUGGINGFACE_BASE}/${modelId}/rec.rten`,
-      `${HUGGINGFACE_BASE}/${modelId}/${asset.recognition}`,
+      `${cleanBase}/models/${assetItem.recognition}`,
       `${cleanBase}/models/${modelId}/rec.rten`,
-      `${cleanBase}/models/${asset.recognition}`,
-      `${GITHUB_RELEASE_BASE}/${tag}/${asset.recognition}`,
-    ],
-    dictionary: [
-      `${HUGGINGFACE_BASE}/${modelId}/${dictFile}`,
-      `${HUGGINGFACE_BASE}/${modelId}/${asset.dictionary}`,
-      `${cleanBase}/models/${modelId}/${dictFile}`,
-      `${cleanBase}/models/${asset.dictionary}`,
-      `${GITHUB_RELEASE_BASE}/${tag}/${asset.dictionary}`,
-    ],
+      assetItem.legacyRecognition
+        ? `${cleanBase}/models/${assetItem.legacyRecognition}`
+        : undefined,
+    ]),
+    dictionary: dedupeStrings([
+      `${HUGGINGFACE_BASE}/${assetItem.dictionary}`,
+      `${HUGGINGFACE_BASE}/${modelId}/${defaultDict}`,
+      `${cleanBase}/models/${assetItem.dictionary}`,
+      `${cleanBase}/models/${modelId}/${defaultDict}`,
+      assetItem.legacyDictionary ? `${cleanBase}/models/${assetItem.legacyDictionary}` : undefined,
+    ]),
   };
 }
 
-export function getModelCdnUrls(
-  modelId: string,
-  _tag: string = DEFAULT_MODELS_TAG
-): {
+export function getModelCdnUrls(modelId: string): {
   detection: string;
   recognition: string;
   dictionary: string;
 } {
-  const isIndra = modelId === 'indraocr' || modelId === 'indra';
-  const dictFile = isIndra ? 'meta.json' : 'dict.txt';
+  const assetItem = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['indraocr']!;
   return {
-    detection: `${HUGGINGFACE_BASE}/${modelId}/det.rten`,
-    recognition: `${HUGGINGFACE_BASE}/${modelId}/rec.rten`,
-    dictionary: `${HUGGINGFACE_BASE}/${modelId}/${dictFile}`,
+    detection: `${HUGGINGFACE_BASE}/${assetItem.detection}`,
+    recognition: `${HUGGINGFACE_BASE}/${assetItem.recognition}`,
+    dictionary: `${HUGGINGFACE_BASE}/${assetItem.dictionary}`,
   };
 }
 
-export async function fetchGitHubReleaseModelIndex(
-  tag: string = DEFAULT_MODELS_TAG
-): Promise<ReleaseAssetInfo[]> {
+let cachedHfIndex: HfModelAssetInfo[] | null = null;
+
+export async function fetchHuggingFaceModelIndex(
+  repo: string = HUGGINGFACE_REPO
+): Promise<HfModelAssetInfo[]> {
+  if (cachedHfIndex && cachedHfIndex.length > 0) {
+    return cachedHfIndex;
+  }
   try {
-    const res = await fetch(`${GITHUB_API_BASE}/releases/tags/${tag}`);
+    const res = await fetch(`https://huggingface.co/api/models/${repo}/tree/main?recursive=true`);
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data.assets) && data.assets.length > 0) {
-        return data.assets.map(
-          (a: { name: string; size: number; browser_download_url: string }) => ({
-            name: a.name,
-            size: a.size,
-            browser_download_url: a.browser_download_url,
-          })
-        );
+      if (Array.isArray(data)) {
+        cachedHfIndex = data
+          .filter((item: { type: string; path: string }) => item.type === 'file')
+          .map((item: { path: string; size: number }) => ({
+            path: item.path,
+            name: item.path.split('/').pop() || item.path,
+            size: item.size || 0,
+            type: 'file' as const,
+            downloadUrl: `${HUGGINGFACE_BASE}/${item.path}`,
+          }));
+        return cachedHfIndex;
       }
     }
-
-    // Fallback: if tag is unreleased (404), query recent releases for published models
-    const releasesRes = await fetch(`${GITHUB_API_BASE}/releases?per_page=10`);
-    if (releasesRes.ok) {
-      const releases = await releasesRes.json();
-      const modelRelease = releases.find(
-        (r: { tag_name: string; assets: unknown[] }) =>
-          r.tag_name?.startsWith('models-rten-v') && Array.isArray(r.assets) && r.assets.length > 0
-      );
-      if (modelRelease && Array.isArray(modelRelease.assets)) {
-        return modelRelease.assets.map(
-          (a: { name: string; size: number; browser_download_url: string }) => ({
-            name: a.name,
-            size: a.size,
-            browser_download_url: a.browser_download_url,
-          })
-        );
-      }
-    }
-  } catch {
-    // Non-blocking fallback
+  } catch (err) {
+    console.warn('Hugging Face model repository index query non-blocking fallback:', err);
   }
   return [];
 }

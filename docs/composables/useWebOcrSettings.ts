@@ -1,10 +1,11 @@
 import { ref } from 'vue';
-import { defaultOcrConfig, type OcrConfig, type OcrProfilePreset } from '../types/ocrConfig';
+import { defaultOcrConfig, type OcrConfig } from '../types/ocrConfig';
+import type { OcrProfilePreset } from '../types/ocrPresets';
 
 export function useWebOcrSettings() {
   const ocrConfig = ref<OcrConfig>({ ...defaultOcrConfig });
   const isConfigOpen = ref<boolean>(false);
-  const configTab = ref<'detection' | 'layout' | 'resizing' | 'preprocess'>('detection');
+  const configTab = ref<'detection' | 'layout' | 'resizing' | 'preprocess' | 'models'>('detection');
 
   function toggleConfigPopover() {
     isConfigOpen.value = !isConfigOpen.value;

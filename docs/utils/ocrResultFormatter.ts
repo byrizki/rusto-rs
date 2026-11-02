@@ -4,12 +4,8 @@ import {
   formatSpatialText,
   groupCandidatesIntoLines,
 } from '@rustors/web';
-import {
-  type OcrModelOption,
-  type ActiveRunConfig,
-  type OcrConfig,
-  buildDetectTextOptions,
-} from '../types/ocrConfig';
+import type { OcrModelOption } from '../types/ocrModels';
+import { type ActiveRunConfig, type OcrConfig, buildDetectTextOptions } from '../types/ocrConfig';
 
 export function processOcrOutput(
   output: TextResult[] | string,

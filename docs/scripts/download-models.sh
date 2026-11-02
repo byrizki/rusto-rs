@@ -6,9 +6,7 @@ DOCS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$DOCS_DIR/.." && pwd)"
 TARGET_DIR="${1:-$DOCS_DIR/public/models}"
 
-MODELS_TAG="${MODELS_TAG:-models-rten-v0.4.0}"
 HF_BASE="${HF_BASE:-https://huggingface.co/byrizki/rten-models/resolve/main}"
-RELEASE_BASE="https://github.com/byrizki/rusto-rs/releases/download/$MODELS_TAG"
 
 mkdir -p "$TARGET_DIR"
 
@@ -49,11 +47,7 @@ download_file() {
   if curl -sSLf "$HF_BASE/$model/$release_file" -o "$target" 2>/dev/null; then
     return 0
   fi
-  echo "  ⬇️ Falling back to GitHub Release ($release_file)..."
-  if curl -sSLf "$RELEASE_BASE/$release_file" -o "$target" 2>/dev/null; then
-    return 0
-  fi
-  echo "  ⚠️ Model download failed for $release_file"
+  echo "  ⚠️ Model download failed from Hugging Face for $model/$file_name ($release_file)"
 }
 
 for model in "${!MODEL_FILES[@]}"; do
