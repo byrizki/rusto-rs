@@ -333,12 +333,24 @@ pub struct UnwarpedImageResult {
     pub height: u32,
 }
 
-/// Engine initialization configuration specifying model paths and template preset.
+/// Engine initialization configuration specifying model paths, preset, and optional extensions.
 #[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InitializeConfig {
-    /// Template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
+    /// Model identifier or directory (e.g. "ppocrv6-tiny", "indraocr", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
+    pub model: Option<String>,
+    /// Base model directory containing det, rec, and dict files.
+    pub model_path: Option<String>,
+    /// Legacy template preset identifier (e.g. "ppv6", "ppv5", "ppv4", "ppv3").
     pub template: Option<String>,
+    /// Language code or name (e.g. "ja", "ko", "ar", "cyrillic", "devanagari", "latin").
+    pub lang: Option<String>,
+    /// Custom cache directory override path.
+    pub cache_dir: Option<String>,
+    /// Enable neural reading order recovery transformer.
+    pub enable_reading_order: Option<bool>,
+    /// Document layout variant: "cdla" (default 10-class) or "publaynet" (5-class).
+    pub layout_variant: Option<String>,
     /// Detection model configuration.
     pub detection: Option<DetectionConfig>,
     /// Recognition model and dictionary configuration.
@@ -512,6 +524,52 @@ pub fn create_initialize_config_ppv6(
         }),
         ..Default::default()
     }
+}
+
+#[uniffi::export]
+pub fn create_initialize_config_for_model(
+    model: Option<String>,
+    lang: Option<String>,
+    model_path: Option<String>,
+) -> InitializeConfig {
+    InitializeConfig {
+        model,
+        lang,
+        model_path,
+        ..Default::default()
+    }
+}
+
+/// Downloads model assets for a specific OCR pipeline ahead of time.
+#[uniffi::export]
+pub fn download_model(
+    model: Option<String>,
+    lang: Option<String>,
+    cache_dir: Option<String>,
+) -> Result<Vec<String>, RustoBindingError> {
+    let cache_path = crate::model_manager::get_cache_dir(cache_dir.as_deref().map(std::path::Path::new));
+    let downloaded = crate::model_manager::download_model_pipeline(
+        model.as_deref(),
+        lang.as_deref(),
+        false,
+        false,
+        false,
+        None,
+        false,
+        &cache_path,
+    ).map_err(|e| RustoBindingError::Initialization { msg: e.to_string() })?;
+    Ok(downloaded.into_iter().map(|p| p.to_string_lossy().to_string()).collect())
+}
+
+/// Downloads all available canonical models to the cache directory ahead of time.
+#[uniffi::export]
+pub fn download_all_models(
+    cache_dir: Option<String>,
+) -> Result<Vec<String>, RustoBindingError> {
+    let cache_path = crate::model_manager::get_cache_dir(cache_dir.as_deref().map(std::path::Path::new));
+    let downloaded = crate::model_manager::download_all_models(&cache_path)
+        .map_err(|e| RustoBindingError::Initialization { msg: e.to_string() })?;
+    Ok(downloaded.into_iter().map(|p| p.to_string_lossy().to_string()).collect())
 }
 
 #[uniffi::export]
@@ -744,5 +802,15 @@ mod tests {
         );
         assert_eq!(config.template.as_deref(), Some("ppv6"));
         assert_eq!(rusto_version(), env!("CARGO_PKG_VERSION"));
+
+        let model_cfg = create_initialize_config_for_model(
+            None,
+            None,
+            Some("models/PPOCR_v6_tiny".to_string()),
+        );
+        let converted_init = convert_init_config(&model_cfg).expect("convert_init_config should succeed");
+        assert_eq!(converted_init.det.model_path, std::path::PathBuf::from("models/PPOCR_v6_tiny/det.rten"));
+        assert_eq!(converted_init.rec.model_path, std::path::PathBuf::from("models/PPOCR_v6_tiny/rec.rten"));
+        assert_eq!(converted_init.rec.rec_keys_path, Some(std::path::PathBuf::from("models/PPOCR_v6_tiny/dict.txt")));
     }
 }

@@ -18,6 +18,7 @@ WITH_CLS=false
 WITH_ORIENT=false
 WITH_UNWARP=false
 WITH_LAYOUT=false
+WITH_INDRA=false
 
 # Parse optional arguments
 while [[ "$#" -gt 0 ]]; do
@@ -29,6 +30,7 @@ while [[ "$#" -gt 0 ]]; do
         --with-orient) WITH_ORIENT=true ;;
         --with-unwarp) WITH_UNWARP=true ;;
         --with-layout) WITH_LAYOUT=true ;;
+        --with-indra|--indra) WITH_INDRA=true ;;
         --model) MODEL_TYPE="$2"; shift ;;
         --tier) TIER="$2"; shift ;;
         --lang) LANG="$2"; shift ;;
@@ -295,22 +297,35 @@ download_layout_publaynet() {
     download_file_to "$dir" "layout_publaynet.onnx" "https://www.modelscope.cn/models/RapidAI/RapidLayout/resolve/v1.2.0/onnx/pp_layout/layout_publaynet.onnx"
 }
 
-download_layout_s() {
-    download_layout_cdla "$@"
-}
-
-download_layout_l() {
-    download_layout_publaynet "$@"
-}
-
 download_layout() {
     local dir="$1"
     local variant="${2:-cdla}"
-    if [ "$variant" = "publaynet" ] || [ "$variant" = "l" ]; then
+    if [ "$variant" = "publaynet" ]; then
         download_layout_publaynet "$dir"
     else
         download_layout_cdla "$dir"
     fi
+}
+
+download_indra() {
+    local dir="$1"
+    echo "=== Downloading Indra OCR Models (Hugging Face) ==="
+    local base_url="https://huggingface.co/datalab-to/indra-ocr/resolve/main"
+    mkdir -p "$dir"
+    download_file_to "$dir" "det.onnx" "$base_url/det.onnx"
+    download_file_to "$dir" "rec.onnx" "$base_url/rec.onnx"
+    download_file_to "$dir" "orient.onnx" "$base_url/orient.onnx"
+    download_file_to "$dir" "order.onnx" "$base_url/order.onnx"
+    download_file_to "$dir" "meta.json" "$base_url/meta.json"
+    download_file_to "$dir" "rec_cjk.onnx" "$base_url/rec_cjk.onnx"
+    download_file_to "$dir" "rec_rtl.onnx" "$base_url/rec_rtl.onnx"
+    download_file_to "$dir" "rec_world.onnx" "$base_url/rec_world.onnx"
+    download_file_to "$dir" "script.onnx" "$base_url/script.onnx"
+    download_file_to "$dir" "mathcls.onnx" "$base_url/mathcls.onnx"
+    download_file_to "$dir" "math_enc.onnx" "$base_url/math_enc.onnx"
+    download_file_to "$dir" "math_dec_init.onnx" "$base_url/math_dec_init.onnx"
+    download_file_to "$dir" "math_dec_step.onnx" "$base_url/math_dec_step.onnx"
+    download_file_to "$dir" "math_meta.json" "$base_url/math_meta.json"
 }
 
 V5_LANGS=("arabic" "cyrillic" "devanagari" "el" "eslav" "korean" "latin" "ta" "te" "th")
@@ -354,6 +369,7 @@ if [ "$DOWNLOAD_ALL" = true ]; then
     start_model_group download_unwarp   "${OUTPUT_DIR:-$REPO_ROOT/models}"
     start_model_group download_layout_cdla       "${OUTPUT_DIR:-$REPO_ROOT/models}"
     start_model_group download_layout_publaynet  "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    start_model_group download_indra             "${OUTPUT_DIR:-$REPO_ROOT/models/indra}"
 
     if ! wait_jobs "${tier_pids[@]}"; then
         tier_failed=1
@@ -386,6 +402,10 @@ else
                 download_ppocrv4 "$TIER" "$TARGET_DIR"
             fi
             ;;
+        indra)
+            TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/indra}"
+            download_indra "$TARGET_DIR"
+            ;;
         *)
             echo "Unknown model type: $MODEL_TYPE"
             exit 1
@@ -406,6 +426,9 @@ else
         download_layout_cdla "$TARGET_DIR"
         download_layout_publaynet "$TARGET_DIR"
     fi
+    if [ "$WITH_INDRA" = true ]; then
+        download_indra "${OUTPUT_DIR:-$REPO_ROOT/models/indra}"
+    fi
 fi
 
 echo ""
@@ -416,6 +439,8 @@ if [ "$CONVERT_RTEN" = true ]; then
     RTEN_CONVERT=""
     if command -v rten-convert &>/dev/null; then
         RTEN_CONVERT="rten-convert"
+    elif [ -f "$REPO_ROOT/benchmarks/omnidocbench/.venv/bin/rten-convert" ]; then
+        RTEN_CONVERT="$REPO_ROOT/benchmarks/omnidocbench/.venv/bin/rten-convert"
     elif [ -f "/tmp/rten-env/bin/rten-convert" ]; then
         RTEN_CONVERT="/tmp/rten-env/bin/rten-convert"
     elif [ -f "$HOME/.local/bin/rten-convert" ]; then

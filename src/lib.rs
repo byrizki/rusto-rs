@@ -42,6 +42,7 @@ pub mod engine;
 pub mod geometry;
 pub mod image_impl;
 pub mod layout;
+pub mod model_manager;
 pub mod orient;
 pub mod postprocess;
 pub mod preprocess;

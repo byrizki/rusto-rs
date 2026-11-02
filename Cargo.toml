@@ -45,6 +45,10 @@ opencv = { version = "0.97.2", optional = true }
 rten = { version = "0.27.0", features = ["onnx_format", "rten_format"] }
 rten-tensor = "0.27.0"
 
+# Model auto-download and caching
+ureq = { version = "2.10", default-features = false, features = ["tls"] }
+dirs = "5.0"
+
 # UniFFI bindings
 uniffi = { version = "0.31.0", default-features = false, optional = true }
 cbindgen = { version = "0.28", default-features = false, optional = true }
