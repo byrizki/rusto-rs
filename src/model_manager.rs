@@ -191,10 +191,10 @@ fn find_local_repo_candidates(asset_filename: &str) -> Vec<PathBuf> {
         candidates.push(PathBuf::from("models/PPOCR_v4/dict.txt"));
     } else if let Some(sub) = asset_filename.strip_prefix("indra_") {
         let base = sub.strip_suffix(".rten").unwrap_or(sub);
+        candidates.push(PathBuf::from(format!("models/indra/{}", asset_filename)));
         candidates.push(PathBuf::from(format!("models/indra/{}", sub)));
         candidates.push(PathBuf::from(format!("models/indra/{}.rten", base)));
         candidates.push(PathBuf::from(format!("models/indra/{}.onnx", base)));
-        candidates.push(PathBuf::from(format!("models/indra/{}", sub)));
     } else if let Some(sub) = asset_filename.strip_prefix("ppocrv6_tiny_") {
         let base = sub.strip_suffix(".rten").unwrap_or(sub);
         candidates.push(PathBuf::from(format!("models/PPOCR_v6_tiny/{}", sub)));
@@ -273,7 +273,7 @@ pub fn find_in_model_dir(dir: &Path, kind: &str) -> Option<PathBuf> {
         "orient" => &["orient.rten", "orient.onnx", "orientation.rten", "orientation.onnx"],
         "unwarp" => &["uvdoc.rten", "uvdoc.onnx", "unwarp.rten", "unwarp.onnx"],
         "layout" => &["layout_cdla.rten", "layout_publaynet.rten", "layout.rten", "layout.onnx"],
-        "order" => &["order.rten", "order.onnx", "reading_order.rten", "reading_order.onnx"],
+        "order" => &["indra_order.rten", "indra_order.onnx", "order.rten", "order.onnx", "reading_order.rten", "reading_order.onnx"],
         _ => &[],
     };
 
@@ -330,7 +330,7 @@ fn resolve_default_model_dir_asset(dir: &Path, kind: &str, filename: &str) -> Pa
         "orient" => "orient.rten",
         "unwarp" => "uvdoc.rten",
         "layout" => "layout_cdla.rten",
-        "order" => "order.rten",
+        "order" => "indra_order.rten",
         _ => filename,
     };
     dir.join(default_name)
