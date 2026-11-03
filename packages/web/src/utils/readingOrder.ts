@@ -145,3 +145,4 @@ export function orderWithTransformer(
   const order = decodeOrderFromLogits(out.data, candidates.length);
   return order.map((idx) => candidates[idx]!);
 }
+

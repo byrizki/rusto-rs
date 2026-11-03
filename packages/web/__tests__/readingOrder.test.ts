@@ -59,3 +59,4 @@ describe('readingOrder tests', () => {
     expect(order).toEqual([0, 2, 1]);
   });
 });
+

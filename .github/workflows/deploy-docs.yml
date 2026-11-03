@@ -21,76 +21,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  check-prerequisites:
-    name: Check @rustors/web availability
-    runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
-    outputs:
-      has_rusto_web: ${{ steps.check.outputs.has_rusto_web }}
-      release_tag: ${{ steps.check.outputs.release_tag }}
-      artifact_run_id: ${{ steps.check.outputs.artifact_run_id }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check if @rustors/web is available
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # 1. Check if WASM bindings exist locally in repo workspace
-          if [ -f "packages/web/src/wasm/rusto_rten_wasm.js" ]; then
-            echo "Found local WASM bindings in packages/web/src/wasm."
-            echo "has_rusto_web=true" >> $GITHUB_OUTPUT
-            echo "release_tag=local" >> $GITHUB_OUTPUT
-            echo "artifact_run_id=" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          VERSION=$(grep -m1 '^version\s*=' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
-          TARGET_TAG="v${VERSION}"
-          echo "Checking GitHub Releases for target tag: ${TARGET_TAG}..."
-
-          FOUND_TAG=""
-          # Check exact target tag release matching the current version
-          if gh release view "$TARGET_TAG" --json assets -q '.assets[].name' 2>/dev/null | grep -q -E '(rustors|rusto)-(web|wasm)'; then
-            FOUND_TAG="$TARGET_TAG"
-          fi
-
-          if [ -n "$FOUND_TAG" ]; then
-            echo "Found prebuilt @rustors/web/wasm in GitHub release: ${FOUND_TAG}"
-            echo "has_rusto_web=true" >> $GITHUB_OUTPUT
-            echo "release_tag=${FOUND_TAG}" >> $GITHUB_OUTPUT
-            echo "artifact_run_id=" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # 3. Check triggering workflow run or latest successful Build & Release run
-          echo "Checking GitHub Actions workflow runs for rusto-wasm-package artifact..."
-          CANDIDATE_RUN_ID="${{ github.event.workflow_run.id }}"
-          if [ -z "$CANDIDATE_RUN_ID" ] || [ "$CANDIDATE_RUN_ID" = "null" ]; then
-            CANDIDATE_RUN_ID=$(gh run list --workflow "Build & Release" --status success --limit 1 --json databaseId -q '.[0].databaseId' 2>/dev/null || true)
-          fi
-
-          if [ -n "$CANDIDATE_RUN_ID" ] && [ "$CANDIDATE_RUN_ID" != "null" ]; then
-            if gh run view "$CANDIDATE_RUN_ID" --json artifacts -q '.artifacts[].name' 2>/dev/null | grep -q 'rusto-wasm-package'; then
-              echo "Found prebuilt rusto-wasm-package in workflow run: ${CANDIDATE_RUN_ID}"
-              echo "has_rusto_web=true" >> $GITHUB_OUTPUT
-              echo "release_tag=run" >> $GITHUB_OUTPUT
-              echo "artifact_run_id=${CANDIDATE_RUN_ID}" >> $GITHUB_OUTPUT
-              exit 0
-            fi
-          fi
-
-          # 4. Fallback: Build WASM on-the-fly during doc build
-          echo "Prebuilt WASM artifact not found in releases or CI runs. Fallback to on-the-fly wasm build."
-          echo "has_rusto_web=true" >> $GITHUB_OUTPUT
-          echo "release_tag=build" >> $GITHUB_OUTPUT
-          echo "artifact_run_id=" >> $GITHUB_OUTPUT
-
   build:
     name: Build Documentation
-    needs: check-prerequisites
-    if: needs.check-prerequisites.outputs.has_rusto_web == 'true'
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     defaults:
       run:
         working-directory: docs
@@ -98,11 +32,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Rust (if building WASM)
-        if: needs.check-prerequisites.outputs.release_tag == 'build'
+      - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -115,62 +51,20 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Fetch WASM runtime
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ needs.check-prerequisites.outputs.release_tag }}
-          ARTIFACT_RUN_ID: ${{ needs.check-prerequisites.outputs.artifact_run_id }}
+      - name: Build WASM runtime from source
         run: |
-          mkdir -p /tmp/wasm-assets
           mkdir -p ../packages/web/src/wasm
           mkdir -p public/wasm
-          # Populate OCR models for live demo
-          bash scripts/download-models.sh
-
-          # Populate WASM bindings
-          if [ "$RELEASE_TAG" = "build" ]; then
-            echo "Building rten-wasm with wasm-pack on runner..."
-            curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-            (cd .. && wasm-pack build crates/rten-wasm --target web --out-dir "$PWD/packages/web/src/wasm")
-          elif [ "$RELEASE_TAG" = "run" ] && [ -n "$ARTIFACT_RUN_ID" ]; then
-            echo "Downloading prebuilt WASM from workflow run ${ARTIFACT_RUN_ID}..."
-            gh run download "$ARTIFACT_RUN_ID" -n rusto-wasm-package --dir /tmp/wasm-assets || true
-            if [ -f /tmp/wasm-assets/rusto-wasm.tar.gz ]; then
-              tar -xzf /tmp/wasm-assets/rusto-wasm.tar.gz -C ../packages/web/src/wasm
-            elif [ -f /tmp/wasm-assets/rusto-wasm.tgz ]; then
-              tar -xzf /tmp/wasm-assets/rusto-wasm.tgz -C ../packages/web/src/wasm
-            fi
-          elif [ "$RELEASE_TAG" != "local" ] && [ -n "$RELEASE_TAG" ]; then
-            echo "Downloading prebuilt WASM from release ${RELEASE_TAG}..."
-            gh release download "$RELEASE_TAG" --pattern 'rusto-wasm.*' --pattern 'rustors-web-*.tgz' --dir /tmp/wasm-assets || true
-
-            if [ -f /tmp/wasm-assets/rusto-wasm.tar.gz ]; then
-              echo "Extracting rusto-wasm.tar.gz..."
-              tar -xzf /tmp/wasm-assets/rusto-wasm.tar.gz -C ../packages/web/src/wasm
-            elif [ -f /tmp/wasm-assets/rusto-wasm.tgz ]; then
-              echo "Extracting rusto-wasm.tgz..."
-              tar -xzf /tmp/wasm-assets/rusto-wasm.tgz -C ../packages/web/src/wasm
-            elif ls /tmp/wasm-assets/rust*web-*.tgz 1>/dev/null 2>&1; then
-              echo "Extracting from @rustors/web npm package tarball..."
-              tar -xzf /tmp/wasm-assets/rust*web-*.tgz -C /tmp/wasm-assets
-              if [ -d /tmp/wasm-assets/package/src/wasm ]; then
-                cp -r /tmp/wasm-assets/package/src/wasm/* ../packages/web/src/wasm/
-              fi
-            fi
-          fi
-
-          # Copy wasm runtime binary to public/wasm for live demo client asset serving
-          if [ -f ../packages/web/src/wasm/rusto_rten_wasm_bg.wasm ]; then
-            cp ../packages/web/src/wasm/rusto_rten_wasm_bg.wasm public/wasm/
-          fi
-
-          if [ ! -f ../packages/web/src/wasm/rusto_rten_wasm.js ]; then
-            echo "::error::rusto_rten_wasm.js was not found in packages/web/src/wasm! Build cannot proceed."
-            exit 1
-          fi
-
-          echo "WebAssembly bindings configured:"
+          echo "Compiling crates/rten-wasm with wasm-pack from source..."
+          (cd .. && wasm-pack build crates/rten-wasm --target web --out-dir "$PWD/packages/web/src/wasm")
+          rm -f ../packages/web/src/wasm/.gitignore
+          cp -f ../packages/web/src/wasm/rusto_rten_wasm_bg.wasm public/wasm/
+          echo "WASM runtime successfully compiled and deployed to public/wasm:"
+          ls -la public/wasm/
           ls -la ../packages/web/src/wasm/
+
+      - name: Populate sample assets & models
+        run: bash scripts/download-models.sh
 
       - name: Build with Nuxt
         run: NUXT_APP_BASE_URL=/rusto-rs/ yarn build

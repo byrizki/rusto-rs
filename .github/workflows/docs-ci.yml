@@ -7,6 +7,7 @@ on:
     paths:
       - 'docs/**'
       - 'packages/web/**'
+      - 'crates/rten-wasm/**'
       - '.github/workflows/docs-ci.yml'
       - '.github/workflows/deploy-docs.yml'
   pull_request:
@@ -15,6 +16,7 @@ on:
     paths:
       - 'docs/**'
       - 'packages/web/**'
+      - 'crates/rten-wasm/**'
       - '.github/workflows/docs-ci.yml'
       - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
@@ -37,6 +39,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -51,9 +61,7 @@ jobs:
       - name: Lint documentation
         run: yarn lint
 
-      - name: Prepare WASM runtime
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prepare WASM runtime from source
         run: bash scripts/prepare-wasm.sh
 
       - name: Build documentation
