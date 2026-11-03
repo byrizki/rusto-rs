@@ -96,29 +96,20 @@ export function sortCandidatesReadingOrder(
     return a.frame.left - b.frame.left;
   });
 
-  // Partition into vertical sections bounded by full-width spanning headlines (>65% page width)
+  // Partition into vertical sections bounded by full-width spanning headlines (>55% page width)
   const sections: TextResult[][] = [];
   let currentSection: TextResult[] = [];
-  let sectionMaxY = -Infinity;
 
   for (const item of sorted) {
-    const isSpanning = item.frame.width > 0.65 * pw;
-
-    if (currentSection.length === 0) {
-      sectionMaxY = item.frame.top + item.frame.height;
-      currentSection.push(item);
-    } else {
-      const prev = currentSection[currentSection.length - 1]!;
-      const prevWasSpanning = prev.frame.width > 0.65 * pw;
-
-      if (isSpanning || prevWasSpanning || item.frame.top >= sectionMaxY) {
+    const isSpanning = item.frame.width > 0.55 * pw;
+    if (isSpanning) {
+      if (currentSection.length > 0) {
         sections.push(currentSection);
-        sectionMaxY = item.frame.top + item.frame.height;
-        currentSection = [item];
-      } else {
-        sectionMaxY = Math.max(sectionMaxY, item.frame.top + item.frame.height);
-        currentSection.push(item);
+        currentSection = [];
       }
+      sections.push([item]);
+    } else {
+      currentSection.push(item);
     }
   }
   if (currentSection.length > 0) {
@@ -161,6 +152,32 @@ export function sortCandidatesReadingOrder(
         columns[bestCol]!.push(item);
       } else {
         columns.push([item]);
+      }
+    }
+
+    // Merge columns that significantly overlap horizontally (>35% of either width)
+    let merged = true;
+    while (merged) {
+      merged = false;
+      for (let i = 0; i < columns.length; i++) {
+        for (let j = i + 1; j < columns.length; j++) {
+          const colA = columns[i]!;
+          const colB = columns[j]!;
+          const aX1 = Math.min(...colA.map((r) => r.frame.left));
+          const aX2 = Math.max(...colA.map((r) => r.frame.left + r.frame.width));
+          const bX1 = Math.min(...colB.map((r) => r.frame.left));
+          const bX2 = Math.max(...colB.map((r) => r.frame.left + r.frame.width));
+          const aW = Math.max(1, aX2 - aX1);
+          const bW = Math.max(1, bX2 - bX1);
+          const overlap = Math.max(0, Math.min(aX2, bX2) - Math.max(aX1, bX1));
+          if (overlap / Math.min(aW, bW) > 0.35) {
+            colA.push(...colB);
+            columns.splice(j, 1);
+            merged = true;
+            break;
+          }
+        }
+        if (merged) break;
       }
     }
 

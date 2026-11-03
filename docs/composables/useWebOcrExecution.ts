@@ -181,11 +181,14 @@ function applyProcessedPipelineOutput(
   ctx: PipelineContext
 ) {
   state.durationMs.value = res.durationMs;
+  const isReadingOrderActive =
+    ctx.ocrConfig.value.enableReadingOrder ||
+    (ctx.ocrConfig.value.layoutModel !== undefined && ctx.ocrConfig.value.layoutModel !== 'none');
   const processed = processOcrOutput(
     res.output,
     ctx.ocrConfig.value.lineYThreshold,
     ctx.ocrConfig.value.wordXThreshold,
-    ctx.ocrConfig.value.enableReadingOrder
+    isReadingOrderActive
   );
   state.results.value = processed.results;
   state.spatialText.value = processed.spatialText;

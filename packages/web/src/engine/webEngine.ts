@@ -200,7 +200,8 @@ export class WebOcrEngine {
     const filteredCandidates = rawCandidates.filter((item) => item.score >= minScore);
 
     const enableReadingOrder =
-      options.enableReadingOrder ?? this.currentConfig.enableReadingOrder ?? false;
+      Boolean(options.enableReadingOrder ?? this.currentConfig.enableReadingOrder) ||
+      (options.layoutModel !== undefined && options.layoutModel !== 'none');
 
     // Group into rows based on vertical center tolerance or multi-column reading order
     let groupedLines: TextResult[][];

@@ -8,6 +8,8 @@ const OPTION_KEYS = [
   'output',
   'lineYThreshold',
   'wordXThreshold',
+  'enableReadingOrder',
+  'layoutModel',
   'textScore',
   'classification',
   'orientation',
@@ -184,11 +186,18 @@ export function normalizeOptions(options: DetectTextOptions | undefined): Detect
     throw new TypeError('DetectTextOptions.textScore must be a finite number from 0 to 1.');
   }
 
-  for (const key of ['classification', 'orientation'] as const) {
+  for (const key of ['classification', 'orientation', 'enableReadingOrder'] as const) {
     const value = options[key];
     if (value !== undefined && typeof value !== 'boolean') {
       throw new TypeError(`DetectTextOptions.${key} must be a boolean.`);
     }
+  }
+
+  if (
+    options.layoutModel !== undefined &&
+    (typeof options.layoutModel !== 'string' || options.layoutModel.trim().length === 0)
+  ) {
+    throw new TypeError('DetectTextOptions.layoutModel must be a non-empty string.');
   }
 
   for (const key of ['minHeight', 'maxSideLen', 'minSideLen'] as const) {

@@ -104,17 +104,33 @@ export interface ActiveRunConfig {
   rawConfig: OcrConfig;
 }
 
+function applyResizeOptions(opts: DetectTextOptions, config: OcrConfig): void {
+  if (!config.enableResize) return;
+  if (config.minHeight > 0) opts.minHeight = config.minHeight;
+  if (config.maxSideLen > 0) opts.maxSideLen = config.maxSideLen;
+  if (config.minSideLen > 0 && config.minSideLen <= (config.maxSideLen || Infinity)) {
+    opts.minSideLen = config.minSideLen;
+  }
+  if (config.widthHeightRatio > 0 || config.widthHeightRatio === -1) {
+    opts.widthHeightRatio = config.widthHeightRatio;
+  }
+}
+
 export function buildDetectTextOptions(
   config: OcrConfig,
   outputMode: OutputGranularity
 ): DetectTextOptions {
   const isSpatial = outputMode === 'spatial';
+  const isReadingOrderActive =
+    config.enableReadingOrder ||
+    (config.layoutModel !== undefined && config.layoutModel !== 'none');
   const opts: DetectTextOptions = {
     output: (isSpatial ? 'lines' : outputMode) as OutputGranularity,
     textScore: config.textScore,
     lineYThreshold: config.lineYThreshold,
     wordXThreshold: config.wordXThreshold,
-    enableReadingOrder: config.enableReadingOrder,
+    enableReadingOrder: isReadingOrderActive,
+    layoutModel: config.layoutModel,
     classification: config.classification,
     orientation: config.orientation,
     detection: {
@@ -141,16 +157,6 @@ export function buildDetectTextOptions(
     },
   };
 
-  if (config.enableResize) {
-    if (config.minHeight > 0) opts.minHeight = config.minHeight;
-    if (config.maxSideLen > 0) opts.maxSideLen = config.maxSideLen;
-    if (config.minSideLen > 0 && config.minSideLen <= (config.maxSideLen || Infinity)) {
-      opts.minSideLen = config.minSideLen;
-    }
-    if (config.widthHeightRatio > 0 || config.widthHeightRatio === -1) {
-      opts.widthHeightRatio = config.widthHeightRatio;
-    }
-  }
-
+  applyResizeOptions(opts, config);
   return opts;
 }

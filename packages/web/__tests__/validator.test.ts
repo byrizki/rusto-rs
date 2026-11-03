@@ -82,5 +82,20 @@ describe('validator tests', () => {
       })
     ).not.toThrow();
   });
+
+  test('normalizeOptions accepts enableReadingOrder and layoutModel', () => {
+    expect(() =>
+      normalizeOptions({
+        enableReadingOrder: true,
+        layoutModel: 'indra',
+      })
+    ).not.toThrow();
+    expect(() => normalizeOptions({ enableReadingOrder: 'true' as any })).toThrow(
+      'DetectTextOptions.enableReadingOrder must be a boolean.'
+    );
+    expect(() => normalizeOptions({ layoutModel: 123 as any })).toThrow(
+      'DetectTextOptions.layoutModel must be a non-empty string.'
+    );
+  });
 });
 
