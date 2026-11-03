@@ -232,6 +232,12 @@ async function copyJson() {
           </span>
         </div>
         <div class="flex justify-between items-center">
+          <span class="text-neutral-500 dark:text-neutral-400">Layout Model:</span>
+          <span class="font-mono font-medium capitalize text-neutral-800 dark:text-neutral-200">
+            {{ displayConfig.rawConfig.layoutModel ?? 'heuristic' }}
+          </span>
+        </div>
+        <div class="flex justify-between items-center">
           <span class="text-neutral-500 dark:text-neutral-400">Reading Order:</span>
           <span
             class="font-mono font-medium"

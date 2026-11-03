@@ -1,4 +1,5 @@
 import type { DetectTextOptions, ModelPreset, OutputGranularity } from '@rustors/web';
+import type { LayoutModelId } from './ocrModels';
 
 export interface ProgressStep {
   current: number;
@@ -29,6 +30,7 @@ export interface OcrConfig {
   lineYThreshold: number;
   wordXThreshold: number;
   enableReadingOrder: boolean;
+  layoutModel: LayoutModelId;
   // Recognition batching
   recBatchNum: number;
   // Stages
@@ -65,6 +67,7 @@ export const defaultOcrConfig: OcrConfig = {
   lineYThreshold: 0.5,
   wordXThreshold: 0.4,
   enableReadingOrder: false,
+  layoutModel: 'heuristic',
   recBatchNum: 1,
   classification: false,
   orientation: false,

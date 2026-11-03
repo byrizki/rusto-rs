@@ -1,24 +1,18 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRuntimeConfig } from '#app';
-import { detectText, isInitialized, type TextResult } from '@rustors/web';
 import {
   availableModels,
+  availableLayoutModels,
   defaultModel,
   modelCategories,
   type OcrModelOption,
+  type LayoutModelOption,
 } from '../../types/ocrModels';
 import { ocrProfilePresets } from '../../types/ocrPresets';
 import { getSampleImages } from '../../types/ocrSamples';
-import {
-  defaultProgressState,
-  buildDetectTextOptions,
-  type ActiveRunConfig,
-  type ProgressState,
-  type ProgressStep,
-} from '../../types/ocrConfig';
 import { useWebOcrSettings } from '../../composables/useWebOcrSettings';
-import { loadAndInitModel } from '../../utils/ocrModelLoader';
+import { useWebOcrExecution } from '../../composables/useWebOcrExecution';
 import {
   fetchHuggingFaceModelIndex,
   getModelCandidateUrls,
@@ -28,8 +22,6 @@ import {
 import {
   formatResultsCsv,
   buildActiveConfigJson,
-  buildActiveRunConfig,
-  processOcrOutput,
   isRunConfigModified,
   getImageDimensions,
 } from '../../utils/ocrResultFormatter';
@@ -52,208 +44,75 @@ const {
   isPresetActive,
 } = useWebOcrSettings();
 
-const progress = ref<ProgressState>({ ...defaultProgressState });
 const selectedModel = ref<string>('indraocr');
-const activeLoadedModel = ref<string | null>(null);
 const currentModel = computed<OcrModelOption>(
   () => availableModels.find((m) => m.id === selectedModel.value) ?? defaultModel
 );
+const selectedLayoutModelMeta = computed<LayoutModelOption>(() => {
+  return (
+    availableLayoutModels.find((m) => m.id === ocrConfig.value.layoutModel) ||
+    availableLayoutModels[0]!
+  );
+});
+
+function onLayoutModelChange() {
+  if (ocrConfig.value.layoutModel === 'none') {
+    ocrConfig.value.enableReadingOrder = false;
+  } else {
+    ocrConfig.value.enableReadingOrder = true;
+  }
+}
+
 const selectedSample = ref<string>('invoice');
 const imageSrc = ref<string>(defaultSample.url);
-const status = ref<'idle' | 'initializing' | 'ready' | 'error'>('idle');
-const statusMessage = ref<string>('Indra OCR selected (click Run OCR to load)');
-const isScanning = ref<boolean>(false);
-const durationMs = ref<number | null>(null);
 const outputMode = ref<'lines' | 'words'>('lines');
 const activeTab = ref<'structured' | 'spatial' | 'csv' | 'json' | 'config'>('structured');
 const copied = ref<boolean>(false);
-const activeRunConfig = ref<ActiveRunConfig | null>(null);
+
+const {
+  status,
+  statusMessage,
+  isScanning,
+  progress,
+  durationMs,
+  results,
+  spatialText,
+  activeRunConfig,
+  ocrError,
+  hoveredIndex,
+  initEngine,
+  switchModel,
+  resetResults,
+  runOcr,
+} = useWebOcrExecution({
+  baseURL,
+  imageSrc,
+  ocrConfig,
+  selectedModel,
+  currentModel,
+  outputMode,
+});
+
 const isConfigModifiedSinceRun = computed(() =>
   isRunConfigModified(activeRunConfig.value, selectedModel.value, outputMode.value, ocrConfig.value)
 );
-const results = ref<TextResult[]>([]);
-const spatialText = ref<string>('');
-const hoveredIndex = ref<number | null>(null);
-const ocrError = ref<string | null>(null);
+
 const imgRef = ref<HTMLImageElement | null>(null);
 const imgDims = ref({ naturalW: 1, naturalH: 1, renderW: 1, renderH: 1 });
 const scaleX = computed(() => imgDims.value.renderW / imgDims.value.naturalW || 1);
 const scaleY = computed(() => imgDims.value.renderH / imgDims.value.naturalH || 1);
-
-function setProgress(
-  phase: 'download' | 'init' | 'inference',
-  stageText: string,
-  percent: number,
-  detailText: string,
-  step?: ProgressStep
-) {
-  progress.value = { active: true, phase, stageText, percent, detailText, step };
-}
-
-// Initialize engine with RTen models (no ONNX)
-async function initEngine(
-  modelId = selectedModel.value,
-  opts?: { keepProgress?: boolean; step?: ProgressStep; progressRange?: [number, number] }
-): Promise<boolean> {
-  if (isInitialized() && activeLoadedModel.value === modelId) {
-    status.value = 'ready';
-    return true;
-  }
-  const modelMeta = availableModels.find((m) => m.id === modelId) ?? defaultModel;
-  const isPipeline = opts?.keepProgress ?? false;
-  const step = opts?.step;
-  const range: [number, number] = opts?.progressRange ?? (isPipeline ? [0, 60] : [0, 100]);
-  try {
-    status.value = 'initializing';
-    statusMessage.value = `Loading ${modelMeta.name}...`;
-    setProgress(
-      'download',
-      `Downloading ${modelMeta.name}...`,
-      range[0] + 5,
-      'Connecting...',
-      step
-    );
-
-    await loadAndInitModel(baseURL, modelMeta, range, (p) => {
-      setProgress('download', p.stageText, p.percent, p.detailText, step);
-    });
-
-    setProgress(
-      'init',
-      'Configuring inference engine...',
-      isPipeline ? 70 : 100,
-      'Ready',
-      isPipeline && step ? { current: 2, total: step.total } : undefined
-    );
-    activeLoadedModel.value = modelId;
-    status.value = 'ready';
-    statusMessage.value = 'Engine Ready';
-    return true;
-  } catch (err: unknown) {
-    status.value = 'error';
-    const msg = `Failed to load ${modelMeta.name}: ${err instanceof Error ? err.message : String(err)}`;
-    statusMessage.value = msg;
-    ocrError.value = msg;
-    console.error(`OCR Init Error [${modelMeta.name}]:`, err);
-    return false;
-  } finally {
-    if (!isPipeline) progress.value.active = false;
-  }
-}
-
-// Switch active OCR model without downloading immediately
-function switchModel(modelId: string) {
-  selectedModel.value = modelId;
-  const modelMeta = availableModels.find((m) => m.id === modelId) ?? defaultModel;
-  ocrConfig.value.recBatchNum = modelMeta.recommendedBatchSize;
-  resetResults();
-  const isLoaded = activeLoadedModel.value === modelId;
-  status.value = isLoaded ? 'ready' : 'idle';
-  statusMessage.value = isLoaded
-    ? 'Engine Ready'
-    : `${currentModel.value.name} selected (click Run OCR to load)`;
-}
 
 function setGranularity(mode: 'lines' | 'words') {
   outputMode.value = mode;
   if (results.value.length > 0 || spatialText.value) runOcr();
 }
 
-// Clear results helper
-function resetResults() {
-  results.value = [];
-  spatialText.value = '';
-  durationMs.value = null;
-  hoveredIndex.value = null;
-  activeRunConfig.value = null;
-  ocrError.value = null;
-}
-
-function applyOcrOutput(
-  output: TextResult[] | string,
-  opts: ReturnType<typeof buildDetectTextOptions>
-) {
-  const processed = processOcrOutput(
-    output,
-    ocrConfig.value.lineYThreshold,
-    ocrConfig.value.wordXThreshold,
-    ocrConfig.value.enableReadingOrder
-  );
-  results.value = processed.results;
-  spatialText.value = processed.spatialText;
-  activeRunConfig.value = buildActiveRunConfig(
-    currentModel.value,
-    outputMode.value,
-    durationMs.value,
-    results.value.length,
-    opts,
-    ocrConfig.value
-  );
-}
-
-async function executeInference(step?: ProgressStep) {
-  setProgress(
-    'inference',
-    'Running OCR Inference...',
-    step ? 75 : 25,
-    'Detecting text regions...',
-    step
-  );
-  await new Promise<void>((r) => {
-    setTimeout(r, 20);
-  });
-  const startTime = performance.now();
-  setProgress(
-    'inference',
-    'Running OCR Inference...',
-    step ? 88 : 65,
-    'Decoding characters...',
-    step
-  );
-  const opts = buildDetectTextOptions(ocrConfig.value, outputMode.value);
-  const output = await detectText(imageSrc.value, opts);
-  durationMs.value = Math.round(performance.now() - startTime);
-  setProgress('inference', 'Finalizing OCR Output...', 100, 'Formatting results...', step);
-  applyOcrOutput(output, opts);
-}
-
-// Run OCR detection manually (single unified pipeline with model download if needed)
-async function runOcr() {
-  if (isScanning.value || status.value === 'initializing') return;
-  resetResults();
-  isScanning.value = true;
-  const needsInit = !isInitialized() || activeLoadedModel.value !== selectedModel.value;
-
-  try {
-    if (needsInit) {
-      const ok = await initEngine(selectedModel.value, {
-        keepProgress: true,
-        step: { current: 1, total: 3 },
-        progressRange: [0, 60],
-      });
-      if (!ok) return;
-    }
-    await executeInference(needsInit ? { current: 3, total: 3 } : undefined);
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    ocrError.value = errorMsg;
-    status.value = 'error';
-    statusMessage.value = `OCR Error: ${errorMsg}`;
-    console.error('OCR Detection error:', err);
-  } finally {
-    isScanning.value = false;
-    progress.value.active = false;
-  }
-}
-
-// Handle sample pick without auto-running OCR
 function pickSample(sample: (typeof samples)[0]) {
   resetResults();
   selectedSample.value = sample.id;
   imageSrc.value = sample.url;
 }
 
-// Handle custom file upload without auto-running OCR
 function handleFileUpload(event: Event) {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
@@ -264,12 +123,10 @@ function handleFileUpload(event: Event) {
   imageSrc.value = `${URL.createObjectURL(file)}#${encodeURIComponent(file.name)}`;
 }
 
-// Handle image load event to record natural & displayed dimensions
 function onImageLoad(e: Event) {
   imgDims.value = getImageDimensions(e.target);
 }
 
-// Copy results to clipboard
 async function copyToClipboard(text: string) {
   try {
     await navigator.clipboard.writeText(text);
@@ -436,7 +293,7 @@ onMounted(() => {
           <!-- Floating Popover Modal -->
           <div
             v-if="isConfigOpen"
-            class="absolute right-0 top-full mt-2 w-84 sm:w-115 max-h-[85vh] flex flex-col rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-50 text-xs overflow-hidden"
+            class="absolute right-0 top-full mt-2 w-84 sm:w-[500px] max-h-[85vh] flex flex-col rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-50 text-xs overflow-hidden"
           >
             <!-- Popover Header -->
             <div
@@ -493,701 +350,872 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- Category Tabs -->
-            <div
-              class="px-3.5 pt-2.5 pb-1 border-b border-neutral-100 dark:border-neutral-800 shrink-0"
-            >
+            <!-- Main Content Area: Left Vertical Icon Rail + Right Settings Panel -->
+            <div class="flex flex-1 min-h-0 overflow-hidden">
+              <!-- Left Vertical Icon Rail -->
               <div
-                class="flex items-center gap-1 p-1 bg-neutral-100 dark:bg-neutral-800/80 rounded-lg overflow-x-auto"
+                class="w-12 shrink-0 border-r border-neutral-100 dark:border-neutral-800 p-1.5 flex flex-col gap-1.5 bg-neutral-50/80 dark:bg-neutral-950/40 items-center select-none"
               >
+                <!-- 1. Detection -->
                 <button
                   type="button"
                   @click="configTab = 'detection'"
-                  class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
+                  class="w-9 h-9 flex items-center justify-center rounded-lg transition-all cursor-pointer relative group"
                   :class="
                     configTab === 'detection'
-                      ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
-                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-neutral-800'
                   "
+                  title="Detection & DBNet Thresholds"
                 >
-                  Detection
+                  <svg
+                    class="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+                    <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+                    <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+                    <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
                 </button>
+
+                <!-- 2. Recognition -->
                 <button
                   type="button"
                   @click="configTab = 'recognition'"
-                  class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
+                  class="w-9 h-9 flex items-center justify-center rounded-lg transition-all cursor-pointer relative group"
                   :class="
                     configTab === 'recognition'
-                      ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
-                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-neutral-800'
                   "
+                  title="Recognition & Batch Size"
                 >
-                  Recognition
+                  <svg
+                    class="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="4 7 4 4 20 4 20 7" />
+                    <line x1="9" y1="20" x2="15" y2="20" />
+                    <line x1="12" y1="4" x2="12" y2="20" />
+                  </svg>
                 </button>
+
+                <!-- 3. Reading & Layout -->
                 <button
                   type="button"
                   @click="configTab = 'layout'"
-                  class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
+                  class="w-9 h-9 flex items-center justify-center rounded-lg transition-all cursor-pointer relative group"
                   :class="
                     configTab === 'layout'
-                      ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
-                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-neutral-800'
                   "
+                  title="Reading Order & Layout Model"
                 >
-                  Reading & Layout
+                  <svg
+                    class="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <rect x="3" y="3" width="7" height="18" rx="1" />
+                    <rect x="14" y="3" width="7" height="18" rx="1" />
+                  </svg>
                 </button>
+
+                <!-- 4. Resizing -->
                 <button
                   type="button"
                   @click="configTab = 'resizing'"
-                  class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
+                  class="w-9 h-9 flex items-center justify-center rounded-lg transition-all cursor-pointer relative group"
                   :class="
                     configTab === 'resizing'
-                      ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
-                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-neutral-800'
                   "
+                  title="Image Resizing & Constraints"
                 >
-                  Resizing
+                  <svg
+                    class="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="15 3 21 3 21 9" />
+                    <polyline points="9 21 3 21 3 15" />
+                    <line x1="21" y1="3" x2="14" y2="10" />
+                    <line x1="3" y1="21" x2="10" y2="14" />
+                  </svg>
                 </button>
+
+                <!-- 5. Preprocess -->
                 <button
                   type="button"
                   @click="configTab = 'preprocess'"
-                  class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
+                  class="w-9 h-9 flex items-center justify-center rounded-lg transition-all cursor-pointer relative group"
                   :class="
                     configTab === 'preprocess'
-                      ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
-                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-neutral-800'
                   "
+                  title="Preprocess & Calibration"
                 >
-                  Preprocess
+                  <svg
+                    class="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="4" y1="21" x2="4" y2="14" />
+                    <line x1="4" y1="10" x2="4" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12" y2="3" />
+                    <line x1="20" y1="21" x2="20" y2="16" />
+                    <line x1="20" y1="12" x2="20" y2="3" />
+                    <line x1="1" y1="14" x2="7" y2="14" />
+                    <line x1="9" y1="8" x2="15" y2="8" />
+                    <line x1="17" y1="16" x2="23" y2="16" />
+                  </svg>
                 </button>
+
+                <!-- 6. HF Models -->
                 <button
                   type="button"
                   @click="configTab = 'models'"
-                  class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
+                  class="w-9 h-9 flex items-center justify-center rounded-lg transition-all cursor-pointer relative group"
                   :class="
                     configTab === 'models'
-                      ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
-                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-neutral-800'
                   "
+                  title="Hugging Face Model Assets"
                 >
-                  HF Models
+                  <svg
+                    class="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                    />
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                    <line x1="12" y1="22.08" x2="12" y2="12" />
+                  </svg>
                 </button>
               </div>
-            </div>
 
-            <!-- Popover Content Area -->
-            <div class="p-3.5 space-y-3.5 overflow-y-auto">
-              <!-- Tab 1: Detection & DBNet Postprocess -->
-              <template v-if="configTab === 'detection'">
-                <!-- Confidence Score -->
-                <div class="space-y-1">
-                  <div class="flex justify-between items-center">
-                    <label class="font-medium text-neutral-700 dark:text-neutral-300">
-                      Min Confidence Score (textScore)
-                    </label>
-                    <span class="font-mono text-[11px] text-primary font-semibold">
-                      {{ Math.round(ocrConfig.textScore * 100) }}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    v-model.number="ocrConfig.textScore"
-                    class="w-full accent-primary cursor-pointer"
-                  />
-                </div>
-
-                <!-- Binarization Threshold -->
-                <div class="space-y-1">
-                  <div class="flex justify-between items-center">
-                    <label class="font-medium text-neutral-700 dark:text-neutral-300">
-                      DBNet Pixel Threshold (threshold)
-                    </label>
-                    <span
-                      class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
-                    >
-                      {{ ocrConfig.postprocessThreshold.toFixed(2) }}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="0.9"
-                    step="0.05"
-                    v-model.number="ocrConfig.postprocessThreshold"
-                    class="w-full accent-primary cursor-pointer"
-                  />
-                </div>
-
-                <!-- Box Threshold -->
-                <div class="space-y-1">
-                  <div class="flex justify-between items-center">
-                    <label class="font-medium text-neutral-700 dark:text-neutral-300">
-                      Box Confidence (boxThreshold)
-                    </label>
-                    <span
-                      class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
-                    >
-                      {{ ocrConfig.postprocessBoxThreshold.toFixed(2) }}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="0.9"
-                    step="0.05"
-                    v-model.number="ocrConfig.postprocessBoxThreshold"
-                    class="w-full accent-primary cursor-pointer"
-                  />
-                </div>
-
-                <!-- Unclip Ratio -->
-                <div class="space-y-1">
-                  <div class="flex justify-between items-center">
-                    <label class="font-medium text-neutral-700 dark:text-neutral-300">
-                      Bounding Box Expansion (unclipRatio)
-                    </label>
-                    <span
-                      class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
-                    >
-                      {{ ocrConfig.postprocessUnclipRatio.toFixed(1) }}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="3"
-                    step="0.1"
-                    v-model.number="ocrConfig.postprocessUnclipRatio"
-                    class="w-full accent-primary cursor-pointer"
-                  />
-                </div>
-
-                <!-- Max Candidates & Limit Side -->
+              <!-- Right Settings Panel -->
+              <div class="flex-1 min-w-0 p-3.5 space-y-3.5 overflow-y-auto max-h-[480px]">
+                <!-- Active Tab Header -->
                 <div
-                  class="grid grid-cols-2 gap-2 pt-1 border-t border-neutral-100 dark:border-neutral-800"
+                  class="flex items-center justify-between pb-1 border-b border-neutral-100 dark:border-neutral-800"
                 >
-                  <div class="space-y-1">
-                    <label class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
-                      Max Candidates
-                    </label>
-                    <input
-                      type="number"
-                      min="100"
-                      max="3000"
-                      step="100"
-                      v-model.number="ocrConfig.postprocessMaxCandidates"
-                      class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
-                    />
-                  </div>
-                  <div class="space-y-1">
-                    <label class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
-                      Limit Side Length
-                    </label>
-                    <input
-                      type="number"
-                      min="320"
-                      max="3840"
-                      step="160"
-                      v-model.number="ocrConfig.detectionLimitSideLen"
-                      class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
-                    />
-                  </div>
-                </div>
-
-                <div class="flex items-center justify-between pt-1">
-                  <div class="flex items-center gap-2">
-                    <label class="text-[11px] text-neutral-600 dark:text-neutral-400"
-                      >Limit Type:</label
-                    >
-                    <select
-                      v-model="ocrConfig.detectionLimitType"
-                      class="px-2 py-0.5 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
-                    >
-                      <option value="max">Max</option>
-                      <option value="min">Min</option>
-                    </select>
-                  </div>
-                  <label class="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      v-model="ocrConfig.postprocessUseDilation"
-                      class="rounded accent-primary w-3.5 h-3.5 cursor-pointer"
-                    />
-                    <span class="text-neutral-700 dark:text-neutral-300 text-[11px]"
-                      >Use Dilation</span
-                    >
-                  </label>
-                </div>
-
-                <!-- Quick Side Presets -->
-                <div
-                  class="flex items-center gap-1.5 pt-1.5 border-t border-neutral-100 dark:border-neutral-800"
-                >
-                  <span class="text-[10px] text-neutral-400">Quick limit:</span>
-                  <button
-                    v-for="side in [640, 960, 1280, 1920]"
-                    :key="side"
-                    type="button"
-                    @click="ocrConfig.detectionLimitSideLen = side"
-                    class="px-1.5 py-0.5 text-[10px] rounded border transition-colors cursor-pointer"
-                    :class="
-                      ocrConfig.detectionLimitSideLen === side
-                        ? 'bg-primary text-white border-primary font-semibold'
-                        : 'border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:border-neutral-400'
-                    "
-                  >
-                    {{ side }}px
-                  </button>
-                </div>
-              </template>
-
-              <!-- Tab 2: Recognition Engine Settings -->
-              <template v-else-if="configTab === 'recognition'">
-                <!-- Recognition Batch Size -->
-                <div class="space-y-1">
-                  <div class="flex justify-between items-center">
-                    <label class="font-medium text-neutral-700 dark:text-neutral-300">
-                      Recognition Batch Size (rec_batch_num)
-                    </label>
-                    <span class="font-mono text-[11px] text-primary font-semibold">
-                      {{ ocrConfig.recBatchNum }}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="16"
-                    step="1"
-                    v-model.number="ocrConfig.recBatchNum"
-                    class="w-full accent-primary cursor-pointer"
-                  />
-                  <p class="text-[10px] text-neutral-400">
+                  <span class="font-semibold text-xs text-neutral-800 dark:text-neutral-200">
                     {{
-                      currentModel.preset === 'indra'
-                        ? 'Indra Linenet: default batch size 1 eliminates padding overhead and gives ~28.5% faster recognition.'
-                        : 'PP-OCR: recommended batch size 4–6 balances vectorization and memory.'
+                      configTab === 'detection'
+                        ? 'Detection & DBNet Thresholds'
+                        : configTab === 'recognition'
+                          ? 'Recognition & Batching'
+                          : configTab === 'layout'
+                            ? 'Reading Order & Layout Model'
+                            : configTab === 'resizing'
+                              ? 'Image Resizing & Constraints'
+                              : configTab === 'preprocess'
+                                ? 'Preprocess & Calibration'
+                                : 'Hugging Face Model Assets'
                     }}
-                  </p>
+                  </span>
                 </div>
-
-                <!-- Text Score Cutoff -->
-                <div class="space-y-1 pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
-                  <div class="flex justify-between items-center">
-                    <label class="font-medium text-neutral-700 dark:text-neutral-300">
-                      Min Text Confidence (textScore)
-                    </label>
-                    <span
-                      class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
-                    >
-                      {{ Math.round(ocrConfig.textScore * 100) }}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="0.95"
-                    step="0.05"
-                    v-model.number="ocrConfig.textScore"
-                    class="w-full accent-primary cursor-pointer"
-                  />
-                  <p class="text-[10px] text-neutral-400">
-                    Filters out low-confidence OCR predictions from the final output.
-                  </p>
-                </div>
-              </template>
-
-              <!-- Tab 3: Reading Order & Layout Geometry -->
-              <template v-else-if="configTab === 'layout'">
-                <!-- Reading Order Recovery -->
-                <div
-                  class="space-y-1.5 bg-neutral-50 dark:bg-neutral-800/40 p-2.5 rounded-lg border border-neutral-200/60 dark:border-neutral-700/60"
-                >
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <span class="font-medium text-neutral-800 dark:text-neutral-200 text-xs">
-                        Multi-Column Reading Order
+                <!-- Tab 1: Detection & DBNet Postprocess -->
+                <template v-if="configTab === 'detection'">
+                  <!-- Confidence Score -->
+                  <div class="space-y-1">
+                    <div class="flex justify-between items-center">
+                      <label class="font-medium text-neutral-700 dark:text-neutral-300">
+                        Min Confidence Score (textScore)
+                      </label>
+                      <span class="font-mono text-[11px] text-primary font-semibold">
+                        {{ Math.round(ocrConfig.textScore * 100) }}%
                       </span>
-                      <p class="text-[10px] text-neutral-500 dark:text-neutral-400">
-                        enableReadingOrder (Natural Column Flow)
-                      </p>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        v-model="ocrConfig.enableReadingOrder"
-                        class="sr-only peer"
-                      />
-                      <div
-                        class="w-8 h-4 bg-neutral-300 peer-focus:outline-none rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-neutral-600 peer-checked:bg-primary"
-                      ></div>
-                    </label>
-                  </div>
-                  <p class="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
-                    Partitions dense multi-column layouts (newspapers, magazines, articles) into
-                    natural human reading sequence (Column 1 top-to-bottom, then Column 2) instead
-                    of horizontal scan.
-                  </p>
-                </div>
-
-                <!-- lineYThreshold -->
-                <div class="space-y-1 pt-1.5">
-                  <div class="flex justify-between items-center">
-                    <label class="font-medium text-neutral-700 dark:text-neutral-300">
-                      Row Center Tolerance (lineYThreshold)
-                    </label>
-                    <span
-                      class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
-                    >
-                      {{ ocrConfig.lineYThreshold.toFixed(2) }}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="1.5"
-                    step="0.05"
-                    v-model.number="ocrConfig.lineYThreshold"
-                    class="w-full accent-primary cursor-pointer"
-                  />
-                  <p class="text-[10px] text-neutral-400">
-                    Vertical center distance multiplier for same-line clustering.
-                  </p>
-                </div>
-
-                <!-- wordXThreshold -->
-                <div class="space-y-1 pt-1 border-t border-neutral-100 dark:border-neutral-800">
-                  <div class="flex justify-between items-center">
-                    <label class="font-medium text-neutral-700 dark:text-neutral-300">
-                      Word Gap Tolerance (wordXThreshold)
-                    </label>
-                    <span
-                      class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
-                    >
-                      {{ ocrConfig.wordXThreshold.toFixed(2) }}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="1.5"
-                    step="0.05"
-                    v-model.number="ocrConfig.wordXThreshold"
-                    class="w-full accent-primary cursor-pointer"
-                  />
-                  <p class="text-[10px] text-neutral-400">
-                    Horizontal gap multiplier when reconstructing words and columns.
-                  </p>
-                </div>
-
-                <!-- Classification & Orientation Toggles -->
-                <div class="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
-                  <label class="flex items-center justify-between cursor-pointer">
-                    <span class="text-neutral-700 dark:text-neutral-300">
-                      Orientation Classifier (0° / 180°)
-                    </span>
-                    <input
-                      type="checkbox"
-                      v-model="ocrConfig.classification"
-                      class="rounded accent-primary w-4 h-4 cursor-pointer"
-                    />
-                  </label>
-                  <label class="flex items-center justify-between cursor-pointer">
-                    <span class="text-neutral-700 dark:text-neutral-300">
-                      4-Way Direction Correction (orientation)
-                    </span>
-                    <input
-                      type="checkbox"
-                      v-model="ocrConfig.orientation"
-                      class="rounded accent-primary w-4 h-4 cursor-pointer"
-                    />
-                  </label>
-                </div>
-              </template>
-
-              <!-- Tab 3: Image Resizing & Geometry -->
-              <template v-else-if="configTab === 'resizing'">
-                <div class="space-y-3">
-                  <label
-                    class="flex items-center justify-between cursor-pointer pb-2 border-b border-neutral-100 dark:border-neutral-800"
-                  >
-                    <div>
-                      <span class="font-medium text-neutral-800 dark:text-neutral-200">
-                        Enable Geometry Resize Overrides
-                      </span>
-                      <p class="text-[10px] text-neutral-400">
-                        Override input dimensions before sending to detector.
-                      </p>
                     </div>
                     <input
-                      type="checkbox"
-                      v-model="ocrConfig.enableResize"
-                      class="rounded accent-primary w-4 h-4 cursor-pointer"
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      v-model.number="ocrConfig.textScore"
+                      class="w-full accent-primary cursor-pointer"
                     />
-                  </label>
+                  </div>
 
+                  <!-- Binarization Threshold -->
+                  <div class="space-y-1">
+                    <div class="flex justify-between items-center">
+                      <label class="font-medium text-neutral-700 dark:text-neutral-300">
+                        DBNet Pixel Threshold (threshold)
+                      </label>
+                      <span
+                        class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                      >
+                        {{ ocrConfig.postprocessThreshold.toFixed(2) }}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="0.9"
+                      step="0.05"
+                      v-model.number="ocrConfig.postprocessThreshold"
+                      class="w-full accent-primary cursor-pointer"
+                    />
+                  </div>
+
+                  <!-- Box Threshold -->
+                  <div class="space-y-1">
+                    <div class="flex justify-between items-center">
+                      <label class="font-medium text-neutral-700 dark:text-neutral-300">
+                        Box Confidence (boxThreshold)
+                      </label>
+                      <span
+                        class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                      >
+                        {{ ocrConfig.postprocessBoxThreshold.toFixed(2) }}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="0.9"
+                      step="0.05"
+                      v-model.number="ocrConfig.postprocessBoxThreshold"
+                      class="w-full accent-primary cursor-pointer"
+                    />
+                  </div>
+
+                  <!-- Unclip Ratio -->
+                  <div class="space-y-1">
+                    <div class="flex justify-between items-center">
+                      <label class="font-medium text-neutral-700 dark:text-neutral-300">
+                        Bounding Box Expansion (unclipRatio)
+                      </label>
+                      <span
+                        class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                      >
+                        {{ ocrConfig.postprocessUnclipRatio.toFixed(1) }}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="3"
+                      step="0.1"
+                      v-model.number="ocrConfig.postprocessUnclipRatio"
+                      class="w-full accent-primary cursor-pointer"
+                    />
+                  </div>
+
+                  <!-- Max Candidates & Limit Side -->
                   <div
-                    class="space-y-2.5 transition-opacity"
-                    :class="{ 'opacity-40 pointer-events-none': !ocrConfig.enableResize }"
+                    class="grid grid-cols-2 gap-2 pt-1 border-t border-neutral-100 dark:border-neutral-800"
                   >
-                    <div class="grid grid-cols-2 gap-2">
-                      <div class="space-y-1">
-                        <label
-                          class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400"
-                        >
-                          Max Side Length (px)
-                        </label>
-                        <input
-                          type="number"
-                          min="320"
-                          max="4096"
-                          step="128"
-                          v-model.number="ocrConfig.maxSideLen"
-                          class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
-                        />
-                      </div>
-                      <div class="space-y-1">
-                        <label
-                          class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400"
-                        >
-                          Min Side Length (px)
-                        </label>
-                        <input
-                          type="number"
-                          min="100"
-                          max="2048"
-                          step="64"
-                          v-model.number="ocrConfig.minSideLen"
-                          class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
-                        />
-                      </div>
+                    <div class="space-y-1">
+                      <label class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+                        Max Candidates
+                      </label>
+                      <input
+                        type="number"
+                        min="100"
+                        max="3000"
+                        step="100"
+                        v-model.number="ocrConfig.postprocessMaxCandidates"
+                        class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
+                      />
                     </div>
-
-                    <div class="grid grid-cols-2 gap-2">
-                      <div class="space-y-1">
-                        <label
-                          class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400"
-                        >
-                          Min Height (px)
-                        </label>
-                        <input
-                          type="number"
-                          min="16"
-                          max="512"
-                          step="16"
-                          v-model.number="ocrConfig.minHeight"
-                          class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
-                        />
-                      </div>
-                      <div class="space-y-1">
-                        <label
-                          class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400"
-                        >
-                          Aspect Ratio (-1 for auto)
-                        </label>
-                        <input
-                          type="number"
-                          min="-1"
-                          max="10"
-                          step="0.1"
-                          v-model.number="ocrConfig.widthHeightRatio"
-                          class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
-                        />
-                      </div>
+                    <div class="space-y-1">
+                      <label class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+                        Limit Side Length
+                      </label>
+                      <input
+                        type="number"
+                        min="320"
+                        max="3840"
+                        step="160"
+                        v-model.number="ocrConfig.detectionLimitSideLen"
+                        class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
+                      />
                     </div>
                   </div>
-                </div>
-              </template>
 
-              <!-- Tab 4: Preprocess & Optimization -->
-              <template v-else-if="configTab === 'preprocess'">
-                <div class="space-y-3">
-                  <div class="space-y-2">
-                    <label class="flex items-center justify-between cursor-pointer">
-                      <span class="text-neutral-700 dark:text-neutral-300">
-                        Adaptive Lighting Calibration
-                      </span>
+                  <div class="flex items-center justify-between pt-1">
+                    <div class="flex items-center gap-2">
+                      <label class="text-[11px] text-neutral-600 dark:text-neutral-400"
+                        >Limit Type:</label
+                      >
+                      <select
+                        v-model="ocrConfig.detectionLimitType"
+                        class="px-2 py-0.5 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
+                      >
+                        <option value="max">Max</option>
+                        <option value="min">Min</option>
+                      </select>
+                    </div>
+                    <label class="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        v-model="ocrConfig.calibrationEnabled"
-                        class="rounded accent-primary w-4 h-4 cursor-pointer"
+                        v-model="ocrConfig.postprocessUseDilation"
+                        class="rounded accent-primary w-3.5 h-3.5 cursor-pointer"
                       />
+                      <span class="text-neutral-700 dark:text-neutral-300 text-[11px]"
+                        >Use Dilation</span
+                      >
                     </label>
+                  </div>
 
-                    <label class="flex items-center justify-between cursor-pointer">
-                      <span class="text-neutral-700 dark:text-neutral-300">
-                        Descreen Pattern Backgrounds (Guilloche)
+                  <!-- Quick Side Presets -->
+                  <div
+                    class="flex items-center gap-1.5 pt-1.5 border-t border-neutral-100 dark:border-neutral-800"
+                  >
+                    <span class="text-[10px] text-neutral-400">Quick limit:</span>
+                    <button
+                      v-for="side in [640, 960, 1280, 1920]"
+                      :key="side"
+                      type="button"
+                      @click="ocrConfig.detectionLimitSideLen = side"
+                      class="px-1.5 py-0.5 text-[10px] rounded border transition-colors cursor-pointer"
+                      :class="
+                        ocrConfig.detectionLimitSideLen === side
+                          ? 'bg-primary text-white border-primary font-semibold'
+                          : 'border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:border-neutral-400'
+                      "
+                    >
+                      {{ side }}px
+                    </button>
+                  </div>
+                </template>
+
+                <!-- Tab 2: Recognition Engine Settings -->
+                <template v-else-if="configTab === 'recognition'">
+                  <!-- Recognition Batch Size -->
+                  <div class="space-y-1">
+                    <div class="flex justify-between items-center">
+                      <label class="font-medium text-neutral-700 dark:text-neutral-300">
+                        Recognition Batch Size (rec_batch_num)
+                      </label>
+                      <span class="font-mono text-[11px] text-primary font-semibold">
+                        {{ ocrConfig.recBatchNum }}
                       </span>
-                      <input
-                        type="checkbox"
-                        v-model="ocrConfig.descreenBackground"
-                        class="rounded accent-primary w-4 h-4 cursor-pointer"
-                      />
-                    </label>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="16"
+                      step="1"
+                      v-model.number="ocrConfig.recBatchNum"
+                      class="w-full accent-primary cursor-pointer"
+                    />
+                    <p class="text-[10px] text-neutral-400">
+                      {{
+                        currentModel.preset === 'indra'
+                          ? 'Indra Linenet: default batch size 1 eliminates padding overhead and gives ~28.5% faster recognition.'
+                          : 'PP-OCR: recommended batch size 4–6 balances vectorization and memory.'
+                      }}
+                    </p>
+                  </div>
 
-                    <!-- Descreen Strength -->
-                    <div class="space-y-1 pt-1">
-                      <div class="flex justify-between items-center">
-                        <label class="text-[11px] text-neutral-600 dark:text-neutral-400">
-                          Descreen Strength
-                        </label>
-                        <span
-                          class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
-                        >
-                          {{ ocrConfig.descreenStrength.toFixed(2) }}
+                  <!-- Text Score Cutoff -->
+                  <div class="space-y-1 pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
+                    <div class="flex justify-between items-center">
+                      <label class="font-medium text-neutral-700 dark:text-neutral-300">
+                        Min Text Confidence (textScore)
+                      </label>
+                      <span
+                        class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                      >
+                        {{ Math.round(ocrConfig.textScore * 100) }}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="0.95"
+                      step="0.05"
+                      v-model.number="ocrConfig.textScore"
+                      class="w-full accent-primary cursor-pointer"
+                    />
+                    <p class="text-[10px] text-neutral-400">
+                      Filters out low-confidence OCR predictions from the final output.
+                    </p>
+                  </div>
+                </template>
+
+                <!-- Tab 3: Reading Order & Layout Geometry -->
+                <template v-else-if="configTab === 'layout'">
+                  <!-- Layout & Reading Model Selection -->
+                  <div
+                    class="space-y-1.5 bg-neutral-50 dark:bg-neutral-800/40 p-2.5 rounded-lg border border-neutral-200/60 dark:border-neutral-700/60"
+                  >
+                    <div class="flex justify-between items-center">
+                      <label class="font-medium text-neutral-800 dark:text-neutral-200 text-xs">
+                        Layout / Structure Model
+                      </label>
+                      <span class="font-mono text-[10px] text-primary font-semibold">
+                        {{ selectedLayoutModelMeta.size }}
+                      </span>
+                    </div>
+                    <select
+                      v-model="ocrConfig.layoutModel"
+                      @change="onLayoutModelChange"
+                      class="w-full text-xs font-medium rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 py-1.5 px-2.5 text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                    >
+                      <optgroup label="Indra OCR (Transformer)">
+                        <option value="indra">Indra Neural Reading Order (2.9 MB)</option>
+                      </optgroup>
+                      <optgroup label="PP-Structure / PaddleOCR">
+                        <option value="cdla">PP-OCR CDLA Document Layout (8.4 MB)</option>
+                        <option value="publaynet">PP-OCR PubLayNet Paper Layout (8.4 MB)</option>
+                      </optgroup>
+                      <optgroup label="Built-in / Baseline">
+                        <option value="heuristic">Geometric Column Flow (0 KB - Built-in)</option>
+                        <option value="none">None / Linear Raster Scan (Disabled)</option>
+                      </optgroup>
+                    </select>
+                    <p class="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                      {{ selectedLayoutModelMeta.description }}
+                    </p>
+                    <div
+                      v-if="selectedLayoutModelMeta.downloadUrl"
+                      class="pt-1 flex items-center justify-between text-[10px]"
+                    >
+                      <span class="text-neutral-400">HF Weight:</span>
+                      <a
+                        :href="selectedLayoutModelMeta.downloadUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-primary hover:underline font-mono truncate max-w-[220px]"
+                      >
+                        {{ selectedLayoutModelMeta.assetFile }}
+                      </a>
+                    </div>
+                  </div>
+
+                  <!-- Reading Order Recovery -->
+                  <div
+                    class="space-y-1.5 bg-neutral-50 dark:bg-neutral-800/40 p-2.5 rounded-lg border border-neutral-200/60 dark:border-neutral-700/60"
+                  >
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="font-medium text-neutral-800 dark:text-neutral-200 text-xs">
+                          Multi-Column Reading Order
                         </span>
+                        <p class="text-[10px] text-neutral-500 dark:text-neutral-400">
+                          enableReadingOrder (Natural Column Flow)
+                        </p>
                       </div>
-                      <input
-                        type="range"
-                        min="0.1"
-                        max="1"
-                        step="0.05"
-                        v-model.number="ocrConfig.descreenStrength"
-                        class="w-full accent-primary cursor-pointer"
-                      />
+                      <label class="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          v-model="ocrConfig.enableReadingOrder"
+                          class="sr-only peer"
+                        />
+                        <div
+                          class="w-8 h-4 bg-neutral-300 peer-focus:outline-none rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-neutral-600 peer-checked:bg-primary"
+                        ></div>
+                      </label>
                     </div>
+                    <p class="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                      Partitions dense multi-column layouts (newspapers, magazines, articles) into
+                      natural human reading sequence (Column 1 top-to-bottom, then Column 2) instead
+                      of horizontal scan.
+                    </p>
                   </div>
 
+                  <!-- lineYThreshold -->
+                  <div class="space-y-1 pt-1.5">
+                    <div class="flex justify-between items-center">
+                      <label class="font-medium text-neutral-700 dark:text-neutral-300">
+                        Row Center Tolerance (lineYThreshold)
+                      </label>
+                      <span
+                        class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                      >
+                        {{ ocrConfig.lineYThreshold.toFixed(2) }}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1.5"
+                      step="0.05"
+                      v-model.number="ocrConfig.lineYThreshold"
+                      class="w-full accent-primary cursor-pointer"
+                    />
+                    <p class="text-[10px] text-neutral-400">
+                      Vertical center distance multiplier for same-line clustering.
+                    </p>
+                  </div>
+
+                  <!-- wordXThreshold -->
+                  <div class="space-y-1 pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                    <div class="flex justify-between items-center">
+                      <label class="font-medium text-neutral-700 dark:text-neutral-300">
+                        Word Gap Tolerance (wordXThreshold)
+                      </label>
+                      <span
+                        class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                      >
+                        {{ ocrConfig.wordXThreshold.toFixed(2) }}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1.5"
+                      step="0.05"
+                      v-model.number="ocrConfig.wordXThreshold"
+                      class="w-full accent-primary cursor-pointer"
+                    />
+                    <p class="text-[10px] text-neutral-400">
+                      Horizontal gap multiplier when reconstructing words and columns.
+                    </p>
+                  </div>
+
+                  <!-- Classification & Orientation Toggles -->
                   <div class="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
                     <label class="flex items-center justify-between cursor-pointer">
                       <span class="text-neutral-700 dark:text-neutral-300">
-                        SIMD & Fast Crop Optimization
+                        Orientation Classifier (0° / 180°)
                       </span>
                       <input
                         type="checkbox"
-                        v-model="ocrConfig.optimizationEnabled"
+                        v-model="ocrConfig.classification"
+                        class="rounded accent-primary w-4 h-4 cursor-pointer"
+                      />
+                    </label>
+                    <label class="flex items-center justify-between cursor-pointer">
+                      <span class="text-neutral-700 dark:text-neutral-300">
+                        4-Way Direction Correction (orientation)
+                      </span>
+                      <input
+                        type="checkbox"
+                        v-model="ocrConfig.orientation"
+                        class="rounded accent-primary w-4 h-4 cursor-pointer"
+                      />
+                    </label>
+                  </div>
+                </template>
+
+                <!-- Tab 3: Image Resizing & Geometry -->
+                <template v-else-if="configTab === 'resizing'">
+                  <div class="space-y-3">
+                    <label
+                      class="flex items-center justify-between cursor-pointer pb-2 border-b border-neutral-100 dark:border-neutral-800"
+                    >
+                      <div>
+                        <span class="font-medium text-neutral-800 dark:text-neutral-200">
+                          Enable Geometry Resize Overrides
+                        </span>
+                        <p class="text-[10px] text-neutral-400">
+                          Override input dimensions before sending to detector.
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        v-model="ocrConfig.enableResize"
                         class="rounded accent-primary w-4 h-4 cursor-pointer"
                       />
                     </label>
 
-                    <div class="grid grid-cols-2 gap-2 pt-1">
-                      <div class="space-y-1">
-                        <label class="text-[11px] text-neutral-600 dark:text-neutral-400">
-                          Target Max Side (px)
-                        </label>
-                        <input
-                          type="number"
-                          min="640"
-                          max="2560"
-                          step="128"
-                          v-model.number="ocrConfig.optimizationTargetMaxSide"
-                          class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
-                        />
-                      </div>
-                      <div class="space-y-1">
-                        <label class="text-[11px] text-neutral-600 dark:text-neutral-400">
-                          Crop Padding (px)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="50"
-                          step="2"
-                          v-model.number="ocrConfig.cropPaddingX"
-                          class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </template>
-
-              <!-- Tab 5: Model Weights & Hugging Face Hub -->
-              <template v-else-if="configTab === 'models'">
-                <div class="space-y-3">
-                  <!-- Selected Model Details Card -->
-                  <div
-                    class="p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 space-y-1.5"
-                  >
-                    <div class="flex items-center justify-between">
-                      <span class="font-semibold text-neutral-900 dark:text-neutral-100 text-xs">
-                        {{ currentModel.name }}
-                      </span>
-                      <span
-                        class="text-[10px] font-mono px-2 py-0.5 rounded bg-primary/10 text-primary font-semibold"
-                      >
-                        {{ currentModel.size }}
-                      </span>
-                    </div>
-                    <p class="text-[11px] text-neutral-500 dark:text-neutral-400">
-                      {{ currentModel.description }}
-                    </p>
-                    <div class="flex items-center gap-2 pt-1 text-[10px]">
-                      <span class="text-neutral-400">Architecture:</span>
-                      <code
-                        class="px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 font-mono"
-                        >{{ currentModel.preset }}</code
-                      >
-                      <span class="text-neutral-400">Rec Batch:</span>
-                      <code
-                        class="px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 font-mono"
-                        >{{ currentModel.recommendedBatchSize }}</code
-                      >
-                    </div>
-                  </div>
-
-                  <!-- Hugging Face Hub Info & Links -->
-                  <div
-                    class="p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 space-y-2"
-                  >
-                    <div class="flex items-center justify-between">
-                      <span
-                        class="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300"
-                      >
-                        Hugging Face Hub Repository
-                      </span>
-                      <a
-                        :href="`https://huggingface.co/${HUGGINGFACE_REPO}`"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="text-[10px] text-primary hover:underline font-mono inline-flex items-center gap-1"
-                      >
-                        <span>{{ HUGGINGFACE_REPO }}</span>
-                        <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                          <path
-                            fill-rule="evenodd"
-                            d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h4a.75.75 0 0 1 0 1.5h-4Zm6.75-2a.75.75 0 0 1 .75-.75h5.5c.414 0 .75.336.75.75v5.5a.75.75 0 0 1-1.5 0V4.56l-6.72 6.72a.75.75 0 1 1-1.06-1.06l6.72-6.72h-4.44a.75.75 0 0 1-.75-.75Z"
-                            clip-rule="evenodd"
-                          />
-                        </svg>
-                      </a>
-                    </div>
                     <div
-                      class="text-[10px] font-mono space-y-1.5 text-neutral-600 dark:text-neutral-400"
+                      class="space-y-2.5 transition-opacity"
+                      :class="{ 'opacity-40 pointer-events-none': !ocrConfig.enableResize }"
                     >
-                      <div>
-                        <span
-                          class="text-neutral-400 block text-[9px] uppercase tracking-wider font-semibold"
-                          >Detection Weight URL</span
-                        >
-                        <span class="break-all select-all text-neutral-800 dark:text-neutral-200">{{
-                          getModelCandidateUrls(selectedModel, baseURL).detection[0]
-                        }}</span>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div class="space-y-1">
+                          <label
+                            class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400"
+                          >
+                            Max Side Length (px)
+                          </label>
+                          <input
+                            type="number"
+                            min="320"
+                            max="4096"
+                            step="128"
+                            v-model.number="ocrConfig.maxSideLen"
+                            class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
+                          />
+                        </div>
+                        <div class="space-y-1">
+                          <label
+                            class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400"
+                          >
+                            Min Side Length (px)
+                          </label>
+                          <input
+                            type="number"
+                            min="100"
+                            max="2048"
+                            step="64"
+                            v-model.number="ocrConfig.minSideLen"
+                            class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <span
-                          class="text-neutral-400 block text-[9px] uppercase tracking-wider font-semibold"
-                          >Recognition Weight URL</span
-                        >
-                        <span class="break-all select-all text-neutral-800 dark:text-neutral-200">{{
-                          getModelCandidateUrls(selectedModel, baseURL).recognition[0]
-                        }}</span>
-                      </div>
-                      <div>
-                        <span
-                          class="text-neutral-400 block text-[9px] uppercase tracking-wider font-semibold"
-                          >Vocabulary / Dictionary URL</span
-                        >
-                        <span class="break-all select-all text-neutral-800 dark:text-neutral-200">{{
-                          getModelCandidateUrls(selectedModel, baseURL).dictionary[0]
-                        }}</span>
+
+                      <div class="grid grid-cols-2 gap-2">
+                        <div class="space-y-1">
+                          <label
+                            class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400"
+                          >
+                            Min Height (px)
+                          </label>
+                          <input
+                            type="number"
+                            min="16"
+                            max="512"
+                            step="16"
+                            v-model.number="ocrConfig.minHeight"
+                            class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
+                          />
+                        </div>
+                        <div class="space-y-1">
+                          <label
+                            class="text-[11px] font-medium text-neutral-600 dark:text-neutral-400"
+                          >
+                            Aspect Ratio (-1 for auto)
+                          </label>
+                          <input
+                            type="number"
+                            min="-1"
+                            max="10"
+                            step="0.1"
+                            v-model.number="ocrConfig.widthHeightRatio"
+                            class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </template>
+                </template>
+
+                <!-- Tab 4: Preprocess & Optimization -->
+                <template v-else-if="configTab === 'preprocess'">
+                  <div class="space-y-3">
+                    <div class="space-y-2">
+                      <label class="flex items-center justify-between cursor-pointer">
+                        <span class="text-neutral-700 dark:text-neutral-300">
+                          Adaptive Lighting Calibration
+                        </span>
+                        <input
+                          type="checkbox"
+                          v-model="ocrConfig.calibrationEnabled"
+                          class="rounded accent-primary w-4 h-4 cursor-pointer"
+                        />
+                      </label>
+
+                      <label class="flex items-center justify-between cursor-pointer">
+                        <span class="text-neutral-700 dark:text-neutral-300">
+                          Descreen Pattern Backgrounds (Guilloche)
+                        </span>
+                        <input
+                          type="checkbox"
+                          v-model="ocrConfig.descreenBackground"
+                          class="rounded accent-primary w-4 h-4 cursor-pointer"
+                        />
+                      </label>
+
+                      <!-- Descreen Strength -->
+                      <div class="space-y-1 pt-1">
+                        <div class="flex justify-between items-center">
+                          <label class="text-[11px] text-neutral-600 dark:text-neutral-400">
+                            Descreen Strength
+                          </label>
+                          <span
+                            class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                          >
+                            {{ ocrConfig.descreenStrength.toFixed(2) }}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="1"
+                          step="0.05"
+                          v-model.number="ocrConfig.descreenStrength"
+                          class="w-full accent-primary cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    <div class="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                      <label class="flex items-center justify-between cursor-pointer">
+                        <span class="text-neutral-700 dark:text-neutral-300">
+                          SIMD & Fast Crop Optimization
+                        </span>
+                        <input
+                          type="checkbox"
+                          v-model="ocrConfig.optimizationEnabled"
+                          class="rounded accent-primary w-4 h-4 cursor-pointer"
+                        />
+                      </label>
+
+                      <div class="grid grid-cols-2 gap-2 pt-1">
+                        <div class="space-y-1">
+                          <label class="text-[11px] text-neutral-600 dark:text-neutral-400">
+                            Target Max Side (px)
+                          </label>
+                          <input
+                            type="number"
+                            min="640"
+                            max="2560"
+                            step="128"
+                            v-model.number="ocrConfig.optimizationTargetMaxSide"
+                            class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
+                          />
+                        </div>
+                        <div class="space-y-1">
+                          <label class="text-[11px] text-neutral-600 dark:text-neutral-400">
+                            Crop Padding (px)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="50"
+                            step="2"
+                            v-model.number="ocrConfig.cropPaddingX"
+                            class="w-full px-2 py-1 text-xs rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Tab 5: Model Weights & Hugging Face Hub -->
+                <template v-else-if="configTab === 'models'">
+                  <div class="space-y-3">
+                    <!-- Selected Model Details Card -->
+                    <div
+                      class="p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 space-y-1.5"
+                    >
+                      <div class="flex items-center justify-between">
+                        <span class="font-semibold text-neutral-900 dark:text-neutral-100 text-xs">
+                          {{ currentModel.name }}
+                        </span>
+                        <span
+                          class="text-[10px] font-mono px-2 py-0.5 rounded bg-primary/10 text-primary font-semibold"
+                        >
+                          {{ currentModel.size }}
+                        </span>
+                      </div>
+                      <p class="text-[11px] text-neutral-500 dark:text-neutral-400">
+                        {{ currentModel.description }}
+                      </p>
+                      <div class="flex items-center gap-2 pt-1 text-[10px]">
+                        <span class="text-neutral-400">Architecture:</span>
+                        <code
+                          class="px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 font-mono"
+                          >{{ currentModel.preset }}</code
+                        >
+                        <span class="text-neutral-400">Rec Batch:</span>
+                        <code
+                          class="px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 font-mono"
+                          >{{ currentModel.recommendedBatchSize }}</code
+                        >
+                      </div>
+                    </div>
+
+                    <!-- Hugging Face Hub Info & Links -->
+                    <div
+                      class="p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 space-y-2"
+                    >
+                      <div class="flex items-center justify-between">
+                        <span
+                          class="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300"
+                        >
+                          Hugging Face Hub Repository
+                        </span>
+                        <a
+                          :href="`https://huggingface.co/${HUGGINGFACE_REPO}`"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="text-[10px] text-primary hover:underline font-mono inline-flex items-center gap-1"
+                        >
+                          <span>{{ HUGGINGFACE_REPO }}</span>
+                          <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                            <path
+                              fill-rule="evenodd"
+                              d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h4a.75.75 0 0 1 0 1.5h-4Zm6.75-2a.75.75 0 0 1 .75-.75h5.5c.414 0 .75.336.75.75v5.5a.75.75 0 0 1-1.5 0V4.56l-6.72 6.72a.75.75 0 1 1-1.06-1.06l6.72-6.72h-4.44a.75.75 0 0 1-.75-.75Z"
+                              clip-rule="evenodd"
+                            />
+                          </svg>
+                        </a>
+                      </div>
+                      <div
+                        class="text-[10px] font-mono space-y-1.5 text-neutral-600 dark:text-neutral-400"
+                      >
+                        <div>
+                          <span
+                            class="text-neutral-400 block text-[9px] uppercase tracking-wider font-semibold"
+                            >Detection Weight URL</span
+                          >
+                          <span
+                            class="break-all select-all text-neutral-800 dark:text-neutral-200"
+                            >{{ getModelCandidateUrls(selectedModel, baseURL).detection[0] }}</span
+                          >
+                        </div>
+                        <div>
+                          <span
+                            class="text-neutral-400 block text-[9px] uppercase tracking-wider font-semibold"
+                            >Recognition Weight URL</span
+                          >
+                          <span
+                            class="break-all select-all text-neutral-800 dark:text-neutral-200"
+                            >{{
+                              getModelCandidateUrls(selectedModel, baseURL).recognition[0]
+                            }}</span
+                          >
+                        </div>
+                        <div>
+                          <span
+                            class="text-neutral-400 block text-[9px] uppercase tracking-wider font-semibold"
+                            >Vocabulary / Dictionary URL</span
+                          >
+                          <span
+                            class="break-all select-all text-neutral-800 dark:text-neutral-200"
+                            >{{ getModelCandidateUrls(selectedModel, baseURL).dictionary[0] }}</span
+                          >
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
             </div>
           </div>
         </div>
@@ -1243,10 +1271,12 @@ onMounted(() => {
     </div>
 
     <!-- Main Workspace: Image Visualizer + Inspector Panel -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 min-h-96 lg:min-h-105">
+    <div
+      class="grid grid-cols-1 lg:grid-cols-12 min-h-96 lg:h-[680px] xl:h-[740px] overflow-hidden"
+    >
       <!-- Left: Interactive Image Canvas & Overlays (7 cols) -->
       <div
-        class="lg:col-span-7 p-3.5 sm:p-4 flex flex-col items-center justify-center bg-neutral-950/5 dark:bg-black/30 border-b lg:border-b-0 lg:border-r border-neutral-200 dark:border-neutral-800 overflow-auto"
+        class="lg:col-span-7 p-3.5 sm:p-4 flex flex-col items-center justify-center bg-neutral-950/5 dark:bg-black/30 border-b lg:border-b-0 lg:border-r border-neutral-200 dark:border-neutral-800 h-full max-h-[500px] lg:max-h-full overflow-auto"
       >
         <div
           class="relative max-w-full inline-block rounded-lg shadow-md overflow-hidden bg-white dark:bg-neutral-950"
@@ -1256,7 +1286,7 @@ onMounted(() => {
             :src="imageSrc"
             alt="OCR Target Document"
             @load="onImageLoad"
-            class="block max-w-full max-h-125 w-auto h-auto object-contain"
+            class="block max-w-full max-h-[440px] lg:max-h-[580px] w-auto h-auto object-contain"
           />
 
           <!-- Scanning Laser Bar Effect -->
@@ -1302,7 +1332,9 @@ onMounted(() => {
       </div>
 
       <!-- Right: Inspector & Output Panel (5 cols) -->
-      <div class="lg:col-span-5 flex flex-col bg-white dark:bg-neutral-900">
+      <div
+        class="lg:col-span-5 flex flex-col bg-white dark:bg-neutral-900 h-full min-h-0 overflow-hidden"
+      >
         <!-- Granularity & Tab Header -->
         <div
           class="p-3 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-2"
@@ -1417,7 +1449,9 @@ onMounted(() => {
         </div>
 
         <!-- Tab Body Content -->
-        <div class="flex-1 min-h-0 p-3 overflow-y-auto max-h-96 lg:max-h-none text-xs font-mono">
+        <div
+          class="flex-1 min-h-0 p-3 overflow-y-auto max-h-[460px] lg:max-h-full text-xs font-mono"
+        >
           <!-- OCR Error Message Box -->
           <div
             v-if="ocrError"

@@ -50,4 +50,66 @@ export interface OcrModelOption {
   tags?: string[];
 }
 
+export type LayoutModelId = 'heuristic' | 'indra' | 'cdla' | 'publaynet' | 'none';
+
+export interface LayoutModelOption {
+  id: LayoutModelId;
+  name: string;
+  category: 'Indra OCR' | 'PP-Structure' | 'Built-in';
+  description: string;
+  size: string;
+  assetFile?: string;
+  downloadUrl?: string;
+}
+
+export const availableLayoutModels: LayoutModelOption[] = [
+  {
+    id: 'heuristic',
+    name: 'Geometric Column Flow (Built-in)',
+    category: 'Built-in',
+    description:
+      'Fast client-side geometric column partitioning and reading flow without extra model download.',
+    size: '0 KB',
+  },
+  {
+    id: 'indra',
+    name: 'Indra Neural Reading Order (Transformer)',
+    category: 'Indra OCR',
+    description:
+      'Sequences multi-column text lines into natural human reading flow using coordinate transformer.',
+    size: '2.9 MB',
+    assetFile: 'indraocr/indra_order.rten',
+    downloadUrl:
+      'https://huggingface.co/byrizki/rten-models/resolve/main/indraocr/indra_order.rten',
+  },
+  {
+    id: 'cdla',
+    name: 'PP-OCR CDLA Document Layout',
+    category: 'PP-Structure',
+    description:
+      'General document layout analysis detecting text, titles, figures, captions, tables, and headers.',
+    size: '8.4 MB',
+    assetFile: 'modules/layout_cdla.rten',
+    downloadUrl: 'https://huggingface.co/byrizki/rten-models/resolve/main/modules/layout_cdla.rten',
+  },
+  {
+    id: 'publaynet',
+    name: 'PP-OCR PubLayNet Paper Layout',
+    category: 'PP-Structure',
+    description:
+      'Academic paper and publication layout model detecting text, titles, lists, tables, and figures.',
+    size: '8.4 MB',
+    assetFile: 'modules/layout_publaynet.rten',
+    downloadUrl:
+      'https://huggingface.co/byrizki/rten-models/resolve/main/modules/layout_publaynet.rten',
+  },
+  {
+    id: 'none',
+    name: 'None (Linear Raster Scan)',
+    category: 'Built-in',
+    description: 'Standard horizontal line-by-line raster scan from top to bottom.',
+    size: '0 KB',
+  },
+];
+
 export { availableModels, defaultModel } from './models/ocrModelList';

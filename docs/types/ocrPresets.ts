@@ -49,6 +49,7 @@ export const ocrProfilePresets: OcrProfilePreset[] = [
       detectionLimitSideLen: 1920,
       detectionLimitType: 'max',
       enableReadingOrder: true,
+      layoutModel: 'indra',
       calibrationEnabled: true,
       descreenBackground: true,
       descreenStrength: 1.0,
