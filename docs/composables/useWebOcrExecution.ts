@@ -1,6 +1,11 @@
 import { ref, type Ref, type ComputedRef } from 'vue';
 import { detectText, isInitialized, type TextResult } from '@rustors/web';
-import { availableModels, defaultModel, type OcrModelOption } from '../types/ocrModels';
+import {
+  availableModels,
+  defaultModel,
+  type LayoutModelId,
+  type OcrModelOption,
+} from '../types/ocrModels';
 import {
   defaultProgressState,
   buildDetectTextOptions,
@@ -33,12 +38,14 @@ export interface EngineInitOptions {
   keepProgress?: boolean;
   step?: ProgressStep;
   progressRange?: [number, number];
+  layoutModelId?: LayoutModelId;
 }
 
 function createOcrExecutionState(defaultModelName: string) {
   return {
     progress: ref<ProgressState>({ ...defaultProgressState }),
     activeLoadedModel: ref<string | null>(null),
+    activeLoadedLayoutModel: ref<LayoutModelId | null>(null),
     status: ref<'idle' | 'initializing' | 'ready' | 'error'>('idle'),
     statusMessage: ref<string>(`${defaultModelName} selected (click Run OCR to load)`),
     isScanning: ref<boolean>(false),
@@ -65,13 +72,46 @@ function resetOcrResultsState(state: OcrState) {
 async function loadEngineWeights(
   baseURL: string,
   modelMeta: OcrModelOption,
+  layoutModelId: LayoutModelId | undefined,
   range: [number, number],
   setProgress: ProgressCallback,
   step?: ProgressStep
 ) {
-  await loadAndInitModel(baseURL, modelMeta, range, (prog) => {
-    setProgress('download', prog.stageText, prog.percent, prog.detailText, step);
-  });
+  await loadAndInitModel(
+    baseURL,
+    modelMeta,
+    range,
+    (prog) => setProgress('download', prog.stageText, prog.percent, prog.detailText, step),
+    layoutModelId
+  );
+}
+
+async function runInitSequence(
+  baseURL: string,
+  modelMeta: OcrModelOption,
+  state: OcrState,
+  setProgress: ProgressCallback,
+  opts?: EngineInitOptions
+): Promise<void> {
+  const isPipeline = opts?.keepProgress ?? false;
+  const range: [number, number] = opts?.progressRange ?? (isPipeline ? [0, 60] : [0, 100]);
+  state.status.value = 'initializing';
+  state.statusMessage.value = `Loading ${modelMeta.name}...`;
+  setProgress(
+    'download',
+    `Downloading ${modelMeta.name}...`,
+    range[0] + 5,
+    'Connecting...',
+    opts?.step
+  );
+  await loadEngineWeights(baseURL, modelMeta, opts?.layoutModelId, range, setProgress, opts?.step);
+  setProgress(
+    'init',
+    'Configuring inference engine...',
+    isPipeline ? 70 : 100,
+    'Ready',
+    isPipeline && opts?.step ? { current: 2, total: opts.step.total } : undefined
+  );
 }
 
 async function performEngineInit(
@@ -81,34 +121,20 @@ async function performEngineInit(
   setProgress: ProgressCallback,
   opts?: EngineInitOptions
 ): Promise<boolean> {
-  if (isInitialized() && state.activeLoadedModel.value === modelId) {
+  const layoutId = opts?.layoutModelId ?? null;
+  if (
+    isInitialized() &&
+    state.activeLoadedModel.value === modelId &&
+    state.activeLoadedLayoutModel.value === layoutId
+  ) {
     state.status.value = 'ready';
     return true;
   }
   const modelMeta = availableModels.find((m) => m.id === modelId) ?? defaultModel;
-  const isPipeline = opts?.keepProgress ?? false;
-  const step = opts?.step;
-  const range: [number, number] = opts?.progressRange ?? (isPipeline ? [0, 60] : [0, 100]);
   try {
-    state.status.value = 'initializing';
-    state.statusMessage.value = `Loading ${modelMeta.name}...`;
-    setProgress(
-      'download',
-      `Downloading ${modelMeta.name}...`,
-      range[0] + 5,
-      'Connecting...',
-      step
-    );
-    await loadEngineWeights(baseURL, modelMeta, range, setProgress, step);
-
-    setProgress(
-      'init',
-      'Configuring inference engine...',
-      isPipeline ? 70 : 100,
-      'Ready',
-      isPipeline && step ? { current: 2, total: step.total } : undefined
-    );
+    await runInitSequence(baseURL, modelMeta, state, setProgress, opts);
     state.activeLoadedModel.value = modelId;
+    state.activeLoadedLayoutModel.value = layoutId;
     state.status.value = 'ready';
     state.statusMessage.value = 'Engine Ready';
     return true;
@@ -117,10 +143,9 @@ async function performEngineInit(
     const msg = `Failed to load ${modelMeta.name}: ${err instanceof Error ? err.message : String(err)}`;
     state.statusMessage.value = msg;
     state.ocrError.value = msg;
-    console.error(`OCR Init Error [${modelMeta.name}]:`, err);
     return false;
   } finally {
-    if (!isPipeline) state.progress.value.active = false;
+    if (!opts?.keepProgress) state.progress.value.active = false;
   }
 }
 
@@ -135,28 +160,16 @@ async function executeModelInference(
   durationMs: number;
   opts: ReturnType<typeof buildDetectTextOptions>;
 }> {
-  setProgress(
-    'inference',
-    'Running OCR Inference...',
-    step ? 75 : 25,
-    'Detecting text regions...',
-    step
-  );
+  setProgress('inference', 'Running OCR Inference...', step ? 75 : 25, 'Detecting...', step);
   await new Promise<void>((resolve) => {
     setTimeout(resolve, 20);
   });
   const startTime = performance.now();
-  setProgress(
-    'inference',
-    'Running OCR Inference...',
-    step ? 88 : 65,
-    'Decoding characters...',
-    step
-  );
+  setProgress('inference', 'Running OCR Inference...', step ? 88 : 65, 'Decoding...', step);
   const opts = buildDetectTextOptions(ocrConfig, outputMode);
   const output = await detectText(imageSrc, opts);
   const durationMs = Math.round(performance.now() - startTime);
-  setProgress('inference', 'Finalizing OCR Output...', 100, 'Formatting results...', step);
+  setProgress('inference', 'Finalizing OCR Output...', 100, 'Formatting...', step);
   return { output, durationMs, opts };
 }
 
@@ -207,13 +220,20 @@ async function performOcrPipeline(ctx: PipelineContext) {
   if (state.isScanning.value || state.status.value === 'initializing') return;
   resetOcrResultsState(state);
   state.isScanning.value = true;
-  const needsInit = !isInitialized() || state.activeLoadedModel.value !== selectedModel.value;
+  const currentLayout = ocrConfig.value.layoutModel;
+  const isLayoutSynced =
+    !currentLayout || currentLayout === 'none' || currentLayout === 'heuristic'
+      ? true
+      : state.activeLoadedLayoutModel.value === currentLayout;
+  const needsInit =
+    !isInitialized() || state.activeLoadedModel.value !== selectedModel.value || !isLayoutSynced;
   try {
     if (needsInit) {
       const ok = await initEngine(selectedModel.value, {
         keepProgress: true,
         step: { current: 1, total: 3 },
         progressRange: [0, 60],
+        layoutModelId: currentLayout,
       });
       if (!ok) return;
     }
@@ -255,7 +275,9 @@ export function useWebOcrExecution(options: WebOcrExecutionOptions) {
     const modelMeta = availableModels.find((m) => m.id === modelId) ?? defaultModel;
     ocrConfig.value.recBatchNum = modelMeta.recommendedBatchSize;
     resetResults();
-    const isLoaded = state.activeLoadedModel.value === modelId;
+    const isLoaded =
+      state.activeLoadedModel.value === modelId &&
+      state.activeLoadedLayoutModel.value === (ocrConfig.value.layoutModel ?? null);
     state.status.value = isLoaded ? 'ready' : 'idle';
     state.statusMessage.value = isLoaded
       ? 'Engine Ready'

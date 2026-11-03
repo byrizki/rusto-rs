@@ -7,6 +7,8 @@ export interface LoadedModels {
   dictionary?: string;
   classification?: Uint8Array;
   orientation?: Uint8Array;
+  order?: Uint8Array;
+  layout?: Uint8Array;
 }
 
 let wasmReady = false;
@@ -107,12 +109,14 @@ export async function loadModelAssets(modelsConfig?: ModelSourceConfig): Promise
     return {};
   }
 
-  const [det, rec, dict, cls, orient] = await Promise.all([
+  const [det, rec, dict, cls, orient, order, layout] = await Promise.all([
     resolveBinaryBuffer(modelsConfig.detection, 'detection'),
     resolveBinaryBuffer(modelsConfig.recognition, 'recognition'),
     resolveTextContent(modelsConfig.dictionary, 'dictionary'),
     resolveBinaryBuffer(modelsConfig.classification, 'classification'),
     resolveBinaryBuffer(modelsConfig.orientation, 'orientation'),
+    resolveBinaryBuffer(modelsConfig.order, 'order'),
+    resolveBinaryBuffer(modelsConfig.layout, 'layout'),
   ]);
 
   return {
@@ -121,6 +125,8 @@ export async function loadModelAssets(modelsConfig?: ModelSourceConfig): Promise
     dictionary: dict,
     classification: cls,
     orientation: orient,
+    order,
+    layout,
   };
 }
 

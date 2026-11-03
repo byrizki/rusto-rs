@@ -80,6 +80,35 @@ export function getModelCdnUrls(modelId: string): {
   };
 }
 
+export function getLayoutModelCandidateUrls(
+  layoutModelId: string,
+  baseURL: string = '/'
+): string[] {
+  const cleanBase = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+  if (layoutModelId === 'indra') {
+    return dedupeStrings([
+      `${HUGGINGFACE_BASE}/indraocr/order.rten`,
+      `${HUGGINGFACE_BASE}/indraocr/indra_order.rten`,
+      `${cleanBase}/models/indraocr/order.rten`,
+      `${cleanBase}/models/indraocr/indra_order.rten`,
+      `${cleanBase}/models/indra/indra_order.rten`,
+    ]);
+  }
+  if (layoutModelId === 'cdla') {
+    return dedupeStrings([
+      `${HUGGINGFACE_BASE}/modules/layout_cdla.rten`,
+      `${cleanBase}/models/modules/layout_cdla.rten`,
+    ]);
+  }
+  if (layoutModelId === 'publaynet') {
+    return dedupeStrings([
+      `${HUGGINGFACE_BASE}/modules/layout_publaynet.rten`,
+      `${cleanBase}/models/modules/layout_publaynet.rten`,
+    ]);
+  }
+  return [];
+}
+
 let cachedHfIndex: HfModelAssetInfo[] | null = null;
 
 export async function fetchHuggingFaceModelIndex(

@@ -18,10 +18,12 @@ import {
   sortCandidatesReadingOrder,
   type QuadPoints,
 } from '../utils/geometry.js';
+import { orderWithTransformer } from '../utils/readingOrder.js';
 import {
   loadModelAssets,
   initWasmRuntime,
   RtenOcrPipeline,
+  RtenModel,
   type LoadedModels,
 } from './wasmLoader.js';
 import { OcrWorkerBridge } from './workerBridge.js';
@@ -31,6 +33,7 @@ export class WebOcrEngine {
   private currentConfig: InitializeConfig = {};
   private loadedModels: LoadedModels = {};
   private pipeline: RtenOcrPipeline | null = null;
+  private orderModel: RtenModel | null = null;
   private workerBridge: OcrWorkerBridge = new OcrWorkerBridge();
 
   /**
@@ -61,7 +64,16 @@ export class WebOcrEngine {
       );
     }
 
-    // 4. Initialize worker bridge if enabled and in browser environment
+    // 4. Construct Neural Reading Order Model if order asset is present
+    if (this.loadedModels.order) {
+      try {
+        this.orderModel = new RtenModel(this.loadedModels.order);
+      } catch (err) {
+        console.warn('Failed to initialize neural reading order model:', err);
+      }
+    }
+
+    // 5. Initialize worker bridge if enabled and in browser environment
     if (validConfig.worker && typeof Worker !== 'undefined') {
       try {
         await this.workerBridge.initialize(validConfig);
@@ -206,11 +218,19 @@ export class WebOcrEngine {
     // Group into rows based on vertical center tolerance or multi-column reading order
     let groupedLines: TextResult[][];
     if (enableReadingOrder) {
-      const orderedCandidates = sortCandidatesReadingOrder(
-        filteredCandidates,
-        lineYThreshold,
-        image.width
-      );
+      const isIndraLayout =
+        options.layoutModel === 'indra' || this.currentConfig.layoutModel === 'indra';
+      const useNeural =
+        Boolean(this.orderModel) && (isIndraLayout || options.enableReadingOrder);
+
+      const orderedCandidates =
+        useNeural && this.orderModel && filteredCandidates.length >= 2
+          ? orderWithTransformer(filteredCandidates, this.orderModel, image.width, image.height)
+          : sortCandidatesReadingOrder(
+              filteredCandidates,
+              lineYThreshold,
+              image.width
+            );
       groupedLines = [];
       let currentLine: TextResult[] = [];
       let currentAvgY = 0;

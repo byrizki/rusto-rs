@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useRuntimeConfig } from '#app';
 import {
   availableModels,
@@ -61,6 +61,7 @@ function onLayoutModelChange() {
   } else {
     ocrConfig.value.enableReadingOrder = true;
   }
+  resetResults();
 }
 
 const selectedSample = ref<string>('invoice');
@@ -123,9 +124,31 @@ function handleFileUpload(event: Event) {
   imageSrc.value = `${URL.createObjectURL(file)}#${encodeURIComponent(file.name)}`;
 }
 
-function onImageLoad(e: Event) {
-  imgDims.value = getImageDimensions(e.target);
+function updateImageDimensions() {
+  if (!imgRef.value) return;
+  const img = imgRef.value;
+  const rect = img.getBoundingClientRect();
+  const rW = rect.width > 0 ? rect.width : img.clientWidth || 0;
+  const rH = rect.height > 0 ? rect.height : img.clientHeight || 0;
+  if (img.naturalWidth > 0 && img.naturalHeight > 0 && rW > 0 && rH > 0) {
+    imgDims.value = {
+      naturalW: img.naturalWidth,
+      naturalH: img.naturalHeight,
+      renderW: rW,
+      renderH: rH,
+    };
+  }
 }
+
+function onImageLoad() {
+  nextTick(() => updateImageDimensions());
+}
+
+watch(results, () => {
+  nextTick(() => updateImageDimensions());
+});
+
+let resizeObserver: ResizeObserver | null = null;
 
 async function copyToClipboard(text: string) {
   try {
@@ -152,6 +175,21 @@ onMounted(() => {
   status.value = 'idle';
   statusMessage.value = `${currentModel.value.name} selected (click Run OCR to load)`;
   fetchHuggingFaceModelIndex().catch(() => {});
+  nextTick(() => updateImageDimensions());
+  if (typeof ResizeObserver !== 'undefined' && imgRef.value) {
+    resizeObserver = new ResizeObserver(() => updateImageDimensions());
+    resizeObserver.observe(imgRef.value);
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', updateImageDimensions);
+  }
+});
+
+onUnmounted(() => {
+  resizeObserver?.disconnect();
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', updateImageDimensions);
+  }
 });
 </script>
 
@@ -293,7 +331,7 @@ onMounted(() => {
           <!-- Floating Popover Modal -->
           <div
             v-if="isConfigOpen"
-            class="absolute right-0 top-full mt-2 w-84 sm:w-[500px] max-h-[85vh] flex flex-col rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-50 text-xs overflow-hidden"
+            class="absolute left-0 top-full mt-2 w-[calc(100vw-2.5rem)] sm:w-[500px] max-w-[500px] max-h-[85vh] flex flex-col rounded-xl shadow-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-50 text-xs overflow-hidden"
           >
             <!-- Popover Header -->
             <div

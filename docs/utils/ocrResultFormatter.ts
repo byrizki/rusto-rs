@@ -107,10 +107,14 @@ export function getImageDimensions(target: EventTarget | null): {
   renderH: number;
 } {
   const img = target as HTMLImageElement | null;
+  const rect = img?.getBoundingClientRect();
+  const renderW = rect && rect.width > 0 ? rect.width : img?.clientWidth || img?.naturalWidth || 1;
+  const renderH =
+    rect && rect.height > 0 ? rect.height : img?.clientHeight || img?.naturalHeight || 1;
   return {
     naturalW: img?.naturalWidth || 1,
     naturalH: img?.naturalHeight || 1,
-    renderW: img?.clientWidth || img?.naturalWidth || 1,
-    renderH: img?.clientHeight || img?.naturalHeight || 1,
+    renderW,
+    renderH,
   };
 }

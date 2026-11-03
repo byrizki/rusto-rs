@@ -98,6 +98,45 @@ impl RtenModel {
         }
         Err("Expected float tensor output from model".to_string())
     }
+
+    #[wasm_bindgen(js_name = runOrder)]
+    pub fn run_order(
+        &self,
+        num_items: usize,
+        feats_data: Vec<f32>,
+    ) -> Result<InferenceOutput, String> {
+        let feats_id = self.model.find_node("feats")
+            .or_else(|| self.model.input_ids().first().copied())
+            .ok_or_else(|| "Node 'feats' not found in order model".to_string())?;
+        let mask_id = self.model.find_node("mask")
+            .or_else(|| self.model.input_ids().get(1).copied())
+            .ok_or_else(|| "Node 'mask' not found in order model".to_string())?;
+        let out_id = self.model.find_node("a")
+            .or_else(|| self.model.output_ids().first().copied())
+            .ok_or_else(|| "Output node 'a' not found in order model".to_string())?;
+
+        let feats_tensor = rten_tensor::Tensor::from_data(&[1, num_items, 16], feats_data);
+        let mask_tensor = rten_tensor::Tensor::from_data(&[1, num_items], vec![1i32; num_items]);
+
+        let results = self.model.run(
+            vec![
+                (feats_id, feats_tensor.view().into()),
+                (mask_id, mask_tensor.view().into()),
+            ],
+            &[out_id],
+            None,
+        ).map_err(|e| format!("Order model run error: {:?}", e))?;
+
+        if let Some(first) = results.into_iter().next() {
+            if let Value::FloatTensor(t) = first {
+                return Ok(InferenceOutput {
+                    shape: t.shape().to_vec(),
+                    data: t.to_vec(),
+                });
+            }
+        }
+        Err("Expected float tensor output 'a' from order model".to_string())
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

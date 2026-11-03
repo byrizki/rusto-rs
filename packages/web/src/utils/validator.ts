@@ -29,6 +29,8 @@ const MODEL_KEYS = [
   'dictionary',
   'classification',
   'orientation',
+  'order',
+  'layout',
 ] as const;
 
 const DETECTION_KEYS = ['limitSideLen', 'limitType', 'mean', 'std'] as const;

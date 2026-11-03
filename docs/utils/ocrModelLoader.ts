@@ -1,6 +1,6 @@
 import { type ModelSourceConfig, initialize } from '@rustors/web';
-import { type OcrModelOption } from '../types/ocrModels';
-import { getModelCandidateUrls } from './ocrReleaseModels';
+import { type LayoutModelId, type OcrModelOption } from '../types/ocrModels';
+import { getLayoutModelCandidateUrls, getModelCandidateUrls } from './ocrReleaseModels';
 
 export interface ModelDownloadProgress {
   stageText: string;
@@ -12,6 +12,7 @@ export interface LoadedModelAssets extends ModelSourceConfig {
   detection: Uint8Array;
   recognition: Uint8Array;
   dictionary: string;
+  order?: Uint8Array;
   [key: string]: string | Uint8Array | ArrayBuffer | undefined;
 }
 
@@ -132,18 +133,39 @@ export async function downloadTextAsset(urlOrUrls: string | string[]): Promise<s
   throw lastError ?? new Error('Failed to load text asset');
 }
 
+function downloadLayoutAsset(
+  layoutModelId: LayoutModelId,
+  baseURL: string,
+  totalSteps: number,
+  onProgress?: (progress: ModelDownloadProgress) => void,
+  progressRange: [number, number] = [0, 100]
+): Promise<Uint8Array | undefined> {
+  const layoutUrls = getLayoutModelCandidateUrls(layoutModelId, baseURL);
+  if (layoutUrls.length === 0) return undefined;
+  const label =
+    layoutModelId === 'indra'
+      ? 'Indra Neural Reading Order (order.rten)'
+      : `${layoutModelId} (layout.rten)`;
+  return downloadBinaryWithProgress(layoutUrls, label, 3, totalSteps, onProgress, progressRange);
+}
+
 export async function fetchModelAssets(
   model: OcrModelOption,
   onProgress?: (progress: ModelDownloadProgress) => void,
   progressRange: [number, number] = [0, 100],
-  baseURL: string = '/'
+  baseURL: string = '/',
+  layoutModelId?: LayoutModelId
 ): Promise<LoadedModelAssets> {
   const candidates = getModelCandidateUrls(model.id, baseURL);
+  const isLayoutNeeded =
+    layoutModelId !== undefined && layoutModelId !== 'none' && layoutModelId !== 'heuristic';
+  const totalSteps = isLayoutNeeded ? 3 : 2;
+
   const detBuffer = await downloadBinaryWithProgress(
     candidates.detection,
     `${model.name} (det.rten)`,
     1,
-    2,
+    totalSteps,
     onProgress,
     progressRange
   );
@@ -151,29 +173,37 @@ export async function fetchModelAssets(
     candidates.recognition,
     `${model.name} (rec.rten)`,
     2,
-    2,
+    totalSteps,
     onProgress,
     progressRange
   );
   const dictText = await downloadTextAsset(candidates.dictionary);
+  const orderBuffer = isLayoutNeeded
+    ? await downloadLayoutAsset(layoutModelId, baseURL, totalSteps, onProgress, progressRange)
+    : undefined;
 
-  return {
+  const assets: LoadedModelAssets = {
     detection: detBuffer,
     recognition: recBuffer,
     dictionary: dictText,
   };
+  if (orderBuffer) assets.order = orderBuffer;
+  return assets;
 }
 
 export async function loadAndInitModel(
   baseURL: string,
   model: OcrModelOption,
   progressRange: [number, number] = [0, 100],
-  onProgress?: (progress: ModelDownloadProgress) => void
+  onProgress?: (progress: ModelDownloadProgress) => void,
+  layoutModelId?: LayoutModelId
 ): Promise<void> {
-  const assets = await fetchModelAssets(model, onProgress, progressRange, baseURL);
+  const assets = await fetchModelAssets(model, onProgress, progressRange, baseURL, layoutModelId);
   await initialize({
     preset: model.preset,
     wasmUrl: `${baseURL}wasm/rusto_rten_wasm_bg.wasm?v=0.4.0`,
     models: assets,
+    enableReadingOrder: layoutModelId !== undefined && layoutModelId !== 'none',
+    layoutModel: layoutModelId,
   });
 }

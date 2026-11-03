@@ -42,6 +42,9 @@ export interface InitializeConfig {
   /** Enable multi-column reading order recovery sequence. */
   enableReadingOrder?: boolean;
 
+  /** Layout / reading order architecture variant or model identifier (e.g. 'indra', 'cdla', 'publaynet', 'heuristic', 'none'). */
+  layoutModel?: string;
+
   /** Default pre-OCR image calibration options. */
   calibration?: CalibrationOptions;
 

@@ -98,3 +98,19 @@ fn test_indra_inference_pipeline() {
     assert!(json_res.contains("JOHN"));
 }
 
+#[test]
+fn test_indra_order_model() {
+    let order_file = Path::new("../../models/indra/indra_order.rten");
+    if !order_file.exists() {
+        return;
+    }
+    let order_data = fs::read(&order_file).expect("read order.rten");
+    let model = rusto_rten_wasm::RtenModel::new(order_data).expect("load order.rten");
+    let feats = vec![0.0f32; 32];
+    let out = model.run_order(2, feats).expect("run_order");
+    assert_eq!(out.shape(), vec![1, 2, 2]);
+    assert_eq!(out.data().len(), 4);
+}
+
+
+
