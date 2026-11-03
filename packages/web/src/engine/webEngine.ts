@@ -15,6 +15,7 @@ import {
   clusterLineSegments,
   formatSpatialText,
   groupCandidatesIntoLines,
+  sortCandidatesReadingOrder,
   type QuadPoints,
 } from '../utils/geometry.js';
 import {
@@ -198,8 +199,48 @@ export class WebOcrEngine {
     // Filter by score threshold
     const filteredCandidates = rawCandidates.filter((item) => item.score >= minScore);
 
-    // Group into rows based on vertical center tolerance
-    const groupedLines = groupCandidatesIntoLines(filteredCandidates, lineYThreshold);
+    const enableReadingOrder =
+      options.enableReadingOrder ?? this.currentConfig.enableReadingOrder ?? false;
+
+    // Group into rows based on vertical center tolerance or multi-column reading order
+    let groupedLines: TextResult[][];
+    if (enableReadingOrder) {
+      const orderedCandidates = sortCandidatesReadingOrder(
+        filteredCandidates,
+        lineYThreshold,
+        image.width
+      );
+      groupedLines = [];
+      let currentLine: TextResult[] = [];
+      let currentAvgY = 0;
+      for (const item of orderedCandidates) {
+        const itemCenterY = item.frame.top + item.frame.height / 2;
+        if (currentLine.length === 0) {
+          currentLine = [item];
+          currentAvgY = itemCenterY;
+        } else {
+          const avgY = currentAvgY / currentLine.length;
+          const avgH = currentLine.reduce((s, c) => s + c.frame.height, 0) / currentLine.length;
+          const tolerance = Math.max(1, avgH * lineYThreshold);
+          const prev = currentLine[currentLine.length - 1]!;
+          const gap = item.frame.left - (prev.frame.left + prev.frame.width);
+          if (
+            Math.abs(itemCenterY - avgY) <= tolerance &&
+            gap <= avgH * (options.wordXThreshold ?? 0.4) * 2.5
+          ) {
+            currentLine.push(item);
+            currentAvgY += itemCenterY;
+          } else {
+            groupedLines.push(currentLine);
+            currentLine = [item];
+            currentAvgY = itemCenterY;
+          }
+        }
+      }
+      if (currentLine.length > 0) groupedLines.push(currentLine);
+    } else {
+      groupedLines = groupCandidatesIntoLines(filteredCandidates, lineYThreshold);
+    }
 
     if (outputMode === 'spatial') {
       return formatSpatialText(groupedLines, wordXThreshold);

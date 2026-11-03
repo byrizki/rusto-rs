@@ -3,6 +3,7 @@ import {
   type TextResult,
   formatSpatialText,
   groupCandidatesIntoLines,
+  sortCandidatesReadingOrder,
 } from '@rustors/web';
 import type { OcrModelOption } from '../types/ocrModels';
 import { type ActiveRunConfig, type OcrConfig, buildDetectTextOptions } from '../types/ocrConfig';
@@ -10,13 +11,17 @@ import { type ActiveRunConfig, type OcrConfig, buildDetectTextOptions } from '..
 export function processOcrOutput(
   output: TextResult[] | string,
   lineYThreshold: number,
-  wordXThreshold: number
+  wordXThreshold: number,
+  enableReadingOrder: boolean = false
 ): { results: TextResult[]; spatialText: string } {
   if (Array.isArray(output)) {
+    const ordered = enableReadingOrder
+      ? sortCandidatesReadingOrder(output, lineYThreshold)
+      : output;
     return {
-      results: output,
+      results: ordered,
       spatialText: formatSpatialText(
-        groupCandidatesIntoLines(output, lineYThreshold),
+        groupCandidatesIntoLines(ordered, lineYThreshold),
         wordXThreshold
       ),
     };

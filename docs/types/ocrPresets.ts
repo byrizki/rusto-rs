@@ -48,6 +48,7 @@ export const ocrProfilePresets: OcrProfilePreset[] = [
       textScore: 0.45,
       detectionLimitSideLen: 1920,
       detectionLimitType: 'max',
+      enableReadingOrder: true,
       calibrationEnabled: true,
       descreenBackground: true,
       descreenStrength: 1.0,

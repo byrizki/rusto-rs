@@ -176,7 +176,8 @@ function applyOcrOutput(
   const processed = processOcrOutput(
     output,
     ocrConfig.value.lineYThreshold,
-    ocrConfig.value.wordXThreshold
+    ocrConfig.value.wordXThreshold,
+    ocrConfig.value.enableReadingOrder
   );
   results.value = processed.results;
   spatialText.value = processed.spatialText;
@@ -513,6 +514,18 @@ onMounted(() => {
                 </button>
                 <button
                   type="button"
+                  @click="configTab = 'recognition'"
+                  class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
+                  :class="
+                    configTab === 'recognition'
+                      ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
+                      : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200'
+                  "
+                >
+                  Recognition
+                </button>
+                <button
+                  type="button"
                   @click="configTab = 'layout'"
                   class="flex-1 py-1 px-1.5 text-[11px] font-medium rounded-md transition-all cursor-pointer text-center whitespace-nowrap"
                   :class="
@@ -521,7 +534,7 @@ onMounted(() => {
                       : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200'
                   "
                 >
-                  Recognition
+                  Reading & Layout
                 </button>
                 <button
                   type="button"
@@ -731,8 +744,8 @@ onMounted(() => {
                 </div>
               </template>
 
-              <!-- Tab 2: Layout & Recognition Pipeline -->
-              <template v-else-if="configTab === 'layout'">
+              <!-- Tab 2: Recognition Engine Settings -->
+              <template v-else-if="configTab === 'recognition'">
                 <!-- Recognition Batch Size -->
                 <div class="space-y-1">
                   <div class="flex justify-between items-center">
@@ -760,8 +773,67 @@ onMounted(() => {
                   </p>
                 </div>
 
-                <!-- lineYThreshold -->
+                <!-- Text Score Cutoff -->
                 <div class="space-y-1 pt-1.5 border-t border-neutral-100 dark:border-neutral-800">
+                  <div class="flex justify-between items-center">
+                    <label class="font-medium text-neutral-700 dark:text-neutral-300">
+                      Min Text Confidence (textScore)
+                    </label>
+                    <span
+                      class="font-mono text-[11px] text-neutral-600 dark:text-neutral-300 font-semibold"
+                    >
+                      {{ Math.round(ocrConfig.textScore * 100) }}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="0.95"
+                    step="0.05"
+                    v-model.number="ocrConfig.textScore"
+                    class="w-full accent-primary cursor-pointer"
+                  />
+                  <p class="text-[10px] text-neutral-400">
+                    Filters out low-confidence OCR predictions from the final output.
+                  </p>
+                </div>
+              </template>
+
+              <!-- Tab 3: Reading Order & Layout Geometry -->
+              <template v-else-if="configTab === 'layout'">
+                <!-- Reading Order Recovery -->
+                <div
+                  class="space-y-1.5 bg-neutral-50 dark:bg-neutral-800/40 p-2.5 rounded-lg border border-neutral-200/60 dark:border-neutral-700/60"
+                >
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <span class="font-medium text-neutral-800 dark:text-neutral-200 text-xs">
+                        Multi-Column Reading Order
+                      </span>
+                      <p class="text-[10px] text-neutral-500 dark:text-neutral-400">
+                        enableReadingOrder (Natural Column Flow)
+                      </p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        v-model="ocrConfig.enableReadingOrder"
+                        class="sr-only peer"
+                      />
+                      <div
+                        class="w-8 h-4 bg-neutral-300 peer-focus:outline-none rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-neutral-600 peer-checked:bg-primary"
+                      ></div>
+                    </label>
+                  </div>
+                  <p class="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                    Partitions dense multi-column layouts (newspapers, magazines, articles) into
+                    natural human reading sequence (Column 1 top-to-bottom, then Column 2) instead
+                    of horizontal scan.
+                  </p>
+                </div>
+
+                <!-- lineYThreshold -->
+                <div class="space-y-1 pt-1.5">
                   <div class="flex justify-between items-center">
                     <label class="font-medium text-neutral-700 dark:text-neutral-300">
                       Row Center Tolerance (lineYThreshold)
@@ -781,12 +853,12 @@ onMounted(() => {
                     class="w-full accent-primary cursor-pointer"
                   />
                   <p class="text-[10px] text-neutral-400">
-                    Vertical center distance tolerance for same-row clustering.
+                    Vertical center distance multiplier for same-line clustering.
                   </p>
                 </div>
 
                 <!-- wordXThreshold -->
-                <div class="space-y-1">
+                <div class="space-y-1 pt-1 border-t border-neutral-100 dark:border-neutral-800">
                   <div class="flex justify-between items-center">
                     <label class="font-medium text-neutral-700 dark:text-neutral-300">
                       Word Gap Tolerance (wordXThreshold)
@@ -806,7 +878,7 @@ onMounted(() => {
                     class="w-full accent-primary cursor-pointer"
                   />
                   <p class="text-[10px] text-neutral-400">
-                    Horizontal gap multiplier when reconstructing words.
+                    Horizontal gap multiplier when reconstructing words and columns.
                   </p>
                 </div>
 

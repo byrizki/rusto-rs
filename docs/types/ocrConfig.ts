@@ -25,9 +25,10 @@ export const defaultProgressState: ProgressState = {
 export interface OcrConfig {
   // Confidence & filtering
   textScore: number;
-  // Layout & line grouping
+  // Layout & reading order
   lineYThreshold: number;
   wordXThreshold: number;
+  enableReadingOrder: boolean;
   // Recognition batching
   recBatchNum: number;
   // Stages
@@ -63,6 +64,7 @@ export const defaultOcrConfig: OcrConfig = {
   textScore: 0.5,
   lineYThreshold: 0.5,
   wordXThreshold: 0.4,
+  enableReadingOrder: false,
   recBatchNum: 1,
   classification: false,
   orientation: false,
@@ -109,6 +111,7 @@ export function buildDetectTextOptions(
     textScore: config.textScore,
     lineYThreshold: config.lineYThreshold,
     wordXThreshold: config.wordXThreshold,
+    enableReadingOrder: config.enableReadingOrder,
     classification: config.classification,
     orientation: config.orientation,
     detection: {

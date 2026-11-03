@@ -67,6 +67,121 @@ export function groupCandidatesIntoLines(
 }
 
 /**
+ * Orders candidate text lines into natural human reading order across multi-column layouts.
+ *
+ * Symmetrical with Rust core `src/layout.rs`:
+ * 1. Partitions page into vertical sections bounded by full-width spanning lines (>65% page width).
+ * 2. Groups candidates within each section into horizontal columns based on x-bounds.
+ * 3. Sorts lines within each column top-to-bottom.
+ * 4. Orders columns left-to-right.
+ */
+export function sortCandidatesReadingOrder(
+  candidates: TextResult[],
+  lineYThreshold: number = 0.5,
+  pageWidth?: number
+): TextResult[] {
+  if (candidates.length <= 1) return [...candidates];
+
+  const pw =
+    pageWidth || Math.max(...candidates.map((c) => c.frame.left + c.frame.width));
+  const heights = candidates.map((c) => c.frame.height).sort((a, b) => a - b);
+  const medianH = Math.max(1, heights[Math.floor(heights.length / 2)] || 20);
+  const yTolerance = medianH * lineYThreshold;
+
+  // Sort initially top-to-bottom, left-to-right
+  const sorted = [...candidates].sort((a, b) => {
+    if (Math.abs(a.frame.top - b.frame.top) > yTolerance) {
+      return a.frame.top - b.frame.top;
+    }
+    return a.frame.left - b.frame.left;
+  });
+
+  // Partition into vertical sections bounded by full-width spanning headlines (>65% page width)
+  const sections: TextResult[][] = [];
+  let currentSection: TextResult[] = [];
+  let sectionMaxY = -Infinity;
+
+  for (const item of sorted) {
+    const isSpanning = item.frame.width > 0.65 * pw;
+
+    if (currentSection.length === 0) {
+      sectionMaxY = item.frame.top + item.frame.height;
+      currentSection.push(item);
+    } else {
+      const prev = currentSection[currentSection.length - 1]!;
+      const prevWasSpanning = prev.frame.width > 0.65 * pw;
+
+      if (isSpanning || prevWasSpanning || item.frame.top >= sectionMaxY) {
+        sections.push(currentSection);
+        sectionMaxY = item.frame.top + item.frame.height;
+        currentSection = [item];
+      } else {
+        sectionMaxY = Math.max(sectionMaxY, item.frame.top + item.frame.height);
+        currentSection.push(item);
+      }
+    }
+  }
+  if (currentSection.length > 0) {
+    sections.push(currentSection);
+  }
+
+  const ordered: TextResult[] = [];
+
+  for (const section of sections) {
+    if (section.length <= 1) {
+      ordered.push(...section);
+      continue;
+    }
+
+    // Group items into columns
+    const columns: TextResult[][] = [];
+    for (const item of section) {
+      const itemX1 = item.frame.left;
+      const itemX2 = item.frame.left + item.frame.width;
+
+      let bestCol = -1;
+      let bestOverlap = 0;
+
+      for (let c = 0; c < columns.length; c++) {
+        const col = columns[c]!;
+        const colX1 = Math.min(...col.map((r) => r.frame.left));
+        const colX2 = Math.max(...col.map((r) => r.frame.left + r.frame.width));
+
+        const overlapX1 = Math.max(itemX1, colX1);
+        const overlapX2 = Math.min(itemX2, colX2);
+        const overlap = Math.max(0, overlapX2 - overlapX1);
+
+        if (overlap > bestOverlap) {
+          bestOverlap = overlap;
+          bestCol = c;
+        }
+      }
+
+      if (bestCol >= 0 && bestOverlap > Math.min(item.frame.width, 40) * 0.3) {
+        columns[bestCol]!.push(item);
+      } else {
+        columns.push([item]);
+      }
+    }
+
+    // Sort columns left-to-right by their min left coordinate
+    columns.sort((colA, colB) => {
+      const minA = Math.min(...colA.map((r) => r.frame.left));
+      const minB = Math.min(...colB.map((r) => r.frame.left));
+      return minA - minB;
+    });
+
+    // Within each column, sort top-to-bottom
+    for (const col of columns) {
+      col.sort((a, b) => a.frame.top - b.frame.top);
+      ordered.push(...col);
+    }
+  }
+
+  return ordered;
+}
+
+/**
  * Clusters adjacent items on the same horizontal line into merged line segments.
  * Only merges adjacent items whose horizontal gap is within maxGap (avgHeight * wordXThreshold).
  * Items separated by gaps greater than maxGap remain distinct candidates (e.g. separate columns).

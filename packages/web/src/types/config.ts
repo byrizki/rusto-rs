@@ -39,6 +39,9 @@ export interface InitializeConfig {
   /** Number of compute threads if WebAssembly multithreading is enabled. */
   numThreads?: number;
 
+  /** Enable multi-column reading order recovery sequence. */
+  enableReadingOrder?: boolean;
+
   /** Default pre-OCR image calibration options. */
   calibration?: CalibrationOptions;
 

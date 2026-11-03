@@ -232,6 +232,21 @@ async function copyJson() {
           </span>
         </div>
         <div class="flex justify-between items-center">
+          <span class="text-neutral-500 dark:text-neutral-400">Reading Order:</span>
+          <span
+            class="font-mono font-medium"
+            :class="
+              displayConfig.options.enableReadingOrder
+                ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                : 'text-neutral-800 dark:text-neutral-200'
+            "
+          >
+            {{
+              displayConfig.options.enableReadingOrder ? 'Natural Column Flow' : 'Disabled (Raster)'
+            }}
+          </span>
+        </div>
+        <div class="flex justify-between items-center">
           <span class="text-neutral-500 dark:text-neutral-400">Recog Batch Size:</span>
           <span class="font-mono font-medium text-neutral-800 dark:text-neutral-200">
             {{ displayConfig.rawConfig.recBatchNum ?? 1 }}

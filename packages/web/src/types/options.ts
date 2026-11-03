@@ -85,6 +85,9 @@ export interface DetectTextOptions {
   /** Same-word horizontal gap tolerance multiplier. Default: 0.4. */
   wordXThreshold?: number;
 
+  /** Enable multi-column reading order recovery sequence. Default: false. */
+  enableReadingOrder?: boolean;
+
   /** Reject recognized candidates below this confidence score [0, 1]. */
   textScore?: number;
 

@@ -5,7 +5,9 @@ import type { OcrProfilePreset } from '../types/ocrPresets';
 export function useWebOcrSettings() {
   const ocrConfig = ref<OcrConfig>({ ...defaultOcrConfig });
   const isConfigOpen = ref<boolean>(false);
-  const configTab = ref<'detection' | 'layout' | 'resizing' | 'preprocess' | 'models'>('detection');
+  const configTab = ref<
+    'detection' | 'recognition' | 'layout' | 'resizing' | 'preprocess' | 'models'
+  >('detection');
 
   function toggleConfigPopover() {
     isConfigOpen.value = !isConfigOpen.value;
