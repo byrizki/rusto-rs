@@ -115,7 +115,7 @@ pub struct InitializeConfig {
 
 impl Default for InitializeConfig {
     fn default() -> Self {
-        Self::from_preset(PPV6_MODEL_CONFIG, "det.rten", "rec.rten", "dict.txt")
+        Self::from_preset(PPV6_MODEL_CONFIG, "det.mnn", "rec.mnn", "dict.txt")
     }
 }
 
@@ -507,9 +507,9 @@ impl InitializeConfig {
             } else {
                 let canonical = crate::model_manager::normalize_model_name(effective_model);
                 let orient_file = if canonical == "indraocr" {
-                    "indra_orient.rten"
+                    "indra_orient.mnn"
                 } else {
-                    "ppocr_orient.rten"
+                    "ppocr_orient.mnn"
                 };
                 crate::model_manager::resolve_asset_with_dir(None, effective_dir, "orient", orient_file, &cache_dir)
                     .map_err(|e| serde::de::Error::custom(e.to_string()))?
@@ -533,7 +533,7 @@ impl InitializeConfig {
             let cls_path = if let Some(p) = cls_override {
                 PathBuf::from(p)
             } else {
-                crate::model_manager::resolve_asset_with_dir(None, effective_dir, "cls", "ppocr_cls.rten", &cache_dir)
+                crate::model_manager::resolve_asset_with_dir(None, effective_dir, "cls", "ppocr_cls.mnn", &cache_dir)
                     .map_err(|e| serde::de::Error::custom(e.to_string()))?
             };
             if let Some(thresh) = flat.classification.as_ref().and_then(|c| c.threshold) {
@@ -555,7 +555,7 @@ impl InitializeConfig {
             let unwarp_path = if let Some(p) = unwarp_override {
                 PathBuf::from(p)
             } else {
-                crate::model_manager::resolve_asset_with_dir(None, effective_dir, "unwarp", "uvdoc.rten", &cache_dir)
+                crate::model_manager::resolve_asset_with_dir(None, effective_dir, "unwarp", "uvdoc.mnn", &cache_dir)
                     .map_err(|e| serde::de::Error::custom(e.to_string()))?
             };
             config = config.with_unwarp(unwarp_path);
@@ -573,7 +573,7 @@ impl InitializeConfig {
             let layout_path = if let Some(p) = layout_override {
                 PathBuf::from(p)
             } else {
-                let layout_file = if flat.layout_variant.as_deref() == Some("publaynet") { "layout_publaynet.rten" } else { "layout_cdla.rten" };
+                let layout_file = if flat.layout_variant.as_deref() == Some("publaynet") { "layout_publaynet.mnn" } else { "layout_cdla.mnn" };
                 crate::model_manager::resolve_asset_with_dir(None, effective_dir, "layout", layout_file, &cache_dir)
                     .map_err(|e| serde::de::Error::custom(e.to_string()))?
             };
@@ -594,7 +594,7 @@ impl InitializeConfig {
         }
 
         if flat.enable_reading_order.unwrap_or(false) {
-            let order_path = crate::model_manager::resolve_asset_with_dir(None, effective_dir, "order", "indra_order.rten", &cache_dir)
+            let order_path = crate::model_manager::resolve_asset_with_dir(None, effective_dir, "order", "indra_order.mnn", &cache_dir)
                 .map_err(|e| serde::de::Error::custom(e.to_string()))?;
             config.global.reading_order = true;
             config.global.reading_order_model = Some(order_path);
@@ -921,7 +921,7 @@ mod tests {
 
         let config = InitializeConfig::from_json(json).unwrap();
         assert_eq!(config.det.model_path, PathBuf::from("Cargo.toml"));
-        assert_eq!(config.rec.model_path, PathBuf::from("models/PPOCR_v6_tiny/rec.rten"));
+        assert_eq!(config.rec.model_path, PathBuf::from("models/PPOCR_v6_tiny/rec.mnn"));
         assert_eq!(config.rec.rec_keys_path, Some(PathBuf::from("models/PPOCR_v6_tiny/dict.txt")));
     }
 }

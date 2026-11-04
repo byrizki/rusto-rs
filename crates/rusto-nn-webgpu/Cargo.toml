@@ -1,0 +1,16 @@
+[package]
+name = "rusto-nn-webgpu"
+version = "0.3.2"
+edition = "2021"
+description = "Pluggable WebGPU hardware acceleration backend for rusto-nn"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/byrizki/rusto-rs"
+keywords = ["webgpu", "wgpu", "deep-learning", "acceleration", "gpu"]
+categories = ["science", "computer-vision"]
+
+[dependencies]
+rusto-nn = { path = "../rusto-nn", version = "0.3.2" }
+wgpu = { version = "24", default-features = false, features = ["wgsl"] }
+pollster = "0.4"
+thiserror = "1.0"
+

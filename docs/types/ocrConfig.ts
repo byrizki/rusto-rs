@@ -60,6 +60,8 @@ export interface OcrConfig {
   optimizationTargetMaxSide: number;
   cropPaddingX: number;
   cropPaddingY: number;
+  // Hardware Acceleration
+  useWebGpu: boolean;
 }
 
 export const defaultOcrConfig: OcrConfig = {
@@ -90,6 +92,7 @@ export const defaultOcrConfig: OcrConfig = {
   optimizationTargetMaxSide: 960,
   cropPaddingX: 0,
   cropPaddingY: 0.02,
+  useWebGpu: false,
 };
 
 export interface ActiveRunConfig {
@@ -155,6 +158,7 @@ export function buildDetectTextOptions(
       cropPaddingX: config.cropPaddingX,
       cropPaddingY: config.cropPaddingY,
     },
+    webgpu: config.useWebGpu,
   };
 
   applyResizeOptions(opts, config);

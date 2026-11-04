@@ -221,6 +221,50 @@ fn test_doc_unwarper_with_mock_session() {
 }
 
 #[test]
+fn test_real_doc_unwarper_mnn() {
+    let unwarp_path = "models/PPOCR_v6_tiny/uvdoc.mnn";
+    let img_path = "models/test_images/example1_curved.png";
+    if !std::path::Path::new(unwarp_path).exists() || !std::path::Path::new(img_path).exists() {
+        return;
+    }
+
+    let unwarp_config = UnwarpConfig::default(unwarp_path.into());
+    let mut unwarper = DocUnwarper::new(unwarp_config).expect("Init DocUnwarper with uvdoc.mnn");
+
+    let img = image::open(img_path).expect("Open curved image");
+    let mat = rusto::image_impl::Mat::new(img);
+    let output = unwarper.unwarp(&mat).expect("Run unwarp with uvdoc.mnn");
+
+    assert_eq!(output.unwarped_image.cols(), mat.cols());
+    assert_eq!(output.unwarped_image.rows(), mat.rows());
+}
+
+#[test]
+fn test_real_doc_unwarper_onnx() {
+    let unwarp_path = "models/PPOCR_v6_tiny/uvdoc.onnx";
+    let img_path = "models/test_images/example1_curved.png";
+    if !std::path::Path::new(unwarp_path).exists() || !std::path::Path::new(img_path).exists() {
+        return;
+    }
+
+    let mnn_session = rusto::engine::MnnSession::from_path(
+        std::path::Path::new(unwarp_path),
+        &rusto::types::EngineConfig::default(),
+    ).expect("Init MnnSession for uvdoc.onnx");
+    let mut unwarper = DocUnwarper::with_custom_session(
+        UnwarpConfig::default(unwarp_path.into()),
+        mnn_session,
+    );
+
+    let img = image::open(img_path).expect("Open curved image");
+    let mat = rusto::image_impl::Mat::new(img);
+    let output = unwarper.unwarp(&mat).expect("Run unwarp with uvdoc.onnx");
+
+    assert_eq!(output.unwarped_image.cols(), mat.cols());
+    assert_eq!(output.unwarped_image.rows(), mat.rows());
+}
+
+#[test]
 fn test_rusto_detect_layout_api() {
     let det_path = "models/PPOCR_v6_tiny/det.rten";
     let rec_path = "models/PPOCR_v6_tiny/rec.rten";
@@ -309,6 +353,44 @@ fn test_real_layout_publaynet_detection() {
         assert!(r.bbox.x_max > r.bbox.x_min);
         assert!(r.bbox.y_max > r.bbox.y_min);
     }
+}
+
+#[test]
+fn test_real_layout_cdla_detection_mnn() {
+    let model_path = "models/PPOCR_v6_tiny/layout_cdla.mnn";
+    let img_path = "vendor/RapidDoc/demo/images/layout_original_image_01.png";
+
+    if !std::path::Path::new(model_path).exists() || !std::path::Path::new(img_path).exists() {
+        return;
+    }
+
+    let config = LayoutConfig::default(model_path.into());
+    let mut detector = LayoutDetector::new(config).expect("Load layout_cdla.mnn");
+
+    let img = image::open(img_path).expect("open test image");
+    let mat = rusto::image_impl::Mat::new(img);
+
+    let output = detector.detect(&mat).expect("Run layout detection with layout_cdla.mnn");
+    assert!(!output.regions.is_empty(), "Should detect layout regions with layout_cdla.mnn");
+}
+
+#[test]
+fn test_real_layout_publaynet_detection_mnn() {
+    let model_path = "models/PPOCR_v6_tiny/layout_publaynet.mnn";
+    let img_path = "vendor/RapidDoc/demo/images/layout_original_image_01.png";
+
+    if !std::path::Path::new(model_path).exists() || !std::path::Path::new(img_path).exists() {
+        return;
+    }
+
+    let config = LayoutConfig::default(model_path.into());
+    let mut detector = LayoutDetector::new(config).expect("Load layout_publaynet.mnn");
+
+    let img = image::open(img_path).expect("open test image");
+    let mat = rusto::image_impl::Mat::new(img);
+
+    let output = detector.detect(&mat).expect("Run layout detection with layout_publaynet.mnn");
+    assert!(!output.regions.is_empty(), "Should detect layout regions with layout_publaynet.mnn");
 }
 
 #[test]

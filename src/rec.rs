@@ -119,19 +119,31 @@ impl CtcDecoder {
             let mut token_indices = Vec::with_capacity(t);
             let mut token_probs = Vec::with_capacity(t);
 
+            let batch_view = preds.index_axis(ndarray::Axis(0), b);
             for ti in 0..t {
-                let batch_view = preds.index_axis(ndarray::Axis(0), b);
                 let row_view = batch_view.index_axis(ndarray::Axis(0), ti);
-
-                let mut best_idx = 0usize;
-                let mut best_val = f32::MIN;
-                for ci in 0..c {
-                    let v = row_view[ci];
-                    if v > best_val {
-                        best_val = v;
-                        best_idx = ci;
+                let (best_idx, best_val) = if let Some(row_slice) = row_view.as_slice() {
+                    let mut b_idx = 0usize;
+                    let mut b_val = f32::MIN;
+                    for (ci, &v) in row_slice.iter().enumerate() {
+                        if v > b_val {
+                            b_val = v;
+                            b_idx = ci;
+                        }
                     }
-                }
+                    (b_idx, b_val)
+                } else {
+                    let mut b_idx = 0usize;
+                    let mut b_val = f32::MIN;
+                    for ci in 0..c {
+                        let v = row_view[ci];
+                        if v > b_val {
+                            b_val = v;
+                            b_idx = ci;
+                        }
+                    }
+                    (b_idx, b_val)
+                };
 
                 token_indices.push(best_idx);
                 token_probs.push(best_val);
@@ -311,6 +323,15 @@ pub struct TextRecognizer {
 impl TextRecognizer {
     pub fn new(cfg: RecConfig) -> Result<Self, EngineError> {
         let session = EngineSession::from_rec_config(&cfg)?;
+        let decoder = CtcDecoder::from_cfg(&cfg, &session)?;
+        Ok(Self { cfg, session, decoder })
+    }
+
+    /// Construct recognizer with an EngineSession
+    pub fn with_engine_session(
+        cfg: RecConfig,
+        session: EngineSession,
+    ) -> Result<Self, EngineError> {
         let decoder = CtcDecoder::from_cfg(&cfg, &session)?;
         Ok(Self { cfg, session, decoder })
     }
@@ -643,7 +664,8 @@ pub fn resize_norm_rec_img(
 
     let mut out = Array3::<f32>::zeros((img_c, img_h, target_w));
 
-    if let Some(rgb) = resized.as_dynamic().as_rgb8() {
+    if img_c == 3 && resized.as_dynamic().as_rgb8().is_some() {
+        let rgb = resized.as_dynamic().as_rgb8().unwrap();
         let raw: &[u8] = rgb.as_raw();
         let stride = w2 * 3;
         let out_slice = out.as_slice_mut().expect("contiguous array");

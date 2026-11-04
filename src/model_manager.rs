@@ -199,10 +199,12 @@ fn find_local_repo_candidates(asset_filename: &str) -> Vec<PathBuf> {
         candidates.push(PathBuf::from(format!("models/indra/{}.rten", base)));
         candidates.push(PathBuf::from(format!("models/indra/{}.onnx", base)));
     } else if let Some(sub) = asset_filename.strip_prefix("ppocrv6_tiny_") {
-        let base = sub.strip_suffix(".rten").unwrap_or(sub);
+        let base = sub.strip_suffix(".mnn").or_else(|| sub.strip_suffix(".rten")).unwrap_or(sub);
+        candidates.push(PathBuf::from(format!("models/PPOCR_v6_tiny/{}.mnn", base)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v6_tiny/{}", sub)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v6_tiny/{}.rten", base)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v6_tiny/{}.onnx", base)));
+        candidates.push(PathBuf::from(format!("models/PPOCR_v6/{}.mnn", base)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v6/{}.rten", base)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v6/{}.onnx", base)));
     } else if let Some(sub) = asset_filename.strip_prefix("ppocrv6_tiny_int8_") {
@@ -232,27 +234,38 @@ fn find_local_repo_candidates(asset_filename: &str) -> Vec<PathBuf> {
         candidates.push(PathBuf::from(format!("models/PPOCR_v5_mobile/{}.onnx", base)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v5/{}.rten", base)));
     } else if let Some(sub) = asset_filename.strip_prefix("ppocrv4_mobile_") {
-        let base = sub.strip_suffix(".rten").unwrap_or(sub);
+        let base = sub.strip_suffix(".mnn").or_else(|| sub.strip_suffix(".rten")).unwrap_or(sub);
+        candidates.push(PathBuf::from(format!("models/PPOCR_v4_mobile/{}.mnn", base)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v4_mobile/{}", sub)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v4_mobile/{}.rten", base)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v4_mobile/{}.onnx", base)));
-    } else if asset_filename == "ppocr_cls.rten" {
+    } else if asset_filename == "ppocr_cls.rten" || asset_filename == "ppocr_cls.mnn" {
+        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/cls.mnn"));
+        candidates.push(PathBuf::from("models/cls.mnn"));
         candidates.push(PathBuf::from("models/cls.rten"));
         candidates.push(PathBuf::from("models/cls.onnx"));
         candidates.push(PathBuf::from("models/PPOCR_v6_tiny/cls.onnx"));
-    } else if asset_filename == "ppocr_orient.rten" {
+    } else if asset_filename == "ppocr_orient.rten" || asset_filename == "ppocr_orient.mnn" {
+        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/orient.mnn"));
+        candidates.push(PathBuf::from("models/orient.mnn"));
         candidates.push(PathBuf::from("models/orient.rten"));
         candidates.push(PathBuf::from("models/orient.onnx"));
         candidates.push(PathBuf::from("models/PPOCR_v6_tiny/orient.onnx"));
-    } else if asset_filename == "uvdoc.rten" {
+    } else if asset_filename == "uvdoc.rten" || asset_filename == "uvdoc.mnn" {
+        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/uvdoc.mnn"));
+        candidates.push(PathBuf::from("models/uvdoc.mnn"));
         candidates.push(PathBuf::from("models/uvdoc.rten"));
         candidates.push(PathBuf::from("models/uvdoc.onnx"));
         candidates.push(PathBuf::from("models/PPOCR_v6_tiny/uvdoc.onnx"));
-    } else if asset_filename == "layout_cdla.rten" {
+    } else if asset_filename == "layout_cdla.rten" || asset_filename == "layout_cdla.mnn" {
+        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/layout_cdla.mnn"));
+        candidates.push(PathBuf::from("models/layout_cdla.mnn"));
         candidates.push(PathBuf::from("models/layout_cdla.rten"));
         candidates.push(PathBuf::from("models/layout_cdla.onnx"));
         candidates.push(PathBuf::from("models/PPOCR_v6_tiny/layout_cdla.onnx"));
-    } else if asset_filename == "layout_publaynet.rten" {
+    } else if asset_filename == "layout_publaynet.rten" || asset_filename == "layout_publaynet.mnn" {
+        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/layout_publaynet.mnn"));
+        candidates.push(PathBuf::from("models/layout_publaynet.mnn"));
         candidates.push(PathBuf::from("models/layout_publaynet.rten"));
         candidates.push(PathBuf::from("models/layout_publaynet.onnx"));
         candidates.push(PathBuf::from("models/PPOCR_v6_tiny/layout_publaynet.onnx"));
@@ -267,16 +280,16 @@ pub fn find_in_model_dir(dir: &Path, kind: &str) -> Option<PathBuf> {
         return None;
     }
 
-    // Direct filename checks first
+    // Direct filename checks first (mnn prioritized, fallback to rten and onnx)
     let direct_checks: &[&str] = match kind {
-        "det" => &["det.rten", "det.onnx", "detection.rten", "detection.onnx"],
-        "rec" => &["rec.rten", "rec.onnx", "recognition.rten", "recognition.onnx"],
+        "det" => &["det.mnn", "det.rten", "det.onnx", "detection.mnn", "detection.rten", "detection.onnx"],
+        "rec" => &["rec.mnn", "rec.rten", "rec.onnx", "recognition.mnn", "recognition.rten", "recognition.onnx"],
         "dict" => &["dict.txt", "meta.json", "ppocr_keys_v1.txt", "keys.txt", "vocab.txt"],
-        "cls" => &["cls.rten", "cls.onnx", "classifier.rten", "classifier.onnx"],
-        "orient" => &["orient.rten", "orient.onnx", "orientation.rten", "orientation.onnx"],
-        "unwarp" => &["uvdoc.rten", "uvdoc.onnx", "unwarp.rten", "unwarp.onnx"],
-        "layout" => &["layout_cdla.rten", "layout_publaynet.rten", "layout.rten", "layout.onnx"],
-        "order" => &["indra_order.rten", "indra_order.onnx", "order.rten", "order.onnx", "reading_order.rten", "reading_order.onnx"],
+        "cls" => &["cls.mnn", "cls.rten", "cls.onnx", "classifier.mnn", "classifier.rten", "classifier.onnx"],
+        "orient" => &["orient.mnn", "orient.rten", "orient.onnx", "orientation.mnn", "orientation.rten", "orientation.onnx"],
+        "unwarp" => &["uvdoc.mnn", "uvdoc.rten", "uvdoc.onnx", "unwarp.mnn", "unwarp.rten", "unwarp.onnx"],
+        "layout" => &["layout_cdla.mnn", "layout_publaynet.mnn", "layout_cdla.rten", "layout_publaynet.rten", "layout.mnn", "layout.rten", "layout.onnx"],
+        "order" => &["indra_order.mnn", "indra_order.rten", "indra_order.onnx", "order.mnn", "order.rten", "order.onnx", "reading_order.mnn", "reading_order.rten", "reading_order.onnx"],
         _ => &[],
     };
 
@@ -298,14 +311,14 @@ pub fn find_in_model_dir(dir: &Path, kind: &str) -> Option<PathBuf> {
                     .unwrap_or("")
                     .to_ascii_lowercase();
                 let matches = match kind {
-                    "det" => (name.contains("det") || name.contains("detection")) && (name.ends_with(".rten") || name.ends_with(".onnx")),
-                    "rec" => (name.contains("rec") || name.contains("recognition")) && (name.ends_with(".rten") || name.ends_with(".onnx")),
+                    "det" => (name.contains("det") || name.contains("detection")) && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
+                    "rec" => (name.contains("rec") || name.contains("recognition")) && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
                     "dict" => (name.contains("dict") || name.contains("keys") || name.contains("meta") || name.contains("vocab")) && (name.ends_with(".txt") || name.ends_with(".json")),
-                    "cls" => name.contains("cls") && (name.ends_with(".rten") || name.ends_with(".onnx")),
-                    "orient" => name.contains("orient") && (name.ends_with(".rten") || name.ends_with(".onnx")),
-                    "unwarp" => (name.contains("unwarp") || name.contains("uvdoc")) && (name.ends_with(".rten") || name.ends_with(".onnx")),
-                    "layout" => name.contains("layout") && (name.ends_with(".rten") || name.ends_with(".onnx")),
-                    "order" => name.contains("order") && (name.ends_with(".rten") || name.ends_with(".onnx")),
+                    "cls" => name.contains("cls") && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
+                    "orient" => name.contains("orient") && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
+                    "unwarp" => (name.contains("unwarp") || name.contains("uvdoc")) && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
+                    "layout" => name.contains("layout") && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
+                    "order" => name.contains("order") && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
                     _ => false,
                 };
                 if matches && fs::metadata(&path).map(|m| m.len() > 0).unwrap_or(false) {
@@ -320,8 +333,8 @@ pub fn find_in_model_dir(dir: &Path, kind: &str) -> Option<PathBuf> {
 
 fn resolve_default_model_dir_asset(dir: &Path, kind: &str, filename: &str) -> PathBuf {
     let default_name = match kind {
-        "det" => "det.rten",
-        "rec" => "rec.rten",
+        "det" => "det.mnn",
+        "rec" => "rec.mnn",
         "dict" => {
             if filename.ends_with(".json") {
                 "meta.json"
@@ -329,11 +342,11 @@ fn resolve_default_model_dir_asset(dir: &Path, kind: &str, filename: &str) -> Pa
                 "dict.txt"
             }
         }
-        "cls" => "cls.rten",
-        "orient" => "orient.rten",
-        "unwarp" => "uvdoc.rten",
-        "layout" => "layout_cdla.rten",
-        "order" => "indra_order.rten",
+        "cls" => "cls.mnn",
+        "orient" => "orient.mnn",
+        "unwarp" => "uvdoc.mnn",
+        "layout" => "layout_cdla.mnn",
+        "order" => "indra_order.mnn",
         _ => filename,
     };
     dir.join(default_name)
@@ -831,8 +844,8 @@ mod tests {
             &cache_dir,
         ).unwrap();
 
-        assert_eq!(det, model_dir.join("det.rten"));
-        assert_eq!(rec, model_dir.join("rec.rten"));
+        assert_eq!(det, model_dir.join("det.mnn"));
+        assert_eq!(rec, model_dir.join("rec.mnn"));
         assert_eq!(dict, model_dir.join("dict.txt"));
     }
 
@@ -852,7 +865,7 @@ mod tests {
         ).unwrap();
 
         assert_eq!(det, custom_det);
-        assert_eq!(rec, model_dir.join("rec.rten"));
+        assert_eq!(rec, model_dir.join("rec.mnn"));
         assert_eq!(dict, model_dir.join("dict.txt"));
     }
 

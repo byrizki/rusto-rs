@@ -1,20 +1,15 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use ndarray::{Array, ArrayD};
-use rten::Model;
-use rten_tensor::prelude::*;
-use rten_tensor::Tensor as RtenTensor;
+use ndarray::ArrayD;
 
 use crate::types::{DetConfig, EngineConfig, RecConfig};
 
 #[derive(thiserror::Error, Debug)]
 pub enum EngineError {
-    #[error("RTen load error: {0}")]
-    Load(#[from] rten::LoadError),
-
-    #[error("RTen run error: {0}")]
-    Run(#[from] rten::RunError),
+    #[cfg(feature = "rten")]
+    #[error("RTen error: {0}")]
+    Rten(#[from] rusto_rten::RtenError),
 
     #[error("Engine error: {0}")]
     Engine(String),
@@ -107,20 +102,38 @@ impl InferenceSession for Box<dyn InferenceSession> {
     }
 }
 
-/// Generic engine session enum supporting both default pure-Rust RTen
-/// and any custom backend implementing `InferenceSession`.
+/// Generic engine session enum supporting pure-Rust Alibaba MNN (rusto-nn) by default,
+/// optional pluggable RTen (rusto-rten), native Alibaba MNN C++, and custom `InferenceSession` backends.
 pub enum EngineSession {
-    Rten(Box<RtenSession>),
+    Mnn(Box<MnnSession>),
+    #[cfg(feature = "rten")]
+    Rten(Box<rusto_rten::RtenSession>),
+    #[cfg(feature = "mnn-cpp")]
+    MnnCpp(Box<rusto_mnn::MnnCppSession>),
     Custom(Box<dyn InferenceSession>),
 }
 
-#[deprecated(note = "MnnSession is deprecated, please use EngineSession")]
-pub type MnnSession = EngineSession;
-
 impl EngineSession {
     pub fn from_path(model_path: &Path, engine_cfg: &EngineConfig) -> Result<Self, EngineError> {
-        let session = RtenSession::from_path(model_path, engine_cfg)?;
-        Ok(Self::Rten(Box::new(session)))
+        let resolved = resolve_model_path(model_path);
+        let ext = resolved.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext.eq_ignore_ascii_case("rten") || ext.eq_ignore_ascii_case("onnx") {
+            #[cfg(feature = "rten")]
+            {
+                let session = rusto_rten::RtenSession::from_file(&resolved, engine_cfg.intra_op_num_threads as usize)?;
+                Ok(Self::Rten(Box::new(session)))
+            }
+            #[cfg(not(feature = "rten"))]
+            {
+                Err(EngineError::Engine(format!(
+                    "RTen model '{}' requested but 'rten' feature is not enabled. Enable feature 'rten' or use MNN format with default rusto-nn.",
+                    resolved.display()
+                )))
+            }
+        } else {
+            let session = MnnSession::from_path(&resolved, engine_cfg)?;
+            Ok(Self::Mnn(Box::new(session)))
+        }
     }
 
     pub fn from_det_config(cfg: &DetConfig) -> Result<Self, EngineError> {
@@ -147,6 +160,28 @@ impl EngineSession {
         Self::from_path(&cfg.model_path, &cfg.engine_cfg)
     }
 
+    pub fn from_mnn(session: MnnSession) -> Self {
+        Self::Mnn(Box::new(session))
+    }
+
+    #[cfg(feature = "rten")]
+    pub fn from_rten(session: rusto_rten::RtenSession) -> Self {
+        Self::Rten(Box::new(session))
+    }
+
+    #[cfg(feature = "mnn-cpp")]
+    pub fn from_mnn_cpp(session: rusto_mnn::MnnCppSession) -> Self {
+        Self::MnnCpp(Box::new(session))
+    }
+
+    #[cfg(feature = "mnn-cpp")]
+    pub fn from_mnn_cpp_path(model_path: &Path, num_threads: usize) -> Result<Self, EngineError> {
+        let resolved = resolve_model_path(model_path);
+        let session = rusto_mnn::MnnCppSession::from_file(&resolved, num_threads)
+            .map_err(|e| EngineError::Engine(e.to_string()))?;
+        Ok(Self::MnnCpp(Box::new(session)))
+    }
+
     pub fn from_custom(session: impl InferenceSession + 'static) -> Self {
         Self::Custom(Box::new(session))
     }
@@ -157,7 +192,11 @@ impl EngineSession {
 
     pub fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
         match self {
-            Self::Rten(s) => s.run(input),
+            Self::Mnn(s) => s.run(input),
+            #[cfg(feature = "rten")]
+            Self::Rten(s) => s.run(&input).map_err(|e| EngineError::Engine(e.to_string())),
+            #[cfg(feature = "mnn-cpp")]
+            Self::MnnCpp(s) => s.run(input).map_err(|e| EngineError::Engine(e.to_string())),
             Self::Custom(s) => s.run(input),
         }
     }
@@ -167,7 +206,11 @@ impl EngineSession {
         input: ArrayD<f32>,
     ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
         match self {
-            Self::Rten(s) => s.run_all(input),
+            Self::Mnn(s) => s.run_all(input),
+            #[cfg(feature = "rten")]
+            Self::Rten(s) => s.run_all(&input).map_err(|e| EngineError::Engine(e.to_string())),
+            #[cfg(feature = "mnn-cpp")]
+            Self::MnnCpp(s) => s.run_all(input).map_err(|e| EngineError::Engine(e.to_string())),
             Self::Custom(s) => s.run_all(input),
         }
     }
@@ -177,28 +220,44 @@ impl EngineSession {
         inputs: HashMap<String, ArrayD<f32>>,
     ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
         match self {
-            Self::Rten(s) => s.run_with_inputs(inputs),
+            Self::Mnn(s) => s.run_with_inputs(inputs),
+            #[cfg(feature = "rten")]
+            Self::Rten(s) => s.run_with_inputs(&inputs).map_err(|e| EngineError::Engine(e.to_string())),
+            #[cfg(feature = "mnn-cpp")]
+            Self::MnnCpp(s) => s.run_with_inputs(inputs).map_err(|e| EngineError::Engine(e.to_string())),
             Self::Custom(s) => s.run_with_inputs(inputs),
         }
     }
 
     pub fn get_character_list(&self, key: &str) -> Option<Vec<String>> {
         match self {
+            Self::Mnn(s) => s.get_character_list(key),
+            #[cfg(feature = "rten")]
             Self::Rten(s) => s.get_character_list(key),
+            #[cfg(feature = "mnn-cpp")]
+            Self::MnnCpp(_) => None,
             Self::Custom(s) => s.get_character_list(key),
         }
     }
 
     pub fn have_key(&self, key: &str) -> bool {
         match self {
+            Self::Mnn(s) => s.have_key(key),
+            #[cfg(feature = "rten")]
             Self::Rten(s) => s.have_key(key),
+            #[cfg(feature = "mnn-cpp")]
+            Self::MnnCpp(_) => false,
             Self::Custom(s) => s.have_key(key),
         }
     }
 
     pub fn input_channels(&self) -> usize {
         match self {
+            Self::Mnn(s) => s.input_channels(),
+            #[cfg(feature = "rten")]
             Self::Rten(s) => s.input_channels(),
+            #[cfg(feature = "mnn-cpp")]
+            Self::MnnCpp(s) => s.input_channels(),
             Self::Custom(s) => s.input_channels(),
         }
     }
@@ -213,7 +272,11 @@ impl EngineSession {
         widths: Vec<i32>,
     ) -> Result<LineNetRecOutput, EngineError> {
         match self {
-            Self::Rten(s) => s.run_linenet_rec(x, widths),
+            Self::Mnn(s) => s.run_linenet_rec(x, widths),
+            #[cfg(feature = "rten")]
+            Self::Rten(s) => s.run_linenet_rec(&x, &widths).map_err(|e| EngineError::Engine(e.to_string())),
+            #[cfg(feature = "mnn-cpp")]
+            Self::MnnCpp(s) => s.run_linenet_rec(x, widths).map_err(|e| EngineError::Engine(e.to_string())),
             Self::Custom(_) => Err(EngineError::Engine(
                 "Custom sessions do not support LineNet multi-input recognition".into(),
             )),
@@ -250,18 +313,18 @@ impl InferenceSession for EngineSession {
     }
 }
 
-pub struct RtenSession {
-    model: Model,
-    thread_pool: Option<std::sync::Arc<rten::ThreadPool>>,
-}
-
 fn resolve_model_path(path: &Path) -> PathBuf {
     if path.exists() {
         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-            if ext.eq_ignore_ascii_case("rten") || ext.eq_ignore_ascii_case("onnx") {
+            if ext.eq_ignore_ascii_case("mnn") || ext.eq_ignore_ascii_case("rten") || ext.eq_ignore_ascii_case("onnx") {
                 return path.to_path_buf();
             }
         }
+    }
+
+    let mnn_cand = path.with_extension("mnn");
+    if mnn_cand.exists() {
+        return mnn_cand;
     }
 
     let rten_cand = path.with_extension("rten");
@@ -305,6 +368,10 @@ fn resolve_model_path(path: &Path) -> PathBuf {
         if !candidates.is_empty() {
             for dir in &["models/PPOCR_v6_tiny", "models/PPOCR_v6", "models/PPOCR_v5", "models/PPOCR_v4_mobile", "models/DocOCR", "models"] {
                 for candidate in candidates {
+                    let p_mnn = PathBuf::from(format!("{}/{}.mnn", dir, candidate));
+                    if p_mnn.exists() {
+                        return p_mnn;
+                    }
                     let p_rten = PathBuf::from(format!("{}/{}.rten", dir, candidate));
                     if p_rten.exists() {
                         return p_rten;
@@ -321,43 +388,58 @@ fn resolve_model_path(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
-fn convert_output_to_array(value: &rten::Value) -> Result<ArrayD<f32>, EngineError> {
-    match value {
-        rten::Value::FloatTensor(t) => {
-            let shape = t.shape().to_vec();
-            let data: Vec<f32> = if let Some(slice) = t.data() {
-                slice.to_vec()
-            } else {
-                t.iter().copied().collect()
-            };
-            let array = Array::from_shape_vec(shape, data)?;
-            Ok(array.into_dyn())
-        }
-        rten::Value::Int32Tensor(t) => {
-            let shape = t.shape().to_vec();
-            let data: Vec<f32> = t.iter().map(|&x| x as f32).collect();
-            let array = Array::from_shape_vec(shape, data)?;
-            Ok(array.into_dyn())
-        }
-        rten::Value::Int8Tensor(t) => {
-            let shape = t.shape().to_vec();
-            let data: Vec<f32> = t.iter().map(|&x| x as f32).collect();
-            let array = Array::from_shape_vec(shape, data)?;
-            Ok(array.into_dyn())
-        }
-        rten::Value::UInt8Tensor(t) => {
-            let shape = t.shape().to_vec();
-            let data: Vec<f32> = t.iter().map(|&x| x as f32).collect();
-            let array = Array::from_shape_vec(shape, data)?;
-            Ok(array.into_dyn())
-        }
-        _ => Err(EngineError::OutputError(
-            "Unsupported output tensor type".into(),
-        )),
+#[cfg(feature = "rten")]
+pub use rusto_rten::RtenSession;
+
+#[cfg(feature = "rten")]
+impl InferenceSession for rusto_rten::RtenSession {
+    fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
+        self.run(&input).map_err(|e| EngineError::Engine(e.to_string()))
+    }
+
+    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        self.run_all(&input).map_err(|e| EngineError::Engine(e.to_string()))
+    }
+
+    fn run_with_inputs(
+        &mut self,
+        inputs: HashMap<String, ArrayD<f32>>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        self.run_with_inputs(&inputs).map_err(|e| EngineError::Engine(e.to_string()))
+    }
+
+    fn get_character_list(&self, key: &str) -> Option<Vec<String>> {
+        self.get_character_list(key)
+    }
+
+    fn have_key(&self, key: &str) -> bool {
+        self.have_key(key)
+    }
+
+    fn input_channels(&self) -> usize {
+        self.input_channels()
     }
 }
 
-impl RtenSession {
+pub struct MnnSession {
+    session: rusto_nn::Session<'static>,
+    channels: usize,
+}
+
+impl MnnSession {
+    pub fn from_path(model_path: &Path, _engine_cfg: &EngineConfig) -> Result<Self, EngineError> {
+        let resolved = resolve_model_path(model_path);
+        let model = rusto_nn::Model::from_file(&resolved)
+            .map_err(|e| EngineError::Engine(format!("Failed to load MNN model {}: {}", resolved.display(), e)))?;
+        let channels = model.input_channels();
+        let session = rusto_nn::Session::from_arc(std::sync::Arc::new(model))
+            .map_err(|e| EngineError::Engine(e.to_string()))?;
+        Ok(Self {
+            session,
+            channels,
+        })
+    }
+
     pub fn from_det_config(cfg: &DetConfig) -> Result<Self, EngineError> {
         Self::from_path(&cfg.model_path, &cfg.engine_cfg)
     }
@@ -366,43 +448,108 @@ impl RtenSession {
         Self::from_path(&cfg.model_path, &cfg.engine_cfg)
     }
 
-    pub fn from_path(model_path: &Path, engine_cfg: &EngineConfig) -> Result<Self, EngineError> {
-        let resolved = resolve_model_path(model_path);
-        let mut model_opts = rten::ModelOptions::with_all_ops();
-        model_opts.prepack_weights(true);
-        let model = model_opts.load_file(&resolved)?;
-
-        let thread_pool = if engine_cfg.intra_op_num_threads > 0 {
-            Some(std::sync::Arc::new(rten::ThreadPool::with_num_threads(
-                engine_cfg.intra_op_num_threads as usize,
-            )))
-        } else {
-            None
-        };
-
-        Ok(Self {
-            model,
-            thread_pool,
-        })
-    }
-
-    fn run_options(&self) -> Option<rten::RunOptions> {
-        let mut opts = rten::RunOptions::default();
-        if let Some(ref tp) = self.thread_pool {
-            opts = opts.with_thread_pool(Some(tp.clone()));
-        }
-        Some(opts)
-    }
-
     pub fn input_channels(&self) -> usize {
-        self.model
-            .input_shape(0)
-            .and_then(|dims| dims.get(1).cloned())
-            .map(|d| match d {
-                rten::Dimension::Fixed(c) => c,
-                _ => 3,
-            })
-            .unwrap_or(3)
+        self.channels
+    }
+
+    pub fn is_linenet(&self) -> bool {
+        self.channels == 1
+    }
+
+    pub fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
+        let shape: Vec<usize> = input.shape().to_vec();
+        let data: Vec<f32> = if let Some(slice) = input.as_slice() {
+            slice.to_vec()
+        } else {
+            input.iter().copied().collect()
+        };
+        let mnn_tensor = rusto_nn::Tensor::from_floats(&shape, data, rusto_nn::TensorLayout::NCHW);
+        let out_tensor = self.session
+            .run_single(&mnn_tensor)
+            .map_err(|e| EngineError::Engine(e.to_string()))?;
+
+        let out_shape = out_tensor.shape().to_vec();
+        let out_data = out_tensor
+            .as_floats()
+            .ok_or_else(|| EngineError::Engine("MNN output tensor is not float data".into()))?
+            .to_vec();
+        ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), out_data)
+            .map_err(EngineError::ShapeError)
+    }
+
+    pub fn run_all(
+        &mut self,
+        input: ArrayD<f32>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        let shape: Vec<usize> = input.shape().to_vec();
+        let data: Vec<f32> = if let Some(slice) = input.as_slice() {
+            slice.to_vec()
+        } else {
+            input.iter().copied().collect()
+        };
+        let mnn_tensor = rusto_nn::Tensor::from_floats(&shape, data, rusto_nn::TensorLayout::NCHW);
+        let input_names = self.session.model().input_names();
+        let in_name = input_names.first().map(|s| s.as_str()).unwrap_or("x");
+        let outputs = self.session
+            .run(&[(in_name, &mnn_tensor)])
+            .map_err(|e| EngineError::Engine(e.to_string()))?;
+
+        let mut results = HashMap::with_capacity(outputs.len());
+        for (name, out_tensor) in outputs {
+            let out_shape = out_tensor.shape().to_vec();
+            if let Some(floats) = out_tensor.as_floats() {
+                let array = ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), floats.to_vec())
+                    .map_err(EngineError::ShapeError)?;
+                results.insert(name, array);
+            } else if let Some(ints) = out_tensor.as_ints() {
+                let floats: Vec<f32> = ints.iter().map(|&x| x as f32).collect();
+                let array = ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), floats)
+                    .map_err(EngineError::ShapeError)?;
+                results.insert(name, array);
+            }
+        }
+        Ok(results)
+    }
+
+    pub fn run_with_inputs(
+        &mut self,
+        inputs_map: HashMap<String, ArrayD<f32>>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        let mut mnn_tensors = Vec::with_capacity(inputs_map.len());
+        for (name, arr) in &inputs_map {
+            let shape = arr.shape().to_vec();
+            let data: Vec<f32> = if let Some(slice) = arr.as_slice() {
+                slice.to_vec()
+            } else {
+                arr.iter().copied().collect()
+            };
+            mnn_tensors.push((name.clone(), rusto_nn::Tensor::from_floats(&shape, data, rusto_nn::TensorLayout::NCHW)));
+        }
+
+        let input_refs: Vec<(&str, &rusto_nn::Tensor)> = mnn_tensors
+            .iter()
+            .map(|(name, t)| (name.as_str(), t))
+            .collect();
+
+        let outputs = self.session
+            .run(&input_refs)
+            .map_err(|e| EngineError::Engine(e.to_string()))?;
+
+        let mut results = HashMap::with_capacity(outputs.len());
+        for (name, out_tensor) in outputs {
+            let out_shape = out_tensor.shape().to_vec();
+            if let Some(floats) = out_tensor.as_floats() {
+                let array = ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), floats.to_vec())
+                    .map_err(EngineError::ShapeError)?;
+                results.insert(name, array);
+            } else if let Some(ints) = out_tensor.as_ints() {
+                let floats: Vec<f32> = ints.iter().map(|&x| x as f32).collect();
+                let array = ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), floats)
+                    .map_err(EngineError::ShapeError)?;
+                results.insert(name, array);
+            }
+        }
+        Ok(results)
     }
 
     pub fn run_linenet_rec(
@@ -410,51 +557,33 @@ impl RtenSession {
         x: ndarray::Array4<f32>,
         widths: Vec<i32>,
     ) -> Result<LineNetRecOutput, EngineError> {
-        let in_ids = self.model.input_ids();
-        if in_ids.len() < 2 {
-            return Err(EngineError::Engine(
-                "LineNet rec model expects at least 2 inputs (x and widths)".into(),
-            ));
-        }
-
-        let x_shape: Vec<usize> = x.shape().to_vec();
+        let x_shape = x.shape().to_vec();
         let x_data: Vec<f32> = if let Some(slice) = x.as_slice() {
             slice.to_vec()
         } else {
             x.iter().copied().collect()
         };
-        let x_tensor = RtenTensor::<f32>::from_data(&x_shape, x_data);
-        let widths_tensor = RtenTensor::<i32>::from_data(&[widths.len()], widths);
+        let x_tensor = rusto_nn::Tensor::from_floats(&x_shape, x_data, rusto_nn::TensorLayout::NCHW);
+        let widths_tensor = rusto_nn::Tensor::from_ints(&[widths.len()], widths);
 
-        let out_ids = self.model.output_ids();
-        let run_opts = self.run_options();
-        let outputs = self.model.run(
-            vec![
-                (in_ids[0], x_tensor.view().into()),
-                (in_ids[1], widths_tensor.view().into()),
-            ],
-            out_ids,
-            run_opts,
-        )?;
+        let outputs = self.session
+            .run(&[("x", &x_tensor), ("widths", &widths_tensor)])
+            .map_err(|e| EngineError::Engine(e.to_string()))?;
 
-        if outputs.len() < 3 {
-            return Err(EngineError::OutputError(
-                "LineNet rec model produced fewer than 3 outputs".into(),
-            ));
-        }
+        let ids_tensor = outputs
+            .get("ids")
+            .ok_or_else(|| EngineError::OutputError("Missing 'ids' in MNN LineNet rec output".into()))?;
+        let conf_tensor = outputs
+            .get("conf")
+            .ok_or_else(|| EngineError::OutputError("Missing 'conf' in MNN LineNet rec output".into()))?;
+        let lengths_tensor = outputs
+            .get("lengths")
+            .ok_or_else(|| EngineError::OutputError("Missing 'lengths' in MNN LineNet rec output".into()))?;
 
-        let (ids_vec, ids_shape) = match &outputs[0] {
-            rten::Value::Int32Tensor(t) => (t.to_vec(), t.shape().to_vec()),
-            _ => return Err(EngineError::OutputError("Expected Int32Tensor for ids".into())),
-        };
-        let (conf_vec, _) = match &outputs[1] {
-            rten::Value::FloatTensor(t) => (t.to_vec(), t.shape().to_vec()),
-            _ => return Err(EngineError::OutputError("Expected FloatTensor for conf".into())),
-        };
-        let lengths_vec = match &outputs[2] {
-            rten::Value::Int32Tensor(t) => t.to_vec(),
-            _ => return Err(EngineError::OutputError("Expected Int32Tensor for lengths".into())),
-        };
+        let ids_vec = ids_tensor.to_i32_vec();
+        let ids_shape = ids_tensor.shape().to_vec();
+        let conf_vec = conf_tensor.to_f32_vec();
+        let lengths_vec = lengths_tensor.to_i32_vec();
 
         let batch_size = lengths_vec.len();
         let max_len = if ids_shape.len() >= 2 {
@@ -479,124 +608,6 @@ impl RtenSession {
         Ok((batch_ids, batch_confs))
     }
 
-    pub fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
-        let shape: Vec<usize> = input.shape().to_vec();
-        let in_ids = self.model.input_ids();
-        if in_ids.is_empty() {
-            return Err(EngineError::OutputError("Model has no inputs".into()));
-        }
-        let in_id = in_ids[0];
-        let out_ids = self.model.output_ids();
-        let run_opts = self.run_options();
-
-        let outputs = if let Some(slice) = input.as_slice() {
-            let view = rten_tensor::TensorView::from_data(&shape, slice);
-            self.model.run(vec![(in_id, view.into())], out_ids, run_opts)?
-        } else {
-            let data: Vec<f32> = input.iter().copied().collect();
-            let tensor = RtenTensor::<f32>::from_data(&shape, data);
-            self.model.run(vec![(in_id, tensor.view().into())], out_ids, run_opts)?
-        };
-
-        if outputs.is_empty() {
-            return Err(EngineError::OutputError("Model produced no outputs".into()));
-        }
-
-        convert_output_to_array(&outputs[0])
-    }
-
-    pub fn run_with_inputs(
-        &mut self,
-        inputs_map: HashMap<String, ArrayD<f32>>,
-    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
-        let mut rten_tensors = Vec::new();
-
-        let model_in_ids = self.model.input_ids();
-        for (name, input) in &inputs_map {
-            let node_id = if let Some(id) = self.model.find_node(name) {
-                id
-            } else if model_in_ids.len() == 1 {
-                if name == "image" || inputs_map.len() == 1 {
-                    model_in_ids[0]
-                } else {
-                    continue;
-                }
-            } else {
-                // Ignore inputs not present in this model variant
-                continue;
-            };
-
-            let shape: Vec<usize> = input.shape().to_vec();
-            let data: Vec<f32> = if let Some(slice) = input.as_slice() {
-                slice.to_vec()
-            } else {
-                input.iter().copied().collect()
-            };
-            rten_tensors.push((node_id, RtenTensor::<f32>::from_data(&shape, data)));
-        }
-
-        let input_pairs: Vec<(rten::NodeId, rten::ValueOrView)> = rten_tensors
-            .iter()
-            .map(|(node_id, tensor)| (*node_id, tensor.view().into()))
-            .collect();
-
-        let out_ids = self.model.output_ids();
-        let run_opts = self.run_options();
-        let outputs = self.model.run(input_pairs, out_ids, run_opts)?;
-
-        let mut results = HashMap::new();
-        for (i, out_id) in out_ids.iter().enumerate() {
-            let name = self
-                .model
-                .node_info(*out_id)
-                .and_then(|info| info.name().map(|s| s.to_string()))
-                .unwrap_or_else(|| format!("output_{}", i));
-            if let Some(out_val) = outputs.get(i) {
-                let array = convert_output_to_array(out_val)?;
-                results.insert(name, array);
-            }
-        }
-
-        Ok(results)
-    }
-
-    pub fn run_all(
-        &mut self,
-        input: ArrayD<f32>,
-    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
-        let shape: Vec<usize> = input.shape().to_vec();
-        let in_ids = self.model.input_ids();
-        if in_ids.is_empty() {
-            return Err(EngineError::OutputError("Model has no inputs".into()));
-        }
-        let in_id = in_ids[0];
-        let out_ids = self.model.output_ids();
-
-        let outputs = if let Some(slice) = input.as_slice() {
-            let view = rten_tensor::TensorView::from_data(&shape, slice);
-            self.model.run(vec![(in_id, view.into())], out_ids, None)?
-        } else {
-            let data: Vec<f32> = input.iter().copied().collect();
-            let tensor = RtenTensor::<f32>::from_data(&shape, data);
-            self.model.run(vec![(in_id, tensor.view().into())], out_ids, None)?
-        };
-
-        let mut results = HashMap::new();
-        for (i, out_id) in out_ids.iter().enumerate() {
-            let name = self
-                .model
-                .node_info(*out_id)
-                .and_then(|info| info.name().map(|s| s.to_string()))
-                .unwrap_or_else(|| format!("output_{}", i));
-            if let Some(out_val) = outputs.get(i) {
-                let array = convert_output_to_array(out_val)?;
-                results.insert(name, array);
-            }
-        }
-
-        Ok(results)
-    }
-
     pub fn get_character_list(&self, _key: &str) -> Option<Vec<String>> {
         None
     }
@@ -606,7 +617,7 @@ impl RtenSession {
     }
 }
 
-impl InferenceSession for RtenSession {
+impl InferenceSession for MnnSession {
     fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
         self.run(input)
     }
@@ -628,5 +639,31 @@ impl InferenceSession for RtenSession {
 
     fn have_key(&self, key: &str) -> bool {
         self.have_key(key)
+    }
+
+    fn input_channels(&self) -> usize {
+        self.input_channels()
+    }
+}
+
+#[cfg(feature = "mnn-cpp")]
+impl InferenceSession for rusto_mnn::MnnCppSession {
+    fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
+        self.run(input).map_err(|e| EngineError::Engine(e.to_string()))
+    }
+
+    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        self.run_all(input).map_err(|e| EngineError::Engine(e.to_string()))
+    }
+
+    fn run_with_inputs(
+        &mut self,
+        inputs: HashMap<String, ArrayD<f32>>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+        self.run_with_inputs(inputs).map_err(|e| EngineError::Engine(e.to_string()))
+    }
+
+    fn input_channels(&self) -> usize {
+        self.input_channels()
     }
 }

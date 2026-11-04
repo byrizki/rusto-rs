@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/rten-wasm", "crates/rusto-node"]
+members = [".", "crates/rusto-nn", "crates/rusto-nn-webgpu", "crates/rusto-nn-cuda", "crates/rusto-rten", "crates/rusto-mnn", "crates/rten-wasm", "crates/rusto-node"]
 
 [package]
 name = "rusto-rs"
@@ -41,9 +41,12 @@ nalgebra = "0.33"
 # Optional OpenCV backend
 opencv = { version = "0.97.2", optional = true }
 
-# Pure Rust inference engine
-rten = { version = "0.27.0", features = ["onnx_format", "rten_format"] }
-rten-tensor = "0.27.0"
+# Pure Rust inference engines
+rusto-nn = { path = "crates/rusto-nn", version = "0.3.2" }
+rusto-rten = { path = "crates/rusto-rten", version = "0.3.2", optional = true }
+rusto-nn-webgpu = { path = "crates/rusto-nn-webgpu", version = "0.3.2", optional = true }
+rusto-nn-cuda = { path = "crates/rusto-nn-cuda", version = "0.3.2", optional = true }
+rusto-mnn = { path = "crates/rusto-mnn", version = "0.3.2", optional = true }
 
 # Model auto-download and caching
 ureq = { version = "2.10", default-features = false, features = ["tls"] }
@@ -71,12 +74,15 @@ required-features = ["cbindgen-cli"]
 criterion = "0.5"
 
 [features]
-default = ["ffi"]
+default = ["ffi", "rten"]
 use-opencv = ["opencv"]
 uniffi = ["dep:uniffi", "uniffi/scaffolding-ffi-buffer-fns"]
 uniffi-cli = ["uniffi", "uniffi/cli"]
 cbindgen-cli = ["dep:cbindgen"]
 ffi = ["uniffi"]  # Enable C FFI and UniFFI bindings
+rten = ["dep:rusto-rten"]
+mnn-cpp = ["dep:rusto-mnn"]
+webgpu = ["dep:rusto-nn-webgpu"]
 
 # Feature stubs for backwards compatibility
 build-from-source = []
@@ -84,7 +90,7 @@ metal = []
 coreml = []
 opencl = []
 vulkan = []
-cuda = []
+cuda = ["dep:rusto-nn-cuda"]
 nnapi = []
 hiai = []
 qnn = []
@@ -106,6 +112,7 @@ panic = "abort"
 inherits = "release"
 debug = true
 strip = false
+panic = "unwind"
 
 # Fast compilation profile for testing
 [profile.test]

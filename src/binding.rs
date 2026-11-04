@@ -20,8 +20,8 @@ impl From<crate::engine::EngineError> for RustoBindingError {
         match err {
             crate::engine::EngineError::Preprocess(msg) => RustoBindingError::Preprocess { msg },
             crate::engine::EngineError::OutputError(msg) => RustoBindingError::Postprocess { msg },
-            crate::engine::EngineError::Load(err) => RustoBindingError::Initialization { msg: err.to_string() },
-            crate::engine::EngineError::Run(err) => RustoBindingError::Inference { msg: err.to_string() },
+            #[cfg(feature = "rten")]
+            crate::engine::EngineError::Rten(err) => RustoBindingError::Inference { msg: err.to_string() },
             crate::engine::EngineError::Engine(msg) => RustoBindingError::Inference { msg },
             crate::engine::EngineError::ImageError(msg) => RustoBindingError::InvalidInput { msg },
             crate::engine::EngineError::InvalidInputShape => RustoBindingError::InvalidInput { msg: "Invalid input shape".into() },
@@ -840,8 +840,8 @@ mod tests {
             Some("models/PPOCR_v6_tiny".to_string()),
         );
         let converted_init = convert_init_config(&model_cfg).expect("convert_init_config should succeed");
-        assert_eq!(converted_init.det.model_path, std::path::PathBuf::from("models/PPOCR_v6_tiny/det.rten"));
-        assert_eq!(converted_init.rec.model_path, std::path::PathBuf::from("models/PPOCR_v6_tiny/rec.rten"));
+        assert_eq!(converted_init.det.model_path, std::path::PathBuf::from("models/PPOCR_v6_tiny/det.mnn"));
+        assert_eq!(converted_init.rec.model_path, std::path::PathBuf::from("models/PPOCR_v6_tiny/rec.mnn"));
         assert_eq!(converted_init.rec.rec_keys_path, Some(std::path::PathBuf::from("models/PPOCR_v6_tiny/dict.txt")));
     }
 }

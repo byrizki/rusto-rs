@@ -1,0 +1,17 @@
+[package]
+name = "rusto-mnn"
+version = "0.3.2"
+edition = "2021"
+description = "Native C++ FFI bindings to Alibaba MNN runtime for benchmark comparison"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/byrizki/rusto-rs"
+keywords = ["mnn", "deep-learning", "ffi", "alibaba-mnn"]
+categories = ["science", "computer-vision"]
+
+[dependencies]
+ndarray = "0.16"
+thiserror = "1.0"
+
+[build-dependencies]
+cc = { version = "1.2", features = ["parallel"] }
+

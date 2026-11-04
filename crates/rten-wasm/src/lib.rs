@@ -1,7 +1,7 @@
+use std::sync::Arc;
 use wasm_bindgen::prelude::*;
-use rten::{Dimension, Model, NodeId, Value};
-use rten_tensor::prelude::*;
 use serde::{Deserialize, Serialize};
+use rusto_nn::{Model, Session, Tensor, TensorLayout};
 
 #[wasm_bindgen]
 pub struct InferenceOutput {
@@ -24,30 +24,38 @@ impl InferenceOutput {
 
 #[wasm_bindgen]
 pub struct RtenModel {
-    model: Model,
+    model: Arc<Model>,
+    session: Session<'static>,
 }
+
+pub type RustoModel = RtenModel;
 
 #[wasm_bindgen]
 impl RtenModel {
     #[wasm_bindgen(constructor)]
     pub fn new(model_data: Vec<u8>) -> Result<RtenModel, String> {
-        let model = Model::load(model_data).map_err(|e| e.to_string())?;
-        Ok(RtenModel { model })
+        let model = Arc::new(Model::from_bytes(model_data).map_err(|e| e.to_string())?);
+        let session = Session::from_arc(Arc::clone(&model)).map_err(|e| e.to_string())?;
+        Ok(RtenModel { model, session })
     }
 
     #[wasm_bindgen(js_name = findNode)]
     pub fn find_node(&self, name: &str) -> Option<u32> {
-        self.model.find_node(name).map(|id| id.as_u32())
+        self.model.tensor_names().iter().position(|n| n == name).map(|id| id as u32)
     }
 
     #[wasm_bindgen(js_name = inputIds)]
     pub fn input_ids(&self) -> Vec<u32> {
-        self.model.input_ids().iter().map(|id| id.as_u32()).collect()
+        self.model.input_names().iter().filter_map(|name| {
+            self.model.tensor_names().iter().position(|n| n == name).map(|id| id as u32)
+        }).collect()
     }
 
     #[wasm_bindgen(js_name = outputIds)]
     pub fn output_ids(&self) -> Vec<u32> {
-        self.model.output_ids().iter().map(|id| id.as_u32()).collect()
+        self.model.output_names().iter().filter_map(|name| {
+            self.model.tensor_names().iter().position(|n| n == name).map(|id| id as u32)
+        }).collect()
     }
 
     #[wasm_bindgen(js_name = run)]
@@ -56,24 +64,12 @@ impl RtenModel {
         input_shape: Vec<usize>,
         input_data: Vec<f32>,
     ) -> Result<InferenceOutput, String> {
-        let input_id = self.model.input_ids().first().copied()
-            .ok_or_else(|| "No input node found in model".to_string())?;
-        let output_id = self.model.output_ids().first().copied()
-            .ok_or_else(|| "No output node found in model".to_string())?;
-
-        let tensor = rten_tensor::Tensor::from_data(&input_shape, input_data);
-        let inputs = vec![(input_id, tensor.view().into())];
-        let outputs = vec![output_id];
-        let results = self.model.run(inputs, &outputs, None).map_err(|e| format!("{:?}", e))?;
-        if let Some(first) = results.into_iter().next() {
-            if let Value::FloatTensor(t) = first {
-                return Ok(InferenceOutput {
-                    shape: t.shape().to_vec(),
-                    data: t.to_vec(),
-                });
-            }
-        }
-        Err("Expected float tensor output from model".to_string())
+        let tensor = Tensor::from_floats(&input_shape, input_data, TensorLayout::NCHW);
+        let out = self.session.run_single(&tensor).map_err(|e| e.to_string())?;
+        Ok(InferenceOutput {
+            shape: out.shape().to_vec(),
+            data: out.to_f32_vec(),
+        })
     }
 
     #[wasm_bindgen(js_name = runWithIds)]
@@ -84,19 +80,24 @@ impl RtenModel {
         input_data: Vec<f32>,
         output_id: u32,
     ) -> Result<InferenceOutput, String> {
-        let tensor = rten_tensor::Tensor::from_data(&input_shape, input_data);
-        let inputs = vec![(NodeId::from_u32(input_id), tensor.view().into())];
-        let outputs = vec![NodeId::from_u32(output_id)];
-        let results = self.model.run(inputs, &outputs, None).map_err(|e| format!("{:?}", e))?;
-        if let Some(first) = results.into_iter().next() {
-            if let Value::FloatTensor(t) = first {
-                return Ok(InferenceOutput {
-                    shape: t.shape().to_vec(),
-                    data: t.to_vec(),
-                });
-            }
-        }
-        Err("Expected float tensor output from model".to_string())
+        let in_name = self.model.tensor_names().get(input_id as usize)
+            .cloned()
+            .or_else(|| self.model.input_names().first().cloned())
+            .ok_or_else(|| "Input tensor not found".to_string())?;
+        let out_name = self.model.tensor_names().get(output_id as usize)
+            .cloned()
+            .or_else(|| self.model.output_names().first().cloned())
+            .ok_or_else(|| "Output tensor not found".to_string())?;
+
+        let tensor = Tensor::from_floats(&input_shape, input_data, TensorLayout::NCHW);
+        let outputs = self.session.run(&[(&in_name, &tensor)]).map_err(|e| e.to_string())?;
+        let out = outputs.get(&out_name)
+            .or_else(|| outputs.values().next())
+            .ok_or_else(|| format!("Output tensor '{}' not produced", out_name))?;
+        Ok(InferenceOutput {
+            shape: out.shape().to_vec(),
+            data: out.to_f32_vec(),
+        })
     }
 
     #[wasm_bindgen(js_name = runOrder)]
@@ -105,37 +106,35 @@ impl RtenModel {
         num_items: usize,
         feats_data: Vec<f32>,
     ) -> Result<InferenceOutput, String> {
-        let feats_id = self.model.find_node("feats")
-            .or_else(|| self.model.input_ids().first().copied())
-            .ok_or_else(|| "Node 'feats' not found in order model".to_string())?;
-        let mask_id = self.model.find_node("mask")
-            .or_else(|| self.model.input_ids().get(1).copied())
-            .ok_or_else(|| "Node 'mask' not found in order model".to_string())?;
-        let out_id = self.model.find_node("a")
-            .or_else(|| self.model.output_ids().first().copied())
-            .ok_or_else(|| "Output node 'a' not found in order model".to_string())?;
+        let in_names = self.model.input_names();
+        let feats_name = if in_names.iter().any(|n| n == "feats") {
+            "feats"
+        } else {
+            in_names.first().map(|s| s.as_str()).unwrap_or("feats")
+        };
+        let mask_name = if in_names.iter().any(|n| n == "mask") {
+            "mask"
+        } else {
+            in_names.get(1).map(|s| s.as_str()).unwrap_or("mask")
+        };
 
-        let feats_tensor = rten_tensor::Tensor::from_data(&[1, num_items, 16], feats_data);
-        let mask_tensor = rten_tensor::Tensor::from_data(&[1, num_items], vec![1i32; num_items]);
+        let feats_tensor = Tensor::from_floats(&[1, num_items, 16], feats_data, TensorLayout::NCHW);
+        let mask_tensor = Tensor::from_ints(&[1, num_items], vec![1i32; num_items]);
 
-        let results = self.model.run(
-            vec![
-                (feats_id, feats_tensor.view().into()),
-                (mask_id, mask_tensor.view().into()),
-            ],
-            &[out_id],
-            None,
-        ).map_err(|e| format!("Order model run error: {:?}", e))?;
+        let results = self.session.run(&[
+            (feats_name, &feats_tensor),
+            (mask_name, &mask_tensor),
+        ]).map_err(|e| format!("Order model run error: {:?}", e))?;
 
-        if let Some(first) = results.into_iter().next() {
-            if let Value::FloatTensor(t) = first {
-                return Ok(InferenceOutput {
-                    shape: t.shape().to_vec(),
-                    data: t.to_vec(),
-                });
-            }
-        }
-        Err("Expected float tensor output 'a' from order model".to_string())
+        let out = results.get("a")
+            .or_else(|| results.get("logits"))
+            .or_else(|| results.values().next())
+            .ok_or_else(|| "Expected float tensor output from order model".to_string())?;
+
+        Ok(InferenceOutput {
+            shape: out.shape().to_vec(),
+            data: out.to_f32_vec(),
+        })
     }
 }
 
@@ -157,10 +156,14 @@ pub struct FrameWasm {
 
 #[wasm_bindgen]
 pub struct RtenOcrPipeline {
-    det_model: Model,
-    rec_model: Model,
+    det_model: Arc<Model>,
+    det_session: Session<'static>,
+    rec_model: Arc<Model>,
+    rec_session: Session<'static>,
     dictionary: Vec<String>,
 }
+
+pub type RustoOcrPipeline = RtenOcrPipeline;
 
 /// Bilinear interpolation sampler from an RGBA byte buffer
 fn sample_bilinear(rgba: &[u8], w: usize, h: usize, x: f32, y: f32) -> (f32, f32, f32) {
@@ -217,7 +220,7 @@ fn descreen_background(rgba: &mut [u8], strength: f32) {
         let max_c = r.max(g.max(b));
         let min_c = r.min(g.min(b));
         let chroma = max_c - min_c;
-        if chroma < 4.0 {
+        if chroma < 12.0 {
             continue;
         }
 
@@ -244,8 +247,11 @@ impl RtenOcrPipeline {
         rec_data: Vec<u8>,
         dict_text: &str,
     ) -> Result<RtenOcrPipeline, String> {
-        let det_model = Model::load(det_data).map_err(|e| format!("Det model load error: {:?}", e))?;
-        let rec_model = Model::load(rec_data).map_err(|e| format!("Rec model load error: {:?}", e))?;
+        let det_model = Arc::new(Model::from_bytes(det_data).map_err(|e| format!("Det model load error: {:?}", e))?);
+        let det_session = Session::from_arc(Arc::clone(&det_model)).map_err(|e| format!("Det session error: {:?}", e))?;
+
+        let rec_model = Arc::new(Model::from_bytes(rec_data).map_err(|e| format!("Rec model load error: {:?}", e))?);
+        let rec_session = Session::from_arc(Arc::clone(&rec_model)).map_err(|e| format!("Rec session error: {:?}", e))?;
 
         let dictionary: Vec<String> = if dict_text.trim_start().starts_with('{') {
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(dict_text) {
@@ -296,7 +302,9 @@ impl RtenOcrPipeline {
 
         Ok(RtenOcrPipeline {
             det_model,
+            det_session,
             rec_model,
+            rec_session,
             dictionary,
         })
     }
@@ -319,18 +327,7 @@ impl RtenOcrPipeline {
         let scale_w = target_w as f32 / orig_w as f32;
         let scale_h = target_h as f32 / orig_h as f32;
 
-        let det_in_channels = self.det_model.input_shape(0)
-            .and_then(|sh| sh.get(1).cloned())
-            .map(|d| match d {
-                Dimension::Fixed(c) => c,
-                _ => 3,
-            })
-            .unwrap_or(3);
-
-        let det_in_id = self.det_model.input_ids().first().copied()
-            .ok_or_else(|| "Det model has no inputs".to_string())?;
-        let det_out_id = self.det_model.output_ids().first().copied()
-            .ok_or_else(|| "Det model has no outputs".to_string())?;
+        let det_in_channels = self.det_model.input_channels();
 
         let mut raw_boxes: Vec<([f32; 4], f32)> = Vec::new();
 
@@ -348,17 +345,12 @@ impl RtenOcrPipeline {
                 }
             }
 
-            let det_tensor = rten_tensor::Tensor::from_data(&[1, 1, target_h, target_w], det_input);
-            let det_outputs = self.det_model.run(
-                vec![(det_in_id, det_tensor.view().into())],
-                &[det_out_id],
-                None,
-            ).map_err(|e| format!("Det inference error: {:?}", e))?;
+            let det_tensor = Tensor::from_floats(&[1, 1, target_h, target_w], det_input, TensorLayout::NCHW);
+            let det_outputs = self.det_session.run_single(&det_tensor)
+                .map_err(|e| format!("Det inference error: {:?}", e))?;
 
-            let (sh, det_data) = match det_outputs.into_iter().next() {
-                Some(Value::FloatTensor(t)) => (t.shape().to_vec(), t.to_vec()),
-                _ => return Err("Invalid detection output tensor".to_string()),
-            };
+            let sh = det_outputs.shape().to_vec();
+            let det_data = det_outputs.to_f32_vec();
 
             if sh.len() >= 4 && sh[1] >= 3 {
                 let out_h = sh[2];
@@ -466,18 +458,11 @@ impl RtenOcrPipeline {
                 }
             }
 
-            let det_tensor = rten_tensor::Tensor::from_data(&[1, 3, target_h, target_w], det_input);
-            let det_outputs = self.det_model.run(
-                vec![(det_in_id, det_tensor.view().into())],
-                &[det_out_id],
-                None,
-            ).map_err(|e| format!("Det inference error: {:?}", e))?;
+            let det_tensor = Tensor::from_floats(&[1, 3, target_h, target_w], det_input, TensorLayout::NCHW);
+            let det_outputs = self.det_session.run_single(&det_tensor)
+                .map_err(|e| format!("Det inference error: {:?}", e))?;
 
-            let heat_map = match det_outputs.into_iter().next() {
-                Some(Value::FloatTensor(t)) => t.to_vec(),
-                _ => return Err("Invalid detection output tensor".to_string()),
-            };
-
+            let heat_map = det_outputs.to_f32_vec();
             let mut visited = vec![false; target_w * target_h];
 
             for y in 0..target_h {
@@ -575,16 +560,12 @@ impl RtenOcrPipeline {
         let box_w = x1 - x0;
         let box_h = y1 - y0;
 
-        let rec_in_shape = self.rec_model.input_shape(0);
-        let rec_in_channels = rec_in_shape.as_ref()
-            .and_then(|sh| sh.get(1).cloned())
-            .map(|d| match d { Dimension::Fixed(c) => c, _ => 3 })
-            .unwrap_or(3);
+        let rec_in_channels = self.rec_model.input_channels();
 
         if rec_in_channels == 1 {
             // LineNet recognition (e.g. Indra OCR)
-            let exp_x0 = (x0 - 0.3 * box_h).max(0.0);
-            let exp_x1 = (x1 + 0.3 * box_h).min(orig_w as f32);
+            let exp_x0 = (x0 - 0.5 * box_h).max(0.0);
+            let exp_x1 = (x1 + 0.5 * box_h).min(orig_w as f32);
             let exp_y0 = (y0 - 1.6 * box_h).max(0.0);
             let exp_y1 = (y1 + 1.6 * box_h).min(orig_h as f32);
             let crop_w = exp_x1 - exp_x0;
@@ -609,32 +590,32 @@ impl RtenOcrPipeline {
                 }
             }
 
-            let rec_in_ids = self.rec_model.input_ids();
-            let x_tensor = rten_tensor::Tensor::from_data(&[1, 1, rec_h, rec_w], rec_input);
-            let widths_tensor = rten_tensor::Tensor::from_data(&[1], vec![rec_w as i32]);
+            let in_names = self.rec_model.input_names();
+            let in_name0 = in_names.first().map(|s| s.as_str()).unwrap_or("x");
+            let in_name1 = in_names.get(1).map(|s| s.as_str()).unwrap_or("widths");
 
-            let rec_outputs = self.rec_model.run(
-                vec![
-                    (rec_in_ids[0], x_tensor.view().into()),
-                    (rec_in_ids[1], widths_tensor.view().into()),
-                ],
-                self.rec_model.output_ids(),
-                None,
-            ).map_err(|e| format!("Rec inference error: {:?}", e))?;
+            let x_tensor = Tensor::from_floats(&[1, 1, rec_h, rec_w], rec_input, TensorLayout::NCHW);
+            let widths_tensor = Tensor::from_ints(&[1], vec![rec_w as i32]);
 
-            let mut it = rec_outputs.into_iter();
-            let ids_vec = match it.next() {
-                Some(Value::Int32Tensor(t)) => t.to_vec(),
-                _ => return Ok(None),
-            };
-            let conf_vec = match it.next() {
-                Some(Value::FloatTensor(t)) => t.to_vec(),
-                _ => return Ok(None),
-            };
-            let len_val = match it.next() {
-                Some(Value::Int32Tensor(t)) => t.to_vec().first().copied().unwrap_or(0) as usize,
-                _ => return Ok(None),
-            };
+            let rec_outputs = self.rec_session.run(&[
+                (in_name0, &x_tensor),
+                (in_name1, &widths_tensor),
+            ]).map_err(|e| format!("Rec inference error: {:?}", e))?;
+
+            let ids_vec = rec_outputs.get("ids")
+                .map(|t| t.to_i32_vec())
+                .or_else(|| rec_outputs.values().next().map(|t| t.to_i32_vec()))
+                .unwrap_or_default();
+            let conf_vec = rec_outputs.get("conf")
+                .map(|t| t.to_f32_vec())
+                .or_else(|| rec_outputs.values().nth(1).map(|t| t.to_f32_vec()))
+                .unwrap_or_default();
+            let len_val = rec_outputs.get("len")
+                .or_else(|| rec_outputs.get("lengths"))
+                .and_then(|t| t.to_i32_vec().first().copied())
+                .map(|l| l as usize)
+                .or_else(|| rec_outputs.values().nth(2).and_then(|t| t.to_i32_vec().first().copied().map(|l| l as usize)))
+                .unwrap_or(ids_vec.len());
 
             let mut text = String::new();
             let mut char_scores = Vec::new();
@@ -715,29 +696,16 @@ impl RtenOcrPipeline {
                 }
             }
 
-            let rec_in_id = self.rec_model.input_ids().first().copied()
-                .ok_or_else(|| "Rec model has no inputs".to_string())?;
-            let rec_out_id = self.rec_model.output_ids().first().copied()
-                .ok_or_else(|| "Rec model has no outputs".to_string())?;
+            let rec_tensor = Tensor::from_floats(&[1, 3, rec_h, rec_w], rec_input, TensorLayout::NCHW);
+            let rec_outputs = self.rec_session.run_single(&rec_tensor)
+                .map_err(|e| format!("Rec inference error: {:?}", e))?;
 
-            let rec_tensor = rten_tensor::Tensor::from_data(&[1, 3, rec_h, rec_w], rec_input);
-            let rec_outputs = self.rec_model.run(
-                vec![(rec_in_id, rec_tensor.view().into())],
-                &[rec_out_id],
-                None,
-            ).map_err(|e| format!("Rec inference error: {:?}", e))?;
-
-            let (seq_len, num_classes, rec_data) = match rec_outputs.into_iter().next() {
-                Some(Value::FloatTensor(t)) => {
-                    let sh = t.shape().to_vec();
-                    if sh.len() >= 3 {
-                        (sh[1], sh[2], t.to_vec())
-                    } else {
-                        return Ok(None);
-                    }
-                }
-                _ => return Ok(None),
-            };
+            let sh = rec_outputs.shape().to_vec();
+            if sh.len() < 3 {
+                return Ok(None);
+            }
+            let (seq_len, num_classes) = (sh[1], sh[2]);
+            let rec_data = rec_outputs.to_f32_vec();
 
             let mut text = String::new();
             let mut char_scores = Vec::new();
@@ -839,4 +807,3 @@ impl RtenOcrPipeline {
         serde_json::to_string(&results).map_err(|e| format!("Serialization error: {:?}", e))
     }
 }
-

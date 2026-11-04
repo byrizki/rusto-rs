@@ -7,3 +7,6 @@
 [submodule "vendor/RapidUnwarp"]
 	path = vendor/RapidUnwarp
 	url = https://github.com/RapidAI/RapidUnDistort
+[submodule "vendor/alibaba-mnn"]
+	path = vendor/alibaba-mnn
+	url = https://github.com/alibaba/MNN.git

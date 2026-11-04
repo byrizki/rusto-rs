@@ -81,7 +81,9 @@ pub use types::{ClsConfig, DetConfig, Frame, GlobalConfig, LayoutConfig, OrientC
 pub use unwarp::{DocUnwarper, UnwarpOutput};
 
 // Re-export for easier access
-pub use crate::engine::{EngineError, EngineSession, InferenceSession, RtenSession};
+pub use crate::engine::{EngineError, EngineSession, InferenceSession, MnnSession};
+#[cfg(feature = "rten")]
+pub use crate::engine::RtenSession;
 
 /// OCR text result with bounding box and frame
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

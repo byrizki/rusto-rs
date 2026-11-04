@@ -11,7 +11,7 @@ mkdir -p "$WASM_DIR" "$DOCS_DIR/public/wasm"
 # 1. If wasm-pack is installed, compile from source to ensure latest build
 if command -v wasm-pack >/dev/null 2>&1; then
   echo "Building rten-wasm from source using wasm-pack..."
-  (cd "$REPO_ROOT" && wasm-pack build crates/rten-wasm --target web --out-dir "$WASM_DIR")
+  (cd "$REPO_ROOT" && wasm-pack build crates/rten-wasm --target web --release --out-dir "$WASM_DIR")
   rm -f "$WASM_DIR/.gitignore"
   if [ -f "$WASM_DIR/rusto_rten_wasm_bg.wasm" ]; then
     cp -f "$WASM_DIR/rusto_rten_wasm_bg.wasm" "$DOCS_DIR/public/wasm/"

@@ -21,6 +21,7 @@ const OPTION_KEYS = [
   'postprocess',
   'calibration',
   'optimization',
+  'webgpu',
 ] as const;
 
 const MODEL_KEYS = [
@@ -188,7 +189,7 @@ export function normalizeOptions(options: DetectTextOptions | undefined): Detect
     throw new TypeError('DetectTextOptions.textScore must be a finite number from 0 to 1.');
   }
 
-  for (const key of ['classification', 'orientation', 'enableReadingOrder'] as const) {
+  for (const key of ['classification', 'orientation', 'enableReadingOrder', 'webgpu'] as const) {
     const value = options[key];
     if (value !== undefined && typeof value !== 'boolean') {
       throw new TypeError(`DetectTextOptions.${key} must be a boolean.`);

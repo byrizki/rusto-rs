@@ -6,7 +6,7 @@ export function useWebOcrSettings() {
   const ocrConfig = ref<OcrConfig>({ ...defaultOcrConfig });
   const isConfigOpen = ref<boolean>(false);
   const configTab = ref<
-    'detection' | 'recognition' | 'layout' | 'resizing' | 'preprocess' | 'models'
+    'detection' | 'recognition' | 'layout' | 'resizing' | 'preprocess' | 'hardware' | 'models'
   >('detection');
 
   function toggleConfigPopover() {

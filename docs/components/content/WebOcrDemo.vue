@@ -69,6 +69,7 @@ const imageSrc = ref<string>(defaultSample.url);
 const outputMode = ref<'lines' | 'words'>('lines');
 const activeTab = ref<'structured' | 'spatial' | 'csv' | 'json' | 'config'>('structured');
 const copied = ref<boolean>(false);
+const isWebGpuSupported = ref<boolean>(false);
 
 const {
   status,
@@ -178,6 +179,9 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 onMounted(() => {
+  if (typeof navigator !== 'undefined' && 'gpu' in navigator && !!navigator.gpu) {
+    isWebGpuSupported.value = true;
+  }
   status.value = 'idle';
   statusMessage.value = `${currentModel.value.name} selected (click Run OCR to load)`;
   fetchHuggingFaceModelIndex().catch(() => {});
@@ -300,6 +304,32 @@ onUnmounted(() => {
               />
             </svg>
           </a>
+
+          <!-- Hardware Acceleration Indicator Pill -->
+          <button
+            type="button"
+            @click="
+              configTab = 'hardware';
+              isConfigOpen = true;
+            "
+            class="hidden sm:inline-flex items-center gap-1.5 text-[11px] px-2.5 py-0.5 rounded-full font-medium border transition-colors cursor-pointer"
+            :class="
+              ocrConfig.useWebGpu
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                : 'bg-neutral-100 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400'
+            "
+            :title="
+              ocrConfig.useWebGpu
+                ? 'WebGPU Acceleration Active (Click to configure)'
+                : 'WASM SIMD128 Active (Click to configure WebGPU)'
+            "
+          >
+            <span
+              class="w-1.5 h-1.5 rounded-full"
+              :class="ocrConfig.useWebGpu ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-400'"
+            />
+            <span>{{ ocrConfig.useWebGpu ? 'WebGPU' : 'WASM SIMD' }}</span>
+          </button>
         </div>
       </div>
 
@@ -568,7 +598,41 @@ onUnmounted(() => {
               </svg>
             </button>
 
-            <!-- 6. HF Models -->
+            <!-- 6. Hardware Acceleration -->
+            <button
+              type="button"
+              @click="configTab = 'hardware'"
+              class="w-9 h-9 flex items-center justify-center rounded-lg transition-all cursor-pointer relative group"
+              :class="
+                configTab === 'hardware'
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/60 dark:hover:bg-neutral-800'
+              "
+              title="Hardware Acceleration (WebGPU / SIMD)"
+            >
+              <svg
+                class="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="4" y="4" width="16" height="16" rx="2" />
+                <rect x="9" y="9" width="6" height="6" />
+                <line x1="9" y1="1" x2="9" y2="4" />
+                <line x1="15" y1="1" x2="15" y2="4" />
+                <line x1="9" y1="20" x2="9" y2="23" />
+                <line x1="15" y1="20" x2="15" y2="23" />
+                <line x1="20" y1="9" x2="23" y2="9" />
+                <line x1="20" y1="14" x2="23" y2="14" />
+                <line x1="1" y1="9" x2="4" y2="9" />
+                <line x1="1" y1="14" x2="4" y2="14" />
+              </svg>
+            </button>
+
+            <!-- 7. HF Models -->
             <button
               type="button"
               @click="configTab = 'models'"
@@ -616,7 +680,9 @@ onUnmounted(() => {
                           ? 'Image Resizing & Constraints'
                           : configTab === 'preprocess'
                             ? 'Preprocess & Calibration'
-                            : 'Hugging Face Model Assets'
+                            : configTab === 'hardware'
+                              ? 'Hardware Acceleration (WebGPU / SIMD)'
+                              : 'Hugging Face Model Assets'
                 }}
               </span>
             </div>
@@ -1177,7 +1243,118 @@ onUnmounted(() => {
               </div>
             </template>
 
-            <!-- Tab 5: Model Weights & Hugging Face Hub -->
+            <!-- Tab 6: Hardware Acceleration (WebGPU / SIMD) -->
+            <template v-else-if="configTab === 'hardware'">
+              <!-- WebGPU Toggle Card -->
+              <div
+                class="space-y-2 bg-neutral-50 dark:bg-neutral-800/40 p-3 rounded-lg border border-neutral-200/60 dark:border-neutral-700/60"
+              >
+                <div class="flex items-center justify-between">
+                  <div>
+                    <span class="font-medium text-neutral-800 dark:text-neutral-200 text-xs">
+                      WebGPU Hardware Acceleration
+                    </span>
+                    <p class="text-[10px] text-neutral-500 dark:text-neutral-400">
+                      useWebGpu (Pluggable GPU Compute Runtime)
+                    </p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" v-model="ocrConfig.useWebGpu" class="sr-only peer" />
+                    <div
+                      class="w-8 h-4 bg-neutral-300 peer-focus:outline-none rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all dark:border-neutral-600 peer-checked:bg-primary"
+                    ></div>
+                  </label>
+                </div>
+                <p class="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight">
+                  Enables client-side GPU compute shaders for matrix multiplication (GEMM) and
+                  convolutional layers via the pluggable
+                  <code class="text-primary font-mono font-semibold">@rustors/webgpu</code> /
+                  <code class="text-primary font-mono font-semibold">rusto-nn-webgpu</code> package.
+                </p>
+                <div
+                  class="pt-1 flex items-center justify-between text-[10px] border-t border-neutral-200/40 dark:border-neutral-700/40"
+                >
+                  <span class="text-neutral-400">Default:</span>
+                  <span class="font-mono text-neutral-600 dark:text-neutral-300"
+                    >Disabled (WASM SIMD128)</span
+                  >
+                </div>
+              </div>
+
+              <!-- Browser Compatibility Status Card -->
+              <div
+                class="p-2.5 rounded-lg border text-[11px]"
+                :class="
+                  isWebGpuSupported
+                    ? 'border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20'
+                    : 'border-amber-200 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/20'
+                "
+              >
+                <div class="flex items-center gap-2 mb-1">
+                  <span
+                    class="w-2 h-2 rounded-full shrink-0"
+                    :class="isWebGpuSupported ? 'bg-emerald-500' : 'bg-amber-500'"
+                  />
+                  <span
+                    class="font-semibold"
+                    :class="
+                      isWebGpuSupported
+                        ? 'text-emerald-800 dark:text-emerald-300'
+                        : 'text-amber-800 dark:text-amber-300'
+                    "
+                  >
+                    {{
+                      isWebGpuSupported
+                        ? 'WebGPU Supported in Browser'
+                        : 'WebGPU Unavailable in Browser'
+                    }}
+                  </span>
+                </div>
+                <p
+                  class="text-[10px]"
+                  :class="
+                    isWebGpuSupported
+                      ? 'text-emerald-700 dark:text-emerald-400'
+                      : 'text-amber-700 dark:text-amber-400'
+                  "
+                >
+                  {{
+                    isWebGpuSupported
+                      ? 'navigator.gpu adapter is available. Toggling WebGPU will execute compute shaders directly on your GPU hardware.'
+                      : 'Your current browser or device environment does not expose navigator.gpu. Inference will automatically execute using vectorized CPU WebAssembly SIMD128.'
+                  }}
+                </p>
+              </div>
+
+              <!-- Architecture Details -->
+              <div class="space-y-1.5 pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                <span class="font-semibold text-[11px] text-neutral-700 dark:text-neutral-300">
+                  Runtime Architecture
+                </span>
+                <div class="text-[10px] space-y-1.5 text-neutral-500 dark:text-neutral-400">
+                  <div class="flex items-start gap-1.5">
+                    <span class="font-semibold text-neutral-700 dark:text-neutral-300 shrink-0"
+                      >WASM SIMD128:</span
+                    >
+                    <span
+                      >100% pure Rust compiled to WebAssembly. Zero dependencies, portable across
+                      all modern browsers and Node.js.</span
+                    >
+                  </div>
+                  <div class="flex items-start gap-1.5">
+                    <span class="font-semibold text-neutral-700 dark:text-neutral-300 shrink-0"
+                      >WebGPU Backend:</span
+                    >
+                    <span
+                      >Pluggable WGPU/WGSL compute shader pipeline. Offloads batch GEMM operations
+                      to GPU hardware for reduced latency.</span
+                    >
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Tab 7: Model Weights & Hugging Face Hub -->
             <template v-else-if="configTab === 'models'">
               <div class="space-y-3">
                 <!-- Selected Model Details Card -->

@@ -127,7 +127,7 @@ async function copyJson() {
     </div>
 
     <!-- Active Run Overview Cards -->
-    <div class="grid grid-cols-2 gap-2 font-sans">
+    <div class="grid grid-cols-3 gap-2 font-sans">
       <div
         class="p-2 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-950/50"
       >
@@ -135,7 +135,7 @@ async function copyJson() {
           class="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-wider block"
           >Model</span
         >
-        <span class="font-semibold text-neutral-800 dark:text-neutral-200">{{
+        <span class="font-semibold text-neutral-800 dark:text-neutral-200 truncate block">{{
           displayConfig.modelName
         }}</span>
       </div>
@@ -149,6 +149,24 @@ async function copyJson() {
         <span class="font-semibold capitalize text-neutral-800 dark:text-neutral-200">{{
           displayConfig.outputMode
         }}</span>
+      </div>
+      <div
+        class="p-2 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-950/50"
+      >
+        <span
+          class="text-[10px] text-neutral-500 dark:text-neutral-400 uppercase tracking-wider block"
+          >Acceleration</span
+        >
+        <span
+          class="font-semibold"
+          :class="
+            displayConfig.options.webgpu
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : 'text-neutral-800 dark:text-neutral-200'
+          "
+        >
+          {{ displayConfig.options.webgpu ? 'WebGPU' : 'WASM SIMD' }}
+        </span>
       </div>
     </div>
 

@@ -648,7 +648,7 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
     print(f"\nUpdating library version to '{new_ver}' across repository files...")
     staged_files: Set[Path] = set()
     
-    # 1. Cargo.toml (root package)
+    # 1. Cargo.toml (root package and workspace dependencies)
     replace_in_file(
         REPO_ROOT / "Cargo.toml",
         r'(?ms)(\[package\](?:(?!\[).)*?\bversion\s*=\s*")[^"]+(")',
@@ -656,26 +656,35 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         dry_run,
         staged_files
     )
-
-    # 2. crates/rten-wasm/Cargo.toml
-    replace_in_file(
-        REPO_ROOT / "crates" / "rten-wasm" / "Cargo.toml",
-        r'(?ms)(\[package\](?:(?!\[).)*?\bversion\s*=\s*")[^"]+(")',
-        rf'\g<1>{new_ver}\g<2>',
-        dry_run,
-        staged_files
-    )
-
-    # 3. crates/rusto-node/Cargo.toml
-    rusto_node_cargo = REPO_ROOT / "crates" / "rusto-node" / "Cargo.toml"
-    if rusto_node_cargo.exists():
+    for pkg in ["rusto-nn", "rusto-rten", "rusto-nn-webgpu", "rusto-nn-cuda", "rusto-mnn"]:
         replace_in_file(
-            rusto_node_cargo,
-            r'(?ms)(\[package\](?:(?!\[).)*?\bversion\s*=\s*")[^"]+(")',
+            REPO_ROOT / "Cargo.toml",
+            rf'({pkg}\s*=\s*\{{[^}}]*\bversion\s*=\s*")[^"]+(")',
             rf'\g<1>{new_ver}\g<2>',
             dry_run,
-            staged_files
+            staged_files,
+            warn_if_not_found=False
         )
+
+    # 2. Workspace crates Cargo.toml
+    for crate_dir in ["rten-wasm", "rusto-node", "rusto-nn", "rusto-rten", "rusto-nn-webgpu", "rusto-nn-cuda", "rusto-mnn"]:
+        crate_cargo = REPO_ROOT / "crates" / crate_dir / "Cargo.toml"
+        if crate_cargo.exists():
+            replace_in_file(
+                crate_cargo,
+                r'(?ms)(\[package\](?:(?!\[).)*?\bversion\s*=\s*")[^"]+(")',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files
+            )
+            replace_in_file(
+                crate_cargo,
+                r'(rusto-nn\s*=\s*\{[^}]*\bversion\s*=\s*")[^"]+(")',
+                rf'\g<1>{new_ver}\g<2>',
+                dry_run,
+                staged_files,
+                warn_if_not_found=False
+            )
     
     # 4. packages/android/gradle.properties (VERSION_NAME only, not MODELS_VERSION_NAME)
     replace_in_file(

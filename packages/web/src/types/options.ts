@@ -123,4 +123,7 @@ export interface DetectTextOptions {
 
   /** Runtime crop and resolution optimization. */
   optimization?: OptimizationOptions;
+
+  /** Enable WebGPU hardware acceleration if supported by browser/runtime. Default: false. */
+  webgpu?: boolean;
 }

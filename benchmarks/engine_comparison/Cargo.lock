@@ -500,6 +500,15 @@ checksum = "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484"
 
 [[package]]
 name = "flatbuffers"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a788f068dd10687940565bf4b5480ee943176cbd114b12e811074bcf7c04e4b9"
+dependencies = [
+ "smallvec",
+]
+
+[[package]]
+name = "flatbuffers"
 version = "24.12.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f1baf0dbf96932ec9a3038d57900329c015b0bfb7b63d904f3bc27e2b02a096"
@@ -941,6 +950,17 @@ checksum = "b63fbc4a50860e98e7b2aa7804ded1db5cbc3aff9193adaff57a6931bf7c4b4c"
 dependencies = [
  "adler2",
  "simd-adler32",
+]
+
+[[package]]
+name = "mnn-rs"
+version = "0.1.0"
+dependencies = [
+ "flatbuffers 0.6.1",
+ "memmap2",
+ "rayon",
+ "smallvec",
+ "thiserror",
 ]
 
 [[package]]
@@ -1453,7 +1473,7 @@ version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "639c5d2ce961f3e154878d1d48c2ac3451e5a6ea5d9c0b0d5f0da362f4c57dab"
 dependencies = [
- "flatbuffers",
+ "flatbuffers 24.12.23",
  "num_cpus",
  "rayon",
  "rten-base",
@@ -1496,7 +1516,7 @@ version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1bc4ee6d1e064a84cbffd240c3bfde0d7a1b4d5172f577c9c821fcf0b7124f00"
 dependencies = [
- "flatbuffers",
+ "flatbuffers 24.12.23",
  "rten-base",
 ]
 
@@ -1640,6 +1660,7 @@ dependencies = [
  "clipper2-rust",
  "dirs",
  "image",
+ "mnn-rs",
  "nalgebra",
  "ndarray 0.16.1",
  "rayon",

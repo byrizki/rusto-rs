@@ -50,4 +50,7 @@ export interface InitializeConfig {
 
   /** Default runtime image optimization options. */
   optimization?: OptimizationOptions;
+
+  /** Enable WebGPU hardware acceleration if supported by browser/runtime. Default: false. */
+  webgpu?: boolean;
 }

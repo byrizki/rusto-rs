@@ -55,6 +55,8 @@ jobs:
       github.event.inputs.publish_crates == 'true'
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -92,6 +94,12 @@ jobs:
             done
           }
           
+          # Publish core and pluggable backend crates in dependency order
+          publish_crate rusto-nn
+          publish_crate rusto-rten
+          publish_crate rusto-nn-webgpu
+          publish_crate rusto-nn-cuda
+          publish_crate rusto-mnn
           publish_crate rusto-rs
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

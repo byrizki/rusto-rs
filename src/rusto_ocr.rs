@@ -15,7 +15,7 @@ use crate::cal_rec_boxes::CalRecBoxes;
 use crate::calibration::{CalibrationOptions, OptimizationOptions};
 use crate::config::InitializeConfig;
 use crate::det::TextDetector;
-use crate::engine::{EngineError, InferenceSession};
+use crate::engine::{EngineError, EngineSession, InferenceSession};
 use crate::geometry::{
     apply_vertical_padding, get_rotate_crop_image, map_boxes_to_original,
     resize_image_within_bounds, OpRecord,
@@ -394,6 +394,66 @@ impl RustO {
             cls: None,
             unwarp: None,
             layout: None,
+        })
+    }
+
+    /// Initialize an OCR engine with pre-configured EngineSessions for detection and recognition.
+    pub fn with_engine_sessions(
+        mut config: InitializeConfig,
+        det_session: EngineSession,
+        rec_session: EngineSession,
+    ) -> Result<Self, EngineError> {
+        validate_preprocessing(&config.global)?;
+        let det = TextDetector::with_engine_session(config.det.clone(), det_session);
+        let rec = TextRecognizer::with_engine_session(config.rec.clone(), rec_session)?;
+        let cal_rec_boxes = CalRecBoxes::new();
+
+        let orient = if let Some(orient_cfg) = config.orient.take() {
+            Some(OrientClassifier::new(orient_cfg)?)
+        } else {
+            None
+        };
+
+        let cls = if let Some(cls_cfg) = config.cls.take() {
+            let orient_cfg = crate::types::OrientConfig {
+                engine_type: cls_cfg.engine_type,
+                model_type: cls_cfg.model_type,
+                task_type: cls_cfg.task_type,
+                model_path: cls_cfg.model_path,
+                orient_image_shape: cls_cfg.cls_image_shape,
+                mean: [0.5, 0.5, 0.5],
+                std: [0.5, 0.5, 0.5],
+                confidence_threshold: cls_cfg.cls_thresh,
+                orient_batch_num: cls_cfg.cls_batch_num,
+                orient_thresh: cls_cfg.cls_thresh,
+                engine_cfg: cls_cfg.engine_cfg,
+            };
+            Some(OrientClassifier::new(orient_cfg)?)
+        } else {
+            None
+        };
+
+        let unwarp = if let Some(unwarp_cfg) = config.unwarp {
+            Some(DocUnwarper::new(unwarp_cfg)?)
+        } else {
+            None
+        };
+
+        let layout = if let Some(layout_cfg) = config.layout {
+            Some(LayoutDetector::new(layout_cfg)?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            det,
+            rec,
+            global: config.global,
+            cal_rec_boxes,
+            orient,
+            cls,
+            unwarp,
+            layout,
         })
     }
 

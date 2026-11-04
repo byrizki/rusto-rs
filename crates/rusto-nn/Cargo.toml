@@ -1,0 +1,26 @@
+[package]
+name = "rusto-nn"
+version = "0.3.2"
+edition = "2021"
+description = "Lightweight, zero-bloat, 100% pure Rust inference engine for Alibaba MNN models"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/byrizki/rusto-rs"
+keywords = ["mnn", "deep-learning", "inference", "pure-rust", "vision"]
+categories = ["science", "computer-vision"]
+exclude = ["tools/**"]
+
+[dependencies]
+flatbuffers = "0.6.1"
+memmap2 = "0.9"
+thiserror = "1.0"
+smallvec = { version = "1.13", features = ["union"] }
+rayon = { version = "1.10", optional = true }
+rten-onnx = { version = "0.27.0", optional = true }
+rten-model-file = { version = "0.27.0", optional = true }
+
+[features]
+default = ["std", "rayon", "rten", "onnx"]
+std = []
+rayon = ["dep:rayon"]
+rten = ["dep:rten-model-file"]
+onnx = ["dep:rten-onnx"]

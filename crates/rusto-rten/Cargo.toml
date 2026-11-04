@@ -1,0 +1,16 @@
+[package]
+name = "rusto-rten"
+version = "0.3.2"
+edition = "2021"
+description = "Pluggable RTen inference engine backend for RustO!"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/byrizki/rusto-rs"
+keywords = ["rten", "deep-learning", "inference", "pure-rust", "vision"]
+categories = ["science", "computer-vision"]
+
+[dependencies]
+rten = { version = "0.27.0", features = ["onnx_format", "rten_format"] }
+rten-tensor = "0.27.0"
+ndarray = "0.16"
+thiserror = "1.0"
+

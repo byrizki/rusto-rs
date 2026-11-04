@@ -29,6 +29,11 @@ impl TextDetector {
         self.session.input_channels() == 1
     }
 
+    /// Construct detector with an EngineSession
+    pub fn with_engine_session(cfg: DetConfig, session: EngineSession) -> Self {
+        Self { cfg, session }
+    }
+
     /// Construct detector with a custom inference session implementation
     pub fn with_custom_session(cfg: DetConfig, session: impl InferenceSession + 'static) -> Self {
         Self {
