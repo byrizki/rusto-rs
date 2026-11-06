@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use ndarray::ArrayD;
 use rusto::{
-    DetectTextResult, EngineError, EngineSession, ImageSource, InferenceSession,
+    CoreError, DetectTextResult, EngineSession, ImageSource, InferenceSession,
     InitializeConfig, OcrRunOptions, RustO, TextDetector, TextRecognizer,
 };
 
@@ -23,22 +23,22 @@ impl CountingSession {
 }
 
 impl InferenceSession for CountingSession {
-    fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
+    fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, CoreError> {
         self.inference_count.fetch_add(1, Ordering::SeqCst);
-        self.inner.run(input)
+        self.inner.run(input).map_err(Into::into)
     }
 
-    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, CoreError> {
         self.inference_count.fetch_add(1, Ordering::SeqCst);
-        self.inner.run_all(input)
+        self.inner.run_all(input).map_err(Into::into)
     }
 
     fn run_with_inputs(
         &mut self,
         inputs: HashMap<String, ArrayD<f32>>,
-    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+    ) -> Result<HashMap<String, ArrayD<f32>>, CoreError> {
         self.inference_count.fetch_add(1, Ordering::SeqCst);
-        self.inner.run_with_inputs(inputs)
+        self.inner.run_with_inputs(inputs).map_err(Into::into)
     }
 
     fn get_character_list(&self, key: &str) -> Option<Vec<String>> {

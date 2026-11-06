@@ -1059,9 +1059,9 @@ def update_models_files(new_ver: str, current_ver: str = "", dry_run: bool = Fal
         staged_files.add(models_ver_file)
     print(f"  [OK] Updated MODELS_VERSION to {new_ver}")
 
-    # 2. src/model_manager.rs (DEFAULT_MODELS_TAG)
+    # 2. crates/rusto-core/src/models.rs (DEFAULT_MODELS_TAG)
     replace_in_file(
-        REPO_ROOT / "src" / "model_manager.rs",
+        REPO_ROOT / "crates" / "rusto-core" / "src" / "models.rs",
         r'(pub const DEFAULT_MODELS_TAG:\s*&str\s*=\s*"models-rten-v)[^"]+(";)',
         rf'\g<1>{new_ver}\g<2>',
         dry_run,

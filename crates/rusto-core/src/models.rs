@@ -1,8 +1,7 @@
-use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::engine::EngineError;
+use crate::error::CoreError;
 
 pub const DEFAULT_MODELS_TAG: &str = "models-rten-v0.4.0";
 pub const DEFAULT_HF_BASE_URL: &str = "https://huggingface.co/byrizki/rten-models/resolve/main";
@@ -39,7 +38,6 @@ pub fn normalize_model_name(name: Option<&str>) -> &'static str {
         Some("ppocrv4") | Some("ppv4") | Some("ppocrv4-mobile") | Some("v4") => "ppocrv4-mobile",
         Some("ppocrv4-server") | Some("v4-server") => "ppocrv4-server",
         Some("ppocrv3") | Some("ppv3") | Some("ppocrv3-mobile") | Some("v3") => "ppocrv3-mobile",
-        // Default flagship
         _ => "indraocr",
     }
 }
@@ -156,27 +154,30 @@ pub fn get_base_pipeline_assets(model_name: &str) -> BasePipelineAssets {
     }
 }
 
-/// Resolves the default cache directory for RustO models.
+/// Resolves the default cache directory for models.
 pub fn get_cache_dir(custom: Option<&Path>) -> PathBuf {
     if let Some(custom_path) = custom {
         return custom_path.to_path_buf();
     }
 
-    if let Ok(env_path) = std::env::var("RUSTO_CACHE_DIR") {
-        if !env_path.trim().is_empty() {
-            return PathBuf::from(env_path);
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        if let Ok(env_path) = std::env::var("RUSTO_CACHE_DIR") {
+            if !env_path.trim().is_empty() {
+                return PathBuf::from(env_path);
+            }
         }
-    }
 
-    if let Some(cache) = dirs::cache_dir() {
-        return cache.join("rusto").join("models");
+        if let Some(cache) = dirs::cache_dir() {
+            return cache.join("rusto").join("models");
+        }
     }
 
     PathBuf::from(".cache").join("rusto").join("models")
 }
 
 /// Finds local checkout repository fallback candidates for an asset filename.
-fn find_local_repo_candidates(asset_filename: &str) -> Vec<PathBuf> {
+pub fn find_local_repo_candidates(asset_filename: &str) -> Vec<PathBuf> {
     let mut candidates = vec![
         PathBuf::from("models").join(asset_filename),
     ];
@@ -227,102 +228,117 @@ fn find_local_repo_candidates(asset_filename: &str) -> Vec<PathBuf> {
         candidates.push(PathBuf::from(format!("models/PPOCR_v6_medium/{}", sub)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v6_medium/{}.rten", base)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v6_medium/{}.onnx", base)));
-    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv5_mobile_") {
+    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv6_medium_int8_") {
         let base = sub.strip_suffix(".rten").unwrap_or(sub);
+        candidates.push(PathBuf::from(format!("models/PPOCR_v6_medium_int8/{}", sub)));
+        candidates.push(PathBuf::from(format!("models/PPOCR_v6_medium_int8/{}.rten", base)));
+        candidates.push(PathBuf::from(format!("models/PPOCR_v6_medium_int8/{}.onnx", base)));
+    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv5_mobile_") {
+        let base = sub.strip_suffix(".mnn").or_else(|| sub.strip_suffix(".rten")).unwrap_or(sub);
+        candidates.push(PathBuf::from(format!("models/PPOCR_v5_mobile/{}.mnn", base)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v5_mobile/{}", sub)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v5_mobile/{}.rten", base)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v5_mobile/{}.onnx", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v5/{}.rten", base)));
+    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv5_server_") {
+        let base = sub.strip_suffix(".mnn").or_else(|| sub.strip_suffix(".rten")).unwrap_or(sub);
+        candidates.push(PathBuf::from(format!("models/PPOCR_v5_server/{}.mnn", base)));
+        candidates.push(PathBuf::from(format!("models/PPOCR_v5_server/{}", sub)));
+        candidates.push(PathBuf::from(format!("models/PPOCR_v5_server/{}.rten", base)));
+        candidates.push(PathBuf::from(format!("models/PPOCR_v5_server/{}.onnx", base)));
     } else if let Some(sub) = asset_filename.strip_prefix("ppocrv4_mobile_") {
         let base = sub.strip_suffix(".mnn").or_else(|| sub.strip_suffix(".rten")).unwrap_or(sub);
         candidates.push(PathBuf::from(format!("models/PPOCR_v4_mobile/{}.mnn", base)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v4_mobile/{}", sub)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v4_mobile/{}.rten", base)));
         candidates.push(PathBuf::from(format!("models/PPOCR_v4_mobile/{}.onnx", base)));
-    } else if asset_filename == "ppocr_cls.rten" || asset_filename == "ppocr_cls.mnn" {
-        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/cls.mnn"));
-        candidates.push(PathBuf::from("models/cls.mnn"));
-        candidates.push(PathBuf::from("models/cls.rten"));
-        candidates.push(PathBuf::from("models/cls.onnx"));
-        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/cls.onnx"));
-    } else if asset_filename == "ppocr_orient.rten" || asset_filename == "ppocr_orient.mnn" {
-        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/orient.mnn"));
-        candidates.push(PathBuf::from("models/orient.mnn"));
-        candidates.push(PathBuf::from("models/orient.rten"));
-        candidates.push(PathBuf::from("models/orient.onnx"));
-        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/orient.onnx"));
+    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv4_server_") {
+        let base = sub.strip_suffix(".mnn").or_else(|| sub.strip_suffix(".rten")).unwrap_or(sub);
+        candidates.push(PathBuf::from(format!("models/PPOCR_v4_server/{}.mnn", base)));
+        candidates.push(PathBuf::from(format!("models/PPOCR_v4_server/{}", sub)));
+        candidates.push(PathBuf::from(format!("models/PPOCR_v4_server/{}.rten", base)));
+        candidates.push(PathBuf::from(format!("models/PPOCR_v4_server/{}.onnx", base)));
     } else if asset_filename == "uvdoc.rten" || asset_filename == "uvdoc.mnn" {
-        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/uvdoc.mnn"));
+        candidates.push(PathBuf::from("models/uvdoc/uvdoc.mnn"));
+        candidates.push(PathBuf::from("models/uvdoc/uvdoc.rten"));
         candidates.push(PathBuf::from("models/uvdoc.mnn"));
         candidates.push(PathBuf::from("models/uvdoc.rten"));
-        candidates.push(PathBuf::from("models/uvdoc.onnx"));
-        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/uvdoc.onnx"));
-    } else if asset_filename == "layout_cdla.rten" || asset_filename == "layout_cdla.mnn" {
-        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/layout_cdla.mnn"));
-        candidates.push(PathBuf::from("models/layout_cdla.mnn"));
-        candidates.push(PathBuf::from("models/layout_cdla.rten"));
-        candidates.push(PathBuf::from("models/layout_cdla.onnx"));
-        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/layout_cdla.onnx"));
-    } else if asset_filename == "layout_publaynet.rten" || asset_filename == "layout_publaynet.mnn" {
-        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/layout_publaynet.mnn"));
-        candidates.push(PathBuf::from("models/layout_publaynet.mnn"));
-        candidates.push(PathBuf::from("models/layout_publaynet.rten"));
-        candidates.push(PathBuf::from("models/layout_publaynet.onnx"));
-        candidates.push(PathBuf::from("models/PPOCR_v6_tiny/layout_publaynet.onnx"));
+    } else if asset_filename == "ppocr_orient.rten" || asset_filename == "ppocr_orient.mnn" || asset_filename == "orient.mnn" {
+        candidates.push(PathBuf::from("models/orient/orient.mnn"));
+        candidates.push(PathBuf::from("models/orient/orient.rten"));
+        candidates.push(PathBuf::from("models/ppocr_orient.mnn"));
+        candidates.push(PathBuf::from("models/ppocr_orient.rten"));
+        candidates.push(PathBuf::from("models/orient.mnn"));
+        candidates.push(PathBuf::from("models/orient.rten"));
+    } else if asset_filename == "ppocr_cls.rten" || asset_filename == "ppocr_cls.mnn" || asset_filename == "cls.mnn" {
+        candidates.push(PathBuf::from("models/cls/cls.mnn"));
+        candidates.push(PathBuf::from("models/cls/cls.rten"));
+        candidates.push(PathBuf::from("models/ppocr_cls.mnn"));
+        candidates.push(PathBuf::from("models/ppocr_cls.rten"));
+        candidates.push(PathBuf::from("models/cls.mnn"));
+        candidates.push(PathBuf::from("models/cls.rten"));
+    } else if asset_filename.contains("layout") {
+        candidates.push(PathBuf::from(format!("models/layout/{}", asset_filename)));
+        candidates.push(PathBuf::from(format!("models/{}", asset_filename)));
     }
 
     candidates
 }
 
-/// Attempts to find a matching model file in a custom model directory.
+/// Searches a directory for model assets matching the specified kind.
 pub fn find_in_model_dir(dir: &Path, kind: &str) -> Option<PathBuf> {
-    if !dir.is_dir() {
-        return None;
+    let mut check_dirs = vec![dir.to_path_buf()];
+    if !dir.is_absolute() {
+        check_dirs.push(PathBuf::from("..").join(dir));
+        check_dirs.push(PathBuf::from("../..").join(dir));
     }
 
-    // Direct filename checks first (mnn prioritized, fallback to rten and onnx)
-    let direct_checks: &[&str] = match kind {
-        "det" => &["det.mnn", "det.rten", "det.onnx", "detection.mnn", "detection.rten", "detection.onnx"],
-        "rec" => &["rec.mnn", "rec.rten", "rec.onnx", "recognition.mnn", "recognition.rten", "recognition.onnx"],
-        "dict" => &["dict.txt", "meta.json", "ppocr_keys_v1.txt", "keys.txt", "vocab.txt"],
-        "cls" => &["cls.mnn", "cls.rten", "cls.onnx", "classifier.mnn", "classifier.rten", "classifier.onnx"],
-        "orient" => &["orient.mnn", "orient.rten", "orient.onnx", "orientation.mnn", "orientation.rten", "orientation.onnx"],
-        "unwarp" => &["uvdoc.mnn", "uvdoc.rten", "uvdoc.onnx", "unwarp.mnn", "unwarp.rten", "unwarp.onnx"],
-        "layout" => &["layout_cdla.mnn", "layout_publaynet.mnn", "layout_cdla.rten", "layout_publaynet.rten", "layout.mnn", "layout.rten", "layout.onnx"],
-        "order" => &["indra_order.mnn", "indra_order.rten", "indra_order.onnx", "order.mnn", "order.rten", "order.onnx", "reading_order.mnn", "reading_order.rten", "reading_order.onnx"],
+    let exact_names: &[&str] = match kind {
+        "det" => &["det.mnn", "det.rten", "det.onnx", "model.mnn", "model.rten"],
+        "rec" => &["rec.mnn", "rec.rten", "rec.onnx"],
+        "dict" => &["dict.txt", "ppocr_keys_v1.txt", "keys.txt", "vocab.txt", "meta.json", "indra_meta.json"],
+        "cls" => &["cls.mnn", "cls.rten", "cls.onnx", "ppocr_cls.mnn", "ppocr_cls.rten"],
+        "orient" => &["orient.mnn", "orient.rten", "orient.onnx", "ppocr_orient.mnn", "ppocr_orient.rten"],
+        "unwarp" => &["uvdoc.mnn", "uvdoc.rten", "unwarp.mnn", "unwarp.rten"],
+        "layout" => &["layout_cdla.mnn", "layout_cdla.rten", "layout_publaynet.mnn", "layout_publaynet.rten", "layout.mnn", "layout.rten"],
+        "order" => &["indra_order.mnn", "indra_order.rten", "order.mnn", "order.rten"],
         _ => &[],
     };
 
-    for &name in direct_checks {
-        let p = dir.join(name);
-        if p.exists() && fs::metadata(&p).map(|m| m.len() > 0).unwrap_or(false) {
-            return Some(p);
+    for check_dir in &check_dirs {
+        for &name in exact_names {
+            let p = check_dir.join(name);
+            if p.exists() && fs::metadata(&p).map(|m| m.len() > 0).unwrap_or(false) {
+                return Some(dir.join(name));
+            }
         }
     }
 
-    // Pattern search in directory if direct names were not found
-    if let Ok(entries) = fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_file() {
-                let name = path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("")
-                    .to_ascii_lowercase();
-                let matches = match kind {
-                    "det" => (name.contains("det") || name.contains("detection")) && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
-                    "rec" => (name.contains("rec") || name.contains("recognition")) && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
-                    "dict" => (name.contains("dict") || name.contains("keys") || name.contains("meta") || name.contains("vocab")) && (name.ends_with(".txt") || name.ends_with(".json")),
-                    "cls" => name.contains("cls") && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
-                    "orient" => name.contains("orient") && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
-                    "unwarp" => (name.contains("unwarp") || name.contains("uvdoc")) && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
-                    "layout" => name.contains("layout") && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
-                    "order" => name.contains("order") && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
-                    _ => false,
-                };
-                if matches && fs::metadata(&path).map(|m| m.len() > 0).unwrap_or(false) {
-                    return Some(path);
+    for check_dir in &check_dirs {
+        if let Ok(entries) = fs::read_dir(check_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    let name = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("")
+                        .to_ascii_lowercase();
+                    let matches = match kind {
+                        "det" => (name.contains("det") || name.contains("detection")) && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
+                        "rec" => (name.contains("rec") || name.contains("recognition")) && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
+                        "dict" => (name.contains("dict") || name.contains("keys") || name.contains("meta") || name.contains("vocab")) && (name.ends_with(".txt") || name.ends_with(".json")),
+                        "cls" => name.contains("cls") && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
+                        "orient" => name.contains("orient") && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
+                        "unwarp" => (name.contains("unwarp") || name.contains("uvdoc")) && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
+                        "layout" => name.contains("layout") && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
+                        "order" => name.contains("order") && (name.ends_with(".mnn") || name.ends_with(".rten") || name.ends_with(".onnx")),
+                        _ => false,
+                    };
+                    if matches && fs::metadata(&path).map(|m| m.len() > 0).unwrap_or(false) {
+                        if let Some(file_name) = path.file_name() {
+                            return Some(dir.join(file_name));
+                        }
+                    }
                 }
             }
         }
@@ -331,7 +347,8 @@ pub fn find_in_model_dir(dir: &Path, kind: &str) -> Option<PathBuf> {
     None
 }
 
-fn resolve_default_model_dir_asset(dir: &Path, kind: &str, filename: &str) -> PathBuf {
+
+pub fn resolve_default_model_dir_asset(dir: &Path, kind: &str, filename: &str) -> PathBuf {
     let default_name = match kind {
         "det" => "det.mnn",
         "rec" => "rec.mnn",
@@ -352,28 +369,21 @@ fn resolve_default_model_dir_asset(dir: &Path, kind: &str, filename: &str) -> Pa
     dir.join(default_name)
 }
 
-/// Resolves a single model asset with optional custom model directory support.
-///
-/// Flow:
-/// 1. User specified explicit path: If provided and exists, return it.
-/// 2. Custom model directory: If model_dir is provided and contains matching asset, return it.
-/// 3. Cache Path: If present in cache directory, return it.
-/// 4. Local checkout candidates: If present in local repository checkout, return it.
-/// 5. Model download: Download from GitHub Release directly into cache directory.
-pub fn resolve_asset_with_dir(
+/// Resolves a single model asset locally without network access.
+pub fn resolve_asset_local(
     explicit_path: Option<&Path>,
     model_dir: Option<&Path>,
     asset_kind: &str,
     asset_filename: &str,
     cache_dir: &Path,
-) -> Result<PathBuf, EngineError> {
-    // 1. User specified explicit path
+) -> Result<PathBuf, CoreError> {
+    // 1. Explicit path
     if let Some(path) = explicit_path {
         if !path.as_os_str().is_empty() {
             if path.exists() {
                 return Ok(path.to_path_buf());
             }
-            return Err(EngineError::Engine(format!(
+            return Err(CoreError::Model(format!(
                 "Specified model path does not exist: {}",
                 path.display()
             )));
@@ -410,17 +420,52 @@ pub fn resolve_asset_with_dir(
         }
     }
 
-    // 5. Model download
-    download_asset(asset_filename, &cached_file)
+    Err(CoreError::Model(format!(
+        "Model asset '{}' not found in cache or local directories",
+        asset_filename
+    )))
 }
 
-/// Resolves a single model asset using the default resolution flow.
-pub fn resolve_asset(
-    explicit_path: Option<&Path>,
-    asset_filename: &str,
+/// Resolves complete base OCR pipeline paths locally.
+pub fn resolve_base_pipeline(
+    model_name: Option<&str>,
+    model_dir: Option<&Path>,
+    lang: Option<&str>,
+    det_override: Option<&Path>,
+    rec_override: Option<&Path>,
+    dict_override: Option<&Path>,
     cache_dir: &Path,
-) -> Result<PathBuf, EngineError> {
-    resolve_asset_with_dir(explicit_path, None, "", asset_filename, cache_dir)
+) -> Result<(PathBuf, PathBuf, PathBuf), CoreError> {
+    let effective_dir = model_dir.or_else(|| {
+        model_name.and_then(|m| {
+            let p = Path::new(m);
+            if p.exists() {
+                Some(p)
+            } else {
+                None
+            }
+        })
+    });
+
+    let canonical_model = normalize_model_name(model_name);
+    let base_assets = get_base_pipeline_assets(canonical_model);
+
+    let det_path = resolve_asset_local(det_override, effective_dir, "det", base_assets.det_filename, cache_dir)?;
+
+    let (rec_filename, dict_filename) = if let Some(l) = lang {
+        if let Some((lang_rec, lang_dict)) = resolve_language_assets(l) {
+            (lang_rec, lang_dict)
+        } else {
+            (base_assets.rec_filename, base_assets.dict_filename)
+        }
+    } else {
+        (base_assets.rec_filename, base_assets.dict_filename)
+    };
+
+    let rec_path = resolve_asset_local(rec_override, effective_dir, "rec", rec_filename, cache_dir)?;
+    let dict_path = resolve_asset_local(dict_override, effective_dir, "dict", dict_filename, cache_dir)?;
+
+    Ok((det_path, rec_path, dict_path))
 }
 
 /// Maps a model asset filename to its organized path in the Hugging Face repository.
@@ -504,80 +549,62 @@ pub fn resolve_hf_asset_path(asset_filename: &str) -> &str {
     }
 }
 
-fn stream_url_to_file(download_url: &str, target_path: &Path, asset_filename: &str) -> Result<(), EngineError> {
-    eprintln!("Downloading {} from {}...", asset_filename, download_url);
+pub fn get_pipeline_assets(
+    model_name: Option<&str>,
+    lang: Option<&str>,
+    include_cls: bool,
+    include_orient: bool,
+    include_unwarp: bool,
+    layout_variant: Option<&str>,
+    include_reading_order: bool,
+) -> Vec<&'static str> {
+    let canonical_model = normalize_model_name(model_name);
+    let base_assets = get_base_pipeline_assets(canonical_model);
+    let mut assets = Vec::with_capacity(8);
 
-    let response = ureq::get(download_url)
-        .call()
-        .map_err(|e| {
-            EngineError::Engine(format!(
-                "Failed to download model '{}' from {}: {}",
-                asset_filename, download_url, e
-            ))
-        })?;
+    assets.push(base_assets.det_filename);
 
-    let part_path = target_path.with_extension("part");
-    let mut file = File::create(&part_path).map_err(|e| {
-        EngineError::Engine(format!("Failed to create temporary file '{}': {}", part_path.display(), e))
-    })?;
-
-    let mut reader = response.into_reader();
-    let mut buffer = [0u8; 64 * 1024];
-    loop {
-        let bytes_read = reader.read(&mut buffer).map_err(|e| {
-            let _ = fs::remove_file(&part_path);
-            EngineError::Engine(format!("Network read error while downloading {}: {}", asset_filename, e))
-        })?;
-        if bytes_read == 0 {
-            break;
+    let (rec_filename, dict_filename) = if let Some(l) = lang {
+        if let Some((lang_rec, lang_dict)) = resolve_language_assets(l) {
+            (lang_rec, lang_dict)
+        } else {
+            (base_assets.rec_filename, base_assets.dict_filename)
         }
-        file.write_all(&buffer[..bytes_read]).map_err(|e| {
-            let _ = fs::remove_file(&part_path);
-            EngineError::Engine(format!("Disk write error while saving {}: {}", asset_filename, e))
-        })?;
+    } else {
+        (base_assets.rec_filename, base_assets.dict_filename)
+    };
+    assets.push(rec_filename);
+    assets.push(dict_filename);
+
+    if include_cls {
+        assets.push("ppocr_cls.rten");
+    }
+    if include_orient {
+        if canonical_model == "indraocr" {
+            assets.push("indra_orient.rten");
+        } else {
+            assets.push("ppocr_orient.rten");
+        }
+    }
+    if include_unwarp {
+        assets.push("uvdoc.rten");
+    }
+    if let Some(variant) = layout_variant {
+        if variant == "publaynet" {
+            assets.push("layout_publaynet.rten");
+        } else {
+            assets.push("layout_cdla.rten");
+        }
+    }
+    if include_reading_order {
+        assets.push("indra_order.rten");
     }
 
-    file.flush().map_err(|e| {
-        let _ = fs::remove_file(&part_path);
-        EngineError::Engine(format!("Failed to flush {}: {}", asset_filename, e))
-    })?;
-    drop(file);
-
-    fs::rename(&part_path, target_path).map_err(|e| {
-        let _ = fs::remove_file(&part_path);
-        EngineError::Engine(format!("Failed to finalize model file '{}': {}", target_path.display(), e))
-    })?;
-
-    eprintln!("✓ Saved {} to {}", asset_filename, target_path.display());
-    Ok(())
+    assets
 }
 
-/// Downloads a single asset with Hugging Face primary resolution and GitHub Release fallback.
-pub fn download_asset(asset_filename: &str, target_path: &Path) -> Result<PathBuf, EngineError> {
-    if target_path.exists() && fs::metadata(target_path).map(|m| m.len() > 0).unwrap_or(false) {
-        return Ok(target_path.to_path_buf());
-    }
-
-    // If candidate exists in local checkout, copy it into target cache to avoid unnecessary network transfer
-    for cand in find_local_repo_candidates(asset_filename) {
-        if cand != target_path && cand.exists() && fs::metadata(&cand).map(|m| m.len() > 0).unwrap_or(false) {
-            if let Some(parent) = target_path.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            if fs::copy(&cand, target_path).is_ok() {
-                eprintln!("✓ Populated {} from local {}", target_path.display(), cand.display());
-                return Ok(target_path.to_path_buf());
-            }
-        }
-    }
-
-    if let Some(parent) = target_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| {
-            EngineError::Engine(format!("Failed to create cache directory '{}': {}", parent.display(), e))
-        })?;
-    }
-
-    let candidates = if let Ok(custom) = std::env::var("RUSTO_MODELS_URL") {
+pub fn get_asset_download_urls(asset_filename: &str) -> Vec<String> {
+    if let Ok(custom) = std::env::var("RUSTO_MODELS_URL") {
         if custom.ends_with('/') {
             vec![format!("{}{}", custom, asset_filename)]
         } else if custom.contains(asset_filename) {
@@ -592,69 +619,79 @@ pub fn download_asset(asset_filename: &str, target_path: &Path) -> Result<PathBu
             format!("{}/{}", DEFAULT_HF_BASE_URL, hf_path),
             format!("{}/{}/{}", DEFAULT_GITHUB_RELEASE_BASE_URL, tag, asset_filename),
         ]
-    };
+    }
+}
 
-    let mut last_err = None;
-    for url in candidates {
-        match stream_url_to_file(&url, target_path, asset_filename) {
-            Ok(()) => return Ok(target_path.to_path_buf()),
-            Err(e) => {
-                last_err = Some(e);
+pub fn populate_from_local_repo(asset_filename: &str, target_path: &Path) -> bool {
+    for cand in find_local_repo_candidates(asset_filename) {
+        if cand != target_path && cand.exists() && fs::metadata(&cand).map(|m| m.len() > 0).unwrap_or(false) {
+            if let Some(parent) = target_path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            if fs::copy(&cand, target_path).is_ok() {
+                return true;
             }
         }
     }
-
-    Err(last_err.unwrap_or_else(|| {
-        EngineError::Engine(format!("Failed to download model '{}'", asset_filename))
-    }))
+    false
 }
 
-/// Resolves complete base OCR pipeline (detection, recognition, dictionary) paths.
-pub fn resolve_base_pipeline(
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelDownloadTarget {
+    pub filename: String,
+    pub target_path: PathBuf,
+    pub urls: Vec<String>,
+    pub already_exists: bool,
+}
+
+pub fn plan_pipeline_download(
     model_name: Option<&str>,
-    model_dir: Option<&Path>,
     lang: Option<&str>,
-    det_override: Option<&Path>,
-    rec_override: Option<&Path>,
-    dict_override: Option<&Path>,
+    include_cls: bool,
+    include_orient: bool,
+    include_unwarp: bool,
+    layout_variant: Option<&str>,
+    include_reading_order: bool,
     cache_dir: &Path,
-) -> Result<(PathBuf, PathBuf, PathBuf), EngineError> {
-    // If model_name itself is an existing directory or file, treat it as model_dir if model_dir is None
-    let effective_dir = model_dir.or_else(|| {
-        model_name.and_then(|m| {
-            let p = Path::new(m);
-            if p.exists() {
-                Some(p)
+) -> Vec<ModelDownloadTarget> {
+    let assets = get_pipeline_assets(
+        model_name,
+        lang,
+        include_cls,
+        include_orient,
+        include_unwarp,
+        layout_variant,
+        include_reading_order,
+    );
+    plan_assets_download(&assets, cache_dir)
+}
+
+pub fn plan_all_models_download(cache_dir: &Path) -> Vec<ModelDownloadTarget> {
+    plan_assets_download(ALL_MODEL_ASSETS, cache_dir)
+}
+
+pub fn plan_assets_download<S: AsRef<str>>(assets: &[S], cache_dir: &Path) -> Vec<ModelDownloadTarget> {
+    assets
+        .iter()
+        .map(|asset| {
+            let name = asset.as_ref();
+            let target = cache_dir.join(name);
+            let already_exists = if target.exists() && fs::metadata(&target).map(|m| m.len() > 0).unwrap_or(false) {
+                true
             } else {
-                None
+                populate_from_local_repo(name, &target)
+            };
+            let urls = get_asset_download_urls(name);
+            ModelDownloadTarget {
+                filename: name.to_string(),
+                target_path: target,
+                urls,
+                already_exists,
             }
         })
-    });
-
-    let canonical_model = normalize_model_name(model_name);
-    let base_assets = get_base_pipeline_assets(canonical_model);
-
-    // Resolve detection model
-    let det_path = resolve_asset_with_dir(det_override, effective_dir, "det", base_assets.det_filename, cache_dir)?;
-
-    // Resolve recognition & dictionary model (checking language add-on if specified)
-    let (rec_filename, dict_filename) = if let Some(l) = lang {
-        if let Some((lang_rec, lang_dict)) = resolve_language_assets(l) {
-            (lang_rec, lang_dict)
-        } else {
-            (base_assets.rec_filename, base_assets.dict_filename)
-        }
-    } else {
-        (base_assets.rec_filename, base_assets.dict_filename)
-    };
-
-    let rec_path = resolve_asset_with_dir(rec_override, effective_dir, "rec", rec_filename, cache_dir)?;
-    let dict_path = resolve_asset_with_dir(dict_override, effective_dir, "dict", dict_filename, cache_dir)?;
-
-    Ok((det_path, rec_path, dict_path))
+        .collect()
 }
 
-/// All canonical model assets published on GitHub Releases.
 pub const ALL_MODEL_ASSETS: &[&str] = &[
     "ppocrv6_tiny_det.rten", "ppocrv6_tiny_rec.rten", "ppocrv6_dict.txt",
     "ppocrv6_tiny_int8_det.rten", "ppocrv6_tiny_int8_rec.rten",
@@ -688,194 +725,48 @@ pub const ALL_MODEL_ASSETS: &[&str] = &[
     "ppocrv4_rec_kannada.rten", "ppocrv4_dict_kannada.txt",
 ];
 
-/// Downloads all assets for a given model pipeline and optional extras.
-#[allow(clippy::too_many_arguments)]
-pub fn download_model_pipeline(
-    model_name: Option<&str>,
-    lang: Option<&str>,
-    include_cls: bool,
-    include_orient: bool,
-    include_unwarp: bool,
-    layout_variant: Option<&str>,
-    include_reading_order: bool,
-    cache_dir: &Path,
-) -> Result<Vec<PathBuf>, EngineError> {
-    let canonical_model = normalize_model_name(model_name);
-    let base_assets = get_base_pipeline_assets(canonical_model);
-    let mut downloaded = Vec::new();
-
-    let det_file = cache_dir.join(base_assets.det_filename);
-    downloaded.push(download_asset(base_assets.det_filename, &det_file)?);
-
-    let (rec_filename, dict_filename) = if let Some(l) = lang {
-        if let Some((lang_rec, lang_dict)) = resolve_language_assets(l) {
-            (lang_rec, lang_dict)
-        } else {
-            (base_assets.rec_filename, base_assets.dict_filename)
-        }
-    } else {
-        (base_assets.rec_filename, base_assets.dict_filename)
-    };
-
-    let rec_file = cache_dir.join(rec_filename);
-    downloaded.push(download_asset(rec_filename, &rec_file)?);
-
-    let dict_file = cache_dir.join(dict_filename);
-    downloaded.push(download_asset(dict_filename, &dict_file)?);
-
-    if include_cls {
-        let cls_file = cache_dir.join("ppocr_cls.rten");
-        downloaded.push(download_asset("ppocr_cls.rten", &cls_file)?);
-    }
-
-    if include_orient {
-        let orient_file = if canonical_model == "indraocr" {
-            "indra_orient.rten"
-        } else {
-            "ppocr_orient.rten"
-        };
-        let target = cache_dir.join(orient_file);
-        downloaded.push(download_asset(orient_file, &target)?);
-    }
-
-    if include_unwarp {
-        let target = cache_dir.join("uvdoc.rten");
-        downloaded.push(download_asset("uvdoc.rten", &target)?);
-    }
-
-    if let Some(variant) = layout_variant {
-        let layout_file = if variant == "publaynet" {
-            "layout_publaynet.rten"
-        } else {
-            "layout_cdla.rten"
-        };
-        let target = cache_dir.join(layout_file);
-        downloaded.push(download_asset(layout_file, &target)?);
-    }
-
-    if include_reading_order || canonical_model == "indraocr" {
-        let target = cache_dir.join("indra_order.rten");
-        downloaded.push(download_asset("indra_order.rten", &target)?);
-    }
-
-    Ok(downloaded)
-}
-
-/// Downloads all available canonical models to the cache directory.
-pub fn download_all_models(cache_dir: &Path) -> Result<Vec<PathBuf>, EngineError> {
-    let mut downloaded = Vec::new();
-    for asset in ALL_MODEL_ASSETS {
-        let target = cache_dir.join(asset);
-        downloaded.push(download_asset(asset, &target)?);
-    }
-    Ok(downloaded)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_normalize_model_name() {
-        assert_eq!(normalize_model_name(None), "indraocr");
-        assert_eq!(normalize_model_name(Some("")), "indraocr");
-        assert_eq!(normalize_model_name(Some("ppocrv6")), "ppocrv6-tiny");
-        assert_eq!(normalize_model_name(Some("ppv6")), "ppocrv6-tiny");
-        assert_eq!(normalize_model_name(Some("PP-OCRv6-Tiny")), "ppocrv6-tiny");
-        assert_eq!(normalize_model_name(Some("ppocrv6_small")), "ppocrv6-small");
-        assert_eq!(normalize_model_name(Some("ppocrv5")), "ppocrv5-mobile");
-        assert_eq!(normalize_model_name(Some("ppv5")), "ppocrv5-mobile");
-        assert_eq!(normalize_model_name(Some("ppv4")), "ppocrv4-mobile");
-        assert_eq!(normalize_model_name(Some("ppv3")), "ppocrv3-mobile");
-        assert_eq!(normalize_model_name(Some("ppocrv4_server")), "ppocrv4-server");
-        assert_eq!(normalize_model_name(Some("indraocr")), "indraocr");
-        assert_eq!(normalize_model_name(Some("indra")), "indraocr");
-        assert_eq!(normalize_model_name(Some("indra-ocr")), "indraocr");
+    fn test_get_pipeline_assets() {
+        let assets = get_pipeline_assets(
+            Some("indraocr"),
+            Some("cjk"),
+            true,
+            true,
+            true,
+            Some("publaynet"),
+            true,
+        );
+        assert_eq!(assets[0], "indra_det.rten");
+        assert_eq!(assets[1], "indra_rec_cjk.rten");
+        assert_eq!(assets[2], "indra_meta.json");
+        assert!(assets.contains(&"ppocr_cls.rten"));
+        assert!(assets.contains(&"indra_orient.rten"));
+        assert!(assets.contains(&"uvdoc.rten"));
+        assert!(assets.contains(&"layout_publaynet.rten"));
+        assert!(assets.contains(&"indra_order.rten"));
     }
 
     #[test]
-    fn test_resolve_language_assets() {
-        let (rec_ja, dict_ja) = resolve_language_assets("ja").unwrap();
-        assert_eq!(rec_ja, "ppocrv4_rec_japan.rten");
-        assert_eq!(dict_ja, "ppocrv4_dict_japan.txt");
-
-        let (rec_ko, dict_ko) = resolve_language_assets("korean").unwrap();
-        assert_eq!(rec_ko, "ppocrv5_rec_korean.rten");
-        assert_eq!(dict_ko, "ppocrv5_dict_korean.txt");
-
-        let (rec_ar, dict_ar) = resolve_language_assets("ar").unwrap();
-        assert_eq!(rec_ar, "ppocrv5_rec_arabic.rten");
-        assert_eq!(dict_ar, "ppocrv5_dict_arabic.txt");
-
-        assert!(resolve_language_assets("unknown-lang").is_none());
-    }
-
-    #[test]
-    fn test_resolve_asset_explicit_override() {
-        let dummy_path = PathBuf::from("Cargo.toml");
-        let cache_dir = PathBuf::from("/tmp/rusto_cache_test");
-        let result = resolve_asset(Some(&dummy_path), "nonexistent.rten", &cache_dir);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), dummy_path);
-
-        let missing = PathBuf::from("definitely_missing_file_12345.rten");
-        let err = resolve_asset(Some(&missing), "test.rten", &cache_dir);
-        assert!(err.is_err());
-    }
-
-    #[test]
-    fn test_resolve_asset_flow_uses_cache() {
-        let cache_dir = PathBuf::from("models/PPOCR_v6_tiny");
-        let result = resolve_asset(None, "dict.txt", &cache_dir);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_resolve_base_pipeline_from_model_dir() {
-        let model_dir = PathBuf::from("models/PPOCR_v6_tiny");
-        let cache_dir = PathBuf::from("/tmp/rusto_empty_cache_dir");
-        let (det, rec, dict) = resolve_base_pipeline(
+    fn test_plan_pipeline_download() {
+        let temp_dir = std::env::temp_dir().join("rusto_test_models_plan");
+        let plan = plan_pipeline_download(
+            Some("ppocrv6-tiny"),
             None,
-            Some(&model_dir),
+            false,
+            false,
+            false,
             None,
-            None,
-            None,
-            None,
-            &cache_dir,
-        ).unwrap();
-
-        assert_eq!(det, model_dir.join("det.mnn"));
-        assert_eq!(rec, model_dir.join("rec.mnn"));
-        assert_eq!(dict, model_dir.join("dict.txt"));
-    }
-
-    #[test]
-    fn test_resolve_base_pipeline_with_det_override() {
-        let model_dir = PathBuf::from("models/PPOCR_v6_tiny");
-        let custom_det = PathBuf::from("Cargo.toml");
-        let cache_dir = PathBuf::from("/tmp/rusto_empty_cache_dir");
-        let (det, rec, dict) = resolve_base_pipeline(
-            None,
-            Some(&model_dir),
-            None,
-            Some(&custom_det),
-            None,
-            None,
-            &cache_dir,
-        ).unwrap();
-
-        assert_eq!(det, custom_det);
-        assert_eq!(rec, model_dir.join("rec.mnn"));
-        assert_eq!(dict, model_dir.join("dict.txt"));
-    }
-
-    #[test]
-    fn test_resolve_hf_asset_path() {
-        assert_eq!(resolve_hf_asset_path("indra_det.rten"), "indraocr/det.rten");
-        assert_eq!(resolve_hf_asset_path("indra_order.rten"), "indraocr/order.rten");
-        assert_eq!(resolve_hf_asset_path("ppocrv6_tiny_det.rten"), "ppocrv6-tiny/det.rten");
-        assert_eq!(resolve_hf_asset_path("ppocrv5_rec_arabic.rten"), "multilingual/ppocrv5_rec_arabic.rten");
-        assert_eq!(resolve_hf_asset_path("layout_cdla.rten"), "modules/layout_cdla.rten");
-        assert_eq!(resolve_hf_asset_path("custom_unknown.rten"), "custom_unknown.rten");
+            false,
+            &temp_dir,
+        );
+        assert_eq!(plan.len(), 3);
+        assert_eq!(plan[0].filename, "ppocrv6_tiny_det.rten");
+        assert_eq!(plan[1].filename, "ppocrv6_tiny_rec.rten");
+        assert_eq!(plan[2].filename, "ppocrv6_dict.txt");
+        assert!(!plan[0].urls.is_empty());
     }
 }

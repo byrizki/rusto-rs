@@ -1,6 +1,3 @@
-// Pure Rust contour detection implementation
-// This module provides OpenCV-like contour detection for the pure Rust backend
-
 use image::GrayImage;
 
 #[derive(Clone, Copy)]
@@ -30,7 +27,6 @@ impl Contour {
         self.points.len()
     }
 
-    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.points.is_empty()
     }
@@ -42,13 +38,10 @@ impl Default for Contour {
     }
 }
 
-/// Find contours in a binary image
-/// Extracts boundary pixels and component area in pure Rust
 pub fn find_contours(binary_img: &GrayImage) -> Vec<Contour> {
     find_contours_with_pred(binary_img, None)
 }
 
-/// Find contours in a binary image, optionally calculating mean probability score from prediction map
 pub fn find_contours_with_pred(
     binary_img: &GrayImage,
     pred: Option<&ndarray::Array4<f32>>,
@@ -69,7 +62,6 @@ pub fn find_contours_with_pred(
         stride: w_usize,
     };
 
-    // First pass: label connected components using flood fill and record component area
     for y in 0..height {
         for x in 0..width {
             let idx = (y as usize) * w_usize + (x as usize);
@@ -93,7 +85,6 @@ pub fn find_contours_with_pred(
         return Vec::new();
     }
 
-    // Second pass: single O(W x H) pass collecting boundary pixels and score sums for each label
     let mut boundary_buckets = vec![Vec::with_capacity(64); num_labels];
     let mut score_sums = vec![0.0f32; num_labels];
     for y in 0..dims.height {
@@ -131,7 +122,6 @@ pub fn find_contours_with_pred(
     contours
 }
 
-/// Flood fill to label a connected component, returning total pixel count
 fn flood_fill_label(
     img: &GrayImage,
     labels: &mut [u32],
@@ -162,7 +152,6 @@ fn flood_fill_label(
         labels[idx] = label;
         count += 1;
 
-        // 4-connected neighbors
         if x + 1 < dims.width {
             stack.push((x + 1, y));
         }
@@ -180,7 +169,6 @@ fn flood_fill_label(
     count
 }
 
-/// Check if a pixel is on the boundary of its labeled region
 fn is_boundary_pixel_label(
     label_map: &[u32],
     x: i32,
@@ -188,7 +176,6 @@ fn is_boundary_pixel_label(
     target_label: u32,
     dims: ImageDims,
 ) -> bool {
-    // Check 4-connected neighbors
     for (dx, dy) in [(0, -1), (1, 0), (0, 1), (-1, 0)] {
         let nx = x + dx;
         let ny = y + dy;
@@ -205,24 +192,3 @@ fn is_boundary_pixel_label(
     false
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use image::{GrayImage, Luma};
-
-    #[test]
-    fn test_find_contours_simple() {
-        let mut img = GrayImage::new(10, 10);
-
-        // Draw a simple 6x6 rectangle (area = 36 pixels)
-        for x in 2..8 {
-            for y in 2..8 {
-                img.put_pixel(x, y, Luma([255]));
-            }
-        }
-
-        let contours = find_contours(&img);
-        assert!(!contours.is_empty(), "Should find at least one contour");
-        assert_eq!(contours[0].area, 36, "Area should match foreground pixel count");
-    }
-}

@@ -471,19 +471,22 @@ pub fn binary_op(
                     out_data
                         .par_chunks_exact_mut(hw)
                         .enumerate()
-                        .for_each(|(c, out_sub)| {
+                        .for_each(|(i, out_sub)| {
+                            let c = i % channels;
                             let b_val = rhs_data[c];
-                            let l_sub = &lhs_data[c * hw..(c + 1) * hw];
+                            let l_sub = &lhs_data[i * hw..(i + 1) * hw];
                             binary_scalar_rhs(l_sub, b_val, out_sub, op_type, act);
                         });
                     return;
                 }
             }
 
-            for c in 0..channels {
+            let total_chunks = lhs_shape[0] * channels;
+            for i in 0..total_chunks {
+                let c = i % channels;
                 let b_val = rhs_data[c];
-                let l_sub = &lhs_data[c * hw..(c + 1) * hw];
-                let o_sub = &mut out_data[c * hw..(c + 1) * hw];
+                let l_sub = &lhs_data[i * hw..(i + 1) * hw];
+                let o_sub = &mut out_data[i * hw..(i + 1) * hw];
                 binary_scalar_rhs(l_sub, b_val, o_sub, op_type, act);
             }
             return;

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use ndarray::{ArrayD, IxDyn};
 use rusto::{
-    DocUnwarper, EngineError, ImageSource, InferenceSession, InitializeConfig, LayoutConfig,
+    CoreError, DocUnwarper, ImageSource, InferenceSession, InitializeConfig, LayoutConfig,
     LayoutDetector, LayoutType, OcrRunOptions, RustO, UnwarpConfig,
 };
 
@@ -94,18 +94,18 @@ struct MockLayoutSession {
 }
 
 impl InferenceSession for MockLayoutSession {
-    fn run(&mut self, _input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
+    fn run(&mut self, _input: ArrayD<f32>) -> Result<ArrayD<f32>, CoreError> {
         let n = self.output_boxes.len();
         let mut flat = Vec::with_capacity(n * 6);
         for b in &self.output_boxes {
             flat.extend_from_slice(b);
         }
         let arr = ArrayD::from_shape_vec(IxDyn(&[1, n, 6]), flat)
-            .map_err(|e| EngineError::Engine(e.to_string()))?;
+            .map_err(|e| CoreError::Model(e.to_string()))?;
         Ok(arr)
     }
 
-    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, CoreError> {
         let mut map = HashMap::new();
         map.insert("output".to_string(), self.run(input)?);
         Ok(map)
@@ -114,9 +114,9 @@ impl InferenceSession for MockLayoutSession {
     fn run_with_inputs(
         &mut self,
         _inputs: HashMap<String, ArrayD<f32>>,
-    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+    ) -> Result<HashMap<String, ArrayD<f32>>, CoreError> {
         let dummy = ArrayD::from_shape_vec(IxDyn(&[1, 1, 1]), vec![0.0])
-            .map_err(|e| EngineError::Engine(e.to_string()))?;
+            .map_err(|e| CoreError::Model(e.to_string()))?;
         self.run_all(dummy)
     }
 
@@ -161,7 +161,7 @@ fn test_layout_detector_with_mock_session() {
 struct MockUnwarpSession;
 
 impl InferenceSession for MockUnwarpSession {
-    fn run(&mut self, _input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
+    fn run(&mut self, _input: ArrayD<f32>) -> Result<ArrayD<f32>, CoreError> {
         // Mock UVDoc 2D displacement field mesh [1, 2, 45, 31]
         let shape = IxDyn(&[1, 2, 45, 31]);
         let total = 2 * 45 * 31;
@@ -179,11 +179,11 @@ impl InferenceSession for MockUnwarpSession {
             }
         }
         let arr = ArrayD::from_shape_vec(shape, grid_data)
-            .map_err(|e| EngineError::Engine(e.to_string()))?;
+            .map_err(|e| CoreError::Model(e.to_string()))?;
         Ok(arr)
     }
 
-    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, CoreError> {
         let mut map = HashMap::new();
         map.insert("output".to_string(), self.run(input)?);
         Ok(map)
@@ -192,9 +192,9 @@ impl InferenceSession for MockUnwarpSession {
     fn run_with_inputs(
         &mut self,
         _inputs: HashMap<String, ArrayD<f32>>,
-    ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
+    ) -> Result<HashMap<String, ArrayD<f32>>, CoreError> {
         let dummy = ArrayD::from_shape_vec(IxDyn(&[1, 1, 1]), vec![0.0])
-            .map_err(|e| EngineError::Engine(e.to_string()))?;
+            .map_err(|e| CoreError::Model(e.to_string()))?;
         self.run_all(dummy)
     }
 

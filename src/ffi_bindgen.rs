@@ -20,15 +20,17 @@ impl From<crate::engine::EngineError> for RustoBindingError {
         match err {
             crate::engine::EngineError::Preprocess(msg) => RustoBindingError::Preprocess { msg },
             crate::engine::EngineError::OutputError(msg) => RustoBindingError::Postprocess { msg },
-            #[cfg(feature = "rten")]
-            crate::engine::EngineError::Rten(err) => RustoBindingError::Inference { msg: err.to_string() },
             crate::engine::EngineError::Engine(msg) => RustoBindingError::Inference { msg },
             crate::engine::EngineError::ImageError(msg) => RustoBindingError::InvalidInput { msg },
             crate::engine::EngineError::InvalidInputShape => RustoBindingError::InvalidInput { msg: "Invalid input shape".into() },
             crate::engine::EngineError::ShapeError(err) => RustoBindingError::InvalidInput { msg: err.to_string() },
-            #[cfg(feature = "use-opencv")]
-            crate::engine::EngineError::OpenCvError(err) => RustoBindingError::Inference { msg: err.to_string() },
         }
+    }
+}
+
+impl From<rusto_core::CoreError> for RustoBindingError {
+    fn from(err: rusto_core::CoreError) -> Self {
+        crate::engine::EngineError::from(err).into()
     }
 }
 
@@ -372,7 +374,7 @@ pub struct InitializeConfig {
 /// High-level RustO OCR Engine for multi-platform bindings.
 #[derive(uniffi::Object)]
 pub struct RustO {
-    inner: Mutex<crate::rusto_ocr::RustO>,
+    inner: Mutex<crate::engine::RustO>,
 }
 
 #[uniffi::export]
@@ -380,8 +382,9 @@ impl RustO {
     /// Initializes an OCR engine instance with structured InitializeConfig.
     #[uniffi::constructor]
     pub fn initialize(config: InitializeConfig) -> Result<Arc<Self>, RustoBindingError> {
+        crate::ensure_rten_registered();
         let internal_config = convert_init_config(&config)?;
-        let ocr = crate::rusto_ocr::RustO::initialize(internal_config)?;
+        let ocr = crate::engine::RustO::initialize(internal_config)?;
         Ok(Arc::new(Self {
             inner: Mutex::new(ocr),
         }))
@@ -390,9 +393,10 @@ impl RustO {
     /// Initializes an OCR engine instance from a JSON configuration string.
     #[uniffi::constructor]
     pub fn initialize_from_json(config_json: String) -> Result<Arc<Self>, RustoBindingError> {
-        let internal_config = crate::config::InitializeConfig::from_json(&config_json)
+        crate::ensure_rten_registered();
+        let internal_config = rusto_core::config::InitializeConfig::from_json(&config_json)
             .map_err(|e| RustoBindingError::Initialization { msg: e.to_string() })?;
-        let ocr = crate::rusto_ocr::RustO::initialize(internal_config)?;
+        let ocr = crate::engine::RustO::initialize(internal_config)?;
         Ok(Arc::new(Self {
             inner: Mutex::new(ocr),
         }))
@@ -571,6 +575,7 @@ pub fn create_initialize_config_for_model(
 
 /// Downloads model assets for a specific OCR pipeline ahead of time.
 #[uniffi::export]
+#[allow(deprecated)]
 pub fn download_model(
     model: Option<String>,
     lang: Option<String>,
@@ -592,6 +597,7 @@ pub fn download_model(
 
 /// Downloads all available canonical models to the cache directory ahead of time.
 #[uniffi::export]
+#[allow(deprecated)]
 pub fn download_all_models(
     cache_dir: Option<String>,
 ) -> Result<Vec<String>, RustoBindingError> {
@@ -609,35 +615,35 @@ pub fn default_ocr_run_options() -> OcrRunOptions {
     }
 }
 
-fn convert_init_config(config: &InitializeConfig) -> Result<crate::config::InitializeConfig, RustoBindingError> {
+fn convert_init_config(config: &InitializeConfig) -> Result<rusto_core::config::InitializeConfig, RustoBindingError> {
     let json = serde_json::to_string(config)
         .map_err(|e| RustoBindingError::Initialization { msg: e.to_string() })?;
-    crate::config::InitializeConfig::from_json(&json)
+    rusto_core::config::InitializeConfig::from_json(&json)
         .map_err(|e| RustoBindingError::Initialization { msg: e.to_string() })
 }
 
-fn convert_source(source: &ImageSource) -> Result<crate::rusto_ocr::ImageSource, RustoBindingError> {
+fn convert_source(source: &ImageSource) -> Result<rusto_core::types::ImageSource, RustoBindingError> {
     match source {
         ImageSource::Path { path } => {
             if path.trim().is_empty() {
                 return Err(RustoBindingError::InvalidInput { msg: "Image path is empty".into() });
             }
-            Ok(crate::rusto_ocr::ImageSource::Path(std::path::PathBuf::from(path)))
+            Ok(rusto_core::types::ImageSource::Path(std::path::PathBuf::from(path)))
         }
         ImageSource::Bytes { data } => {
             if data.is_empty() {
                 return Err(RustoBindingError::InvalidInput { msg: "Image data is empty".into() });
             }
-            Ok(crate::rusto_ocr::ImageSource::Bytes(data.clone()))
+            Ok(rusto_core::types::ImageSource::Bytes(data.clone()))
         }
     }
 }
 
-fn convert_options(opts: &OcrRunOptions) -> Result<crate::rusto_ocr::OcrRunOptions, RustoBindingError> {
+fn convert_options(opts: &OcrRunOptions) -> Result<rusto_core::types::OcrRunOptions, RustoBindingError> {
     let output = match opts.output {
-        OutputGranularity::Lines => crate::rusto_ocr::OutputGranularity::Lines,
-        OutputGranularity::Words => crate::rusto_ocr::OutputGranularity::Words,
-        OutputGranularity::Spatial => crate::rusto_ocr::OutputGranularity::Spatial,
+        OutputGranularity::Lines => rusto_core::types::OutputGranularity::Lines,
+        OutputGranularity::Words => rusto_core::types::OutputGranularity::Words,
+        OutputGranularity::Spatial => rusto_core::types::OutputGranularity::Spatial,
     };
     let detection = opts.detection.as_ref().map(|d| {
         let mean = d.mean.as_ref().and_then(|m| {
@@ -646,7 +652,7 @@ fn convert_options(opts: &OcrRunOptions) -> Result<crate::rusto_ocr::OcrRunOptio
         let std = d.std.as_ref().and_then(|s| {
             if s.len() == 3 { Some([s[0], s[1], s[2]]) } else { None }
         });
-        let postprocess = d.postprocess.as_ref().map(|p| crate::rusto_ocr::PostprocessRunOptions {
+        let postprocess = d.postprocess.as_ref().map(|p| rusto_core::types::PostprocessRunOptions {
             threshold: p.threshold,
             box_threshold: p.box_threshold,
             max_candidates: p.max_candidates,
@@ -654,7 +660,7 @@ fn convert_options(opts: &OcrRunOptions) -> Result<crate::rusto_ocr::OcrRunOptio
             use_dilation: p.use_dilation,
             score_mode: p.score_mode.clone(),
         });
-        crate::rusto_ocr::DetectionRunOptions {
+        rusto_core::types::DetectionRunOptions {
             limit_side_len: d.limit_side_len,
             limit_type: d.limit_type.clone(),
             mean,
@@ -662,7 +668,7 @@ fn convert_options(opts: &OcrRunOptions) -> Result<crate::rusto_ocr::OcrRunOptio
             postprocess,
         }
     });
-    let postprocess = opts.postprocess.as_ref().map(|p| crate::rusto_ocr::PostprocessRunOptions {
+    let postprocess = opts.postprocess.as_ref().map(|p| rusto_core::types::PostprocessRunOptions {
         threshold: p.threshold,
         box_threshold: p.box_threshold,
         max_candidates: p.max_candidates,
@@ -670,18 +676,18 @@ fn convert_options(opts: &OcrRunOptions) -> Result<crate::rusto_ocr::OcrRunOptio
         use_dilation: p.use_dilation,
         score_mode: p.score_mode.clone(),
     });
-    let calibration = opts.calibration.as_ref().map(|c| crate::calibration::CalibrationOptions {
+    let calibration = opts.calibration.as_ref().map(|c| rusto_core::calibration::CalibrationOptions {
         descreen_strength: c.descreen_strength,
         ..Default::default()
     });
-    let optimization = opts.optimization.as_ref().map(|o| crate::calibration::OptimizationOptions {
+    let optimization = opts.optimization.as_ref().map(|o| rusto_core::calibration::OptimizationOptions {
         enabled: o.enabled,
         target_max_side: o.target_max_side,
         crop_padding_x: o.crop_padding_x,
         crop_padding_y: o.crop_padding_y,
     });
 
-    let internal = crate::rusto_ocr::OcrRunOptions {
+    let internal = rusto_core::types::OcrRunOptions {
         output,
         line_y_threshold: opts.line_y_threshold,
         word_x_threshold: opts.word_x_threshold,
@@ -704,9 +710,9 @@ fn convert_options(opts: &OcrRunOptions) -> Result<crate::rusto_ocr::OcrRunOptio
     Ok(internal)
 }
 
-fn convert_result(res: crate::rusto_ocr::DetectTextResult) -> DetectTextResult {
+fn convert_result(res: rusto_core::types::DetectTextResult) -> DetectTextResult {
     match res {
-        crate::rusto_ocr::DetectTextResult::Structured(items) => {
+        rusto_core::types::DetectTextResult::Structured(items) => {
             DetectTextResult::Structured {
                 results: items
                     .into_iter()
@@ -730,7 +736,7 @@ fn convert_result(res: crate::rusto_ocr::DetectTextResult) -> DetectTextResult {
                     .collect(),
             }
         }
-        crate::rusto_ocr::DetectTextResult::Spatial(text) => DetectTextResult::Spatial { text },
+        rusto_core::types::DetectTextResult::Spatial(text) => DetectTextResult::Spatial { text },
     }
 }
 
@@ -762,25 +768,23 @@ fn convert_layout_region(r: crate::layout::LayoutRegion) -> LayoutRegion {
     }
 }
 
-fn convert_mat_to_unwarped(mat: crate::image_impl::Mat) -> Result<UnwarpedImageResult, RustoBindingError> {
-    #[cfg(not(feature = "use-opencv"))]
-    {
-        let width = mat.cols() as u32;
-        let height = mat.rows() as u32;
-        let rgb = mat.to_rgb8();
-        Ok(UnwarpedImageResult {
-            pixels: rgb.into_raw(),
-            width,
-            height,
-        })
-    }
-    #[cfg(feature = "use-opencv")]
-    {
-        let _ = mat;
-        Err(RustoBindingError::InvalidInput {
-            msg: "RGB unwarped image export requires the pure Rust image backend".into(),
-        })
-    }
+#[cfg(not(feature = "use-opencv"))]
+fn convert_mat_to_unwarped(mat: rusto_core::image::Mat) -> Result<UnwarpedImageResult, RustoBindingError> {
+    let width = mat.cols() as u32;
+    let height = mat.rows() as u32;
+    let rgb = mat.to_rgb8();
+    Ok(UnwarpedImageResult {
+        pixels: rgb.into_raw(),
+        width,
+        height,
+    })
+}
+
+#[cfg(feature = "use-opencv")]
+fn convert_mat_to_unwarped(_mat: opencv::core::Mat) -> Result<UnwarpedImageResult, RustoBindingError> {
+    Err(RustoBindingError::InvalidInput {
+        msg: "RGB unwarped image export requires the pure Rust image backend".into(),
+    })
 }
 
 /// # Safety

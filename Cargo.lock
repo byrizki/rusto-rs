@@ -1958,11 +1958,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusto-core"
+version = "0.3.2"
+dependencies = [
+ "clipper2-rust",
+ "dirs",
+ "image",
+ "nalgebra",
+ "ndarray",
+ "rusto-nn",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "rusto-cpp"
+version = "0.3.2"
+dependencies = [
+ "clipper2-rust",
+ "ndarray",
+ "opencv",
+ "rusto-core",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "rusto-mnn"
 version = "0.3.2"
 dependencies = [
  "cc",
  "ndarray",
+ "rusto-core",
  "thiserror 1.0.69",
 ]
 
@@ -2025,6 +2052,8 @@ dependencies = [
  "ndarray",
  "opencv",
  "rayon",
+ "rusto-core",
+ "rusto-cpp",
  "rusto-mnn",
  "rusto-nn",
  "rusto-nn-cuda",
@@ -2044,6 +2073,7 @@ dependencies = [
  "ndarray",
  "rten",
  "rten-tensor",
+ "rusto-core",
  "thiserror 1.0.69",
 ]
 
@@ -2052,6 +2082,7 @@ name = "rusto-rten-wasm"
 version = "0.3.2"
 dependencies = [
  "image",
+ "rusto-core",
  "rusto-nn",
  "serde",
  "serde_json",

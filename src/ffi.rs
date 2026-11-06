@@ -64,6 +64,7 @@ pub struct CLayoutRegion {
 /// config_json must be a valid null-terminated UTF-8 JSON string
 #[no_mangle]
 pub unsafe extern "C" fn rocr_initialize(config_json: *const c_char) -> *mut ROCRHandle {
+    crate::ensure_rten_registered();
     if config_json.is_null() {
         return std::ptr::null_mut();
     }
@@ -235,7 +236,7 @@ pub unsafe extern "C" fn rocr_detect_text_rgb(
         || results_out.is_null() || count_out.is_null() {
         return -1;
     }
-    let (_, required) = match crate::rusto_ocr::rgb_layout(width, height, stride) {
+    let (_, required) = match rusto_core::image::rgb_layout(width, height, stride) {
         Ok(layout) if image_len >= layout.1 => layout,
         _ => return -2,
     };
@@ -280,7 +281,7 @@ pub unsafe extern "C" fn rocr_detect_text_rgb_spatial(
     if handle.is_null() || image_data.is_null() || options_json.is_null() {
         return std::ptr::null_mut();
     }
-    let (_, required) = match crate::rusto_ocr::rgb_layout(width, height, stride) {
+    let (_, required) = match rusto_core::image::rgb_layout(width, height, stride) {
         Ok(layout) if image_len >= layout.1 => layout,
         _ => return std::ptr::null_mut(),
     };
@@ -470,7 +471,7 @@ pub unsafe extern "C" fn rocr_detect_layout_rgb(
     if handle.is_null() || image_data.is_null() || regions_out.is_null() || count_out.is_null() {
         return -1;
     }
-    let (_, required) = match crate::rusto_ocr::rgb_layout(width, height, stride) {
+    let (_, required) = match rusto_core::image::rgb_layout(width, height, stride) {
         Ok(layout) if image_len >= layout.1 => layout,
         _ => return -2,
     };

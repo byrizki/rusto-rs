@@ -456,6 +456,27 @@ impl Drop for MnnCppSession {
     }
 }
 
+impl rusto_core::engine::InferenceSession for MnnCppSession {
+    fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, rusto_core::CoreError> {
+        self.run(input).map_err(|e| rusto_core::CoreError::Model(e.to_string()))
+    }
+
+    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, rusto_core::CoreError> {
+        self.run_all(input).map_err(|e| rusto_core::CoreError::Model(e.to_string()))
+    }
+
+    fn run_with_inputs(
+        &mut self,
+        inputs: HashMap<String, ArrayD<f32>>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, rusto_core::CoreError> {
+        self.run_with_inputs(inputs).map_err(|e| rusto_core::CoreError::Model(e.to_string()))
+    }
+
+    fn input_channels(&self) -> usize {
+        self.input_channels()
+    }
+}
+
 fn num_cpus_count() -> usize {
     std::thread::available_parallelism()
         .map(|n| n.get())

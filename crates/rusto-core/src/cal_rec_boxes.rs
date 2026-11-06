@@ -1,13 +1,15 @@
-#[cfg(feature = "use-opencv")]
-use opencv::core::Point2f;
-#[cfg(not(feature = "use-opencv"))]
-use crate::image_impl::Point2f;
-
-use crate::rec::{TextRecOutput, WordInfo, WordType};
+use crate::image::Point2f;
+use crate::ctc::{WordInfo, WordType};
 
 type CalWordBoxResult = (Vec<String>, Vec<(f32, f32, f32, f32)>, Vec<f32>);
 
 pub struct CalRecBoxes;
+
+impl Default for CalRecBoxes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl CalRecBoxes {
     pub fn new() -> Self {
@@ -17,17 +19,19 @@ impl CalRecBoxes {
     pub fn calc_word_boxes(
         &self,
         dt_boxes: &[[Point2f; 4]],
-        rec_res: &TextRecOutput,
+        txts: &[String],
+        word_infos: &[Option<WordInfo>],
         return_single_char_box: bool,
     ) -> Vec<Vec<(String, f32, [Point2f; 4])>> {
         let mut all_word_results: Vec<Vec<(String, f32, [Point2f; 4])>> = Vec::new();
 
-        let num = dt_boxes.len()
-            .min(rec_res.txts.len())
-            .min(rec_res.word_infos.len());
+        let num = dt_boxes
+            .len()
+            .min(txts.len())
+            .min(word_infos.len());
 
-        for (idx, txt) in rec_res.txts.iter().enumerate().take(num) {
-            let word_info_opt = &rec_res.word_infos[idx];
+        for (idx, txt) in txts.iter().enumerate().take(num) {
+            let word_info_opt = &word_infos[idx];
 
             if txt.is_empty() {
                 all_word_results.push(Vec::new());
@@ -140,7 +144,6 @@ impl CalRecBoxes {
         (word_contents, rects, confs)
     }
 }
-
 
 fn rect_to_quad_in_box(
     box_pts: &[Point2f; 4],
@@ -282,3 +285,4 @@ fn calc_all_char_avg_width(
 
     (bbox_x1 - bbox_x0) / (txt_len as f32)
 }
+

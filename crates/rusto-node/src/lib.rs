@@ -11,6 +11,7 @@ pub struct JsRustO {
 impl JsRustO {
     #[napi(factory)]
     pub fn initialize(config_json: String) -> Result<Self> {
+        rusto_rs::ensure_rten_registered();
         let config = InitializeConfig::from_json(&config_json)
             .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid config JSON: {e}")))?;
 
@@ -21,6 +22,7 @@ impl JsRustO {
     }
 
     #[napi]
+    #[allow(deprecated)]
     pub fn download_model(
         model: Option<String>,
         lang: Option<String>,
@@ -41,6 +43,7 @@ impl JsRustO {
     }
 
     #[napi]
+    #[allow(deprecated)]
     pub fn download_all_models(cache_dir: Option<String>) -> Result<Vec<String>> {
         let cache_path = rusto_rs::model_manager::get_cache_dir(cache_dir.as_deref().map(std::path::Path::new));
         let downloaded = rusto_rs::model_manager::download_all_models(&cache_path)

@@ -1,0 +1,703 @@
+use ndarray::{Array3, Array4};
+use crate::error::CoreError;
+use crate::image::{self, sample_bilinear, Mat, Size, INTER_LINEAR};
+
+pub struct DetPreProcess {
+    pub limit_side_len: i32,
+    pub limit_type: String,
+    pub mean: [f32; 3],
+    pub std: [f32; 3],
+}
+
+impl DetPreProcess {
+    pub fn new(limit_side_len: i32, limit_type: String, mean: [f32; 3], std: [f32; 3]) -> Self {
+        Self {
+            limit_side_len,
+            limit_type,
+            mean,
+            std,
+        }
+    }
+
+    pub fn run(&self, img: &Mat) -> Result<Array4<f32>, CoreError> {
+        let resized = self.resize(img)?;
+        self.normalize_and_permute(&resized)
+    }
+
+    pub fn resize(&self, img: &Mat) -> Result<Mat, CoreError> {
+        let h = img.rows();
+        let w = img.cols();
+
+        let ratio = if self.limit_type == "max" {
+            let max_side = h.max(w) as f32;
+            if max_side > self.limit_side_len as f32 {
+                self.limit_side_len as f32 / max_side
+            } else {
+                1.0
+            }
+        } else {
+            let min_side = h.min(w) as f32;
+            if min_side < self.limit_side_len as f32 {
+                self.limit_side_len as f32 / min_side
+            } else {
+                1.0
+            }
+        };
+
+        let mut resize_h = (h as f32 * ratio) as i32;
+        let mut resize_w = (w as f32 * ratio) as i32;
+
+        resize_h = ((resize_h as f32 / 32.0).round() * 32.0) as i32;
+        resize_w = ((resize_w as f32 / 32.0).round() * 32.0) as i32;
+
+        if resize_h <= 0 || resize_w <= 0 {
+            return Err(CoreError::Preprocess("resize_h or resize_w <= 0".to_string()));
+        }
+
+        let mut dst = Mat::default();
+        image::resize(
+            img,
+            &mut dst,
+            Size::new(resize_w, resize_h),
+            INTER_LINEAR,
+        )?;
+
+        Ok(dst)
+    }
+
+    pub fn normalize_and_permute(&self, img: &Mat) -> Result<Array4<f32>, CoreError> {
+        let size = img.size()?;
+        let h = size.height as usize;
+        let w = size.width as usize;
+
+        let mut out = Array4::<f32>::zeros((1, 3, h, w));
+        let scale = 1.0 / 255.0;
+
+        let mean_b = self.mean[0];
+        let mean_g = self.mean[1];
+        let mean_r = self.mean[2];
+        let std_b = self.std[0];
+        let std_g = self.std[1];
+        let std_r = self.std[2];
+
+        for y in 0..h {
+            for x in 0..w {
+                let pix = img.get_pixel(x as u32, y as u32);
+                let r = pix[0] as f32 * scale;
+                let g = pix[1] as f32 * scale;
+                let b = pix[2] as f32 * scale;
+
+                out[[0, 0, y, x]] = (b - mean_b) / std_b;
+                out[[0, 1, y, x]] = (g - mean_g) / std_g;
+                out[[0, 2, y, x]] = (r - mean_r) / std_r;
+            }
+        }
+
+        Ok(out)
+    }
+
+    pub fn preprocess_rgba_raw(
+        rgba: &[u8],
+        orig_w: usize,
+        orig_h: usize,
+        limit_side_len: usize,
+        limit_type: &str,
+        mean: [f32; 3],
+        std: [f32; 3],
+    ) -> (Vec<f32>, usize, usize, f32, f32) {
+        let ratio = if limit_type == "max" {
+            (limit_side_len as f32 / (orig_w.max(orig_h) as f32)).min(1.0)
+        } else {
+            let min_side = orig_w.min(orig_h) as f32;
+            if min_side < limit_side_len as f32 {
+                limit_side_len as f32 / min_side
+            } else {
+                1.0
+            }
+        };
+
+        let target_w = ((orig_w as f32 * ratio / 32.0).round() as usize * 32).max(32);
+        let target_h = ((orig_h as f32 * ratio / 32.0).round() as usize * 32).max(32);
+        let scale_w = target_w as f32 / orig_w as f32;
+        let scale_h = target_h as f32 / orig_h as f32;
+
+        let mut det_input = vec![0.0f32; target_w * target_h * 3];
+
+        for ty in 0..target_h {
+            let sy = ((ty as f32 + 0.5) / scale_h - 0.5).clamp(0.0, (orig_h.saturating_sub(1)) as f32);
+            for tx in 0..target_w {
+                let sx = ((tx as f32 + 0.5) / scale_w - 0.5).clamp(0.0, (orig_w.saturating_sub(1)) as f32);
+                let (r, g, b) = image::sample_bilinear(rgba, orig_w, orig_h, sx, sy);
+
+                let bn = (b / 255.0 - mean[0]) / std[0];
+                let gn = (g / 255.0 - mean[1]) / std[1];
+                let rn = (r / 255.0 - mean[2]) / std[2];
+
+                let pixel_idx = ty * target_w + tx;
+                det_input[pixel_idx] = bn;
+                det_input[target_h * target_w + pixel_idx] = gn;
+                det_input[2 * target_h * target_w + pixel_idx] = rn;
+            }
+        }
+
+        (det_input, target_w, target_h, scale_w, scale_h)
+    }
+}
+
+pub fn preprocess_rgba_raw(
+    rgba: &[u8],
+    orig_w: usize,
+    orig_h: usize,
+    limit_side_len: usize,
+    limit_type: &str,
+    mean: [f32; 3],
+    std: [f32; 3],
+) -> (Vec<f32>, usize, usize, f32, f32) {
+    DetPreProcess::preprocess_rgba_raw(rgba, orig_w, orig_h, limit_side_len, limit_type, mean, std)
+}
+
+pub fn calculate_linenet_dims(
+    ori_w: i32,
+    ori_h: i32,
+    limit_side_len: i32,
+    limit_type: &str,
+) -> (usize, usize, f32, f32) {
+    let ratio = if limit_type == "max" {
+        (limit_side_len as f32 / (ori_h.max(ori_w) as f32)).min(1.0)
+    } else {
+        1.0
+    };
+
+    let mut resize_h = ((ori_h as f32 * ratio / 32.0).round() * 32.0) as usize;
+    let mut resize_w = ((ori_w as f32 * ratio / 32.0).round() * 32.0) as usize;
+    if resize_h == 0 {
+        resize_h = 32;
+    }
+    if resize_w == 0 {
+        resize_w = 32;
+    }
+
+    let scale_w = resize_w as f32 / ori_w as f32;
+    let scale_h = resize_h as f32 / ori_h as f32;
+
+    (resize_w, resize_h, scale_w, scale_h)
+}
+
+pub fn prepare_linenet_det_input(
+    img: &Mat,
+    target_w: usize,
+    target_h: usize,
+) -> Result<Array4<f32>, CoreError> {
+    let orig_w = img.cols() as f32;
+    let orig_h = img.rows() as f32;
+    let scale_w = target_w as f32 / orig_w;
+    let scale_h = target_h as f32 / orig_h;
+
+    let mut input = Array4::<f32>::zeros((1, 1, target_h, target_w));
+
+    for ty in 0..target_h {
+        let sy = ((ty as f32 + 0.5) / scale_h - 0.5).clamp(0.0, orig_h - 1.0);
+        let y0 = sy.floor() as u32;
+        let y1 = (y0 + 1).min(img.rows() as u32 - 1);
+        let fy = sy - y0 as f32;
+
+        for tx in 0..target_w {
+            let sx = ((tx as f32 + 0.5) / scale_w - 0.5).clamp(0.0, orig_w - 1.0);
+            let x0 = sx.floor() as u32;
+            let x1 = (x0 + 1).min(img.cols() as u32 - 1);
+            let fx = sx - x0 as f32;
+
+            let p00 = img.get_pixel(x0, y0);
+            let p10 = img.get_pixel(x1, y0);
+            let p01 = img.get_pixel(x0, y1);
+            let p11 = img.get_pixel(x1, y1);
+
+            let r = (p00[0] as f32 * (1.0 - fx) + p10[0] as f32 * fx) * (1.0 - fy)
+                + (p01[0] as f32 * (1.0 - fx) + p11[0] as f32 * fx) * fy;
+            let g = (p00[1] as f32 * (1.0 - fx) + p10[1] as f32 * fx) * (1.0 - fy)
+                + (p01[1] as f32 * (1.0 - fx) + p11[1] as f32 * fx) * fy;
+            let b = (p00[2] as f32 * (1.0 - fx) + p10[2] as f32 * fx) * (1.0 - fy)
+                + (p01[2] as f32 * (1.0 - fx) + p11[2] as f32 * fx) * fy;
+
+            let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            let ink = (1.0 - gray / 255.0).clamp(0.0, 1.0);
+            input[[0, 0, ty, tx]] = ink;
+        }
+    }
+
+    Ok(input)
+}
+
+
+/// Crop and prepare LineNet recognition crop from raw RGBA buffer
+pub fn prepare_linenet_rec_crop_rgba(
+    rgba: &[u8],
+    orig_w: usize,
+    orig_h: usize,
+    box_coords: [f32; 4],
+) -> Option<(Vec<f32>, usize, usize)> {
+    let [x0, y0, x1, y1] = box_coords;
+    let box_h = y1 - y0;
+
+    let exp_x0 = (x0 - 0.5 * box_h).max(0.0);
+    let exp_x1 = (x1 + 0.5 * box_h).min(orig_w as f32);
+    let exp_y0 = (y0 - 1.6 * box_h).max(0.0);
+    let exp_y1 = (y1 + 1.6 * box_h).min(orig_h as f32);
+    let crop_w = exp_x1 - exp_x0;
+    let crop_h = exp_y1 - exp_y0;
+    if crop_w < 4.0 || crop_h < 4.0 {
+        return None;
+    }
+
+    let rec_h = 96usize;
+    let target_w = (96.0 * (crop_w / crop_h)).round() as usize;
+    let rec_w = ((target_w + 7) / 8 * 8).clamp(8, 4096);
+
+    let mut rec_input = vec![0.0f32; rec_h * rec_w];
+    for ry in 0..rec_h {
+        let sy = exp_y0 + (ry as f32 + 0.5) * (crop_h / rec_h as f32) - 0.5;
+        for rx in 0..rec_w {
+            let sx = exp_x0 + (rx as f32 + 0.5) * (crop_w / rec_w as f32) - 0.5;
+            let (r, g, b) = image::sample_bilinear(rgba, orig_w, orig_h, sx, sy);
+            let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            let ink = (1.0 - gray / 255.0).clamp(0.0, 1.0);
+            rec_input[ry * rec_w + rx] = ink;
+        }
+    }
+
+    Some((rec_input, rec_w, rec_h))
+}
+
+/// Crop and prepare PP-OCR SVTR recognition crop from raw RGBA buffer
+pub fn prepare_ppocr_rec_crop_rgba(
+    rgba: &[u8],
+    orig_w: usize,
+    orig_h: usize,
+    box_coords: [f32; 4],
+) -> Option<(Vec<f32>, usize, usize)> {
+    let [x0, y0, x1, y1] = box_coords;
+    let box_w = x1 - x0;
+    let box_h = y1 - y0;
+
+    let pad_x_ratio = 0.035f32;
+    let pad_y_ratio = 0.045f32;
+
+    let exp_x0 = (x0 - box_w * pad_x_ratio).max(0.0);
+    let exp_x1 = (x1 + box_w * pad_x_ratio).min(orig_w as f32);
+    let exp_y0 = (y0 - box_h * pad_y_ratio).max(0.0);
+    let exp_y1 = (y1 + box_h * pad_y_ratio).min(orig_h as f32);
+
+    let crop_w = exp_x1 - exp_x0;
+    let crop_h = exp_y1 - exp_y0;
+    if crop_w < 4.0 || crop_h < 4.0 {
+        return None;
+    }
+
+    let rec_h = 48usize;
+    let target_w = (48.0 * (crop_w / crop_h)).ceil() as usize;
+    let rec_w = ((target_w as f32 / 32.0).ceil() as usize * 32).clamp(64, 960);
+
+    let mut rec_input = vec![0.0f32; rec_h * rec_w * 3];
+
+    for ry in 0..rec_h {
+        let sy = exp_y0 + (ry as f32 + 0.5) * (crop_h / rec_h as f32) - 0.5;
+        for rx in 0..rec_w {
+            let sx = exp_x0 + (rx as f32 + 0.5) * (crop_w / rec_w as f32) - 0.5;
+            let (r, g, b) = image::sample_bilinear(rgba, orig_w, orig_h, sx, sy);
+
+            let bn = (b / 255.0 - 0.5) / 0.5;
+            let gn = (g / 255.0 - 0.5) / 0.5;
+            let rn = (r / 255.0 - 0.5) / 0.5;
+
+            let pixel_idx = ry * rec_w + rx;
+            rec_input[pixel_idx] = bn;
+            rec_input[rec_h * rec_w + pixel_idx] = gn;
+            rec_input[2 * rec_h * rec_w + pixel_idx] = rn;
+        }
+    }
+
+    Some((rec_input, rec_w, rec_h))
+}
+
+pub fn prepare_linenet_rec_crop(
+    img: &Mat,
+    target_h: usize,
+    target_w: usize,
+) -> Result<ndarray::Array2<f32>, CoreError> {
+    let mut out = ndarray::Array2::<f32>::zeros((target_h, target_w));
+    let orig_w = img.cols() as f32;
+    let orig_h = img.rows() as f32;
+    if orig_w <= 0.0 || orig_h <= 0.0 {
+        return Ok(out);
+    }
+    let scale_w = target_w as f32 / orig_w;
+    let scale_h = target_h as f32 / orig_h;
+
+    for ty in 0..target_h {
+        let sy = ((ty as f32 + 0.5) / scale_h - 0.5).clamp(0.0, orig_h - 1.0);
+        let y0 = sy.floor() as u32;
+        let y1 = (y0 + 1).min(img.rows() as u32 - 1);
+        let fy = sy - y0 as f32;
+
+        for tx in 0..target_w {
+            let sx = ((tx as f32 + 0.5) / scale_w - 0.5).clamp(0.0, orig_w - 1.0);
+            let x0 = sx.floor() as u32;
+            let x1 = (x0 + 1).min(img.cols() as u32 - 1);
+            let fx = sx - x0 as f32;
+
+            let p00 = img.get_pixel(x0, y0);
+            let p10 = img.get_pixel(x1, y0);
+            let p01 = img.get_pixel(x0, y1);
+            let p11 = img.get_pixel(x1, y1);
+
+            let r = (p00[0] as f32 * (1.0 - fx) + p10[0] as f32 * fx) * (1.0 - fy)
+                + (p01[0] as f32 * (1.0 - fx) + p11[0] as f32 * fx) * fy;
+            let g = (p00[1] as f32 * (1.0 - fx) + p10[1] as f32 * fx) * (1.0 - fy)
+                + (p01[1] as f32 * (1.0 - fx) + p11[1] as f32 * fx) * fy;
+            let b = (p00[2] as f32 * (1.0 - fx) + p10[2] as f32 * fx) * (1.0 - fy)
+                + (p01[2] as f32 * (1.0 - fx) + p11[2] as f32 * fx) * fy;
+
+            let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            let ink = (1.0 - gray / 255.0).clamp(0.0, 1.0);
+            out[[ty, tx]] = ink;
+        }
+    }
+
+    Ok(out)
+}
+
+pub fn build_linenet_rec_batch(
+    img_list: &[Mat],
+    chunk: &[usize],
+    target_widths: &[usize],
+    rec_h: usize,
+) -> Result<(Array4<f32>, Vec<i32>), CoreError> {
+    let n = chunk.len();
+    let max_w = chunk.iter().map(|&idx| target_widths[idx]).max().unwrap_or(rec_h);
+    let mut batch_tensor = Array4::<f32>::zeros((n, 1, rec_h, max_w));
+    let mut widths = Vec::with_capacity(n);
+
+    for (local_i, &idx) in chunk.iter().enumerate() {
+        let w = target_widths[idx];
+        widths.push(w as i32);
+        let ink_crop = prepare_linenet_rec_crop(&img_list[idx], rec_h, w)?;
+        for y in 0..rec_h {
+            for x in 0..w {
+                batch_tensor[[local_i, 0, y, x]] = ink_crop[[y, x]];
+            }
+        }
+    }
+
+    Ok((batch_tensor, widths))
+}
+
+/// Preprocesses raw RGBA bytes into a 1-channel inverted grayscale tensor input for LineNet detection.
+pub fn preprocess_linenet_det_rgba(
+    rgba: &[u8],
+    orig_w: usize,
+    orig_h: usize,
+    limit: i32,
+    limit_type: &str,
+) -> (Vec<f32>, usize, usize, f32, f32) {
+    let (target_w, target_h, scale_w, scale_h) =
+        calculate_linenet_dims(orig_w as i32, orig_h as i32, limit, limit_type);
+
+    let mut det_input = vec![0.0f32; target_w * target_h];
+    for ty in 0..target_h {
+        let sy = (ty as f32 + 0.5) / scale_h - 0.5;
+        for tx in 0..target_w {
+            let sx = (tx as f32 + 0.5) / scale_w - 0.5;
+            let (r, g, b) = sample_bilinear(rgba, orig_w, orig_h, sx, sy);
+            let gray: f32 = 0.299 * r + 0.587 * g + 0.114 * b;
+            det_input[ty * target_w + tx] = (1.0f32 - gray / 255.0f32).clamp(0.0f32, 1.0f32);
+        }
+    }
+
+    (det_input, target_w, target_h, scale_w, scale_h)
+}
+
+static NORM_LUT: std::sync::LazyLock<[f32; 256]> = std::sync::LazyLock::new(|| {
+    let mut lut = [0.0f32; 256];
+    for (i, item) in lut.iter_mut().enumerate() {
+        *item = (i as f32 / 255.0 - 0.5) / 0.5;
+    }
+    lut
+});
+
+/// Resizes and normalizes an image crop for PP-OCR recognition models.
+pub fn resize_norm_rec_img(
+    img: &Mat,
+    img_c: usize,
+    img_h: usize,
+    max_wh_ratio: f32,
+) -> Result<ndarray::Array3<f32>, CoreError> {
+    let img_width = (img_h as f32 * max_wh_ratio).round() as i32;
+
+    let h = img.rows();
+    let w = img.cols();
+    if h <= 0 || w <= 0 {
+        return Err(CoreError::Preprocess("invalid image size".to_string()));
+    }
+
+    let ratio = w as f32 / h as f32;
+    let resized_w = if ((img_h as f32) * ratio).ceil() as i32 > img_width {
+        img_width
+    } else {
+        ((img_h as f32) * ratio).ceil() as i32
+    };
+
+    let mut resized = Mat::default();
+    image::resize(
+        img,
+        &mut resized,
+        Size::new(resized_w, img_h as i32),
+        INTER_LINEAR,
+    )?;
+
+    let size = resized.size()?;
+    let h2 = size.height as usize;
+    let w2 = size.width as usize;
+
+    let target_w = img_width as usize;
+    let plane_size = img_h * target_w;
+    let valid_w = w2.min(target_w);
+    let valid_h = h2.min(img_h);
+
+    let mut out = ndarray::Array3::<f32>::zeros((img_c, img_h, target_w));
+
+    if img_c == 3 && resized.as_dynamic().as_rgb8().is_some() {
+        let rgb = resized.as_dynamic().as_rgb8().unwrap();
+        let raw: &[u8] = rgb.as_raw();
+        let stride = w2 * 3;
+        let out_slice = out.as_slice_mut().expect("contiguous array");
+        let (b_plane, rest) = out_slice.split_at_mut(plane_size);
+        let (g_plane, r_plane) = rest.split_at_mut(plane_size);
+
+        for y in 0..valid_h {
+            let row = &raw[y * stride..y * stride + valid_w * 3];
+            let b_row = &mut b_plane[y * target_w..y * target_w + valid_w];
+            let g_row = &mut g_plane[y * target_w..y * target_w + valid_w];
+            let r_row = &mut r_plane[y * target_w..y * target_w + valid_w];
+
+            for x in 0..valid_w {
+                b_row[x] = NORM_LUT[row[x * 3 + 2] as usize];
+                g_row[x] = NORM_LUT[row[x * 3 + 1] as usize];
+                r_row[x] = NORM_LUT[row[x * 3] as usize];
+            }
+        }
+    } else {
+        for y in 0..valid_h {
+            for x in 0..valid_w {
+                let pix = resized.get_pixel(x as u32, y as u32);
+                out[[0, y, x]] = NORM_LUT[pix[2] as usize];
+                out[[1, y, x]] = NORM_LUT[pix[1] as usize];
+                out[[2, y, x]] = NORM_LUT[pix[0] as usize];
+            }
+        }
+    }
+
+    Ok(out)
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedDetParams {
+    pub limit_side_len: i32,
+    pub limit_type: String,
+    pub mean: [f32; 3],
+    pub std: [f32; 3],
+    pub thresh: f32,
+    pub box_thresh: f32,
+    pub max_candidates: i32,
+    pub unclip_ratio: f32,
+    pub use_dilation: bool,
+    pub score_mode: String,
+}
+
+pub fn resolve_det_params(
+    cfg: &crate::types::DetConfig,
+    options: Option<&crate::types::DetectionRunOptions>,
+    postprocess: Option<&crate::types::PostprocessRunOptions>,
+    ori_w: i32,
+    ori_h: i32,
+) -> ResolvedDetParams {
+    let options = options.cloned().unwrap_or_default();
+    let limit_type = options.limit_type.unwrap_or_else(|| cfg.limit_type.clone());
+    let configured_limit_side_len = options.limit_side_len.unwrap_or(cfg.limit_side_len);
+    let mean = options.mean.unwrap_or(cfg.mean);
+    let std = options.std.unwrap_or(cfg.std);
+
+    let pp_thresh = postprocess
+        .and_then(|p| p.threshold)
+        .or_else(|| options.postprocess.as_ref().and_then(|p| p.threshold))
+        .unwrap_or(cfg.thresh);
+    let pp_box_thresh = postprocess
+        .and_then(|p| p.box_threshold)
+        .or_else(|| options.postprocess.as_ref().and_then(|p| p.box_threshold))
+        .unwrap_or(cfg.box_thresh);
+    let pp_max_candidates = postprocess
+        .and_then(|p| p.max_candidates)
+        .or_else(|| options.postprocess.as_ref().and_then(|p| p.max_candidates))
+        .unwrap_or(cfg.max_candidates);
+    let pp_unclip_ratio = postprocess
+        .and_then(|p| p.unclip_ratio)
+        .or_else(|| options.postprocess.as_ref().and_then(|p| p.unclip_ratio))
+        .unwrap_or(cfg.unclip_ratio);
+    let pp_use_dilation = postprocess
+        .and_then(|p| p.use_dilation)
+        .or_else(|| options.postprocess.as_ref().and_then(|p| p.use_dilation))
+        .unwrap_or(cfg.use_dilation);
+    let pp_score_mode = postprocess
+        .and_then(|p| p.score_mode.clone())
+        .or_else(|| options.postprocess.as_ref().and_then(|p| p.score_mode.clone()))
+        .unwrap_or_else(|| cfg.score_mode.clone());
+
+    let max_wh = ori_h.max(ori_w);
+    let limit_side_len = if let Some(explicit_limit) = options.limit_side_len {
+        explicit_limit
+    } else if limit_type == "min" {
+        configured_limit_side_len
+    } else if cfg.limit_side_len > 0 {
+        cfg.limit_side_len
+    } else if max_wh < 960 {
+        960
+    } else if max_wh < 1500 {
+        1500
+    } else {
+        2000
+    };
+
+    ResolvedDetParams {
+        limit_side_len,
+        limit_type,
+        mean,
+        std,
+        thresh: pp_thresh,
+        box_thresh: pp_box_thresh,
+        max_candidates: pp_max_candidates,
+        unclip_ratio: pp_unclip_ratio,
+        use_dilation: pp_use_dilation,
+        score_mode: pp_score_mode,
+    }
+}
+
+pub fn prepare_det_input(
+    img: &Mat,
+    is_linenet: bool,
+    params: &ResolvedDetParams,
+    ori_w: i32,
+    ori_h: i32,
+) -> Result<(Array4<f32>, f32, f32), CoreError> {
+    if is_linenet {
+        let (target_w, target_h, scale_w, scale_h) =
+            calculate_linenet_dims(ori_w, ori_h, params.limit_side_len, &params.limit_type);
+        let input = prepare_linenet_det_input(img, target_w, target_h)?;
+        Ok((input, scale_w, scale_h))
+    } else {
+        let pre = DetPreProcess::new(
+            params.limit_side_len,
+            params.limit_type.clone(),
+            params.mean,
+            params.std,
+        );
+        let input = pre.run(img)?;
+        Ok((input, 1.0, 1.0))
+    }
+}
+
+pub fn calculate_linenet_rec_target_widths(sizes: &[(f32, f32)], rec_h: usize) -> Vec<usize> {
+    let rec_h_f32 = rec_h as f32;
+    sizes
+        .iter()
+        .map(|&(w, h)| {
+            let target_w = if h > 0.0 {
+                (rec_h_f32 * (w / h)).round() as usize
+            } else {
+                rec_h
+            };
+            (target_w.div_ceil(8) * 8).clamp(8, 4096)
+        })
+        .collect()
+}
+
+pub fn stack_rec_batch(
+    norm_batch: &[Array3<f32>],
+    img_c: usize,
+    img_h: usize,
+    batch_img_width: usize,
+) -> Array4<f32> {
+    let n = norm_batch.len();
+    let mut batch = Array4::<f32>::zeros((n, img_c, img_h, batch_img_width));
+    for (i, arr) in norm_batch.iter().enumerate() {
+        batch.slice_mut(ndarray::s![i, .., .., ..]).assign(arr);
+    }
+    batch
+}
+
+#[derive(Debug, Clone)]
+pub struct RecBatchPlan {
+    pub sorted_indices: Vec<usize>,
+    pub batches: Vec<RecBatchItem>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RecBatchItem {
+    pub indices: Vec<usize>,
+    pub max_wh_ratio: f32,
+    pub wh_ratio_list: Vec<f32>,
+}
+
+pub fn plan_rec_batches(sizes: &[(f32, f32)], batch_num: usize, default_wh_ratio: f32) -> RecBatchPlan {
+    let mut width_list = Vec::with_capacity(sizes.len());
+    for &(w, h) in sizes {
+        width_list.push(if h > 0.0 { w / h } else { 1.0 });
+    }
+
+    let mut indices: Vec<usize> = (0..sizes.len()).collect();
+    indices.sort_by(|&a, &b| width_list[a].partial_cmp(&width_list[b]).unwrap_or(std::cmp::Ordering::Equal));
+
+    let img_num = sizes.len();
+    let batch_num = batch_num.max(1);
+    let mut batches = Vec::new();
+
+    let mut beg = 0usize;
+    while beg < img_num {
+        let end = (beg + batch_num).min(img_num);
+        let mut max_wh_ratio = default_wh_ratio;
+        let mut wh_ratio_list = Vec::with_capacity(end - beg);
+        for &idx in &indices[beg..end] {
+            let wh_ratio = width_list[idx];
+            if wh_ratio > max_wh_ratio {
+                max_wh_ratio = wh_ratio;
+            }
+            wh_ratio_list.push(wh_ratio);
+        }
+        batches.push(RecBatchItem {
+            indices: indices[beg..end].to_vec(),
+            max_wh_ratio,
+            wh_ratio_list,
+        });
+        beg = end;
+    }
+
+    RecBatchPlan {
+        sorted_indices: indices,
+        batches,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_plan_rec_batches() {
+        let sizes = vec![(100.0, 50.0), (300.0, 50.0), (50.0, 50.0)];
+        let plan = plan_rec_batches(&sizes, 2, 2.0);
+        assert_eq!(plan.sorted_indices, vec![2, 0, 1]);
+        assert_eq!(plan.batches.len(), 2);
+        assert_eq!(plan.batches[0].indices, vec![2, 0]);
+        assert_eq!(plan.batches[1].indices, vec![1]);
+        assert_eq!(plan.batches[1].max_wh_ratio, 6.0);
+    }
+}
+

@@ -1,6 +1,12 @@
+use std::fs::{self, File};
+use std::path::{Path, PathBuf};
+
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use rusto::{DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, RustO};
-use std::path::PathBuf;
+use rusto_core::models::{
+    get_cache_dir, plan_all_models_download, plan_pipeline_download, resolve_asset_local,
+    resolve_base_pipeline, ModelDownloadTarget,
+};
 
 #[derive(Parser)]
 #[command(name = "rusto")]
@@ -165,24 +171,128 @@ enum OutputFormat {
     TextOrdered,
 }
 
+fn stream_url_to_file(
+    download_url: &str,
+    target_path: &Path,
+    asset_filename: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    eprintln!("Downloading {} from {}...", asset_filename, download_url);
+    let response = ureq::get(download_url).call().map_err(|e| {
+        format!(
+            "Failed to download model '{}' from {}: {}",
+            asset_filename, download_url, e
+        )
+    })?;
+
+    let part_path = target_path.with_extension("part");
+    let mut file = File::create(&part_path).map_err(|e| {
+        format!(
+            "Failed to create temporary file '{}': {}",
+            part_path.display(),
+            e
+        )
+    })?;
+
+    if let Err(e) = std::io::copy(&mut response.into_reader(), &mut file) {
+        let _ = fs::remove_file(&part_path);
+        return Err(format!(
+            "Network/disk write error while downloading {}: {}",
+            asset_filename, e
+        )
+        .into());
+    }
+    drop(file);
+
+    fs::rename(&part_path, target_path).map_err(|e| {
+        let _ = fs::remove_file(&part_path);
+        format!(
+            "Failed to finalize model file '{}': {}",
+            target_path.display(),
+            e
+        )
+    })?;
+
+    eprintln!("✓ Saved {} to {}", asset_filename, target_path.display());
+    Ok(())
+}
+
+fn download_target(target: &ModelDownloadTarget) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    if target.already_exists && target.target_path.exists() {
+        return Ok(target.target_path.clone());
+    }
+
+    if let Some(parent) = target.target_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    for url in &target.urls {
+        if stream_url_to_file(url, &target.target_path, &target.filename).is_ok() {
+            return Ok(target.target_path.clone());
+        }
+    }
+
+    Err(format!("Failed to download model '{}'", target.filename).into())
+}
+
+fn download_model_pipeline(
+    model_name: Option<&str>,
+    lang: Option<&str>,
+    include_cls: bool,
+    include_orient: bool,
+    include_unwarp: bool,
+    layout_variant: Option<&str>,
+    include_reading_order: bool,
+    cache_dir: &Path,
+) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+    let targets = plan_pipeline_download(
+        model_name,
+        lang,
+        include_cls,
+        include_orient,
+        include_unwarp,
+        layout_variant,
+        include_reading_order,
+        cache_dir,
+    );
+    let mut paths = Vec::with_capacity(targets.len());
+    for target in &targets {
+        paths.push(download_target(target)?);
+    }
+    Ok(paths)
+}
+
+fn download_all_models(cache_dir: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+    let targets = plan_all_models_download(cache_dir);
+    let mut paths = Vec::with_capacity(targets.len());
+    for target in &targets {
+        paths.push(download_target(target)?);
+    }
+    Ok(paths)
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    rusto::ensure_rten_registered();
     let cli = Cli::parse();
 
     if let Some(Commands::Download(args)) = cli.command {
-        let cache_dir = rusto::model_manager::get_cache_dir(args.cache_dir.as_deref());
+        let cache_dir = get_cache_dir(args.cache_dir.as_deref());
         if args.all {
             eprintln!("Downloading all available models to {}...", cache_dir.display());
-            let downloaded = rusto::model_manager::download_all_models(&cache_dir)?;
+            let downloaded = download_all_models(&cache_dir)?;
             eprintln!("✓ Successfully verified/downloaded {} model asset(s).", downloaded.len());
         } else {
             eprintln!("Downloading {} pipeline to {}...", args.model, cache_dir.display());
-            let downloaded = rusto::model_manager::download_model_pipeline(
+            let downloaded = download_model_pipeline(
                 Some(&args.model),
                 args.lang.as_deref(),
                 args.cls,
                 args.orient,
                 args.unwarp,
-                if args.layout { Some(args.layout_variant.as_deref().unwrap_or("cdla")) } else { None },
+                if args.layout {
+                    Some(args.layout_variant.as_deref().unwrap_or("cdla"))
+                } else {
+                    None
+                },
                 args.reading_order,
                 &cache_dir,
             )?;
@@ -192,9 +302,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if cli.download_only {
-        let cache_dir = rusto::model_manager::get_cache_dir(cli.cache_dir.as_deref());
+        let cache_dir = get_cache_dir(cli.cache_dir.as_deref());
         eprintln!("Downloading {} pipeline to {}...", cli.model, cache_dir.display());
-        let downloaded = rusto::model_manager::download_model_pipeline(
+        let downloaded = download_model_pipeline(
             Some(&cli.model),
             cli.lang.as_deref(),
             cli.enable_cls || cli.cls_model.is_some(),
@@ -229,8 +339,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let cache_dir = rusto::model_manager::get_cache_dir(cli.cache_dir.as_deref());
-    let (det_path, rec_path, dict_path) = rusto::model_manager::resolve_base_pipeline(
+    let cache_dir = get_cache_dir(cli.cache_dir.as_deref());
+    let (det_path, rec_path, dict_path) = resolve_base_pipeline(
         Some(&cli.model),
         effective_dir,
         cli.lang.as_deref(),
@@ -256,33 +366,69 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = InitializeConfig::from_preset(preset, det_path, rec_path, dict_path);
 
     if cli.enable_cls || cli.cls_model.is_some() {
-        let cls_path = rusto::model_manager::resolve_asset_with_dir(cli.cls_model.as_deref(), effective_dir, "cls", "ppocr_cls.rten", &cache_dir)?;
+        let cls_path = resolve_asset_local(
+            cli.cls_model.as_deref(),
+            effective_dir,
+            "cls",
+            "ppocr_cls.rten",
+            &cache_dir,
+        )?;
         config = config.with_cls(cls_path);
     }
 
     if cli.enable_orient || cli.orient_model.is_some() {
-        let orient_file = if cli.model.eq_ignore_ascii_case("indraocr") || cli.model.eq_ignore_ascii_case("indra") {
+        let orient_file = if cli.model.eq_ignore_ascii_case("indraocr")
+            || cli.model.eq_ignore_ascii_case("indra")
+        {
             "indra_orient.rten"
         } else {
             "ppocr_orient.rten"
         };
-        let orient_path = rusto::model_manager::resolve_asset_with_dir(cli.orient_model.as_deref(), effective_dir, "orient", orient_file, &cache_dir)?;
+        let orient_path = resolve_asset_local(
+            cli.orient_model.as_deref(),
+            effective_dir,
+            "orient",
+            orient_file,
+            &cache_dir,
+        )?;
         config = config.with_orientation(orient_path);
     }
 
     if cli.enable_unwarp || cli.unwarp_model.is_some() {
-        let unwarp_path = rusto::model_manager::resolve_asset_with_dir(cli.unwarp_model.as_deref(), effective_dir, "unwarp", "uvdoc.rten", &cache_dir)?;
+        let unwarp_path = resolve_asset_local(
+            cli.unwarp_model.as_deref(),
+            effective_dir,
+            "unwarp",
+            "uvdoc.rten",
+            &cache_dir,
+        )?;
         config = config.with_unwarp(unwarp_path);
     }
 
     if cli.enable_layout || cli.layout_model.is_some() || cli.layout_variant.is_some() {
-        let layout_file = if cli.layout_variant.as_deref() == Some("publaynet") { "layout_publaynet.rten" } else { "layout_cdla.rten" };
-        let layout_path = rusto::model_manager::resolve_asset_with_dir(cli.layout_model.as_deref(), effective_dir, "layout", layout_file, &cache_dir)?;
+        let layout_file = if cli.layout_variant.as_deref() == Some("publaynet") {
+            "layout_publaynet.rten"
+        } else {
+            "layout_cdla.rten"
+        };
+        let layout_path = resolve_asset_local(
+            cli.layout_model.as_deref(),
+            effective_dir,
+            "layout",
+            layout_file,
+            &cache_dir,
+        )?;
         config = config.with_layout(layout_path);
     }
 
     if cli.reading_order {
-        let order_path = rusto::model_manager::resolve_asset_with_dir(None, effective_dir, "order", "indra_order.rten", &cache_dir)?;
+        let order_path = resolve_asset_local(
+            None,
+            effective_dir,
+            "order",
+            "indra_order.rten",
+            &cache_dir,
+        )?;
         config.global.reading_order = true;
         config.global.reading_order_model = Some(order_path);
     }
@@ -311,22 +457,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         det_opts.limit_side_len = Some(det_limit);
         det_opts.limit_type = Some("max".to_string());
     }
+    if let Some(batch_num) = cli.rec_batch_num {
+        options.rec_batch_num = Some(batch_num);
+    }
     if let Some(max_side) = cli.max_side_len {
         options.max_side_len = Some(max_side);
     }
 
-    // Run OCR
-    eprintln!("Processing image...");
-    let detected = ocr.detect_text(
-        &ImageSource::Path(image_path.clone()),
-        &options,
-    )?;
-    let DetectTextResult::Structured(results) = detected else {
-        unreachable!("default OCR output is structured lines");
-    };
-    eprintln!("✓ OCR completed");
-
-    let layout_regions = if cli.enable_layout && ocr.layout.is_some() {
+    let layout_regions = if cli.enable_layout && ocr.pipeline.layout.is_some() {
         match ocr.detect_layout(&ImageSource::Path(image_path.clone())) {
             Ok(regions) => Some(regions),
             Err(e) => {
@@ -338,21 +476,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
-    // Output projected text results.
-    let effective_results = results;
+    let result = ocr.detect_text(&ImageSource::Path(image_path), &options)?;
+
+    let mut effective_results = match result {
+        DetectTextResult::Structured(results) => results,
+        DetectTextResult::Spatial(text) => {
+            println!("{}", text);
+            return Ok(());
+        }
+    };
+
+    if cli.format == OutputFormat::TextOrdered {
+        effective_results.sort_by(|a, b| {
+            let y_diff = (a.frame.top - b.frame.top).abs();
+            if y_diff < 10.0 {
+                a.frame.left.partial_cmp(&b.frame.left).unwrap()
+            } else {
+                a.frame.top.partial_cmp(&b.frame.top).unwrap()
+            }
+        });
+    }
 
     match cli.format {
         OutputFormat::Json => {
-            if let Some(regions) = &layout_regions {
+            if let Some(regions) = layout_regions.as_deref() {
                 #[derive(serde::Serialize)]
                 struct OutputWithLayout<'a> {
                     text_results: &'a [rusto::TextResult],
                     layout_regions: &'a [rusto::LayoutRegion],
                 }
-                println!("{}", serde_json::to_string_pretty(&OutputWithLayout {
-                    text_results: &effective_results,
-                    layout_regions: regions,
-                })?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&OutputWithLayout {
+                        text_results: &effective_results,
+                        layout_regions: regions,
+                    })?
+                );
             } else {
                 println!("{}", serde_json::to_string_pretty(&effective_results)?);
             }

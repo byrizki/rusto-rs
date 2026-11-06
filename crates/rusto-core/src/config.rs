@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+
 use crate::calibration::{CalibrationOptions, OptimizationOptions};
-use crate::types::{ClsConfig, DetConfig, RecConfig, OrientConfig, UnwarpConfig, LayoutConfig, GlobalConfig};
+use crate::models;
+use crate::types::{ClsConfig, DetConfig, GlobalConfig, LayoutConfig, OrientConfig, RecConfig, UnwarpConfig};
 
 /// Preset configuration for OCR model architectures
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -88,29 +90,18 @@ pub const INDRA_MODEL_CONFIG: ModelPreset = ModelPreset {
     text_score: 0.5,
 };
 
-/// Main configuration for RustO OCR engine
+/// Main configuration for OCR engine
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InitializeConfig {
-    /// Detection model configuration
     pub det: DetConfig,
-    
-    /// Recognition model configuration
     pub rec: RecConfig,
-    
-    /// Global OCR settings
     pub global: GlobalConfig,
-
-    /// Optional: Orientation classification configuration
     pub orient: Option<OrientConfig>,
-    
-    /// Optional: Text rectification configuration
     pub unwarp: Option<UnwarpConfig>,
-    
-    /// Optional: Text classification (line orientation) configuration
     pub cls: Option<ClsConfig>,
-
-    /// Optional: Document layout detection configuration
     pub layout: Option<LayoutConfig>,
+    pub calibration: Option<CalibrationOptions>,
+    pub optimization: Option<OptimizationOptions>,
 }
 
 impl Default for InitializeConfig {
@@ -186,7 +177,6 @@ struct UnwarpConfigJson {
     #[serde(alias = "modelPath", alias = "unwarpModelPath", alias = "model_path", alias = "unwarp_model_path")]
     model_path: Option<PathBuf>,
 }
-
 
 #[derive(Deserialize, Default, Clone, Debug)]
 struct LayoutConfigJson {
@@ -333,6 +323,8 @@ impl InitializeConfig {
             unwarp: None,
             cls: None,
             layout: None,
+            calibration: None,
+            optimization: None,
         }
     }
 
@@ -391,7 +383,7 @@ impl InitializeConfig {
         // Fall back to grouped format
         let flat: FlatConfig = serde_json::from_str(json_str)?;
 
-        let cache_dir = crate::model_manager::get_cache_dir(flat.cache_dir.as_deref());
+        let cache_dir = models::get_cache_dir(flat.cache_dir.as_deref());
 
         let det_override = flat
             .det_model_path
@@ -420,13 +412,13 @@ impl InitializeConfig {
         });
 
         let (det_path, rec_path, dict_path) = {
-            let canonical_model = crate::model_manager::normalize_model_name(effective_model);
-            let base_assets = crate::model_manager::get_base_pipeline_assets(canonical_model);
+            let canonical_model = models::normalize_model_name(effective_model);
+            let base_assets = models::get_base_pipeline_assets(canonical_model);
 
             let det = if let Some(p) = det_override {
                 PathBuf::from(p)
             } else {
-                crate::model_manager::resolve_asset_with_dir(
+                models::resolve_asset_local(
                     None,
                     effective_dir,
                     "det",
@@ -436,7 +428,7 @@ impl InitializeConfig {
             };
 
             let (default_rec, default_dict) = if let Some(l) = flat.lang.as_deref() {
-                if let Some((rec_file, dict_file)) = crate::model_manager::resolve_language_assets(l) {
+                if let Some((rec_file, dict_file)) = models::resolve_language_assets(l) {
                     (rec_file, dict_file)
                 } else {
                     (base_assets.rec_filename, base_assets.dict_filename)
@@ -448,7 +440,7 @@ impl InitializeConfig {
             let rec = if let Some(p) = rec_override {
                 PathBuf::from(p)
             } else {
-                crate::model_manager::resolve_asset_with_dir(
+                models::resolve_asset_local(
                     None,
                     effective_dir,
                     "rec",
@@ -460,7 +452,7 @@ impl InitializeConfig {
             let dict = if let Some(p) = dict_override {
                 PathBuf::from(p)
             } else {
-                crate::model_manager::resolve_asset_with_dir(
+                models::resolve_asset_local(
                     None,
                     effective_dir,
                     "dict",
@@ -505,13 +497,13 @@ impl InitializeConfig {
             let orient_path = if let Some(p) = orient_override {
                 PathBuf::from(p)
             } else {
-                let canonical = crate::model_manager::normalize_model_name(effective_model);
+                let canonical = models::normalize_model_name(effective_model);
                 let orient_file = if canonical == "indraocr" {
                     "indra_orient.mnn"
                 } else {
                     "ppocr_orient.mnn"
                 };
-                crate::model_manager::resolve_asset_with_dir(None, effective_dir, "orient", orient_file, &cache_dir)
+                models::resolve_asset_local(None, effective_dir, "orient", orient_file, &cache_dir)
                     .map_err(|e| serde::de::Error::custom(e.to_string()))?
             };
             if let Some(thresh) = flat.orientation.as_ref().and_then(|o| o.threshold) {
@@ -533,7 +525,7 @@ impl InitializeConfig {
             let cls_path = if let Some(p) = cls_override {
                 PathBuf::from(p)
             } else {
-                crate::model_manager::resolve_asset_with_dir(None, effective_dir, "cls", "ppocr_cls.mnn", &cache_dir)
+                models::resolve_asset_local(None, effective_dir, "cls", "ppocr_cls.mnn", &cache_dir)
                     .map_err(|e| serde::de::Error::custom(e.to_string()))?
             };
             if let Some(thresh) = flat.classification.as_ref().and_then(|c| c.threshold) {
@@ -555,7 +547,7 @@ impl InitializeConfig {
             let unwarp_path = if let Some(p) = unwarp_override {
                 PathBuf::from(p)
             } else {
-                crate::model_manager::resolve_asset_with_dir(None, effective_dir, "unwarp", "uvdoc.mnn", &cache_dir)
+                models::resolve_asset_local(None, effective_dir, "unwarp", "uvdoc.mnn", &cache_dir)
                     .map_err(|e| serde::de::Error::custom(e.to_string()))?
             };
             config = config.with_unwarp(unwarp_path);
@@ -574,7 +566,7 @@ impl InitializeConfig {
                 PathBuf::from(p)
             } else {
                 let layout_file = if flat.layout_variant.as_deref() == Some("publaynet") { "layout_publaynet.mnn" } else { "layout_cdla.mnn" };
-                crate::model_manager::resolve_asset_with_dir(None, effective_dir, "layout", layout_file, &cache_dir)
+                models::resolve_asset_local(None, effective_dir, "layout", layout_file, &cache_dir)
                     .map_err(|e| serde::de::Error::custom(e.to_string()))?
             };
             let mut l_cfg = LayoutConfig::default(layout_path);
@@ -594,7 +586,7 @@ impl InitializeConfig {
         }
 
         if flat.enable_reading_order.unwrap_or(false) {
-            let order_path = crate::model_manager::resolve_asset_with_dir(None, effective_dir, "order", "indra_order.mnn", &cache_dir)
+            let order_path = models::resolve_asset_local(None, effective_dir, "order", "indra_order.mnn", &cache_dir)
                 .map_err(|e| serde::de::Error::custom(e.to_string()))?;
             config.global.reading_order = true;
             config.global.reading_order_model = Some(order_path);
@@ -742,7 +734,6 @@ impl InitializeConfig {
     }
     
     /// Enable debug images (oriented and rectified images will be included in output)
-    /// Note: This adds overhead and should only be used for debugging/development
     pub fn with_debug_images(mut self, enabled: bool) -> Self {
         self.global.debug_images = enabled;
         self
@@ -925,4 +916,3 @@ mod tests {
         assert_eq!(config.rec.rec_keys_path, Some(PathBuf::from("models/PPOCR_v6_tiny/dict.txt")));
     }
 }
-

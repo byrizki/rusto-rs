@@ -105,6 +105,7 @@ packages/react-native/example/ios/Pods/
 packages/react-native/example/ios/build/
 
 # Language binding artifacts
+packages/node/*.node
 packages/java/build/
 packages/java/.gradle/
 packages/dart/.dart_tool/

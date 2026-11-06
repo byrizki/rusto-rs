@@ -7,6 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+rusto-core = { path = "../rusto-core" }
 rusto-nn = { path = "../rusto-nn", default-features = false, features = ["std", "rten", "onnx"] }
 wasm-bindgen = "0.2"
 serde = { version = "1.0", features = ["derive"] }

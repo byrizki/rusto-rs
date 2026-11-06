@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/rusto-nn", "crates/rusto-nn-webgpu", "crates/rusto-nn-cuda", "crates/rusto-rten", "crates/rusto-mnn", "crates/rten-wasm", "crates/rusto-node"]
+members = [".", "crates/rusto-core", "crates/rusto-cpp", "crates/rusto-nn", "crates/rusto-nn-webgpu", "crates/rusto-nn-cuda", "crates/rusto-rten", "crates/rusto-mnn", "crates/rten-wasm", "crates/rusto-node"]
 
 [package]
 name = "rusto-rs"
@@ -38,10 +38,12 @@ rayon = "1.10"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 nalgebra = "0.33"
 
-# Optional OpenCV backend
+# Optional OpenCV / C++ backend
 opencv = { version = "0.97.2", optional = true }
+rusto-cpp = { path = "crates/rusto-cpp", version = "0.3.2", optional = true }
 
 # Pure Rust inference engines
+rusto-core = { path = "crates/rusto-core", version = "0.3.2" }
 rusto-nn = { path = "crates/rusto-nn", version = "0.3.2" }
 rusto-rten = { path = "crates/rusto-rten", version = "0.3.2", optional = true }
 rusto-nn-webgpu = { path = "crates/rusto-nn-webgpu", version = "0.3.2", optional = true }
@@ -75,7 +77,7 @@ criterion = "0.5"
 
 [features]
 default = ["ffi", "rten"]
-use-opencv = ["opencv"]
+use-opencv = ["opencv", "dep:rusto-cpp", "rusto-cpp/opencv"]
 uniffi = ["dep:uniffi", "uniffi/scaffolding-ffi-buffer-fns"]
 uniffi-cli = ["uniffi", "uniffi/cli"]
 cbindgen-cli = ["dep:cbindgen"]

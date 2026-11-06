@@ -326,3 +326,61 @@ impl RtenSession {
         false
     }
 }
+
+impl rusto_core::engine::InferenceSession for RtenSession {
+    fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, rusto_core::CoreError> {
+        self.run(&input).map_err(|e| rusto_core::CoreError::Model(e.to_string()))
+    }
+
+    fn run_all(&mut self, input: ArrayD<f32>) -> Result<HashMap<String, ArrayD<f32>>, rusto_core::CoreError> {
+        self.run_all(&input).map_err(|e| rusto_core::CoreError::Model(e.to_string()))
+    }
+
+    fn run_with_inputs(
+        &mut self,
+        inputs: HashMap<String, ArrayD<f32>>,
+    ) -> Result<HashMap<String, ArrayD<f32>>, rusto_core::CoreError> {
+        self.run_with_inputs(&inputs).map_err(|e| rusto_core::CoreError::Model(e.to_string()))
+    }
+
+    fn get_character_list(&self, key: &str) -> Option<Vec<String>> {
+        self.get_character_list(key)
+    }
+
+    fn have_key(&self, key: &str) -> bool {
+        self.have_key(key)
+    }
+
+    fn input_channels(&self) -> usize {
+        self.input_channels()
+    }
+
+    fn run_linenet_rec(
+        &mut self,
+        x: ndarray::Array4<f32>,
+        widths: Vec<i32>,
+    ) -> Result<rusto_core::engine::LineNetRecOutput, rusto_core::CoreError> {
+        self.run_linenet_rec(&x, &widths)
+            .map_err(|e| rusto_core::CoreError::Model(e.to_string()))
+    }
+}
+
+/// RTen session loader callback for `rusto_core::engine::register_session_loader`.
+pub fn loader(
+    path: &Path,
+    cfg: &rusto_core::types::EngineConfig,
+) -> Result<Box<dyn rusto_core::engine::InferenceSession>, rusto_core::error::CoreError> {
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    if ext.eq_ignore_ascii_case("rten") || ext.eq_ignore_ascii_case("onnx") {
+        let session = RtenSession::from_file(path, cfg.intra_op_num_threads as usize)
+            .map_err(|e| rusto_core::error::CoreError::Model(e.to_string()))?;
+        Ok(Box::new(session))
+    } else {
+        Err(rusto_core::error::CoreError::Model("UNSUPPORTED_FORMAT".into()))
+    }
+}
+
+/// Register the RTen backend with `rusto-core`'s engine session loader.
+pub fn register() {
+    rusto_core::engine::register_session_loader(loader);
+}
