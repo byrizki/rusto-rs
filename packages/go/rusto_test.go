@@ -21,22 +21,22 @@ func TestInitializationInvalidJSON(t *testing.T) {
 func TestClosedEngineReturnsError(t *testing.T) {
 	e := &Engine{handle: nil}
 
-	_, err := e.DetectTextFile("/tmp/nonexistent.png", "{}")
+	_, err := e.DetectText("/tmp/nonexistent.png").AsLines().Run()
 	if !errors.Is(err, ErrEngineClosed) {
 		t.Fatalf("expected ErrEngineClosed for file detect, got %v", err)
 	}
 
-	_, err = e.DetectTextData([]byte{0x01, 0x02}, "{}")
+	_, err = e.DetectText().Data([]byte{0x01, 0x02}).AsLines().Run()
 	if !errors.Is(err, ErrEngineClosed) {
 		t.Fatalf("expected ErrEngineClosed for data detect, got %v", err)
 	}
 
-	_, err = e.DetectTextFileSpatial("/tmp/nonexistent.png", "{}")
+	_, err = e.DetectText("/tmp/nonexistent.png").AsSpatial().Run()
 	if !errors.Is(err, ErrEngineClosed) {
 		t.Fatalf("expected ErrEngineClosed for spatial file detect, got %v", err)
 	}
 
-	_, err = e.DetectTextDataSpatial([]byte{0x01, 0x02}, "{}")
+	_, err = e.DetectText().Data([]byte{0x01, 0x02}).AsSpatial().Run()
 	if !errors.Is(err, ErrEngineClosed) {
 		t.Fatalf("expected ErrEngineClosed for spatial data detect, got %v", err)
 	}
@@ -92,20 +92,20 @@ func TestDetectExample1Image(t *testing.T) {
 	}
 	defer engine.Close()
 
-	results, err := engine.DetectTextFile(imgPath, "{}")
+	structured, err := engine.DetectText(imgPath).AsLines().Run()
 	if err != nil {
-		t.Fatalf("DetectTextFile failed: %v", err)
+		t.Fatalf("DetectText AsLines failed: %v", err)
 	}
-	if len(results) == 0 {
-		t.Fatalf("Expected non-empty text results on example1.png")
+	if structured.IsSpatial || len(structured.Results) == 0 {
+		t.Fatalf("Expected non-empty structured text results on example1.png")
 	}
 
-	spatial, err := engine.DetectTextFileSpatial(imgPath, "{}")
+	spatial, err := engine.DetectText(imgPath).AsSpatial().Run()
 	if err != nil {
-		t.Fatalf("DetectTextFileSpatial failed: %v", err)
+		t.Fatalf("DetectText AsSpatial failed: %v", err)
 	}
-	if !strings.Contains(spatial, "INVOICE") {
-		t.Fatalf("Expected spatial text to contain 'INVOICE', got: %s", spatial)
+	if !spatial.IsSpatial || !strings.Contains(spatial.Text, "INVOICE") {
+		t.Fatalf("Expected spatial text to contain 'INVOICE', got: %s", spatial.Text)
 	}
 }
 
@@ -130,23 +130,23 @@ func TestDetectIndraOCRIdCard(t *testing.T) {
 	}
 	defer engine.Close()
 
-	results, err := engine.DetectTextFile(imgPath, "{}")
+	out, err := engine.DetectText(imgPath).AsLines().Run()
 	if err != nil {
-		t.Fatalf("DetectTextFile with Indra OCR failed: %v", err)
+		t.Fatalf("DetectText with Indra OCR failed: %v", err)
 	}
-	if len(results) == 0 {
+	if len(out.Results) == 0 {
 		t.Fatalf("Expected non-empty text results on idcard.jpg")
 	}
 
 	foundPassport := false
-	for _, res := range results {
+	for _, res := range out.Results {
 		if strings.Contains(res.Text, "PASSPORT") || strings.Contains(res.Text, "UNITED") || strings.Contains(res.Text, "BRITAIN") {
 			foundPassport = true
 			break
 		}
 	}
 	if !foundPassport {
-		t.Fatalf("Expected detected text to include passport keywords, got %v", results)
+		t.Fatalf("Expected detected text to include passport keywords, got %v", out.Results)
 	}
 }
 
@@ -170,17 +170,15 @@ func TestDetectLayoutAPI(t *testing.T) {
 	}
 	defer engine.Close()
 
-	// Calling DetectLayoutFile without layout model configured should return an error
-	_, err = engine.DetectLayoutFile("../../models/test_images/example1.png")
-	if err == nil {
-		t.Fatal("expected error when layout model is not configured, got nil")
+	out, err := engine.DetectText("../../models/test_images/example1.png").
+		WithLayoutReading(true).
+		AsLines().
+		Run()
+	if err != nil {
+		t.Fatalf("expected text detection to succeed even without layout model, got: %v", err)
 	}
-
-	// Calling DetectLayoutRGB without layout model configured should return an error
-	pixels := make([]byte, 100*100*3)
-	_, err = engine.DetectLayoutRGB(pixels, 100, 100, 300)
-	if err == nil {
-		t.Fatal("expected error when layout model is not configured, got nil")
+	if len(out.Results) == 0 {
+		t.Fatal("expected text detection results, got 0")
 	}
 }
 
@@ -210,32 +208,99 @@ func TestDetectChronamDensePageWithLayout(t *testing.T) {
 	}
 	defer engine.Close()
 
-	results, err := engine.DetectTextFile(imgPath, `{"layout": true}`)
+	out, err := engine.DetectText(imgPath).WithLayoutReading(true).AsLines().Run()
 	if err != nil {
-		t.Fatalf("DetectTextFile with layout failed: %v", err)
+		t.Fatalf("DetectText with layout failed: %v", err)
 	}
 
-	if len(results) != 153 {
-		t.Fatalf("Expected exactly 153 lines, got %d", len(results))
+	if len(out.Results) != 153 {
+		t.Fatalf("Expected exactly 153 lines, got %d", len(out.Results))
 	}
 
-	if results[0].Text != "All Orders in our" {
-		t.Fatalf("Expected first line to be 'All Orders in our', got '%s'", results[0].Text)
+	if out.Results[0].Text != "All Orders in our" {
+		t.Fatalf("Expected first line to be 'All Orders in our', got '%s'", out.Results[0].Text)
 	}
-	if results[0].RegionID < 0 {
-		t.Fatalf("Expected RegionID >= 0 when layout is enabled, got %d", results[0].RegionID)
+	if out.Results[0].RegionID < 0 {
+		t.Fatalf("Expected RegionID >= 0 when layout is enabled, got %d", out.Results[0].RegionID)
 	}
-	if results[0].LayoutType < 0 {
-		t.Fatalf("Expected LayoutType >= 0 when layout is enabled, got %d", results[0].LayoutType)
-	}
-
-	regions, err := engine.DetectLayoutFile(imgPath)
-	if err != nil {
-		t.Fatalf("DetectLayoutFile failed: %v", err)
-	}
-	if len(regions) < 1 {
-		t.Fatalf("Expected at least 1 layout region, got %d", len(regions))
+	if out.Results[0].LayoutType < 0 {
+		t.Fatalf("Expected LayoutType >= 0 when layout is enabled, got %d", out.Results[0].LayoutType)
 	}
 }
 
+func TestDetectTextFluentBuilder(t *testing.T) {
+	detPath := "../../models/PPOCR_v6_tiny/det.rten"
+	recPath := "../../models/PPOCR_v6_tiny/rec.rten"
+	dictPath := "../../models/PPOCR_v6_tiny/dict.txt"
+	layoutPath := "../../models/PPOCR_v6_tiny/layout_cdla.onnx"
+	imgPath := "../../tests/fixtures/chronam-ad-page.png"
+
+	if _, err := os.Stat(detPath); os.IsNotExist(err) {
+		t.Skip("Model files not found, skipping fluent builder test")
+	}
+
+	config := fmt.Sprintf(`{
+		"detection": {"modelPath": "%s", "enabled": true},
+		"recognition": {"modelPath": "%s", "dictPath": "%s", "enabled": true},
+		"layout": {"modelPath": "%s", "enabled": true}
+	}`, detPath, recPath, dictPath, layoutPath)
+
+	engine, err := New(config)
+	if err != nil {
+		t.Fatalf("Failed to initialize engine with layout: %v", err)
+	}
+	defer engine.Close()
+
+	descreen := float32(0.1)
+	batchSize := int32(6)
+	scoreThresh := float32(0.5)
+
+	res, err := engine.DetectText().
+		Image(imgPath).
+		WithLayoutReading(true).
+		WithPreDetection(PreDetectionOptions{DescreenStrength: &descreen}).
+		WithRecognition(RecognitionRunOptions{BatchSize: &batchSize}).
+		WithPostRecognition(PostRecognitionOptions{ScoreThreshold: &scoreThresh}).
+		AsLines().
+		Run()
+
+	if err != nil {
+		t.Fatalf("Fluent builder Run failed: %v", err)
+	}
+
+	if res.IsSpatial || len(res.Results) == 0 {
+		t.Fatalf("Expected non-empty structured results from fluent builder")
+	}
+	if !strings.HasPrefix(res.Results[0].Text, "All Orders in") {
+		t.Fatalf("Expected text to start with 'All Orders in', got: %s", res.Results[0].Text)
+	}
+
+	spatialRes, err := engine.DetectText().
+		Image(imgPath).
+		WithLayoutReading(true).
+		AsSpatial().
+		Run()
+
+	if err != nil {
+		t.Fatalf("Fluent builder AsSpatial().Run() failed: %v", err)
+	}
+	if !spatialRes.IsSpatial || !strings.Contains(spatialRes.Text, "Orders") {
+		t.Fatalf("Expected spatial text to contain 'Orders', got: %s", spatialRes.Text)
+	}
+}
+
+func TestVersionAndIsReady(t *testing.T) {
+	v := Version()
+	if v != "0.4.0" {
+		t.Fatalf("Expected version '0.4.0', got: %s", v)
+	}
+
+	e := &Engine{handle: nil}
+	if e.IsReady() {
+		t.Fatal("Expected closed engine IsReady() to be false")
+	}
+	if e.Version() != "0.4.0" {
+		t.Fatalf("Expected e.Version() '0.4.0', got: %s", e.Version())
+	}
+}
 

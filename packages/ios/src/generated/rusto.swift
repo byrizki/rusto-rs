@@ -577,16 +577,6 @@ fileprivate struct FfiConverterData: FfiConverterRustBuffer {
 public protocol RustOProtocol: AnyObject, Sendable {
     
     /**
-     * Detects document layout regions from an image source.
-     */
-    func detectLayout(source: ImageSource) throws  -> [LayoutRegion]
-    
-    /**
-     * Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
-     */
-    func detectLayoutRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64) throws  -> [LayoutRegion]
-    
-    /**
      * Runs text detection and recognition on an image source.
      */
     func detectText(source: ImageSource, options: OcrRunOptions) throws  -> DetectTextResult
@@ -597,14 +587,9 @@ public protocol RustOProtocol: AnyObject, Sendable {
     func detectTextRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64, options: OcrRunOptions) throws  -> DetectTextResult
     
     /**
-     * Unwarps a distorted or curved document image from an image source.
+     * Returns whether the engine is ready for inference.
      */
-    func unwarpImage(source: ImageSource) throws  -> UnwarpedImageResult
-    
-    /**
-     * Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
-     */
-    func unwarpImageRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64) throws  -> UnwarpedImageResult
+    func isReady()  -> Bool
     
     /**
      * Returns the engine library version string.
@@ -691,33 +676,6 @@ public static func initializeFromJson(configJson: String)throws  -> RustO  {
 
     
     /**
-     * Detects document layout regions from an image source.
-     */
-open func detectLayout(source: ImageSource)throws  -> [LayoutRegion]  {
-    return try  FfiConverterSequenceTypeLayoutRegion.lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
-    uniffi_rusto_fn_method_rusto_detect_layout(
-            self.uniffiCloneHandle(),
-        FfiConverterTypeImageSource_lower(source),$0
-    )
-})
-}
-    
-    /**
-     * Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
-     */
-open func detectLayoutRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64)throws  -> [LayoutRegion]  {
-    return try  FfiConverterSequenceTypeLayoutRegion.lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
-    uniffi_rusto_fn_method_rusto_detect_layout_rgb(
-            self.uniffiCloneHandle(),
-        FfiConverterData.lower(pixels),
-        FfiConverterUInt32.lower(width),
-        FfiConverterUInt32.lower(height),
-        FfiConverterUInt64.lower(stride),$0
-    )
-})
-}
-    
-    /**
      * Runs text detection and recognition on an image source.
      */
 open func detectText(source: ImageSource, options: OcrRunOptions)throws  -> DetectTextResult  {
@@ -747,28 +705,12 @@ open func detectTextRgb(pixels: Data, width: UInt32, height: UInt32, stride: UIn
 }
     
     /**
-     * Unwarps a distorted or curved document image from an image source.
+     * Returns whether the engine is ready for inference.
      */
-open func unwarpImage(source: ImageSource)throws  -> UnwarpedImageResult  {
-    return try  FfiConverterTypeUnwarpedImageResult_lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
-    uniffi_rusto_fn_method_rusto_unwarp_image(
-            self.uniffiCloneHandle(),
-        FfiConverterTypeImageSource_lower(source),$0
-    )
-})
-}
-    
-    /**
-     * Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
-     */
-open func unwarpImageRgb(pixels: Data, width: UInt32, height: UInt32, stride: UInt64)throws  -> UnwarpedImageResult  {
-    return try  FfiConverterTypeUnwarpedImageResult_lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
-    uniffi_rusto_fn_method_rusto_unwarp_image_rgb(
-            self.uniffiCloneHandle(),
-        FfiConverterData.lower(pixels),
-        FfiConverterUInt32.lower(width),
-        FfiConverterUInt32.lower(height),
-        FfiConverterUInt64.lower(stride),$0
+open func isReady() -> Bool  {
+    return try!  FfiConverterBool.lift(try! rustCall() {
+    uniffi_rusto_fn_method_rusto_is_ready(
+            self.uniffiCloneHandle(),$0
     )
 })
 }
@@ -830,65 +772,6 @@ public func FfiConverterTypeRustO_lower(_ value: RustO) -> UInt64 {
 }
 
 
-
-
-/**
- * Pre-OCR image calibration options for descreening patterned backgrounds.
- */
-public struct CalibrationOptions: Equatable, Hashable {
-    /**
-     * Descreen filtering strength (0.0 - 1.0).
-     */
-    public var descreenStrength: Float?
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(
-        /**
-         * Descreen filtering strength (0.0 - 1.0).
-         */descreenStrength: Float?) {
-        self.descreenStrength = descreenStrength
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension CalibrationOptions: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeCalibrationOptions: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CalibrationOptions {
-        return
-            try CalibrationOptions(
-                descreenStrength: FfiConverterOptionFloat.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: CalibrationOptions, into buf: inout [UInt8]) {
-        FfiConverterOptionFloat.write(value.descreenStrength, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeCalibrationOptions_lift(_ buf: RustBuffer) throws -> CalibrationOptions {
-    return try FfiConverterTypeCalibrationOptions.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeCalibrationOptions_lower(_ value: CalibrationOptions) -> RustBuffer {
-    return FfiConverterTypeCalibrationOptions.lower(value)
-}
 
 
 /**
@@ -1129,10 +1012,6 @@ public struct DetectionRunOptions: Equatable, Hashable {
      * Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
      */
     public var std: [Float]?
-    /**
-     * Post-processing options for detection.
-     */
-    public var postprocess: PostprocessRunOptions?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1148,15 +1027,11 @@ public struct DetectionRunOptions: Equatable, Hashable {
          */mean: [Float]?, 
         /**
          * Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
-         */std: [Float]?, 
-        /**
-         * Post-processing options for detection.
-         */postprocess: PostprocessRunOptions?) {
+         */std: [Float]?) {
         self.limitSideLen = limitSideLen
         self.limitType = limitType
         self.mean = mean
         self.std = std
-        self.postprocess = postprocess
     }
 
     
@@ -1178,8 +1053,7 @@ public struct FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer {
                 limitSideLen: FfiConverterOptionInt32.read(from: &buf), 
                 limitType: FfiConverterOptionString.read(from: &buf), 
                 mean: FfiConverterOptionSequenceFloat.read(from: &buf), 
-                std: FfiConverterOptionSequenceFloat.read(from: &buf), 
-                postprocess: FfiConverterOptionTypePostprocessRunOptions.read(from: &buf)
+                std: FfiConverterOptionSequenceFloat.read(from: &buf)
         )
     }
 
@@ -1188,7 +1062,6 @@ public struct FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.limitType, into: &buf)
         FfiConverterOptionSequenceFloat.write(value.mean, into: &buf)
         FfiConverterOptionSequenceFloat.write(value.std, into: &buf)
-        FfiConverterOptionTypePostprocessRunOptions.write(value.postprocess, into: &buf)
     }
 }
 
@@ -1477,95 +1350,6 @@ public func FfiConverterTypeInitializeConfig_lower(_ value: InitializeConfig) ->
 
 
 /**
- * Bounding box coordinates for a detected document layout region.
- */
-public struct LayoutBBox: Equatable, Hashable {
-    /**
-     * Minimum horizontal coordinate (left).
-     */
-    public var xMin: Int32
-    /**
-     * Minimum vertical coordinate (top).
-     */
-    public var yMin: Int32
-    /**
-     * Maximum horizontal coordinate (right).
-     */
-    public var xMax: Int32
-    /**
-     * Maximum vertical coordinate (bottom).
-     */
-    public var yMax: Int32
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(
-        /**
-         * Minimum horizontal coordinate (left).
-         */xMin: Int32, 
-        /**
-         * Minimum vertical coordinate (top).
-         */yMin: Int32, 
-        /**
-         * Maximum horizontal coordinate (right).
-         */xMax: Int32, 
-        /**
-         * Maximum vertical coordinate (bottom).
-         */yMax: Int32) {
-        self.xMin = xMin
-        self.yMin = yMin
-        self.xMax = xMax
-        self.yMax = yMax
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension LayoutBBox: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeLayoutBBox: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LayoutBBox {
-        return
-            try LayoutBBox(
-                xMin: FfiConverterInt32.read(from: &buf), 
-                yMin: FfiConverterInt32.read(from: &buf), 
-                xMax: FfiConverterInt32.read(from: &buf), 
-                yMax: FfiConverterInt32.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: LayoutBBox, into buf: inout [UInt8]) {
-        FfiConverterInt32.write(value.xMin, into: &buf)
-        FfiConverterInt32.write(value.yMin, into: &buf)
-        FfiConverterInt32.write(value.xMax, into: &buf)
-        FfiConverterInt32.write(value.yMax, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeLayoutBBox_lift(_ buf: RustBuffer) throws -> LayoutBBox {
-    return try FfiConverterTypeLayoutBBox.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeLayoutBBox_lower(_ value: LayoutBBox) -> RustBuffer {
-    return FfiConverterTypeLayoutBBox.lower(value)
-}
-
-
-/**
  * Document layout analysis model configuration.
  */
 public struct LayoutConfig: Equatable, Hashable {
@@ -1675,85 +1459,6 @@ public func FfiConverterTypeLayoutConfig_lower(_ value: LayoutConfig) -> RustBuf
 
 
 /**
- * Detected document layout region with category, bounding box, and confidence score.
- */
-public struct LayoutRegion: Equatable, Hashable {
-    /**
-     * Axis-aligned bounding box.
-     */
-    public var bbox: LayoutBBox
-    /**
-     * Semantic layout category.
-     */
-    public var layoutType: LayoutType
-    /**
-     * Classification confidence score [0.0 - 1.0].
-     */
-    public var confidence: Float
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(
-        /**
-         * Axis-aligned bounding box.
-         */bbox: LayoutBBox, 
-        /**
-         * Semantic layout category.
-         */layoutType: LayoutType, 
-        /**
-         * Classification confidence score [0.0 - 1.0].
-         */confidence: Float) {
-        self.bbox = bbox
-        self.layoutType = layoutType
-        self.confidence = confidence
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension LayoutRegion: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeLayoutRegion: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LayoutRegion {
-        return
-            try LayoutRegion(
-                bbox: FfiConverterTypeLayoutBBox.read(from: &buf), 
-                layoutType: FfiConverterTypeLayoutType.read(from: &buf), 
-                confidence: FfiConverterFloat.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: LayoutRegion, into buf: inout [UInt8]) {
-        FfiConverterTypeLayoutBBox.write(value.bbox, into: &buf)
-        FfiConverterTypeLayoutType.write(value.layoutType, into: &buf)
-        FfiConverterFloat.write(value.confidence, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeLayoutRegion_lift(_ buf: RustBuffer) throws -> LayoutRegion {
-    return try FfiConverterTypeLayoutRegion.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeLayoutRegion_lower(_ value: LayoutRegion) -> RustBuffer {
-    return FfiConverterTypeLayoutRegion.lower(value)
-}
-
-
-/**
  * Per-request execution options for text detection.
  */
 public struct OcrRunOptions: Equatable, Hashable {
@@ -1762,69 +1467,45 @@ public struct OcrRunOptions: Equatable, Hashable {
      */
     public var output: OutputGranularity
     /**
-     * Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
+     * Enable document unwarping stage.
      */
-    public var lineYThreshold: Float?
+    public var autoUnwarp: Bool?
     /**
-     * Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
+     * Enable document layout analysis and reading order stage.
      */
-    public var wordXThreshold: Float?
-    /**
-     * Minimum recognition confidence score threshold [0.0 - 1.0].
-     */
-    public var textScore: Float?
-    /**
-     * Enable text line orientation classifier stage.
-     */
-    public var classification: Bool?
+    public var layoutReading: Bool?
     /**
      * Enable document orientation angle correction stage.
      */
-    public var orientation: Bool?
+    public var orientationDetection: Bool?
     /**
-     * Enable document unwarping stage.
+     * Enable text line orientation classifier stage.
      */
-    public var unwarp: Bool?
+    public var lineClassification: Bool?
     /**
-     * Enable document layout analysis stage.
+     * Pre-detection calibration & optimization options.
      */
-    public var layout: Bool?
-    /**
-     * Request-local minimum height resize override.
-     */
-    public var minHeight: Float?
-    /**
-     * Request-local maximum side length resize override.
-     */
-    public var maxSideLen: Float?
-    /**
-     * Request-local minimum side length resize override.
-     */
-    public var minSideLen: Float?
-    /**
-     * Width-to-height aspect ratio padding override.
-     */
-    public var widthHeightRatio: Float?
+    public var preDetection: PreDetectionOptions?
     /**
      * Detection stage options.
      */
     public var detection: DetectionRunOptions?
     /**
-     * Post-processing options.
+     * Post-detection binarization, expansion, and filtering options.
      */
-    public var postprocess: PostprocessRunOptions?
+    public var postDetection: PostDetectionOptions?
     /**
-     * Pre-OCR background descreening calibration options.
+     * Pre-recognition clustering options.
      */
-    public var calibration: CalibrationOptions?
+    public var preRecognition: PreRecognitionOptions?
     /**
-     * Runtime crop and resolution optimization options.
+     * Recognition stage options.
      */
-    public var optimization: OptimizationOptions?
+    public var recognition: RecognitionRunOptions?
     /**
-     * Request-local recognition batch size override.
+     * Post-recognition filtering options.
      */
-    public var recBatchNum: Int32?
+    public var postRecognition: PostRecognitionOptions?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1833,70 +1514,46 @@ public struct OcrRunOptions: Equatable, Hashable {
          * Output format granularity: Lines (default), Words, or Spatial.
          */output: OutputGranularity, 
         /**
-         * Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
-         */lineYThreshold: Float?, 
+         * Enable document unwarping stage.
+         */autoUnwarp: Bool?, 
         /**
-         * Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
-         */wordXThreshold: Float?, 
-        /**
-         * Minimum recognition confidence score threshold [0.0 - 1.0].
-         */textScore: Float?, 
-        /**
-         * Enable text line orientation classifier stage.
-         */classification: Bool?, 
+         * Enable document layout analysis and reading order stage.
+         */layoutReading: Bool?, 
         /**
          * Enable document orientation angle correction stage.
-         */orientation: Bool?, 
+         */orientationDetection: Bool?, 
         /**
-         * Enable document unwarping stage.
-         */unwarp: Bool?, 
+         * Enable text line orientation classifier stage.
+         */lineClassification: Bool?, 
         /**
-         * Enable document layout analysis stage.
-         */layout: Bool?, 
-        /**
-         * Request-local minimum height resize override.
-         */minHeight: Float?, 
-        /**
-         * Request-local maximum side length resize override.
-         */maxSideLen: Float?, 
-        /**
-         * Request-local minimum side length resize override.
-         */minSideLen: Float?, 
-        /**
-         * Width-to-height aspect ratio padding override.
-         */widthHeightRatio: Float?, 
+         * Pre-detection calibration & optimization options.
+         */preDetection: PreDetectionOptions?, 
         /**
          * Detection stage options.
          */detection: DetectionRunOptions?, 
         /**
-         * Post-processing options.
-         */postprocess: PostprocessRunOptions?, 
+         * Post-detection binarization, expansion, and filtering options.
+         */postDetection: PostDetectionOptions?, 
         /**
-         * Pre-OCR background descreening calibration options.
-         */calibration: CalibrationOptions?, 
+         * Pre-recognition clustering options.
+         */preRecognition: PreRecognitionOptions?, 
         /**
-         * Runtime crop and resolution optimization options.
-         */optimization: OptimizationOptions?, 
+         * Recognition stage options.
+         */recognition: RecognitionRunOptions?, 
         /**
-         * Request-local recognition batch size override.
-         */recBatchNum: Int32?) {
+         * Post-recognition filtering options.
+         */postRecognition: PostRecognitionOptions?) {
         self.output = output
-        self.lineYThreshold = lineYThreshold
-        self.wordXThreshold = wordXThreshold
-        self.textScore = textScore
-        self.classification = classification
-        self.orientation = orientation
-        self.unwarp = unwarp
-        self.layout = layout
-        self.minHeight = minHeight
-        self.maxSideLen = maxSideLen
-        self.minSideLen = minSideLen
-        self.widthHeightRatio = widthHeightRatio
+        self.autoUnwarp = autoUnwarp
+        self.layoutReading = layoutReading
+        self.orientationDetection = orientationDetection
+        self.lineClassification = lineClassification
+        self.preDetection = preDetection
         self.detection = detection
-        self.postprocess = postprocess
-        self.calibration = calibration
-        self.optimization = optimization
-        self.recBatchNum = recBatchNum
+        self.postDetection = postDetection
+        self.preRecognition = preRecognition
+        self.recognition = recognition
+        self.postRecognition = postRecognition
     }
 
     
@@ -1916,43 +1573,31 @@ public struct FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer {
         return
             try OcrRunOptions(
                 output: FfiConverterTypeOutputGranularity.read(from: &buf), 
-                lineYThreshold: FfiConverterOptionFloat.read(from: &buf), 
-                wordXThreshold: FfiConverterOptionFloat.read(from: &buf), 
-                textScore: FfiConverterOptionFloat.read(from: &buf), 
-                classification: FfiConverterOptionBool.read(from: &buf), 
-                orientation: FfiConverterOptionBool.read(from: &buf), 
-                unwarp: FfiConverterOptionBool.read(from: &buf), 
-                layout: FfiConverterOptionBool.read(from: &buf), 
-                minHeight: FfiConverterOptionFloat.read(from: &buf), 
-                maxSideLen: FfiConverterOptionFloat.read(from: &buf), 
-                minSideLen: FfiConverterOptionFloat.read(from: &buf), 
-                widthHeightRatio: FfiConverterOptionFloat.read(from: &buf), 
+                autoUnwarp: FfiConverterOptionBool.read(from: &buf), 
+                layoutReading: FfiConverterOptionBool.read(from: &buf), 
+                orientationDetection: FfiConverterOptionBool.read(from: &buf), 
+                lineClassification: FfiConverterOptionBool.read(from: &buf), 
+                preDetection: FfiConverterOptionTypePreDetectionOptions.read(from: &buf), 
                 detection: FfiConverterOptionTypeDetectionRunOptions.read(from: &buf), 
-                postprocess: FfiConverterOptionTypePostprocessRunOptions.read(from: &buf), 
-                calibration: FfiConverterOptionTypeCalibrationOptions.read(from: &buf), 
-                optimization: FfiConverterOptionTypeOptimizationOptions.read(from: &buf), 
-                recBatchNum: FfiConverterOptionInt32.read(from: &buf)
+                postDetection: FfiConverterOptionTypePostDetectionOptions.read(from: &buf), 
+                preRecognition: FfiConverterOptionTypePreRecognitionOptions.read(from: &buf), 
+                recognition: FfiConverterOptionTypeRecognitionRunOptions.read(from: &buf), 
+                postRecognition: FfiConverterOptionTypePostRecognitionOptions.read(from: &buf)
         )
     }
 
     public static func write(_ value: OcrRunOptions, into buf: inout [UInt8]) {
         FfiConverterTypeOutputGranularity.write(value.output, into: &buf)
-        FfiConverterOptionFloat.write(value.lineYThreshold, into: &buf)
-        FfiConverterOptionFloat.write(value.wordXThreshold, into: &buf)
-        FfiConverterOptionFloat.write(value.textScore, into: &buf)
-        FfiConverterOptionBool.write(value.classification, into: &buf)
-        FfiConverterOptionBool.write(value.orientation, into: &buf)
-        FfiConverterOptionBool.write(value.unwarp, into: &buf)
-        FfiConverterOptionBool.write(value.layout, into: &buf)
-        FfiConverterOptionFloat.write(value.minHeight, into: &buf)
-        FfiConverterOptionFloat.write(value.maxSideLen, into: &buf)
-        FfiConverterOptionFloat.write(value.minSideLen, into: &buf)
-        FfiConverterOptionFloat.write(value.widthHeightRatio, into: &buf)
+        FfiConverterOptionBool.write(value.autoUnwarp, into: &buf)
+        FfiConverterOptionBool.write(value.layoutReading, into: &buf)
+        FfiConverterOptionBool.write(value.orientationDetection, into: &buf)
+        FfiConverterOptionBool.write(value.lineClassification, into: &buf)
+        FfiConverterOptionTypePreDetectionOptions.write(value.preDetection, into: &buf)
         FfiConverterOptionTypeDetectionRunOptions.write(value.detection, into: &buf)
-        FfiConverterOptionTypePostprocessRunOptions.write(value.postprocess, into: &buf)
-        FfiConverterOptionTypeCalibrationOptions.write(value.calibration, into: &buf)
-        FfiConverterOptionTypeOptimizationOptions.write(value.optimization, into: &buf)
-        FfiConverterOptionInt32.write(value.recBatchNum, into: &buf)
+        FfiConverterOptionTypePostDetectionOptions.write(value.postDetection, into: &buf)
+        FfiConverterOptionTypePreRecognitionOptions.write(value.preRecognition, into: &buf)
+        FfiConverterOptionTypeRecognitionRunOptions.write(value.recognition, into: &buf)
+        FfiConverterOptionTypePostRecognitionOptions.write(value.postRecognition, into: &buf)
     }
 }
 
@@ -1969,95 +1614,6 @@ public func FfiConverterTypeOcrRunOptions_lift(_ buf: RustBuffer) throws -> OcrR
 #endif
 public func FfiConverterTypeOcrRunOptions_lower(_ value: OcrRunOptions) -> RustBuffer {
     return FfiConverterTypeOcrRunOptions.lower(value)
-}
-
-
-/**
- * Runtime crop and resolution optimization options.
- */
-public struct OptimizationOptions: Equatable, Hashable {
-    /**
-     * Enable or disable image optimization.
-     */
-    public var enabled: Bool?
-    /**
-     * Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
-     */
-    public var targetMaxSide: UInt32?
-    /**
-     * Horizontal padding around bounding box crops in pixels.
-     */
-    public var cropPaddingX: Float?
-    /**
-     * Vertical padding around bounding box crops in pixels.
-     */
-    public var cropPaddingY: Float?
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(
-        /**
-         * Enable or disable image optimization.
-         */enabled: Bool?, 
-        /**
-         * Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
-         */targetMaxSide: UInt32?, 
-        /**
-         * Horizontal padding around bounding box crops in pixels.
-         */cropPaddingX: Float?, 
-        /**
-         * Vertical padding around bounding box crops in pixels.
-         */cropPaddingY: Float?) {
-        self.enabled = enabled
-        self.targetMaxSide = targetMaxSide
-        self.cropPaddingX = cropPaddingX
-        self.cropPaddingY = cropPaddingY
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension OptimizationOptions: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeOptimizationOptions: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OptimizationOptions {
-        return
-            try OptimizationOptions(
-                enabled: FfiConverterOptionBool.read(from: &buf), 
-                targetMaxSide: FfiConverterOptionUInt32.read(from: &buf), 
-                cropPaddingX: FfiConverterOptionFloat.read(from: &buf), 
-                cropPaddingY: FfiConverterOptionFloat.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: OptimizationOptions, into buf: inout [UInt8]) {
-        FfiConverterOptionBool.write(value.enabled, into: &buf)
-        FfiConverterOptionUInt32.write(value.targetMaxSide, into: &buf)
-        FfiConverterOptionFloat.write(value.cropPaddingX, into: &buf)
-        FfiConverterOptionFloat.write(value.cropPaddingY, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeOptimizationOptions_lift(_ buf: RustBuffer) throws -> OptimizationOptions {
-    return try FfiConverterTypeOptimizationOptions.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeOptimizationOptions_lower(_ value: OptimizationOptions) -> RustBuffer {
-    return FfiConverterTypeOptimizationOptions.lower(value)
 }
 
 
@@ -2210,9 +1766,9 @@ public func FfiConverterTypePoint2D_lower(_ value: Point2D) -> RustBuffer {
 
 
 /**
- * Post-processing options for DBNet polygon detection and binarization.
+ * Post-detection polygon extraction, thresholding, and box filtering options.
  */
-public struct PostprocessRunOptions: Equatable, Hashable {
+public struct PostDetectionOptions: Equatable, Hashable {
     /**
      * Binarization probability cutoff threshold. Default: 0.3.
      */
@@ -2221,10 +1777,6 @@ public struct PostprocessRunOptions: Equatable, Hashable {
      * Polygon contour score confidence threshold. Default: 0.6.
      */
     public var boxThreshold: Float?
-    /**
-     * Maximum candidate text boxes to detect per image. Default: 1000.
-     */
-    public var maxCandidates: Int32?
     /**
      * Polygon unclip expansion ratio. Default: 1.5 - 2.0.
      */
@@ -2237,6 +1789,26 @@ public struct PostprocessRunOptions: Equatable, Hashable {
      * DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
      */
     public var scoreMode: String?
+    /**
+     * Maximum candidate text boxes to detect per image. Default: 1000.
+     */
+    public var maxCandidates: Int32?
+    /**
+     * Minimum box pixel height filter.
+     */
+    public var minHeight: Float?
+    /**
+     * Minimum box side length filter.
+     */
+    public var minSideLen: Float?
+    /**
+     * Maximum box side length filter.
+     */
+    public var maxSideLen: Float?
+    /**
+     * Width-to-height aspect ratio padding override.
+     */
+    public var widthHeightRatio: Float?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -2248,9 +1820,6 @@ public struct PostprocessRunOptions: Equatable, Hashable {
          * Polygon contour score confidence threshold. Default: 0.6.
          */boxThreshold: Float?, 
         /**
-         * Maximum candidate text boxes to detect per image. Default: 1000.
-         */maxCandidates: Int32?, 
-        /**
          * Polygon unclip expansion ratio. Default: 1.5 - 2.0.
          */unclipRatio: Float?, 
         /**
@@ -2258,13 +1827,32 @@ public struct PostprocessRunOptions: Equatable, Hashable {
          */useDilation: Bool?, 
         /**
          * DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
-         */scoreMode: String?) {
+         */scoreMode: String?, 
+        /**
+         * Maximum candidate text boxes to detect per image. Default: 1000.
+         */maxCandidates: Int32?, 
+        /**
+         * Minimum box pixel height filter.
+         */minHeight: Float?, 
+        /**
+         * Minimum box side length filter.
+         */minSideLen: Float?, 
+        /**
+         * Maximum box side length filter.
+         */maxSideLen: Float?, 
+        /**
+         * Width-to-height aspect ratio padding override.
+         */widthHeightRatio: Float?) {
         self.threshold = threshold
         self.boxThreshold = boxThreshold
-        self.maxCandidates = maxCandidates
         self.unclipRatio = unclipRatio
         self.useDilation = useDilation
         self.scoreMode = scoreMode
+        self.maxCandidates = maxCandidates
+        self.minHeight = minHeight
+        self.minSideLen = minSideLen
+        self.maxSideLen = maxSideLen
+        self.widthHeightRatio = widthHeightRatio
     }
 
     
@@ -2273,32 +1861,40 @@ public struct PostprocessRunOptions: Equatable, Hashable {
 }
 
 #if compiler(>=6)
-extension PostprocessRunOptions: Sendable {}
+extension PostDetectionOptions: Sendable {}
 #endif
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PostprocessRunOptions {
+public struct FfiConverterTypePostDetectionOptions: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PostDetectionOptions {
         return
-            try PostprocessRunOptions(
+            try PostDetectionOptions(
                 threshold: FfiConverterOptionFloat.read(from: &buf), 
                 boxThreshold: FfiConverterOptionFloat.read(from: &buf), 
-                maxCandidates: FfiConverterOptionInt32.read(from: &buf), 
                 unclipRatio: FfiConverterOptionFloat.read(from: &buf), 
                 useDilation: FfiConverterOptionBool.read(from: &buf), 
-                scoreMode: FfiConverterOptionString.read(from: &buf)
+                scoreMode: FfiConverterOptionString.read(from: &buf), 
+                maxCandidates: FfiConverterOptionInt32.read(from: &buf), 
+                minHeight: FfiConverterOptionFloat.read(from: &buf), 
+                minSideLen: FfiConverterOptionFloat.read(from: &buf), 
+                maxSideLen: FfiConverterOptionFloat.read(from: &buf), 
+                widthHeightRatio: FfiConverterOptionFloat.read(from: &buf)
         )
     }
 
-    public static func write(_ value: PostprocessRunOptions, into buf: inout [UInt8]) {
+    public static func write(_ value: PostDetectionOptions, into buf: inout [UInt8]) {
         FfiConverterOptionFloat.write(value.threshold, into: &buf)
         FfiConverterOptionFloat.write(value.boxThreshold, into: &buf)
-        FfiConverterOptionInt32.write(value.maxCandidates, into: &buf)
         FfiConverterOptionFloat.write(value.unclipRatio, into: &buf)
         FfiConverterOptionBool.write(value.useDilation, into: &buf)
         FfiConverterOptionString.write(value.scoreMode, into: &buf)
+        FfiConverterOptionInt32.write(value.maxCandidates, into: &buf)
+        FfiConverterOptionFloat.write(value.minHeight, into: &buf)
+        FfiConverterOptionFloat.write(value.minSideLen, into: &buf)
+        FfiConverterOptionFloat.write(value.maxSideLen, into: &buf)
+        FfiConverterOptionFloat.write(value.widthHeightRatio, into: &buf)
     }
 }
 
@@ -2306,15 +1902,232 @@ public struct FfiConverterTypePostprocessRunOptions: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypePostprocessRunOptions_lift(_ buf: RustBuffer) throws -> PostprocessRunOptions {
-    return try FfiConverterTypePostprocessRunOptions.lift(buf)
+public func FfiConverterTypePostDetectionOptions_lift(_ buf: RustBuffer) throws -> PostDetectionOptions {
+    return try FfiConverterTypePostDetectionOptions.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypePostprocessRunOptions_lower(_ value: PostprocessRunOptions) -> RustBuffer {
-    return FfiConverterTypePostprocessRunOptions.lower(value)
+public func FfiConverterTypePostDetectionOptions_lower(_ value: PostDetectionOptions) -> RustBuffer {
+    return FfiConverterTypePostDetectionOptions.lower(value)
+}
+
+
+/**
+ * Post-recognition confidence score filtering.
+ */
+public struct PostRecognitionOptions: Equatable, Hashable {
+    /**
+     * Minimum recognition confidence score threshold [0.0 - 1.0].
+     */
+    public var scoreThreshold: Float?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Minimum recognition confidence score threshold [0.0 - 1.0].
+         */scoreThreshold: Float?) {
+        self.scoreThreshold = scoreThreshold
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PostRecognitionOptions: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePostRecognitionOptions: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PostRecognitionOptions {
+        return
+            try PostRecognitionOptions(
+                scoreThreshold: FfiConverterOptionFloat.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PostRecognitionOptions, into buf: inout [UInt8]) {
+        FfiConverterOptionFloat.write(value.scoreThreshold, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePostRecognitionOptions_lift(_ buf: RustBuffer) throws -> PostRecognitionOptions {
+    return try FfiConverterTypePostRecognitionOptions.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePostRecognitionOptions_lower(_ value: PostRecognitionOptions) -> RustBuffer {
+    return FfiConverterTypePostRecognitionOptions.lower(value)
+}
+
+
+/**
+ * Pre-detection image conditioning and resolution optimization options.
+ */
+public struct PreDetectionOptions: Equatable, Hashable {
+    /**
+     * Descreen filtering strength (0.0 - 1.0).
+     */
+    public var descreenStrength: Float?
+    /**
+     * Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
+     */
+    public var targetMaxSide: UInt32?
+    /**
+     * Horizontal padding around bounding box crops in pixels.
+     */
+    public var cropPaddingX: Float?
+    /**
+     * Vertical padding around bounding box crops in pixels.
+     */
+    public var cropPaddingY: Float?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Descreen filtering strength (0.0 - 1.0).
+         */descreenStrength: Float?, 
+        /**
+         * Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
+         */targetMaxSide: UInt32?, 
+        /**
+         * Horizontal padding around bounding box crops in pixels.
+         */cropPaddingX: Float?, 
+        /**
+         * Vertical padding around bounding box crops in pixels.
+         */cropPaddingY: Float?) {
+        self.descreenStrength = descreenStrength
+        self.targetMaxSide = targetMaxSide
+        self.cropPaddingX = cropPaddingX
+        self.cropPaddingY = cropPaddingY
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PreDetectionOptions: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePreDetectionOptions: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PreDetectionOptions {
+        return
+            try PreDetectionOptions(
+                descreenStrength: FfiConverterOptionFloat.read(from: &buf), 
+                targetMaxSide: FfiConverterOptionUInt32.read(from: &buf), 
+                cropPaddingX: FfiConverterOptionFloat.read(from: &buf), 
+                cropPaddingY: FfiConverterOptionFloat.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PreDetectionOptions, into buf: inout [UInt8]) {
+        FfiConverterOptionFloat.write(value.descreenStrength, into: &buf)
+        FfiConverterOptionUInt32.write(value.targetMaxSide, into: &buf)
+        FfiConverterOptionFloat.write(value.cropPaddingX, into: &buf)
+        FfiConverterOptionFloat.write(value.cropPaddingY, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePreDetectionOptions_lift(_ buf: RustBuffer) throws -> PreDetectionOptions {
+    return try FfiConverterTypePreDetectionOptions.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePreDetectionOptions_lower(_ value: PreDetectionOptions) -> RustBuffer {
+    return FfiConverterTypePreDetectionOptions.lower(value)
+}
+
+
+/**
+ * Pre-recognition text line/word clustering tolerances.
+ */
+public struct PreRecognitionOptions: Equatable, Hashable {
+    /**
+     * Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
+     */
+    public var lineYThreshold: Float?
+    /**
+     * Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
+     */
+    public var wordXThreshold: Float?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
+         */lineYThreshold: Float?, 
+        /**
+         * Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
+         */wordXThreshold: Float?) {
+        self.lineYThreshold = lineYThreshold
+        self.wordXThreshold = wordXThreshold
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension PreRecognitionOptions: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypePreRecognitionOptions: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PreRecognitionOptions {
+        return
+            try PreRecognitionOptions(
+                lineYThreshold: FfiConverterOptionFloat.read(from: &buf), 
+                wordXThreshold: FfiConverterOptionFloat.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: PreRecognitionOptions, into buf: inout [UInt8]) {
+        FfiConverterOptionFloat.write(value.lineYThreshold, into: &buf)
+        FfiConverterOptionFloat.write(value.wordXThreshold, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePreRecognitionOptions_lift(_ buf: RustBuffer) throws -> PreRecognitionOptions {
+    return try FfiConverterTypePreRecognitionOptions.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypePreRecognitionOptions_lower(_ value: PreRecognitionOptions) -> RustBuffer {
+    return FfiConverterTypePreRecognitionOptions.lower(value)
 }
 
 
@@ -2404,6 +2217,65 @@ public func FfiConverterTypeRecognitionConfig_lift(_ buf: RustBuffer) throws -> 
 #endif
 public func FfiConverterTypeRecognitionConfig_lower(_ value: RecognitionConfig) -> RustBuffer {
     return FfiConverterTypeRecognitionConfig.lower(value)
+}
+
+
+/**
+ * Text recognition inference parameters.
+ */
+public struct RecognitionRunOptions: Equatable, Hashable {
+    /**
+     * Recognition batch size. Default: 10.
+     */
+    public var batchSize: Int32?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Recognition batch size. Default: 10.
+         */batchSize: Int32?) {
+        self.batchSize = batchSize
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RecognitionRunOptions: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRecognitionRunOptions: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RecognitionRunOptions {
+        return
+            try RecognitionRunOptions(
+                batchSize: FfiConverterOptionInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RecognitionRunOptions, into buf: inout [UInt8]) {
+        FfiConverterOptionInt32.write(value.batchSize, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRecognitionRunOptions_lift(_ buf: RustBuffer) throws -> RecognitionRunOptions {
+    return try FfiConverterTypeRecognitionRunOptions.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRecognitionRunOptions_lower(_ value: RecognitionRunOptions) -> RustBuffer {
+    return FfiConverterTypeRecognitionRunOptions.lower(value)
 }
 
 
@@ -2582,85 +2454,6 @@ public func FfiConverterTypeUnwarpConfig_lift(_ buf: RustBuffer) throws -> Unwar
 #endif
 public func FfiConverterTypeUnwarpConfig_lower(_ value: UnwarpConfig) -> RustBuffer {
     return FfiConverterTypeUnwarpConfig.lower(value)
-}
-
-
-/**
- * Unwarped image result with raw RGB8 pixel buffer and dimensions.
- */
-public struct UnwarpedImageResult: Equatable, Hashable {
-    /**
-     * Interleaved 24-bit RGB pixel bytes.
-     */
-    public var pixels: Data
-    /**
-     * Image width in pixels.
-     */
-    public var width: UInt32
-    /**
-     * Image height in pixels.
-     */
-    public var height: UInt32
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(
-        /**
-         * Interleaved 24-bit RGB pixel bytes.
-         */pixels: Data, 
-        /**
-         * Image width in pixels.
-         */width: UInt32, 
-        /**
-         * Image height in pixels.
-         */height: UInt32) {
-        self.pixels = pixels
-        self.width = width
-        self.height = height
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension UnwarpedImageResult: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeUnwarpedImageResult: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UnwarpedImageResult {
-        return
-            try UnwarpedImageResult(
-                pixels: FfiConverterData.read(from: &buf), 
-                width: FfiConverterUInt32.read(from: &buf), 
-                height: FfiConverterUInt32.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: UnwarpedImageResult, into buf: inout [UInt8]) {
-        FfiConverterData.write(value.pixels, into: &buf)
-        FfiConverterUInt32.write(value.width, into: &buf)
-        FfiConverterUInt32.write(value.height, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeUnwarpedImageResult_lift(_ buf: RustBuffer) throws -> UnwarpedImageResult {
-    return try FfiConverterTypeUnwarpedImageResult.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeUnwarpedImageResult_lower(_ value: UnwarpedImageResult) -> RustBuffer {
-    return FfiConverterTypeUnwarpedImageResult.lower(value)
 }
 
 // Note that we don't yet support `indirect` for enums.
@@ -2973,6 +2766,10 @@ public enum OutputGranularity: Equatable, Hashable {
      * Reconstruct a 2D spatial text layout preserving visual arrangement.
      */
     case spatial
+    /**
+     * Export formatted TSV (tab-separated values).
+     */
+    case tsv
 
 
 
@@ -3000,6 +2797,8 @@ public struct FfiConverterTypeOutputGranularity: FfiConverterRustBuffer {
         
         case 3: return .spatial
         
+        case 4: return .tsv
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -3018,6 +2817,10 @@ public struct FfiConverterTypeOutputGranularity: FfiConverterRustBuffer {
         
         case .spatial:
             writeInt(&buf, Int32(3))
+        
+        
+        case .tsv:
+            writeInt(&buf, Int32(4))
         
         }
     }
@@ -3276,30 +3079,6 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionTypeCalibrationOptions: FfiConverterRustBuffer {
-    typealias SwiftType = CalibrationOptions?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeCalibrationOptions.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeCalibrationOptions.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterOptionTypeClassificationConfig: FfiConverterRustBuffer {
     typealias SwiftType = ClassificationConfig?
 
@@ -3396,30 +3175,6 @@ fileprivate struct FfiConverterOptionTypeLayoutConfig: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionTypeOptimizationOptions: FfiConverterRustBuffer {
-    typealias SwiftType = OptimizationOptions?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeOptimizationOptions.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeOptimizationOptions.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterOptionTypeOrientationConfig: FfiConverterRustBuffer {
     typealias SwiftType = OrientationConfig?
 
@@ -3444,8 +3199,8 @@ fileprivate struct FfiConverterOptionTypeOrientationConfig: FfiConverterRustBuff
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionTypePostprocessRunOptions: FfiConverterRustBuffer {
-    typealias SwiftType = PostprocessRunOptions?
+fileprivate struct FfiConverterOptionTypePostDetectionOptions: FfiConverterRustBuffer {
+    typealias SwiftType = PostDetectionOptions?
 
     public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
@@ -3453,13 +3208,85 @@ fileprivate struct FfiConverterOptionTypePostprocessRunOptions: FfiConverterRust
             return
         }
         writeInt(&buf, Int8(1))
-        FfiConverterTypePostprocessRunOptions.write(value, into: &buf)
+        FfiConverterTypePostDetectionOptions.write(value, into: &buf)
     }
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
-        case 1: return try FfiConverterTypePostprocessRunOptions.read(from: &buf)
+        case 1: return try FfiConverterTypePostDetectionOptions.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypePostRecognitionOptions: FfiConverterRustBuffer {
+    typealias SwiftType = PostRecognitionOptions?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypePostRecognitionOptions.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypePostRecognitionOptions.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypePreDetectionOptions: FfiConverterRustBuffer {
+    typealias SwiftType = PreDetectionOptions?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypePreDetectionOptions.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypePreDetectionOptions.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypePreRecognitionOptions: FfiConverterRustBuffer {
+    typealias SwiftType = PreRecognitionOptions?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypePreRecognitionOptions.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypePreRecognitionOptions.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -3484,6 +3311,30 @@ fileprivate struct FfiConverterOptionTypeRecognitionConfig: FfiConverterRustBuff
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeRecognitionConfig.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeRecognitionRunOptions: FfiConverterRustBuffer {
+    typealias SwiftType = RecognitionRunOptions?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRecognitionRunOptions.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRecognitionRunOptions.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -3614,31 +3465,6 @@ fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterSequenceTypeLayoutRegion: FfiConverterRustBuffer {
-    typealias SwiftType = [LayoutRegion]
-
-    public static func write(_ value: [LayoutRegion], into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        for item in value {
-            FfiConverterTypeLayoutRegion.write(item, into: &buf)
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [LayoutRegion] {
-        let len: Int32 = try readInt(&buf)
-        var seq = [LayoutRegion]()
-        seq.reserveCapacity(Int(len))
-        for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeLayoutRegion.read(from: &buf))
-        }
-        return seq
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterSequenceTypePoint2D: FfiConverterRustBuffer {
     typealias SwiftType = [Point2D]
 
@@ -3725,16 +3551,6 @@ public func defaultOcrRunOptions() -> OcrRunOptions  {
 })
 }
 /**
- * Downloads all available canonical models to the cache directory ahead of time.
- */
-public func downloadAllModels(cacheDir: String?)throws  -> [String]  {
-    return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypeRustoBindingError_lift) {
-    uniffi_rusto_fn_func_download_all_models(
-        FfiConverterOptionString.lower(cacheDir),$0
-    )
-})
-}
-/**
  * Downloads model assets for a specific OCR pipeline ahead of time.
  */
 public func downloadModel(model: String?, lang: String?, cacheDir: String?)throws  -> [String]  {
@@ -3771,52 +3587,40 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_rusto_checksum_func_create_initialize_config_for_model() != 37532) {
+    if (uniffi_rusto_checksum_func_create_initialize_config_for_model() != 11653) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_func_create_initialize_config_indra() != 37620) {
+    if (uniffi_rusto_checksum_func_create_initialize_config_indra() != 43664) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 42085) {
+    if (uniffi_rusto_checksum_func_create_initialize_config_ppv6() != 1547) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_func_default_ocr_run_options() != 50314) {
+    if (uniffi_rusto_checksum_func_default_ocr_run_options() != 35678) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_func_download_all_models() != 11564) {
+    if (uniffi_rusto_checksum_func_download_model() != 53186) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_func_download_model() != 15041) {
+    if (uniffi_rusto_checksum_func_rusto_version() != 28570) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_func_rusto_version() != 3477) {
+    if (uniffi_rusto_checksum_method_rusto_detect_text() != 15124) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_method_rusto_detect_layout() != 43417) {
+    if (uniffi_rusto_checksum_method_rusto_detect_text_rgb() != 18449) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_method_rusto_detect_layout_rgb() != 59477) {
+    if (uniffi_rusto_checksum_method_rusto_is_ready() != 31182) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_method_rusto_detect_text() != 5963) {
+    if (uniffi_rusto_checksum_method_rusto_version() != 54110) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_method_rusto_detect_text_rgb() != 9991) {
+    if (uniffi_rusto_checksum_constructor_rusto_initialize() != 11054) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_rusto_checksum_method_rusto_unwarp_image() != 24978) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_rusto_checksum_method_rusto_unwarp_image_rgb() != 44077) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_rusto_checksum_method_rusto_version() != 31217) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_rusto_checksum_constructor_rusto_initialize() != 41233) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_rusto_checksum_constructor_rusto_initialize_from_json() != 40384) {
+    if (uniffi_rusto_checksum_constructor_rusto_initialize_from_json() != 53393) {
         return InitializationResult.apiChecksumMismatch
     }
 

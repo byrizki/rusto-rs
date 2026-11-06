@@ -1,61 +1,105 @@
-# Examples
+# RustO! Examples
 
-This directory contains example applications demonstrating various features of RustO!
+This directory (alongside SDK `example/` apps under `packages/`) showcases **RustO! v0.4.0** across Rust, .NET, React Native, Flutter, and Dart using standalone **`.rten`** models and zero-config **Indra OCR** auto-downloading.
 
-## Document Pipeline Demo
+## Overview of Example Projects
 
-**File:** `doc_pipeline_demo.rs`
+| Example | Location | Description |
+| :--- | :--- | :--- |
+| **Rust Core Examples** | `examples/*.rs` | Direct `rusto` Rust crate examples (calibration/optimization, spatial layout, document layout + table pipeline, performance benchmarks) |
+| **.NET Console & Smoke Suite** | [`examples/dotnet`](./dotnet/README.md) | C# / .NET consumer app demonstrating `RustO.Initialize()`, fluent `.AsLines().Run()` / `.AsSpatial().Run()`, and offline `.rten` models |
+| **React Native (New Architecture)** | [`examples/react-native-new-arch`](./react-native-new-arch/README.md) | React Native TurboModule / Fabric verification app using `@rustors/react-native` |
+| **React Native (Legacy Bridge)** | [`examples/react-native-legacy`](./react-native-legacy/README.md) | React Native Classic Architecture verification app using `@rustors/react-native` |
+| **React Native Bare / Expo Dev Build** | `packages/react-native/example` | Interactive bare React Native showcase (also compatible with Expo Development Builds via `npx expo prebuild`) |
+| **Flutter Mobile & Desktop App** | [`packages/flutter/example`](../packages/flutter/example) | Full Flutter verification app demonstrating `rusto_flutter`, bundled `.rten` assets, structured detection, and 2D spatial layout |
+| **Dart CLI Example** | [`packages/dart/example`](../packages/dart/example) | Standalone Dart FFI command-line example using `RustO.initialize()` and fluent `.asLines().run()` / `.asSpatial().run()` |
 
-Demonstrates the full document processing pipeline with layout analysis and OCR.
+---
 
-### Features
-- Layout detection using PP-DocLayout models from RapidDoc
-- Text recognition using PaddleOCR models
-- Markdown output generation
-- Support for multiple layout element types
+## Model Assets (`.rten` & Zero-Config Auto-Download)
 
-### Usage
+In **RustO! v0.4.0**, all high-level SDKs default to the **Indra OCR** (`indraocr`) `.rten` pipeline and automatically download missing `.rten` models into your local cache directory (`~/.cache/rusto/models` or `$RUSTO_CACHE_DIR`) on first run.
+
+To pre-download standalone `.rten` models locally for offline examples or Rust CLI demos:
 
 ```bash
-cargo run --example doc_pipeline_demo -- \
-  --image path/to/document.jpg \
-  --layout-model models/DocOCR/layout.onnx \
-  --det-model models/PPOCR_v5/det.onnx \
-  --rec-model models/PPOCR_v5/rec.onnx \
-  --keys-path models/PPOCR_v5/dict.txt
+bash docs/scripts/download-models.sh
 ```
 
-### Arguments
+Or download specific `.rten` files from [Hugging Face (`byrizki/rten-models`)](https://huggingface.co/byrizki/rten-models) or the [`models-rten-v0.4.0` GitHub Release](https://github.com/byrizki/rusto-rs/releases/tag/models-rten-v0.4.0).
 
-- `--image`: Path to the input document image
-- `--layout-model`: Path to the layout detection model (default: `models/DocOCR/layout.onnx`)
-- `--det-model`: Path to the text detection model (default: `models/PPOCR_v5/det.onnx`)
-- `--rec-model`: Path to the text recognition model (default: `models/PPOCR_v5/rec.onnx`)
-- `--keys-path`: Path to the character dictionary (default: `models/PPOCR_v5/dict.txt`)
+---
 
-### Output
+## Running the Examples
 
-The example generates markdown-formatted output with:
-- `# Title` for titles
-- `**Header**` for headers
-- `*Caption*` for figure/table captions
-- Plain text for body text
-- Placeholder indicators for figures and tables
+### 1. Rust Core Examples (`examples/*.rs`)
 
-### Required Models
+Run from the repository root:
 
-You need to download the following models:
+```bash
+# PP-OCRv6 Tiny with built-in calibration & optimization (.rten models)
+cargo run --release --example optimized_ocr_demo
 
-1. **Layout Model** (`layout.onnx`):
-   - Place in `models/DocOCR/`
+# 2D spatial layout reconstruction
+cargo run --release --example spatial_export
 
-2. **Detection Model** (`det.onnx` or `det.rten`):
-   - Download using `bash scripts/download_models.sh`
+# Full document layout & Markdown export demo
+cargo run --release --example doc_pipeline_demo -- \
+  --image path/to/document.jpg \
+  --layout-model models/layout/layout_cdla.rten \
+  --det-model models/indra/indra_det.rten \
+  --rec-model models/indra/indra_rec.rten \
+  --keys-path models/indra/indra_meta.json
+```
 
-3. **Recognition Model** (`rec.onnx` or `rec.rten`):
-   - Download using `bash scripts/download_models.sh`
+Other Rust examples in `examples/`: `ocr_with_fixes.rs`, `ocr_without_fixes.rs`, `test_layout_simple.rs`, `perf_test.rs`, and `raw_ocr.rs`.
 
-4. **Dictionary** (`dict.txt`):
-   - Included with model downloads
+### 2. .NET Consumer Example (`examples/dotnet`)
 
-See the main [README.md](../README.md) for model conversion instructions.
+```bash
+# Build native FFI library first when testing from source
+cargo build --release -p rusto-ffi
+
+cd examples/dotnet
+dotnet run --project RustOConsumer
+```
+
+Inside C#, the consumer uses the v0.4.0 fluent API:
+
+```csharp
+using var ocr = RustO.Initialize();
+var lines = ocr.DetectText("invoice.png").WithAutoUnwarp().WithLayoutReading().AsLines().Run();
+var spatial = ocr.DetectText("invoice.png").AsSpatial().Run();
+```
+
+### 3. React Native Bare & Architecture Examples
+
+- **Bare Showcase (`packages/react-native/example`)**:
+  ```bash
+  cd packages/react-native/example
+  yarn install
+  yarn android   # or: cd ios && pod install && cd .. && yarn ios
+  ```
+- **New Architecture (`examples/react-native-new-arch`) & Legacy (`examples/react-native-legacy`)**:
+  See [`examples/react-native-new-arch/README.md`](./react-native-new-arch/README.md) and [`examples/react-native-legacy/README.md`](./react-native-legacy/README.md) for automated Android/iOS E2E verification scripts.
+- **Expo Projects (Development Builds)**:
+  Because `@rustors/react-native` links compiled Rust native libraries (`rusto-android` AAR & `RustO.xcframework`), Expo Go is not supported. In an Expo app, install `@rustors/react-native`, generate native directories with `npx expo prebuild`, and launch with `npx expo run:android` or `npx expo run:ios` — zero-config `await initialize()` works out of the box.
+
+### 4. Flutter Example (`packages/flutter/example`)
+
+```bash
+cd packages/flutter/example
+flutter pub get
+flutter run
+```
+
+Demonstrates `RustO.initialize(...)` from `package:rusto_flutter/rusto_flutter.dart`, bundled `assets/models/*.rten` extraction, `.asLines().run()`, `.asSpatial().run()`, and `engine.close()`.
+
+### 5. Dart CLI Example (`packages/dart/example`)
+
+```bash
+cargo build --release -p rusto-ffi
+cd packages/dart/example
+dart pub get
+dart run main.dart
+```

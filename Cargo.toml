@@ -3,7 +3,7 @@ members = [".", "crates/rusto-core", "crates/rusto-cpp", "crates/rusto-nn", "cra
 
 [package]
 name = "rusto-rs"
-version = "0.3.2"
+version = "0.4.0"
 edition = "2021"
 description = "RustO! - Pure Rust OCR library based on RapidOCR with PaddleOCR engine"
 license = "MIT"
@@ -15,7 +15,6 @@ include = [
     "/Cargo.toml",
     "/README.md",
     "/include/rusto.h",
-    "/docs/decoded-rgb.md",
     "/LICENSE*",
     "/CHANGELOG.md"
 ]
@@ -40,15 +39,15 @@ nalgebra = "0.33"
 
 # Optional OpenCV / C++ backend
 opencv = { version = "0.97.2", optional = true }
-rusto-cpp = { path = "crates/rusto-cpp", version = "0.3.2", optional = true }
+rusto-cpp = { path = "crates/rusto-cpp", version = "0.4.0", optional = true }
 
 # Pure Rust inference engines
-rusto-core = { path = "crates/rusto-core", version = "0.3.2" }
-rusto-nn = { path = "crates/rusto-nn", version = "0.3.2" }
-rusto-rten = { path = "crates/rusto-rten", version = "0.3.2", optional = true }
-rusto-nn-webgpu = { path = "crates/rusto-nn-webgpu", version = "0.3.2", optional = true }
-rusto-nn-cuda = { path = "crates/rusto-nn-cuda", version = "0.3.2", optional = true }
-rusto-mnn = { path = "crates/rusto-mnn", version = "0.3.2", optional = true }
+rusto-core = { path = "crates/rusto-core", version = "0.4.0" }
+rusto-nn = { path = "crates/rusto-nn", version = "0.4.0" }
+rusto-rten = { path = "crates/rusto-rten", version = "0.4.0", optional = true }
+rusto-nn-webgpu = { path = "crates/rusto-nn-webgpu", version = "0.4.0", optional = true }
+rusto-nn-cuda = { path = "crates/rusto-nn-cuda", version = "0.4.0", optional = true }
+rusto-mnn = { path = "crates/rusto-mnn", version = "0.4.0", optional = true }
 
 # Model auto-download and caching
 ureq = { version = "2.10", default-features = false, features = ["tls"] }
@@ -59,7 +58,7 @@ uniffi = { version = "0.31.0", default-features = false, optional = true }
 cbindgen = { version = "0.28", default-features = false, optional = true }
 
 [[bin]]
-name = "rusto-rs"
+name = "rusto"
 path = "src/main.rs"
 
 [[bin]]

@@ -1,6 +1,6 @@
 {
   "name": "rusto-react-native-new-arch-example",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "android": "react-native run-android",

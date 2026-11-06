@@ -14,8 +14,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let result = ocr.detect_text(
         &ImageSource::Path("models/test_images/example1.png".into()),
         &OcrRunOptions {
-            classification: Some(true),
-            orientation: Some(true),
+            line_classification: Some(true),
+            orientation_detection: Some(true),
             ..Default::default()
         },
     )?;

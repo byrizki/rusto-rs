@@ -33,17 +33,7 @@ def get_current_lib_version() -> str:
         raise ValueError(f"Could not determine current version from {cargo_toml}")
     return match.group(1)
 
-def get_current_models_version() -> str:
-    models_file = REPO_ROOT / "MODELS_VERSION"
-    if models_file.exists():
-        val = models_file.read_text(encoding="utf-8").strip()
-        if val:
-            return val
-    return get_current_lib_version()
-
-def get_current_version(target: str = "lib") -> str:
-    if target == "models":
-        return get_current_models_version()
+def get_current_version() -> str:
     return get_current_lib_version()
 
 def parse_new_version(current_ver: str, bump_arg: str) -> str:
@@ -656,7 +646,7 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         dry_run,
         staged_files
     )
-    for pkg in ["rusto-nn", "rusto-rten", "rusto-nn-webgpu", "rusto-nn-cuda", "rusto-mnn"]:
+    for pkg in ["rusto-core", "rusto-cpp", "rusto-nn", "rusto-rten", "rusto-nn-webgpu", "rusto-nn-cuda", "rusto-mnn"]:
         replace_in_file(
             REPO_ROOT / "Cargo.toml",
             rf'({pkg}\s*=\s*\{{[^}}]*\bversion\s*=\s*")[^"]+(")',
@@ -667,7 +657,7 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         )
 
     # 2. Workspace crates Cargo.toml
-    for crate_dir in ["rten-wasm", "rusto-node", "rusto-nn", "rusto-rten", "rusto-nn-webgpu", "rusto-nn-cuda", "rusto-mnn"]:
+    for crate_dir in ["rusto-core", "rusto-cpp", "rten-wasm", "rusto-node", "rusto-nn", "rusto-rten", "rusto-nn-webgpu", "rusto-nn-cuda", "rusto-mnn"]:
         crate_cargo = REPO_ROOT / "crates" / crate_dir / "Cargo.toml"
         if crate_cargo.exists():
             replace_in_file(
@@ -677,14 +667,15 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
                 dry_run,
                 staged_files
             )
-            replace_in_file(
-                crate_cargo,
-                r'(rusto-nn\s*=\s*\{[^}]*\bversion\s*=\s*")[^"]+(")',
-                rf'\g<1>{new_ver}\g<2>',
-                dry_run,
-                staged_files,
-                warn_if_not_found=False
-            )
+            for dep_pkg in ["rusto-nn", "rusto-core", "rusto-cpp"]:
+                replace_in_file(
+                    crate_cargo,
+                    rf'({dep_pkg}\s*=\s*\{{[^}}]*\bversion\s*=\s*")[^"]+(")',
+                    rf'\g<1>{new_ver}\g<2>',
+                    dry_run,
+                    staged_files,
+                    warn_if_not_found=False
+                )
     
     # 4. packages/android/gradle.properties (VERSION_NAME only, not MODELS_VERSION_NAME)
     replace_in_file(
@@ -1039,64 +1030,6 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
 
     return staged_files
 
-def _update_docs_model_links(new_ver: str, dry_run: bool, staged_files: Set[Path]) -> None:
-    docs_content = REPO_ROOT / "docs" / "content"
-    if not docs_content.exists():
-        return
-    pattern = r'(https://github\.com/byrizki/rusto-rs/releases/download/models-rten-v)[0-9A-Za-z.-]+(/)'
-    for doc_file in docs_content.rglob("*.md"):
-        replace_in_file(doc_file, pattern, rf'\g<1>{new_ver}\g<2>', dry_run, staged_files, warn_if_not_found=False)
-
-def update_models_files(new_ver: str, current_ver: str = "", dry_run: bool = False) -> Set[Path]:
-    print(f"\nUpdating OCR models version to '{new_ver}' across repository files...")
-    staged_files: Set[Path] = set()
-
-    # 1. MODELS_VERSION file
-    models_ver_file = REPO_ROOT / "MODELS_VERSION"
-    if not dry_run:
-        models_ver_file.write_text(f"{new_ver}\n", encoding="utf-8")
-    if staged_files is not None:
-        staged_files.add(models_ver_file)
-    print(f"  [OK] Updated MODELS_VERSION to {new_ver}")
-
-    # 2. crates/rusto-core/src/models.rs (DEFAULT_MODELS_TAG)
-    replace_in_file(
-        REPO_ROOT / "crates" / "rusto-core" / "src" / "models.rs",
-        r'(pub const DEFAULT_MODELS_TAG:\s*&str\s*=\s*"models-rten-v)[^"]+(";)',
-        rf'\g<1>{new_ver}\g<2>',
-        dry_run,
-        staged_files
-    )
-
-    # 3. docs/scripts/download-models.sh (MODELS_TAG)
-    replace_in_file(
-        REPO_ROOT / "docs" / "scripts" / "download-models.sh",
-        r'(MODELS_TAG="\$\{MODELS_TAG:-models-rten-v)[^"}]+(\}")',
-        rf'\g<1>{new_ver}\g<2>',
-        dry_run,
-        staged_files
-    )
-
-    # 4. docs/utils/ocrReleaseModels.ts (DEFAULT_MODELS_TAG)
-    replace_in_file(
-        REPO_ROOT / "docs" / "utils" / "ocrReleaseModels.ts",
-        r"(export const DEFAULT_MODELS_TAG\s*=\s*'models-rten-v)[^']+(\';)",
-        rf"\g<1>{new_ver}\g<2>",
-        dry_run,
-        staged_files
-    )
-
-    # 5. Documentation guides for standalone release assets
-    _update_docs_model_links(new_ver, dry_run, staged_files)
-
-    return staged_files
-
-def update_all_files(new_ver: str, current_ver: str = "", dry_run: bool = False) -> Set[Path]:
-    staged = set()
-    staged.update(update_lib_files(new_ver, current_ver=current_ver, dry_run=dry_run))
-    staged.update(update_models_files(new_ver, current_ver=current_ver, dry_run=dry_run))
-    return staged
-
 def stage_git_files(files: Set[Path]):
     if not files:
         return
@@ -1116,12 +1049,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  ./bump_version.sh patch                 # 0.3.0 -> 0.3.1 (updates lib packages only)
-  ./bump_version.sh minor                 # 0.3.0 -> 0.4.0 (updates lib packages only)
-  ./bump_version.sh --models patch        # 0.3.0 -> 0.3.1 (updates OCR model packages only)
-  ./bump_version.sh --all patch           # 0.3.0 -> 0.3.1 (updates both lib and model packages)
-  ./bump_version.sh --git patch           # Bump lib, stage, commit, and tag 'v0.3.1'
-  ./bump_version.sh --models --git patch  # Bump models, stage, commit, and tag 'models-rten-v0.3.1'
+  ./bump_version.sh patch          # 0.3.0 -> 0.3.1
+  ./bump_version.sh minor          # 0.3.0 -> 0.4.0
+  ./bump_version.sh --git patch    # Bump, stage, commit, and tag 'v0.3.1'
   ./bump_version.sh --dry-run patch
   ./bump_version.sh --no-stage
         """
@@ -1131,27 +1061,6 @@ Examples:
         nargs="?",
         default="patch",
         help="Bump type ('patch', 'minor', 'major') or explicit version (e.g. '0.3.1'). Default: 'patch'"
-    )
-    parser.add_argument(
-        "--target",
-        choices=["lib", "models", "all"],
-        default="lib",
-        help="Target component to bump: 'lib' (default), 'models', or 'all'"
-    )
-    parser.add_argument(
-        "--lib",
-        action="store_true",
-        help="Bump library packages only (default)"
-    )
-    parser.add_argument(
-        "--models",
-        action="store_true",
-        help="Bump OCR model packages only"
-    )
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Bump both library and OCR model packages"
     )
     parser.add_argument(
         "--dry-run",
@@ -1181,36 +1090,12 @@ Examples:
         print(section)
         return
 
-    target = args.target
-    if args.models:
-        target = "models"
-    elif args.all:
-        target = "all"
-    elif args.lib:
-        target = "lib"
-
     try:
-        if target == "models":
-            current_ver = get_current_models_version()
-            new_ver = parse_new_version(current_ver, args.version)
-            print(f"Target          : OCR Models")
-            print(f"Current version : {current_ver}")
-            print(f"New version     : {new_ver}")
-        elif target == "all":
-            current_lib = get_current_lib_version()
-            new_lib = parse_new_version(current_lib, args.version)
-            current_models = get_current_models_version()
-            new_models = parse_new_version(current_models, args.version)
-            print(f"Target          : Libraries & OCR Models")
-            print(f"Current lib ver : {current_lib} -> {new_lib}")
-            print(f"Current mod ver : {current_models} -> {new_models}")
-            new_ver = new_lib
-        else:
-            current_ver = get_current_lib_version()
-            new_ver = parse_new_version(current_ver, args.version)
-            print(f"Target          : Libraries (core engine & bindings)")
-            print(f"Current version : {current_ver}")
-            print(f"New version     : {new_ver}")
+        current_ver = get_current_lib_version()
+        new_ver = parse_new_version(current_ver, args.version)
+        print(f"Target          : Libraries (core engine & bindings)")
+        print(f"Current version : {current_ver}")
+        print(f"New version     : {new_ver}")
     except ValueError as err:
         print(f"Error: {err}", file=sys.stderr)
         sys.exit(1)
@@ -1218,83 +1103,46 @@ Examples:
     if args.dry_run:
         print("Mode            : [DRY-RUN - No files will be modified]")
 
-    if target == "models":
-        modified_files = update_models_files(new_ver, current_ver=current_ver, dry_run=args.dry_run)
-    elif target == "all":
-        modified_files = set()
-        modified_files.update(update_lib_files(new_lib, current_ver=current_lib, dry_run=args.dry_run))
-        modified_files.update(update_models_files(new_models, current_ver=current_models, dry_run=args.dry_run))
-    else:
-        modified_files = update_lib_files(new_ver, current_ver=current_ver, dry_run=args.dry_run)
+    modified_files = update_lib_files(new_ver, current_ver=current_ver, dry_run=args.dry_run)
 
-    # Sync Cargo.lock if cargo is installed and library was bumped
-    if not args.dry_run and target in ("lib", "all"):
+    # Sync Cargo.lock if cargo is installed
+    if not args.dry_run:
         print("\nUpdating Cargo.lock...")
-        try:
-            subprocess.run(
-                ["cargo", "check", "--workspace"],
-                cwd=REPO_ROOT,
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+        result = subprocess.run(
+            ["cargo", "check", "--workspace"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print(f"  [WARN] cargo check --workspace exited with code {result.returncode}:", file=sys.stderr)
+            print(result.stderr.strip(), file=sys.stderr)
+        else:
             cargo_lock = REPO_ROOT / "Cargo.lock"
             if cargo_lock.exists():
                 modified_files.add(cargo_lock)
             print("  [OK] Cargo.lock updated.")
-        except Exception:
-            pass
 
     if not args.dry_run and not args.no_stage:
         stage_git_files(modified_files)
 
-    if target == "models":
-        print(f"\n✨ OCR models version bump to models-rten-v{new_ver} complete!")
-    elif target == "all":
-        print(f"\n✨ Full version bump complete (lib: v{new_lib}, models: models-rten-v{new_models})!")
-    else:
-        print(f"\n✨ Library version bump to v{new_ver} complete!")
+    print(f"\n✨ Library version bump to v{new_ver} complete!")
 
     if args.git and not args.dry_run:
-        print("\nCreating Git commit and tag(s)...")
-        if target == "models":
-            commit_msg = f"chore: release models-rten-v{new_ver}"
-            tag_name = f"models-rten-v{new_ver}"
-            subprocess.run(["git", "commit", "-m", commit_msg], cwd=REPO_ROOT, check=True)
-            subprocess.run(["git", "tag", "-a", tag_name, "-m", f"Release {tag_name}"], cwd=REPO_ROOT, check=True)
-            print(f"  [OK] Created commit: '{commit_msg}'")
-            print(f"  [OK] Created git tag: '{tag_name}'")
-        elif target == "all":
-            commit_msg = f"chore: release v{new_lib} & models-rten-v{new_models}"
-            subprocess.run(["git", "commit", "-m", commit_msg], cwd=REPO_ROOT, check=True)
-            tag_lib = f"v{new_lib}"
-            tag_models = f"models-rten-v{new_models}"
-            subprocess.run(["git", "tag", "-a", tag_lib, "-m", f"Release {tag_lib}"], cwd=REPO_ROOT, check=True)
-            subprocess.run(["git", "tag", "-a", tag_models, "-m", f"Release {tag_models}"], cwd=REPO_ROOT, check=True)
-            print(f"  [OK] Created commit: '{commit_msg}'")
-            print(f"  [OK] Created git tag: '{tag_lib}'")
-            print(f"  [OK] Created git tag: '{tag_models}'")
-        else:
-            commit_msg = f"chore: release v{new_ver}"
-            tag_name = f"v{new_ver}"
-            subprocess.run(["git", "commit", "-m", commit_msg], cwd=REPO_ROOT, check=True)
-            subprocess.run(["git", "tag", "-a", tag_name, "-m", f"Release {tag_name}"], cwd=REPO_ROOT, check=True)
-            print(f"  [OK] Created commit: '{commit_msg}'")
-            print(f"  [OK] Created git tag: '{tag_name}'")
+        print("\nCreating Git commit and tag...")
+        commit_msg = f"chore: release v{new_ver}"
+        tag_name = f"v{new_ver}"
+        subprocess.run(["git", "commit", "-m", commit_msg], cwd=REPO_ROOT, check=True)
+        subprocess.run(["git", "tag", "-a", tag_name, "-m", f"Release {tag_name}"], cwd=REPO_ROOT, check=True)
+        print(f"  [OK] Created commit: '{commit_msg}'")
+        print(f"  [OK] Created git tag: '{tag_name}'")
         print("\nTo push changes and trigger CI/CD release:")
         print(f"  git push origin main --tags")
     elif not args.dry_run:
         print("\nSuggested next steps:")
-        if target == "models":
-            print(f'  git commit -m "chore: release models-rten-v{new_ver}"')
-            print(f'  git tag -a models-rten-v{new_ver} -m "Release models-rten-v{new_ver}"')
-        elif target == "all":
-            print(f'  git commit -m "chore: release v{new_lib} & models-rten-v{new_models}"')
-            print(f'  git tag -a v{new_lib} -m "Release v{new_lib}"')
-            print(f'  git tag -a models-rten-v{new_models} -m "Release models-rten-v{new_models}"')
-        else:
-            print(f'  git commit -m "chore: release v{new_ver}"')
-            print(f'  git tag -a v{new_ver} -m "Release v{new_ver}"')
+        print(f'  git commit -m "chore: release v{new_ver}"')
+        print(f'  git tag -a v{new_ver} -m "Release v{new_ver}"')
         print(f"  git push origin main --tags")
 
 if __name__ == "__main__":

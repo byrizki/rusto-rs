@@ -1,98 +1,147 @@
 # @rustors/react
 
-[![npm](https://img.shields.io/npm/v/@rustors/react.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/@rustors/react)
-[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-> Official React hooks, provider, and UI components for [RustO!](https://github.com/byrizki/rusto-rs)
-
-> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
+Official React hooks, context provider, and UI components for **RustO!** — client-side WebAssembly OCR powered by [`@rustors/web`](../web/README.md), Indra OCR, and PaddleOCR.
 
 ## Features
 
-- **Provider Lifecycle**: Engine initialization, status tracking (`idle`, `initializing`, `ready`, `error`), and error recovery with `<RustoProvider>`.
-- **Hooks**: `useRusto()` to access engine status, and `useOcr()` for running OCR and managing state (`isProcessing`, `results`, `spatialText`).
-- **Composite Components**: `<OcrOverlay>` for displaying interactive bounding boxes, and `<OcrDropzone>` for drag-and-drop scanning.
-- **Clean Architecture**: Functional logic is separated into testable services and hooks; components remain focused on presentation.
+- **Zero-Backend Privacy**: Runs OCR in the browser via WebAssembly + Web Workers (`@rustors/web`).
+- **Standalone `.rten` Model URLs**: Load `.rten` models directly from `public/models/`, your CDN, Hugging Face, or GitHub Releases — no npm model wrapper packages required.
+- **Indra OCR & PP-OCRv6 Presets**: Supports `'indra'` alongside `'ppv6'`, `'ppv5'`, `'ppv4'`, and `'ppv3'`, plus optional `unwarp`, `orientation`, `layout`, and `order` `.rten` models.
+- **Hooks & Ready-Made Components**: `<RustoProvider>`, `useOcr()`, `useRusto()`, `<OcrDropzone>`, `<OcrOverlay>`, and direct fluent `DetectTextBuilder` access (`.asLines().run()`, `.asWords().run()`, `.asSpatial().run()`).
 
 ## Installation
 
 ```bash
 npm install @rustors/react @rustors/web
 # or
-yarn add @rustors/react @rustors/web
-# or
 pnpm add @rustors/react @rustors/web
 ```
 
-## Quick Start
+## Configuring `.rten` Models with `<RustoProvider>`
 
-### 1. Wrap your application with `RustoProvider`
+Point `models` to standalone `.rten` URLs hosted in your app's `public/models/` folder, a CDN, Hugging Face (`https://huggingface.co/byrizki/rten-models/resolve/main`), or GitHub Releases (`https://github.com/byrizki/rusto-rs/releases/download/models-rten-v0.4.0`):
 
 ```tsx
-import React from 'react';
 import { RustoProvider } from '@rustors/react';
 
-const models = {
-  detection: '/models/ppocrv6-tiny/det.rten',
-  recognition: '/models/ppocrv6-tiny/rec.rten',
-  dictionary: '/models/ppocrv6-tiny/dict.txt',
-};
+const HF_BASE = 'https://huggingface.co/byrizki/rten-models/resolve/main';
 
 export function App() {
   return (
     <RustoProvider
       config={{
-        preset: 'ppv6',
-        models,
+        preset: 'indra', // or 'ppv6' for lightweight PP-OCRv6 Tiny
+        enableReadingOrder: true,
+        models: {
+          detection: `${HF_BASE}/indra_det.rten`,
+          recognition: `${HF_BASE}/indra_rec.rten`,
+          dictionary: `${HF_BASE}/indra_meta.json`,
+          // Optional auxiliary document models:
+          unwarp: `${HF_BASE}/uvdoc.rten`,
+          orientation: `${HF_BASE}/indra_orient.rten`,
+          layout: `${HF_BASE}/layout_cdla.rten`,
+          order: `${HF_BASE}/indra_order.rten`,
+        },
       }}
     >
-      <OcrScanner />
+      <InvoiceScanner />
     </RustoProvider>
   );
 }
 ```
 
-### 2. Scan and Display with Hooks & Overlay
+## Using the `useOcr` Hook & UI Components
 
 ```tsx
-import React, { useState } from 'react';
-import { useOcr, OcrOverlay, OcrDropzone } from '@rustors/react';
+import { useState } from 'react';
+import { OcrDropzone, OcrOverlay, useOcr, useRusto } from '@rustors/react';
 
-export function OcrScanner() {
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const { detect, results, isProcessing } = useOcr();
+export function InvoiceScanner() {
+  const { status } = useRusto();
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
-  const handleFileSelect = async (file: File) => {
-    setImageSrc(URL.createObjectURL(file));
+  const { detect, results, spatialText, isProcessing, error } = useOcr({
+    autoUnwarp: true,
+    layoutReading: true,
+    output: 'lines',
+  });
+
+  const handleFile = async (file: File) => {
+    setImageUrl(URL.createObjectURL(file));
     await detect(file);
   };
 
+  if (status !== 'ready') {
+    return <p>Loading OCR engine ({status})...</p>;
+  }
+
   return (
     <div>
-      <OcrDropzone onFileSelect={handleFileSelect} />
+      <OcrDropzone onFileAccepted={handleFile} disabled={isProcessing} />
+      {error && <p role="alert">{error.message}</p>}
 
-      {isProcessing && <p>Scanning document...</p>}
-
-      {imageSrc && results.length > 0 && (
-        <OcrOverlay
-          imageSrc={imageSrc}
-          results={results}
-          onItemClick={(item) => alert(`Clicked: ${item.text}`)}
-        />
+      {imageUrl && (
+        <div style={{ position: 'relative', display: 'inline-block' }}>
+          <img src={imageUrl} alt="Uploaded document" style={{ maxWidth: '100%' }} />
+          <OcrOverlay results={results} />
+        </div>
       )}
+
+      <ul>
+        {results.map((item, idx) => (
+          <li key={idx}>
+            [{item.score.toFixed(2)}] ({item.layout_type ?? 'line'} #{item.region_id ?? '-'}){' '}
+            {item.text}
+          </li>
+        ))}
+      </ul>
+
+      {spatialText && <pre>{spatialText}</pre>}
     </div>
   );
 }
 ```
 
-## 📖 Documentation
+## Direct Fluent Builder Access (`asLines` / `asWords` / `asSpatial`)
 
-For full documentation, guides, and API reference:
-- [React Guide](https://byrizki.com/rusto-rs/how-to/use-react)
-- [Full Documentation](https://byrizki.com/rusto-rs/)
+When you want chained fluent builder methods directly inside a component or custom hook, access the underlying `WebOcrEngine` via `useRusto()` (or import `detectText` from `@rustors/web`):
+
+```tsx
+import { useRusto } from '@rustors/react';
+
+export function useFluentScanner() {
+  const { service } = useRusto();
+
+  const scanInvoice = async (file: File) => {
+    const engine = service.getEngine();
+
+    // Line-level structured results with document unwarping & layout reading order
+    const lines = await engine
+      .detectText(file)
+      .withAutoUnwarp()
+      .withLayoutReading()
+      .asLines()
+      .run();
+
+    // 2D spatial plain-text layout
+    const spatial = await engine
+      .detectText(file)
+      .asSpatial()
+      .run();
+
+    return { lines, spatial };
+  };
+
+  return { scanInvoice };
+}
+```
+
+## Exported Utilities
+
+- **Hooks & Context**: `RustoProvider`, `RustoContext`, `useRusto`, `useOcr`
+- **Components**: `OcrDropzone`, `DropzonePrompt`, `DropzonePreview`, `OcrOverlay`, `BoundingBox`
+- **Formatters & Geometry**: `resultsToText`, `resultsToCsv`, `resultsToJson`, `scaleFrame`, `scaleQuad`, `calculateScale`
 
 ## License
 
-MIT License
-
+Apache-2.0 OR MIT

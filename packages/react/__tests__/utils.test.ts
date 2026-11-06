@@ -1,5 +1,5 @@
 import { calculateScale, scaleFrame, scaleQuad } from '../src/utils/geometry.js';
-import { resultsToCsv, resultsToJson, resultsToText } from '../src/utils/formatters.js';
+import { resultsToTsv, resultsToJson, resultsToText } from '../src/utils/formatters.js';
 import type { TextResult } from '@rustors/web';
 
 describe('@rustors/react utils', () => {
@@ -55,9 +55,9 @@ describe('@rustors/react utils', () => {
     const text = resultsToText(mockResults);
     expect(text).toBe('Invoice #123\nTotal: $42.00');
 
-    const csv = resultsToCsv(mockResults);
-    expect(csv).toContain('"Invoice #123",0.9921,0,0,10,10');
-    expect(csv).toContain('"Total: $42.00",0.9854,0,20,20,10');
+    const tsv = resultsToTsv(mockResults);
+    expect(tsv).toContain('Invoice #123\t0.9921\t0\t0\t10\t10');
+    expect(tsv).toContain('Total: $42.00\t0.9854\t0\t20\t20\t10');
 
     const json = resultsToJson(mockResults);
     const parsed = JSON.parse(json);

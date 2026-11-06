@@ -69,23 +69,6 @@ function resetOcrResultsState(state: OcrState) {
   state.ocrError.value = null;
 }
 
-async function loadEngineWeights(
-  baseURL: string,
-  modelMeta: OcrModelOption,
-  layoutModelId: LayoutModelId | undefined,
-  range: [number, number],
-  setProgress: ProgressCallback,
-  step?: ProgressStep
-) {
-  await loadAndInitModel(
-    baseURL,
-    modelMeta,
-    range,
-    (prog) => setProgress('download', prog.stageText, prog.percent, prog.detailText, step),
-    layoutModelId
-  );
-}
-
 async function runInitSequence(
   baseURL: string,
   modelMeta: OcrModelOption,
@@ -104,7 +87,13 @@ async function runInitSequence(
     'Connecting...',
     opts?.step
   );
-  await loadEngineWeights(baseURL, modelMeta, opts?.layoutModelId, range, setProgress, opts?.step);
+  await loadAndInitModel(
+    baseURL,
+    modelMeta,
+    range,
+    (prog) => setProgress('download', prog.stageText, prog.percent, prog.detailText, opts?.step),
+    opts?.layoutModelId
+  );
   setProgress(
     'init',
     'Configuring inference engine...',
@@ -161,13 +150,14 @@ async function executeModelInference(
   opts: ReturnType<typeof buildDetectTextOptions>;
 }> {
   setProgress('inference', 'Running OCR Inference...', step ? 75 : 25, 'Detecting...', step);
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, 20);
+  await new Promise<void>((r) => {
+    setTimeout(r, 20);
   });
   const startTime = performance.now();
   setProgress('inference', 'Running OCR Inference...', step ? 88 : 65, 'Decoding...', step);
   const opts = buildDetectTextOptions(ocrConfig, outputMode);
-  const output = await detectText(imageSrc, opts);
+  const builder = detectText(imageSrc).withOptions(opts);
+  const output = await (outputMode === 'words' ? builder.asWords() : builder.asLines()).run();
   const durationMs = Math.round(performance.now() - startTime);
   setProgress('inference', 'Finalizing OCR Output...', 100, 'Formatting...', step);
   return { output, durationMs, opts };
@@ -195,6 +185,7 @@ function applyProcessedPipelineOutput(
 ) {
   state.durationMs.value = res.durationMs;
   const isReadingOrderActive =
+    ctx.ocrConfig.value.layoutReading ||
     ctx.ocrConfig.value.enableReadingOrder ||
     (ctx.ocrConfig.value.layoutModel !== undefined && ctx.ocrConfig.value.layoutModel !== 'none');
   const processed = processOcrOutput(

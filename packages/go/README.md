@@ -1,85 +1,188 @@
-# rusto (Go Binding)
+# RustO! Go SDK (`rusto`)
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/byrizki/rusto-rs/packages/go.svg)](https://pkg.go.dev/github.com/byrizki/rusto-rs/packages/go)
-[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-High-performance, pure-Rust OCR engine bindings for Golang via Cgo.
-
-> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
+Official Go bindings (via Cgo) for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
 
 ## Features
 
-- **Native Cgo Bridge**: Direct in-memory C ABI bindings without subprocess overhead.
-- **Embedded Runtime Rpath**: Built-in dynamic linker configuration (`-Wl,-rpath`) for seamless runtime resolution.
-- **Structured & Spatial Results**: Line boxes, polygon coordinates, confidence scores, and physical text layouts.
-- **Thread Safe**: Concurrent recognition support with standard Go finalizers.
+- **Zero-Config Indra OCR**: `rusto.Initialize()` automatically downloads and caches the default `indraocr` `.rten` models on first run.
+- **Thread-Safe Native Handle**: Concurrent-safe `rusto.Engine` (`rusto.RustO`) synchronized with `sync.RWMutex` and deterministic `Close()`.
+- **Document Intelligence**: Enable UVDoc unwarping (`WithAutoUnwarp(true)`), 4-way orientation detection (`WithOrientationDetection(true)`), and neural reading-order recovery (`WithLayoutReading(true)`).
+- **Fluent Builder API**: Select `.AsLines()`, `.AsWords()`, `.AsSpatial()`, or `.WithOutput(...)` and execute with a single `.Run()` terminal call.
+- **Multiple Input Modes**: File paths, in-memory PNG/JPEG `[]byte` slices, or raw 24-bit interleaved RGB buffers via `.RGB(...)`.
 
-## Installation
+## Prerequisites & Installation
+
+Build or install the native `librusto` shared library (`librusto.so`, `librusto.dylib`, or `rusto.dll`) from the repository root:
+
+```bash
+cargo build --release -p rusto-ffi
+```
+
+Add the Go package to your module:
 
 ```bash
 go get github.com/byrizki/rusto-rs/packages/go
 ```
 
-Ensure `librusto.so` (Linux), `librusto.dylib` (macOS), or `librusto.dll` (Windows) is built and available.
+Ensure `librusto` is discoverable via your linker/runtime search path (for example `LD_LIBRARY_PATH` on Linux or `DYLD_LIBRARY_PATH` on macOS when running outside the monorepo).
 
-## Quick Start
+## Quick Start (Zero-Config)
 
 ```go
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 
-	"github.com/byrizki/rusto-rs/packages/go"
+	rusto "github.com/byrizki/rusto-rs/packages/go"
 )
 
 func main() {
-	config := map[string]interface{}{
-		"detection": map[string]string{
-			"model_path": "models/PPOCR_v6/det.rten",
-		},
-		"recognition": map[string]string{
-			"model_path": "models/PPOCR_v6/rec.rten",
-			"dict_path":  "models/PPOCR_v6/dict.txt",
-		},
-	}
-	configJSON, _ := json.Marshal(config)
-
-	engine, err := rusto.New(string(configJSON))
+	// Zero-config: initializes Indra OCR and auto-downloads .rten models if missing
+	engine, err := rusto.Initialize()
 	if err != nil {
-		log.Fatalf("Failed to initialize RustO: %v", err)
+		log.Fatalf("failed to initialize RustO: %v", err)
 	}
 	defer engine.Close()
 
-	// Detect structured lines
-	results, err := engine.DetectTextFile("invoice.png", "{}")
+	// Structured line-level recognition with unwarping and layout reading order
+	res, err := engine.
+		DetectText("invoice.png").
+		WithAutoUnwarp(true).
+		WithLayoutReading(true).
+		AsLines().
+		Run()
 	if err != nil {
-		log.Fatalf("Detection failed: %v", err)
+		log.Fatalf("OCR failed: %v", err)
 	}
 
-	for _, item := range results {
-		fmt.Printf("[%0.2f] %s\n", item.Score, item.Text)
+	for _, item := range res.Results {
+		fmt.Printf("[%.2f] (region=%d, layout=%d) %s\n",
+			item.Score, item.RegionID, item.LayoutType, item.Text)
 	}
 
-	// Detect spatial 2D formatted text
-	spatial, err := engine.DetectTextFileSpatial("invoice.png", "{}")
-	if err == nil {
-		fmt.Println("--- Spatial Output ---")
-		fmt.Println(spatial)
+	// Reconstructed 2D spatial layout
+	spatialRes, err := engine.
+		DetectText("invoice.png").
+		AsSpatial().
+		Run()
+	if err != nil {
+		log.Fatalf("spatial OCR failed: %v", err)
+	}
+	if spatialRes.IsSpatial {
+		fmt.Println(spatialRes.Text)
 	}
 }
 ```
 
-## 📖 Documentation
+## Custom Configuration (`rusto.New` / `rusto.Initialize`)
 
-For full documentation, guides, and API reference:
-- [Golang Guide](https://byrizki.com/rusto-rs/how-to/use-golang)
-- [Full Documentation](https://byrizki.com/rusto-rs/)
+Pass a JSON configuration string to `rusto.New(configJSON)` or `rusto.Initialize(configJSON)` to use specific presets (`"indra"`, `"ppv6"`, `"ppv5"`, `"ppv4"`) or offline `.rten` files:
+
+```go
+configJSON := `{
+  "template": "indra",
+  "enableReadingOrder": true,
+  "detection": {
+    "enabled": true,
+    "modelPath": "./models/indra_det.rten"
+  },
+  "recognition": {
+    "enabled": true,
+    "modelPath": "./models/indra_rec.rten",
+    "dictPath": "./models/indra_meta.json"
+  },
+  "unwarp": {
+    "enabled": true,
+    "modelPath": "./models/uvdoc.rten"
+  },
+  "layout": {
+    "enabled": true,
+    "modelPath": "./models/layout_cdla.rten"
+  }
+}`
+
+engine, err := rusto.New(configJSON)
+if err != nil {
+	log.Fatal(err)
+}
+defer engine.Close()
+```
+
+Or select a canonical model and language for automatic download:
+
+```go
+engine, err := rusto.New(`{"model": "ppocrv6-tiny", "lang": "latin"}`)
+```
+
+## Input Sources & Raw RGB Buffers
+
+```go
+// 1. Encoded image bytes (PNG, JPEG, WebP)
+imgBytes, err := os.ReadFile("receipt.jpg")
+if err != nil {
+	log.Fatal(err)
+}
+wordsRes, err := engine.DetectText(imgBytes).AsWords().Run()
+
+// 2. Raw interleaved 24-bit RGB pixel buffer
+width, height := 1280, 720
+stride := width * 3 // pass 0 to default to width * 3
+rgbPixels := make([]byte, stride*height)
+
+rgbRes, err := engine.
+	DetectText().
+	RGB(rgbPixels, width, height, stride).
+	AsLines().
+	Run()
+```
+
+## 6-Phase Pipeline Options
+
+Chain per-request tuning stages on `DetectTextBuilder`:
+
+```go
+limitSide := 960
+scoreThresh := float32(0.5)
+
+res, err := engine.
+	DetectText("scan.png").
+	WithOrientationDetection(true).
+	WithAutoUnwarp(true).
+	WithLayoutReading(true).
+	WithDetection(rusto.DetectionRunOptions{
+		LimitSideLen: &limitSide,
+		LimitType:    "max",
+	}).
+	WithPostRecognition(rusto.PostRecognitionOptions{
+		ScoreThreshold: &scoreThresh,
+	}).
+	WithOutput(rusto.OutputLines).
+	Run()
+```
+
+## Result Types
+
+### `DetectTextResult`
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `Results` | `[]TextResult` | Recognized lines or words when `IsSpatial` is `false` |
+| `Text` | `string` | Formatted 2D spatial layout when `IsSpatial` is `true` |
+| `IsSpatial` | `bool` | `true` when executed with `.AsSpatial()` or `.WithOutput(rusto.OutputSpatial)` |
+
+### `TextResult`
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `Text` | `string` | Recognized UTF-8 text |
+| `Score` | `float32` | Recognition confidence (`0.0` – `1.0`) |
+| `BoxPoints` | `[4][2]float32` | 4-vertex polygon `[top-left, top-right, bottom-right, bottom-left]` |
+| `Frame` | `Frame` | Axis-aligned bounding box (`Width`, `Height`, `Top`, `Left`) |
+| `RegionID` | `int32` | Layout region index when layout reading is enabled (`-1` if unassigned) |
+| `LayoutType` | `int32` | Semantic layout category code (`-1` if unassigned; `0`=text, `1`=title, `4`=table, etc.) |
 
 ## License
 
-MIT License
-
+Apache-2.0 OR MIT

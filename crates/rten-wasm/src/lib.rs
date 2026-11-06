@@ -4,13 +4,28 @@ use rusto_nn::{Model, Session, Tensor, TensorLayout};
 use rusto_core::{
     calibration::descreen_background_rgba,
     ctc::{composite_ocr_score, CtcDecoder},
+    image::Point2f,
+    layout::sort_lines_reading_order,
     postprocess::{decode_dbnet_boxes_fast, decode_linenet_det_boxes_slice},
     preprocess::{
         prepare_linenet_rec_crop_rgba, prepare_ppocr_rec_crop_rgba,
         preprocess_linenet_det_rgba, preprocess_rgba_raw,
     },
-    types::{Frame, TextResult},
+    spatial::{cluster_text_results_into_lines, to_spatial_text, to_tsv},
+    types::{Frame, OcrRunOptions, OutputGranularity, TextResult},
 };
+
+/// Returns the engine library version string.
+#[wasm_bindgen(js_name = version)]
+pub fn wasm_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+/// Returns whether WebAssembly inference engine is ready.
+#[wasm_bindgen(js_name = isReady)]
+pub fn wasm_is_ready() -> bool {
+    true
+}
 
 #[wasm_bindgen]
 pub struct InferenceOutput {
@@ -185,6 +200,19 @@ impl RtenOcrPipeline {
             decoder,
         })
     }
+
+    /// Returns the engine library version string.
+    #[wasm_bindgen(js_name = version)]
+    pub fn version(&self) -> String {
+        env!("CARGO_PKG_VERSION").to_string()
+    }
+
+    /// Returns whether the pipeline is initialized and ready.
+    #[wasm_bindgen(js_name = isReady)]
+    pub fn is_ready(&self) -> bool {
+        true
+    }
+
 
     fn detect_boxes(
         &self,
@@ -382,5 +410,236 @@ impl RtenOcrPipeline {
         }
 
         serde_json::to_string(&results).map_err(|e| format!("Serialization error: {:?}", e))
+    }
+
+    /// Run full OCR pipeline directly in WebAssembly accepting RGBA or RGB buffers with runtime options.
+    #[wasm_bindgen(js_name = detectText)]
+    pub fn detect_text(
+        &self,
+        image_bytes: &[u8],
+        width: u32,
+        height: u32,
+        channels: u32,
+        stride: Option<u32>,
+        options_json: Option<String>,
+    ) -> Result<String, String> {
+        if width == 0 || height == 0 {
+            return Err("Invalid image dimensions: width and height must be > 0".to_string());
+        }
+
+        let options: OcrRunOptions = match &options_json {
+            Some(json) if !json.trim().is_empty() => {
+                serde_json::from_str(json).map_err(|e| format!("Invalid options JSON: {e}"))?
+            }
+            _ => OcrRunOptions::default(),
+        };
+
+        let orig_w = width as usize;
+        let orig_h = height as usize;
+
+        let mut processed_rgba = match channels {
+            4 => {
+                let min_len = orig_w * orig_h * 4;
+                if image_bytes.len() < min_len {
+                    return Err(format!(
+                        "Buffer size too small for RGBA: expected {min_len}, got {}",
+                        image_bytes.len()
+                    ));
+                }
+                image_bytes[..min_len].to_vec()
+            }
+            3 => {
+                let eff_stride = stride.unwrap_or(width.saturating_mul(3)) as usize;
+                let min_len = orig_h.saturating_sub(1) * eff_stride + orig_w * 3;
+                if image_bytes.len() < min_len {
+                    return Err(format!(
+                        "Buffer size too small for RGB: expected {min_len}, got {}",
+                        image_bytes.len()
+                    ));
+                }
+                let mut rgba = Vec::with_capacity(orig_w * orig_h * 4);
+                for y in 0..orig_h {
+                    let row_start = y * eff_stride;
+                    for x in 0..orig_w {
+                        let px = row_start + x * 3;
+                        rgba.push(image_bytes[px]);
+                        rgba.push(image_bytes[px + 1]);
+                        rgba.push(image_bytes[px + 2]);
+                        rgba.push(255);
+                    }
+                }
+                rgba
+            }
+            _ => {
+                return Err(format!(
+                    "Unsupported channel count: {channels}, expected 3 (RGB) or 4 (RGBA)"
+                ))
+            }
+        };
+
+        let apply_calibration = options
+            .pre_detection
+            .as_ref()
+            .and_then(|p| p.descreen_strength)
+            .map(|s| s > 0.0)
+            .unwrap_or(true);
+        if apply_calibration {
+            let strength = options
+                .pre_detection
+                .as_ref()
+                .and_then(|p| p.descreen_strength)
+                .unwrap_or(1.15);
+            descreen_background_rgba(&mut processed_rgba, strength);
+        }
+
+        let det_thresh = options
+            .post_detection
+            .as_ref()
+            .and_then(|p| p.threshold)
+            .unwrap_or(0.3);
+        let box_thresh = options
+            .post_detection
+            .as_ref()
+            .and_then(|p| p.box_threshold)
+            .unwrap_or(0.5);
+        let unclip_ratio = options
+            .post_detection
+            .as_ref()
+            .and_then(|p| p.unclip_ratio)
+            .unwrap_or(1.8);
+        let max_side_len = options
+            .detection
+            .as_ref()
+            .and_then(|d| d.limit_side_len.map(|l| l as u32))
+            .or_else(|| {
+                options
+                    .post_detection
+                    .as_ref()
+                    .and_then(|p| p.max_side_len.map(|l| l as u32))
+            })
+            .unwrap_or(960);
+
+        let raw_boxes = self.detect_boxes(
+            &processed_rgba,
+            orig_w,
+            orig_h,
+            det_thresh,
+            box_thresh,
+            unclip_ratio,
+            Some(max_side_len),
+        )?;
+
+        let score_thresh = options
+            .post_recognition
+            .as_ref()
+            .and_then(|p| p.score_threshold)
+            .unwrap_or(0.5);
+
+        let mut recognized: Vec<TextResult> = Vec::new();
+        for (box_coords, det_score) in raw_boxes {
+            if let Some(res) = self.recognize_box(&processed_rgba, orig_w, orig_h, box_coords, det_score)? {
+                if res.score >= score_thresh {
+                    recognized.push(res);
+                }
+            }
+        }
+
+        let line_y = options.pre_recognition.as_ref().and_then(|pr| pr.line_y_threshold);
+        let word_x = options.pre_recognition.as_ref().and_then(|pr| pr.word_x_threshold);
+
+        match options.output {
+            OutputGranularity::Spatial => {
+                let boxes: Vec<[Point2f; 4]> = recognized
+                    .iter()
+                    .map(|c| {
+                        [
+                            Point2f::new(c.box_points[0].0, c.box_points[0].1),
+                            Point2f::new(c.box_points[1].0, c.box_points[1].1),
+                            Point2f::new(c.box_points[2].0, c.box_points[2].1),
+                            Point2f::new(c.box_points[3].0, c.box_points[3].1),
+                        ]
+                    })
+                    .collect();
+                let texts: Vec<String> = recognized.iter().map(|c| c.text.clone()).collect();
+                let spatial_text = to_spatial_text(&boxes, &texts, line_y, word_x);
+                serde_json::to_string(&spatial_text)
+                    .map_err(|e| format!("Serialization error: {:?}", e))
+            }
+            OutputGranularity::Tsv => {
+                let boxes: Vec<[Point2f; 4]> = recognized
+                    .iter()
+                    .map(|c| {
+                        [
+                            Point2f::new(c.box_points[0].0, c.box_points[0].1),
+                            Point2f::new(c.box_points[1].0, c.box_points[1].1),
+                            Point2f::new(c.box_points[2].0, c.box_points[2].1),
+                            Point2f::new(c.box_points[3].0, c.box_points[3].1),
+                        ]
+                    })
+                    .collect();
+                let texts: Vec<String> = recognized.iter().map(|c| c.text.clone()).collect();
+                let tsv_text = to_tsv(&boxes, &texts);
+                serde_json::to_string(&tsv_text)
+                    .map_err(|e| format!("Serialization error: {:?}", e))
+            }
+            OutputGranularity::Words => {
+                let mut words: Vec<TextResult> = Vec::new();
+                for cand in &recognized {
+                    let parts: Vec<&str> = cand.text.split_whitespace().collect();
+                    if parts.len() <= 1 {
+                        words.push(cand.clone());
+                    } else {
+                        let char_w = cand.frame.width / (cand.text.len().max(1) as f32);
+                        let mut curr_x = cand.frame.left;
+                        for part in parts {
+                            let part_w = (part.len() as f32 * char_w).max(1.0);
+                            let part_pts = [
+                                (curr_x, cand.frame.top),
+                                (curr_x + part_w, cand.frame.top),
+                                (curr_x + part_w, cand.frame.top + cand.frame.height),
+                                (curr_x, cand.frame.top + cand.frame.height),
+                            ];
+                            words.push(TextResult {
+                                text: part.to_string(),
+                                score: cand.score,
+                                frame: Frame::from_points(&part_pts),
+                                box_points: part_pts,
+                                region_id: cand.region_id,
+                                layout_type: cand.layout_type.clone(),
+                            });
+                            curr_x += part_w + char_w;
+                        }
+                    }
+                }
+                if options.layout_reading.unwrap_or(false) {
+                    sort_lines_reading_order(&mut words);
+                }
+                serde_json::to_string(&words).map_err(|e| format!("Serialization error: {:?}", e))
+            }
+            OutputGranularity::Lines => {
+                let mut segments = cluster_text_results_into_lines(
+                    recognized,
+                    line_y.unwrap_or(0.5),
+                    word_x.unwrap_or(0.4),
+                );
+                if options.layout_reading.unwrap_or(false) {
+                    sort_lines_reading_order(&mut segments);
+                }
+                serde_json::to_string(&segments).map_err(|e| format!("Serialization error: {:?}", e))
+            }
+        }
+    }
+
+    /// Run full OCR pipeline on raw RGB pixels directly in WebAssembly.
+    #[wasm_bindgen(js_name = detectTextRgb)]
+    pub fn detect_text_rgb(
+        &self,
+        image_rgb: &[u8],
+        width: u32,
+        height: u32,
+        stride: Option<u32>,
+        options_json: Option<String>,
+    ) -> Result<String, String> {
+        self.detect_text(image_rgb, width, height, 3, stride, options_json)
     }
 }

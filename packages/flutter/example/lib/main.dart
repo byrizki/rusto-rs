@@ -164,10 +164,13 @@ class _OcrVerificationScreenState extends State<OcrVerificationScreen> {
       final imgPath = await _copyAssetToFile('assets/images/example1.png', 'example1.png');
       final imageBytes = File(imgPath).readAsBytesSync();
 
-      final results = engine.detectTextData(
-        imageBytes,
-        jsonEncode({'output': 'lines', 'textScore': 0.3}),
-      );
+      final res = engine
+          .detectTextBuilder()
+          .data(imageBytes)
+          .withPostRecognition(scoreThreshold: 0.3)
+          .asLines()
+          .run();
+      final results = res is DetectTextResultStructured ? res.results : const <TextResult>[];
 
       setState(() {
         _detectedCount = results.length;
@@ -185,7 +188,12 @@ class _OcrVerificationScreenState extends State<OcrVerificationScreen> {
       final imgPath = await _copyAssetToFile('assets/images/example1.png', 'example1.png');
       final imageBytes = File(imgPath).readAsBytesSync();
 
-      final spatial = engine.detectTextDataSpatial(imageBytes);
+      final res = engine
+          .detectTextBuilder()
+          .data(imageBytes)
+          .asSpatial()
+          .run();
+      final spatial = res is DetectTextResultSpatial ? res.text : '';
       setState(() {
         _spatialText = spatial;
       });
@@ -199,8 +207,8 @@ class _OcrVerificationScreenState extends State<OcrVerificationScreen> {
     // 5. Cleanup
     _updateStatus('cleanup', 'RUNNING');
     try {
-      engine.dispose();
-      _updateStatus('cleanup', 'SUCCESS', 'Native handle safely disposed');
+      engine.close();
+      _updateStatus('cleanup', 'SUCCESS', 'Native handle safely closed');
       _addLog('Cleanup verified');
     } catch (e) {
       _updateStatus('cleanup', 'FAILURE', e.toString());

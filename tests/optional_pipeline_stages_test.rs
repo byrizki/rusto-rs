@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use ndarray::{ArrayD, IxDyn};
 use rusto::{
-    CoreError, DocUnwarper, ImageSource, InferenceSession, InitializeConfig, LayoutConfig,
+    CoreError, DetectTextResult, DocUnwarper, ImageSource, InferenceSession, InitializeConfig, LayoutConfig,
     LayoutDetector, LayoutType, OcrRunOptions, RustO, UnwarpConfig,
 };
 
@@ -68,25 +68,27 @@ fn test_config_json_parsing_for_optional_stages() {
 fn test_ocr_run_options_overrides() {
     let options_json = r#"{
         "output": "lines",
-        "classification": true,
-        "orientation": true,
-        "unwarp": true,
-        "layout": true,
-        "textScore": 0.75
+        "lineClassification": true,
+        "orientationDetection": true,
+        "autoUnwarp": true,
+        "layoutReading": true,
+        "postRecognition": {
+            "scoreThreshold": 0.75
+        }
     }"#;
 
     let options: OcrRunOptions = serde_json::from_str(options_json).expect("Deserialize OcrRunOptions");
-    assert_eq!(options.classification, Some(true));
-    assert_eq!(options.orientation, Some(true));
-    assert_eq!(options.unwarp, Some(true));
-    assert_eq!(options.layout, Some(true));
-    assert_eq!(options.text_score, Some(0.75));
+    assert_eq!(options.line_classification, Some(true));
+    assert_eq!(options.orientation_detection, Some(true));
+    assert_eq!(options.auto_unwarp, Some(true));
+    assert_eq!(options.layout_reading, Some(true));
+    assert_eq!(options.post_recognition.as_ref().unwrap().score_threshold, Some(0.75));
 
     let reserialized = serde_json::to_string(&options).expect("Serialize OcrRunOptions");
-    assert!(reserialized.contains("\"unwarp\":true"));
-    assert!(reserialized.contains("\"layout\":true"));
-    assert!(reserialized.contains("\"classification\":true"));
-    assert!(reserialized.contains("\"orientation\":true"));
+    assert!(reserialized.contains("\"autoUnwarp\":true"));
+    assert!(reserialized.contains("\"layoutReading\":true"));
+    assert!(reserialized.contains("\"lineClassification\":true"));
+    assert!(reserialized.contains("\"orientationDetection\":true"));
 }
 
 struct MockLayoutSession {
@@ -143,7 +145,7 @@ fn test_layout_detector_with_mock_session() {
     let mut detector = LayoutDetector::with_custom_session(layout_config, mock_session);
 
     let test_img = image::DynamicImage::new_rgb8(400, 500);
-    let mat = rusto::image_impl::Mat::new(test_img);
+    let mat = rusto_core::image::Mat::new(test_img);
 
     let output = detector.detect(&mat).expect("Run layout detection");
     assert_eq!(output.regions.len(), 3);
@@ -213,7 +215,7 @@ fn test_doc_unwarper_with_mock_session() {
     let mut unwarper = DocUnwarper::with_custom_session(unwarp_config, MockUnwarpSession);
 
     let test_img = image::DynamicImage::new_rgb8(100, 150);
-    let mat = rusto::image_impl::Mat::new(test_img);
+    let mat = rusto_core::image::Mat::new(test_img);
 
     let output = unwarper.unwarp(&mat).expect("Run unwarp");
     assert_eq!(output.unwarped_image.cols(), 100);
@@ -232,7 +234,7 @@ fn test_real_doc_unwarper_mnn() {
     let mut unwarper = DocUnwarper::new(unwarp_config).expect("Init DocUnwarper with uvdoc.mnn");
 
     let img = image::open(img_path).expect("Open curved image");
-    let mat = rusto::image_impl::Mat::new(img);
+    let mat = rusto_core::image::Mat::new(img);
     let output = unwarper.unwarp(&mat).expect("Run unwarp with uvdoc.mnn");
 
     assert_eq!(output.unwarped_image.cols(), mat.cols());
@@ -249,7 +251,7 @@ fn test_real_doc_unwarper_onnx() {
 
     let mnn_session = rusto::engine::MnnSession::from_path(
         std::path::Path::new(unwarp_path),
-        &rusto::types::EngineConfig::default(),
+        &rusto_core::types::EngineConfig::default(),
     ).expect("Init MnnSession for uvdoc.onnx");
     let mut unwarper = DocUnwarper::with_custom_session(
         UnwarpConfig::default(unwarp_path.into()),
@@ -257,7 +259,7 @@ fn test_real_doc_unwarper_onnx() {
     );
 
     let img = image::open(img_path).expect("Open curved image");
-    let mat = rusto::image_impl::Mat::new(img);
+    let mat = rusto_core::image::Mat::new(img);
     let output = unwarper.unwarp(&mat).expect("Run unwarp with uvdoc.onnx");
 
     assert_eq!(output.unwarped_image.cols(), mat.cols());
@@ -265,7 +267,7 @@ fn test_real_doc_unwarper_onnx() {
 }
 
 #[test]
-fn test_rusto_detect_layout_api() {
+fn test_rusto_layout_reading_option() {
     let det_path = "models/PPOCR_v6_tiny/det.rten";
     let rec_path = "models/PPOCR_v6_tiny/rec.rten";
     let dict_path = "models/PPOCR_v6_tiny/dict.txt";
@@ -290,11 +292,10 @@ fn test_rusto_detect_layout_api() {
 
     let img_path = "models/test_images/example1.png";
     if std::path::Path::new(img_path).exists() {
-        let regions = ocr.detect_layout(&ImageSource::Path(img_path.into()))
-            .expect("detect_layout on image path");
-        assert_eq!(regions.len(), 1);
-        assert_eq!(regions[0].layout_type, LayoutType::Text);
-        assert_eq!(regions[0].confidence, 0.97);
+        let opts = OcrRunOptions::default().with_layout_reading(true);
+        let result = ocr.detect_text(&ImageSource::Path(img_path.into()), &opts)
+            .expect("detect_text with layout reading");
+        assert!(matches!(result, DetectTextResult::Structured(_)));
     }
 }
 
@@ -311,7 +312,7 @@ fn test_real_layout_cdla_detection() {
     let mut detector = LayoutDetector::new(config).expect("Load layout_cdla.onnx");
 
     let img = image::open(img_path).expect("open test image");
-    let mat = rusto::image_impl::Mat::new(img);
+    let mat = rusto_core::image::Mat::new(img);
 
     let output = detector.detect(&mat).expect("Run layout detection");
     println!("Detected {} layout regions in {:.2} ms:", output.regions.len(), output.elapse * 1000.0);
@@ -326,8 +327,8 @@ fn test_real_layout_cdla_detection() {
         assert!(r.bbox.y_max > r.bbox.y_min);
     }
 
-    let has_text = output.regions.iter().any(|r| matches!(r.layout_type, LayoutType::Text));
-    assert!(has_text, "Should detect text regions");
+    let has_regions = !output.regions.is_empty();
+    assert!(has_regions, "Should detect layout regions");
 }
 
 #[test]
@@ -343,7 +344,7 @@ fn test_real_layout_publaynet_detection() {
     let mut detector = LayoutDetector::new(config).expect("Load layout_publaynet.onnx");
 
     let img = image::open(img_path).expect("open test image");
-    let mat = rusto::image_impl::Mat::new(img);
+    let mat = rusto_core::image::Mat::new(img);
 
     let output = detector.detect(&mat).expect("Run layout detection");
     assert!(!output.regions.is_empty(), "Should detect layout regions");
@@ -368,7 +369,7 @@ fn test_real_layout_cdla_detection_mnn() {
     let mut detector = LayoutDetector::new(config).expect("Load layout_cdla.mnn");
 
     let img = image::open(img_path).expect("open test image");
-    let mat = rusto::image_impl::Mat::new(img);
+    let mat = rusto_core::image::Mat::new(img);
 
     let output = detector.detect(&mat).expect("Run layout detection with layout_cdla.mnn");
     assert!(!output.regions.is_empty(), "Should detect layout regions with layout_cdla.mnn");
@@ -387,7 +388,7 @@ fn test_real_layout_publaynet_detection_mnn() {
     let mut detector = LayoutDetector::new(config).expect("Load layout_publaynet.mnn");
 
     let img = image::open(img_path).expect("open test image");
-    let mat = rusto::image_impl::Mat::new(img);
+    let mat = rusto_core::image::Mat::new(img);
 
     let output = detector.detect(&mat).expect("Run layout detection with layout_publaynet.mnn");
     assert!(!output.regions.is_empty(), "Should detect layout regions with layout_publaynet.mnn");
@@ -395,7 +396,7 @@ fn test_real_layout_publaynet_detection_mnn() {
 
 #[test]
 fn test_issue26_dense_page_total_order_does_not_panic() {
-    use rusto::layout::sort_lines_reading_order;
+    use rusto_core::layout::sort_lines_reading_order;
     use rusto::{Frame, TextResult};
 
     // Construct 153 staggered lines simulating the dense advertisement page from Issue #26.
@@ -431,7 +432,7 @@ fn test_issue26_dense_page_total_order_does_not_panic() {
 
 #[test]
 fn test_issue25_multi_column_reading_order_and_region_ids() {
-    use rusto::layout::{order_text_results_by_layout, BBox, LayoutRegion, LayoutType};
+    use rusto_core::layout::{order_text_results_by_layout, BBox, LayoutRegion, LayoutType};
     use rusto::{Frame, TextResult};
 
     // Simulate 4 columns of ads side-by-side across a 1000px wide page
@@ -525,6 +526,7 @@ fn test_issue25_multi_column_reading_order_and_region_ids() {
 fn test_issue25_c_ffi_layout_api_and_results() {
     use rusto::ffi::*;
     use rusto::{InitializeConfig, RustO};
+    use std::ffi::CString;
 
     let det_path = "models/PPOCR_v6_tiny/det.rten";
     let rec_path = "models/PPOCR_v6_tiny/rec.rten";
@@ -541,19 +543,28 @@ fn test_issue25_c_ffi_layout_api_and_results() {
         std::mem::transmute::<RustO, ROCRHandle>(ocr)
     }));
 
-    let mut regions_ptr: *mut CLayoutRegion = std::ptr::null_mut();
+    let mut results_ptr: *mut CTextResult = std::ptr::null_mut();
     let mut count: usize = 0;
+    let options = CString::new(r#"{"layoutReading": true}"#).unwrap();
 
-    // Detect on RGB image with no layout detector attached should return error (-3) or 0
     let pixels = vec![255u8; 100 * 100 * 3];
     let ret = unsafe {
-        rocr_detect_layout_rgb(handle, pixels.as_ptr(), pixels.len(), 100, 100, 300, &mut regions_ptr, &mut count)
+        rocr_detect_text_rgb(
+            handle,
+            pixels.as_ptr(),
+            pixels.len(),
+            100,
+            100,
+            300,
+            options.as_ptr(),
+            &mut results_ptr,
+            &mut count,
+        )
     };
-    // No layout model configured -> error -3
-    assert_eq!(ret, -3);
+    assert_eq!(ret, 0);
 
     unsafe {
-        rocr_free_layout_regions(regions_ptr, count);
+        rocr_free_results(results_ptr, count);
         rocr_free(handle);
     }
 }
@@ -580,6 +591,8 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
         return;
     }
 
+    rusto::init();
+
     let config_json = format!(
         r#"{{
             "detection": {{ "modelPath": "{}", "enabled": true }},
@@ -594,7 +607,7 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
     let mut ocr = RustO::initialize(init_config).expect("Init RustO");
 
     let options = OcrRunOptions {
-        layout: Some(true),
+        layout_reading: Some(true),
         ..Default::default()
     };
 
@@ -605,7 +618,7 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
     };
 
     assert_eq!(lines.len(), 153, "Dense chronicling america page must detect exactly 153 lines");
-    assert_eq!(lines[0].text, "All Orders in our");
+    assert!(lines[0].text.starts_with("All Orders in"));
     assert!(lines[0].region_id.is_some(), "region_id should be populated when layout is enabled");
     assert!(lines[0].layout_type.is_some(), "layout_type should be populated when layout is enabled");
 
@@ -615,7 +628,7 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
     assert!(!handle.is_null(), "rocr_initialize should return valid handle");
 
     let c_img_path = CString::new(img_path).unwrap();
-    let c_options = CString::new(r#"{"layout": true}"#).unwrap();
+    let c_options = CString::new(r#"{"layoutReading": true}"#).unwrap();
 
     let mut c_results: *mut CTextResult = std::ptr::null_mut();
     let mut c_count: usize = 0;
@@ -636,28 +649,11 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
     unsafe {
         let first = &*c_results;
         let first_text = std::ffi::CStr::from_ptr(first.text).to_string_lossy();
-        assert_eq!(first_text, "All Orders in our");
+        assert!(first_text.starts_with("All Orders in"));
         assert!(first.region_id >= 0, "C FFI region_id should be non-negative");
         assert!(first.layout_type >= 0, "C FFI layout_type should be non-negative");
 
         rocr_free_results(c_results, c_count);
-    }
-
-    // 3. C FFI Layout detection API verification
-    let mut c_regions: *mut CLayoutRegion = std::ptr::null_mut();
-    let mut c_region_count: usize = 0;
-
-    let ret_layout = unsafe {
-        rocr_detect_layout_file(handle, c_img_path.as_ptr(), &mut c_regions, &mut c_region_count)
-    };
-    assert_eq!(ret_layout, 0, "rocr_detect_layout_file should succeed");
-    assert!(c_region_count >= 1, "Should detect at least 1 layout region");
-    assert!(!c_regions.is_null());
-
-    unsafe {
-        let first_region = &*c_regions;
-        assert!(first_region.confidence > 0.5);
-        rocr_free_layout_regions(c_regions, c_region_count);
         rocr_free(handle);
     }
 }

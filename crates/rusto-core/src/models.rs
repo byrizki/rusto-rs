@@ -3,9 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::error::CoreError;
 
-pub const DEFAULT_MODELS_TAG: &str = "models-rten-v0.4.0";
 pub const DEFAULT_HF_BASE_URL: &str = "https://huggingface.co/byrizki/rten-models/resolve/main";
-pub const DEFAULT_GITHUB_RELEASE_BASE_URL: &str = "https://github.com/byrizki/rusto-rs/releases/download";
 pub const DEFAULT_BASE_URL: &str = DEFAULT_HF_BASE_URL;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,6 +43,9 @@ pub fn normalize_model_name(name: Option<&str>) -> &'static str {
 /// Normalizes language identifier to canonical asset names.
 pub fn resolve_language_assets(lang: &str) -> Option<(&'static str, &'static str)> {
     match lang.trim().to_ascii_lowercase().as_str() {
+        "latin" | "en" | "eng" | "english" => {
+            Some(("ppocrv5_rec_latin.rten", "ppocrv5_dict_latin.txt"))
+        }
         "ja" | "jp" | "jpn" | "japan" | "japanese" => {
             Some(("ppocrv4_rec_japan.rten", "ppocrv4_dict_japan.txt"))
         }
@@ -84,8 +85,28 @@ pub fn resolve_language_assets(lang: &str) -> Option<(&'static str, &'static str
         "cjk" => {
             Some(("indra_rec_cjk.rten", "indra_meta.json"))
         }
+        "rtl" => {
+            Some(("indra_rec_rtl.rten", "indra_meta.json"))
+        }
+        "world" => {
+            Some(("indra_rec_world.rten", "indra_meta.json"))
+        }
         _ => None,
     }
+}
+
+/// Resolves language-specific recognition assets taking the canonical model family into account.
+pub fn resolve_model_language_assets(
+    canonical_model: &str,
+    lang: &str,
+) -> Option<(&'static str, &'static str)> {
+    let normalized = lang.trim().to_ascii_lowercase();
+    if matches!(normalized.as_str(), "latin" | "en" | "eng" | "english") {
+        if canonical_model == "indraocr" || canonical_model.starts_with("ppocrv6") {
+            return None;
+        }
+    }
+    resolve_language_assets(&normalized)
 }
 
 /// Returns default asset names for a base model.
@@ -350,8 +371,8 @@ pub fn find_in_model_dir(dir: &Path, kind: &str) -> Option<PathBuf> {
 
 pub fn resolve_default_model_dir_asset(dir: &Path, kind: &str, filename: &str) -> PathBuf {
     let default_name = match kind {
-        "det" => "det.mnn",
-        "rec" => "rec.mnn",
+        "det" => "det.rten",
+        "rec" => "rec.rten",
         "dict" => {
             if filename.ends_with(".json") {
                 "meta.json"
@@ -359,11 +380,11 @@ pub fn resolve_default_model_dir_asset(dir: &Path, kind: &str, filename: &str) -
                 "dict.txt"
             }
         }
-        "cls" => "cls.mnn",
-        "orient" => "orient.mnn",
-        "unwarp" => "uvdoc.mnn",
-        "layout" => "layout_cdla.mnn",
-        "order" => "indra_order.mnn",
+        "cls" => "cls.rten",
+        "orient" => "orient.rten",
+        "unwarp" => "uvdoc.rten",
+        "layout" => "layout_cdla.rten",
+        "order" => "indra_order.rten",
         _ => filename,
     };
     dir.join(default_name)
@@ -407,10 +428,21 @@ pub fn resolve_asset_local(
         return Ok(resolve_default_model_dir_asset(dir_path, asset_kind, asset_filename));
     }
 
-    // 3. Cache Path
+    // 3. Cache Path (including .rten / .mnn stem fallback)
     let cached_file = cache_dir.join(asset_filename);
     if cached_file.exists() && fs::metadata(&cached_file).map(|m| m.len() > 0).unwrap_or(false) {
         return Ok(cached_file);
+    }
+    if let Some(stem) = asset_filename
+        .strip_suffix(".mnn")
+        .or_else(|| asset_filename.strip_suffix(".rten"))
+    {
+        for ext in ["rten", "mnn"] {
+            let alt = cache_dir.join(format!("{stem}.{ext}"));
+            if alt.exists() && fs::metadata(&alt).map(|m| m.len() > 0).unwrap_or(false) {
+                return Ok(alt);
+            }
+        }
     }
 
     // 4. Local checkout repository candidate fallback
@@ -453,7 +485,7 @@ pub fn resolve_base_pipeline(
     let det_path = resolve_asset_local(det_override, effective_dir, "det", base_assets.det_filename, cache_dir)?;
 
     let (rec_filename, dict_filename) = if let Some(l) = lang {
-        if let Some((lang_rec, lang_dict)) = resolve_language_assets(l) {
+        if let Some((lang_rec, lang_dict)) = resolve_model_language_assets(canonical_model, l) {
             (lang_rec, lang_dict)
         } else {
             (base_assets.rec_filename, base_assets.dict_filename)
@@ -565,7 +597,7 @@ pub fn get_pipeline_assets(
     assets.push(base_assets.det_filename);
 
     let (rec_filename, dict_filename) = if let Some(l) = lang {
-        if let Some((lang_rec, lang_dict)) = resolve_language_assets(l) {
+        if let Some((lang_rec, lang_dict)) = resolve_model_language_assets(canonical_model, l) {
             (lang_rec, lang_dict)
         } else {
             (base_assets.rec_filename, base_assets.dict_filename)
@@ -613,12 +645,8 @@ pub fn get_asset_download_urls(asset_filename: &str) -> Vec<String> {
             vec![format!("{}/{}", custom, asset_filename)]
         }
     } else {
-        let tag = std::env::var("RUSTO_MODELS_TAG").unwrap_or_else(|_| DEFAULT_MODELS_TAG.to_string());
         let hf_path = resolve_hf_asset_path(asset_filename);
-        vec![
-            format!("{}/{}", DEFAULT_HF_BASE_URL, hf_path),
-            format!("{}/{}/{}", DEFAULT_GITHUB_RELEASE_BASE_URL, tag, asset_filename),
-        ]
+        vec![format!("{}/{}", DEFAULT_HF_BASE_URL, hf_path)]
     }
 }
 

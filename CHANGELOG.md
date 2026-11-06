@@ -5,6 +5,32 @@ All notable changes to RustO! will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-11-06
+
+### Breaking Changes
+- **api**: Unify all 12 platform SDKs around a single fluent `DetectTextBuilder` contract with `as_lines()`/`asLines()`/`AsLines()`, `as_words()`/`asWords()`/`AsWords()`, `as_spatial()`/`asSpatial()`/`AsSpatial()`, and a single terminal `.run()` / `.Run()` method; remove pre-0.4 `detectTextFile*`, `detectTextData*`, `detectTextSpatial`, `runSpatial`, `execute()`, and `dispose()` methods (@byrizki)
+- **options**: Replace v0.3 runtime options (`textScore`, `postprocess`, `calibration`, `optimization`) with 4 top-level pipeline toggles (`autoUnwarp`, `layoutReading`, `orientationDetection`, `lineClassification`) and 6 structured pipeline phases (`preDetection`, `detection`, `postDetection`, `preRecognition`, `recognition`, `postRecognition`) (@byrizki)
+- **models**: Set DataLab **Indra OCR** (`indraocr`) as the flagship default model and decouple standalone `.rten` assets onto GitHub Releases (`models-rten-v0.4.0`) and Hugging Face Hub; retire legacy platform-specific model wrapper packages (@byrizki)
+- **cli**: Rename the CLI binary from `rusto-rs` to `rusto` (`rusto <IMAGE>`, `rusto ocr <IMAGE>`, `rusto download`) and standardize CLI flags (`--score-threshold`, `--rec-batch-num`, `--format spatial`) (@byrizki)
+
+### Added
+- **nn**: Implement `rusto-nn` pure-Rust neural inference runtime and hardware acceleration backends alongside modular `rusto-core`, `rusto-rten`, and `rusto-mnn` crates (@byrizki)
+- **pipeline**: Add end-to-end document processing stages — 3D UVDoc document unwarping, orientation detection, PP-Structure/RapidLayout PicoDet multi-scale region detection (`region_id`, `layout_type`), and Indra graph neural reading order (`indra_order.rten`) (#23) (@byrizki)
+- **models, bindings**: Add zero-config model auto-download on `RustO::initialize()` across Rust, Node.js, Python, Go, Java, .NET, Dart, Android, iOS, and React Native, plus `rusto download` CLI command (@byrizki)
+- **bindings**: Expose fluent `.rgb(...)` decoded interleaved RGB8 buffer input on `DetectTextBuilder` across native and managed SDKs (@byrizki)
+- **web, wasm**: Support 1-channel Indra OCR pipeline, neural reading order (`indra_order.rten`), dynamic release model resolution, and multi-column reading order in `rten-wasm`, `@rustors/web`, and `@rustors/react` (@byrizki)
+- **docs**: Add interactive layout/unwarp WASM configurator, head-to-head OmniDocBench evaluation suite, and bilingual v0.3 → v0.4 migration guides (EN / ID) (@byrizki)
+
+### Changed
+- **core**: Optimize RTen inference arena reuse, parallel Rayon line cropping, and 1-channel grayscale recognition preprocessing (@byrizki)
+- **mnn**: Register `vendor/alibaba-mnn` as an explicit Git submodule with `MNN_DIR` build fallback for source distributions (@byrizki)
+- **layout**: Add multi-platform end-to-end dense multi-column layout regression suite (`chronam-ad-page.png`) across all SDK bindings (@byrizki)
+
+### Fixed
+- **layout**: Resolve multi-column reading order sequencing and expose `region_id` and `layout_type` across C FFI (`CTextResult`) and all language bindings (fixes #25, #26) (@byrizki)
+- **det**: Support polygon scoring (`scoreMode: "poly"`) and forward nested post-detection options (#21) (@byrizki)
+- **ios, android, flutter**: Synchronize UniFFI generated bindings, Swift struct initializers, Kotlin `InitializeConfig` asset/cache resolution, and asynchronous Flutter widget tests (@byrizki)
+
 ## [0.3.2] - 2026-10-25
 
 ### Added
@@ -260,7 +286,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Project Status
 
-**Version**: 0.3.2  
+**Version**: 0.4.0  
 **Status**: Production Ready  
 **Accuracy**: 99.3% OpenCV parity  
-**Last Updated**: October 25, 2026
+**Last Updated**: November 06, 2026

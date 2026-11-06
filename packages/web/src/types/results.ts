@@ -24,6 +24,10 @@ export interface TextResult {
   box_points: [[number, number], [number, number], [number, number], [number, number]];
   /** Axis-aligned bounding box frame. */
   frame: Frame;
+  /** Optional detected document layout region index when layoutReading is enabled. */
+  region_id?: number | null;
+  /** Optional detected semantic layout category when layoutReading is enabled. */
+  layout_type?: string | null;
 }
 
 /**

@@ -36,35 +36,31 @@ export type ImageSource = { uri: string } | { base64: string } | { bytes: Binary
  * - 'words': Return individual word-level tokens.
  * - 'spatial': Return a formatted 2D text layout preserving spatial arrangement.
  */
-export type OutputGranularity = 'lines' | 'words' | 'spatial';
+export type OutputGranularity = 'lines' | 'words' | 'spatial' | 'tsv';
 
 /**
- * Model architecture preset: 'ppv6', 'ppv5', 'ppv4', or 'ppv3'.
+ * Model architecture preset: 'indra', 'ppv6', 'ppv5', 'ppv4', or 'ppv3'.
  */
-export type ModelPreset = 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3';
+export type ModelPreset = 'indra' | 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3';
 
 /**
- * Post-processing options for DBNet polygon detection and binarization.
+ * Phase 1: Pre-detection options (descreen, downscale, padding).
  */
-export interface PostprocessOptions {
-  /** Binarization probability cutoff threshold for segmentation map. Default: 0.3. */
-  threshold?: number;
-  /** Box score confidence threshold for candidate contour filtering. Default: 0.6. */
-  boxThreshold?: number;
-  /** Maximum candidate text boxes to detect per image. Default: 1000. */
-  maxCandidates?: number;
-  /** Polygon unclip expansion ratio. Default: 1.5 - 2.0. */
-  unclipRatio?: number;
-  /** Enable morphological dilation to connect broken text strokes. */
-  useDilation?: boolean;
-  /** DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean). */
-  scoreMode?: 'fast' | 'slow';
+export interface PreDetectionOptions {
+  /** Descreen filtering strength (0.0 - 1.0). */
+  descreenStrength?: number;
+  /** Optimal target maximum side dimension for downscaling (e.g. 960 or 1024). */
+  targetMaxSide?: number;
+  /** Horizontal crop padding expansion ratio applied to bounding boxes (e.g. 0.05 = 5%). */
+  cropPaddingX?: number;
+  /** Vertical crop padding expansion ratio applied to bounding boxes (e.g. 0.05 = 5%). */
+  cropPaddingY?: number;
 }
 
 /**
- * Image detection stage options.
+ * Phase 2: Detection inference options (limits, normalization).
  */
-export interface DetectionOptions {
+export interface DetectionRunOptions {
   /** Target side length constraint for image resizing. Default: 960. */
   limitSideLen?: number;
   /** Side length limit behavior: 'min' ensures short side meets threshold, 'max' caps long side. */
@@ -75,26 +71,122 @@ export interface DetectionOptions {
   std?: [number, number, number];
 }
 
+export type DetectionOptions = DetectionRunOptions;
+
 /**
- * Pre-OCR image calibration options for descreening patterned backgrounds.
+ * Phase 3: Post-detection options (thresholds, unclip, dilation, box geometry).
  */
-export interface CalibrationOptions {
-  /** Descreen filtering strength (0.0 - 1.0). */
-  descreenStrength?: number;
+export interface PostDetectionOptions {
+  /** Binarization threshold for pixel segmentation map. Default: 0.3. */
+  threshold?: number;
+  /** Polygon box threshold score for candidate filtering. Default: 0.6. */
+  boxThreshold?: number;
+  /** Polygon unclip expansion ratio. Default: 1.5 - 2.0. */
+  unclipRatio?: number;
+  /** Enable morphological dilation to connect broken text strokes. */
+  useDilation?: boolean;
+  /** DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean). */
+  scoreMode?: 'fast' | 'slow';
+  /** Maximum candidate boxes to detect per image. Default: 1000. */
+  maxCandidates?: number;
+  /** Minimum text box height in pixels. */
+  minHeight?: number;
+  /** Minimum text box side length in pixels. */
+  minSideLen?: number;
+  /** Maximum text box side length in pixels. */
+  maxSideLen?: number;
+  /** Width-to-height aspect ratio filter cutoff. */
+  widthHeightRatio?: number;
+}
+
+export type PostprocessOptions = PostDetectionOptions;
+
+/**
+ * Phase 4: Pre-recognition grouping options (line_y, word_x tolerances).
+ */
+export interface PreRecognitionOptions {
+  /** Vertical center tolerance multiplier for same-line grouping. Default: 0.5. */
+  lineYThreshold?: number;
+  /** Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4. */
+  wordXThreshold?: number;
 }
 
 /**
- * Runtime crop and resolution optimization options.
+ * Phase 5: Recognition inference options (batch size).
  */
-export interface OptimizationOptions {
-  /** Enable or disable image optimization. */
-  enabled?: boolean;
-  /** Optimal target maximum side dimension for downscaling (e.g. 960 or 1024). */
-  targetMaxSide?: number;
-  /** Horizontal crop padding expansion ratio applied to bounding boxes (e.g. 0.06 = 6%). */
-  cropPaddingX?: number;
-  /** Vertical crop padding expansion ratio applied to bounding boxes (e.g. 0.08 = 8%). */
-  cropPaddingY?: number;
+export interface RecognitionRunOptions {
+  /** Recognition batch size (number of text crops processed concurrently). */
+  batchSize?: number;
+}
+
+/**
+ * Phase 6: Post-recognition filtering options (score threshold).
+ */
+export interface PostRecognitionOptions {
+  /** Minimum confidence score threshold [0.0 - 1.0] for recognition filtering. */
+  scoreThreshold?: number;
+}
+
+/**
+ * Request-local OCR runtime execution options.
+ */
+export interface OcrRunOptions {
+  /** Output granularity: 'lines' (default), 'words', or 'spatial'. */
+  output?: OutputGranularity;
+  /** Enable document unwarping stage before detection. */
+  autoUnwarp?: boolean;
+  /** Enable document layout reading order analysis. */
+  layoutReading?: boolean;
+  /** Enable 0°/90°/180°/270° document orientation detection and rotation. */
+  orientationDetection?: boolean;
+  /** Enable 180° text line orientation classification. */
+  lineClassification?: boolean;
+  /** Phase 1: Pre-detection options (descreen, downscale, padding). */
+  preDetection?: PreDetectionOptions;
+  /** Phase 2: Detection inference options (limits, normalization). */
+  detection?: DetectionRunOptions;
+  /** Phase 3: Post-detection options (thresholds, unclip, dilation, box geometry). */
+  postDetection?: PostDetectionOptions;
+  /** Phase 4: Pre-recognition grouping options (line_y, word_x tolerances). */
+  preRecognition?: PreRecognitionOptions;
+  /** Phase 5: Recognition inference options (batch size). */
+  recognition?: RecognitionRunOptions;
+  /** Phase 6: Post-recognition filtering options (score threshold). */
+  postRecognition?: PostRecognitionOptions;
+}
+
+export type DetectTextOptions = OcrRunOptions;
+
+/**
+ * Axis-aligned bounding box frame with position and size in image pixels.
+ */
+export interface Frame {
+  /** Width of the bounding box in pixels. */
+  width: number;
+  /** Height of the bounding box in pixels. */
+  height: number;
+  /** Top vertical coordinate (Y) of the bounding box. */
+  top: number;
+  /** Left horizontal coordinate (X) of the bounding box. */
+  left: number;
+}
+
+/**
+ * Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
+ */
+export interface TextResult {
+  /** Recognized text string. */
+  text: string;
+  /** Confidence score between 0.0 and 1.0. */
+  score: number;
+  /** Four polygon vertex coordinates [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]. */
+  box_points: [[number, number], [number, number], [number, number], [number, number]];
+  /** Axis-aligned bounding box frame. */
+  frame: Frame;
+  /** Optional layout region index if layoutReading was enabled. */
+  region_id?: number;
+  /** Optional layout semantic tag if layoutReading was enabled. */
+  layout_type?: string;
 }
 
 /**
@@ -136,134 +228,19 @@ export interface InitializeConfig {
   };
 }
 
-/**
- * Request-local OCR runtime execution options.
- */
-export interface DetectTextOptions {
-  /** Output granularity: 'lines' (default), 'words', or 'spatial'. */
-  output?: OutputGranularity;
-  /** Same-row vertical center tolerance multiplier. Default: 0.5. */
-  lineYThreshold?: number;
-  /** Same-word horizontal gap tolerance multiplier. Default: 0.4. */
-  wordXThreshold?: number;
-  /** Minimum recognition confidence score threshold [0.0 - 1.0]. */
-  textScore?: number;
-  /** Enable 180° text line orientation classifier stage. */
-  classification?: boolean;
-  /** Enable 0°/90°/180°/270° document orientation rotation stage. */
-  orientation?: boolean;
-  /** Enable document dewarping stage before detection. */
-  unwarp?: boolean;
-  /** Enable document layout analysis stage. */
-  layout?: boolean;
-  /** Request-local minimum height resize override. */
-  minHeight?: number;
-  /** Request-local maximum side length resize override. */
-  maxSideLen?: number;
-  /** Request-local minimum side length resize override. */
-  minSideLen?: number;
-  /** Width-to-height aspect ratio padding override. */
-  widthHeightRatio?: number;
-  /** Request-local detector input overrides. */
-  detection?: DetectionOptions;
-  /** Request-local detector postprocess overrides. */
-  postprocess?: PostprocessOptions;
-  /** Request-local recognition batch size override. Default: 6. */
-  recBatchNum?: number;
-  /** Pre-OCR background descreening calibration options. */
-  calibration?: CalibrationOptions;
-  /** Runtime crop and resolution optimization options. */
-  optimization?: OptimizationOptions;
-}
-
-/**
- * Axis-aligned bounding box frame with position and size in image pixels.
- */
-export interface Frame {
-  /** Width of the bounding box in pixels. */
-  width: number;
-  /** Height of the bounding box in pixels. */
-  height: number;
-  /** Top vertical coordinate (Y) of the bounding box. */
-  top: number;
-  /** Left horizontal coordinate (X) of the bounding box. */
-  left: number;
-}
-
-/**
- * Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
- */
-export interface TextResult {
-  /** Recognized text string. */
-  text: string;
-  /** Confidence score between 0.0 and 1.0. */
-  score: number;
-  /** Four polygon vertex coordinates [[x1, y1], [x2, y2], [x3, y3], [x4, y4]]. */
-  box_points: [[number, number], [number, number], [number, number], [number, number]];
-  /** Axis-aligned bounding box frame. */
-  frame: Frame;
-}
-
-/**
- * Semantic layout category of a detected document region.
- */
-export type LayoutType =
-  | 'text'
-  | 'title'
-  | 'figure'
-  | 'figureCaption'
-  | 'table'
-  | 'tableCaption'
-  | 'header'
-  | 'footer'
-  | 'reference'
-  | 'equation';
-
-/**
- * Axis-aligned bounding box coordinates for a detected document layout region.
- */
-export interface LayoutBBox {
-  /** Left coordinate (minimum X) in pixels. */
-  xMin: number;
-  /** Top coordinate (minimum Y) in pixels. */
-  yMin: number;
-  /** Right coordinate (maximum X) in pixels. */
-  xMax: number;
-  /** Bottom coordinate (maximum Y) in pixels. */
-  yMax: number;
-}
-
-/**
- * Detected document layout region with category, bounding box, and confidence score.
- */
-export interface LayoutRegion {
-  /** Bounding box coordinates. */
-  bbox: LayoutBBox;
-  /** Semantic layout category. */
-  layoutType: LayoutType;
-  /** Classification confidence score [0.0 - 1.0]. */
-  confidence: number;
-}
-
 const SOURCE_KEYS = ['uri', 'base64', 'bytes'] as const;
 const OPTION_KEYS = [
   'output',
-  'lineYThreshold',
-  'wordXThreshold',
-  'textScore',
-  'classification',
-  'orientation',
-  'unwarp',
-  'layout',
-  'minHeight',
-  'maxSideLen',
-  'minSideLen',
-  'widthHeightRatio',
+  'autoUnwarp',
+  'layoutReading',
+  'orientationDetection',
+  'lineClassification',
+  'preDetection',
   'detection',
-  'postprocess',
-  'recBatchNum',
-  'calibration',
-  'optimization',
+  'postDetection',
+  'preRecognition',
+  'recognition',
+  'postRecognition',
 ] as const;
 const MODEL_KEYS = [
   'detection',
@@ -274,27 +251,34 @@ const MODEL_KEYS = [
   'unwarp',
   'layout',
 ] as const;
-const DETECTION_KEYS = ['limitSideLen', 'limitType', 'mean', 'std'] as const;
-const POSTPROCESS_KEYS = [
-  'threshold',
-  'boxThreshold',
-  'maxCandidates',
-  'unclipRatio',
-  'useDilation',
-  'scoreMode',
-] as const;
-const CALIBRATION_KEYS = ['descreenStrength'] as const;
-const OPTIMIZATION_KEYS = [
-  'enabled',
+const PRE_DETECTION_KEYS = [
+  'descreenStrength',
   'targetMaxSide',
   'cropPaddingX',
   'cropPaddingY',
 ] as const;
-const PRESETS = ['ppv6', 'ppv5', 'ppv4', 'ppv3'] as const;
+const DETECTION_KEYS = ['limitSideLen', 'limitType', 'mean', 'std'] as const;
+const POST_DETECTION_KEYS = [
+  'threshold',
+  'boxThreshold',
+  'unclipRatio',
+  'useDilation',
+  'scoreMode',
+  'maxCandidates',
+  'minHeight',
+  'minSideLen',
+  'maxSideLen',
+  'widthHeightRatio',
+] as const;
+const PRE_RECOGNITION_KEYS = ['lineYThreshold', 'wordXThreshold'] as const;
+const RECOGNITION_KEYS = ['batchSize'] as const;
+const POST_RECOGNITION_KEYS = ['scoreThreshold'] as const;
+const PRESETS = ['indra', 'ppv6', 'ppv5', 'ppv4', 'ppv3'] as const;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && value !== undefined && typeof value === 'object' && !Array.isArray(value);
 }
+
 function requireOnlyKeys(
   value: Record<string, unknown>,
   allowed: readonly string[],
@@ -302,6 +286,7 @@ function requireOnlyKeys(
 ): void {
   if (Object.keys(value).some((key) => !allowed.includes(key))) throw new TypeError(message);
 }
+
 function bytesToBase64(bytes: unknown): string {
   if (!(bytes instanceof Uint8Array) && !(bytes instanceof ArrayBuffer)) {
     throw new TypeError('ImageSource.bytes must be a Uint8Array or ArrayBuffer.');
@@ -311,15 +296,15 @@ function bytesToBase64(bytes: unknown): string {
   let binary = '';
   for (let i = 0; i < data.length; i += 0x8000)
     binary += String.fromCodePoint(...data.subarray(i, i + 0x8000));
-  const encoder = global.btoa;
+  const encoder = (global as any).btoa;
   if (typeof encoder !== 'function')
     throw new Error('Base64 encoding is unavailable in this React Native runtime.');
   return encoder(binary);
 }
+
 function normalizeSource(source: ImageSource): { uri?: string; base64?: string } {
   if (!isObject(source))
     throw new TypeError('ImageSource must be an object with exactly one of uri, base64, or bytes.');
-  // Runtime validation deliberately handles values cast past ImageSource's union type.
   const rawSource = source as unknown as Record<string, unknown>;
   requireOnlyKeys(
     rawSource,
@@ -338,13 +323,35 @@ function normalizeSource(source: ImageSource): { uri?: string; base64?: string }
   }
   return { [key]: value.trim() };
 }
+
+function normalizePreDetectionOptions(preDetection: unknown): void {
+  if (preDetection === undefined) return;
+  if (!isObject(preDetection)) throw new TypeError('OcrRunOptions.preDetection must be an object.');
+  requireOnlyKeys(
+    preDetection,
+    PRE_DETECTION_KEYS,
+    'OcrRunOptions.preDetection contains an unknown key.'
+  );
+  const descreen = preDetection.descreenStrength;
+  if (descreen !== undefined && (typeof descreen !== 'number' || !Number.isFinite(descreen) || descreen < 0))
+    throw new TypeError('OcrRunOptions.preDetection.descreenStrength must be a non-negative number.');
+  const target = preDetection.targetMaxSide;
+  if (target !== undefined && (typeof target !== 'number' || !Number.isInteger(target) || target < 1))
+    throw new TypeError('OcrRunOptions.preDetection.targetMaxSide must be an integer >= 1.');
+  for (const key of ['cropPaddingX', 'cropPaddingY'] as const) {
+    const pad = preDetection[key];
+    if (pad !== undefined && (typeof pad !== 'number' || !Number.isFinite(pad) || pad < 0))
+      throw new TypeError(`OcrRunOptions.preDetection.${key} must be a non-negative number.`);
+  }
+}
+
 function normalizeDetectionOptions(detection: unknown): void {
   if (detection === undefined) return;
-  if (!isObject(detection)) throw new TypeError('DetectTextOptions.detection must be an object.');
+  if (!isObject(detection)) throw new TypeError('OcrRunOptions.detection must be an object.');
   requireOnlyKeys(
     detection,
     DETECTION_KEYS,
-    'DetectTextOptions.detection contains an unknown key.'
+    'OcrRunOptions.detection contains an unknown key.'
   );
   const limitSideLen = detection.limitSideLen;
   if (
@@ -355,14 +362,14 @@ function normalizeDetectionOptions(detection: unknown): void {
       limitSideLen > 32767)
   )
     throw new TypeError(
-      'DetectTextOptions.detection.limitSideLen must be an integer between 1 and 32767.'
+      'OcrRunOptions.detection.limitSideLen must be an integer between 1 and 32767.'
     );
   if (
     detection.limitType !== undefined &&
     detection.limitType !== 'min' &&
     detection.limitType !== 'max'
   )
-    throw new TypeError('DetectTextOptions.detection.limitType is invalid.');
+    throw new TypeError('OcrRunOptions.detection.limitType is invalid.');
   for (const key of ['mean', 'std'] as const) {
     const values = detection[key];
     if (
@@ -374,135 +381,130 @@ function normalizeDetectionOptions(detection: unknown): void {
             typeof value !== 'number' || !Number.isFinite(value) || (key === 'std' && value === 0)
         ))
     )
-      throw new TypeError(`DetectTextOptions.detection.${key} must contain three valid numbers.`);
+      throw new TypeError(`OcrRunOptions.detection.${key} must contain three valid numbers.`);
   }
 }
-function normalizePostprocessOptions(postprocess: unknown): void {
-  if (postprocess === undefined) return;
-  if (!isObject(postprocess))
-    throw new TypeError('DetectTextOptions.postprocess must be an object.');
+
+function normalizePostDetectionOptions(postDetection: unknown): void {
+  if (postDetection === undefined) return;
+  if (!isObject(postDetection))
+    throw new TypeError('OcrRunOptions.postDetection must be an object.');
   requireOnlyKeys(
-    postprocess,
-    POSTPROCESS_KEYS,
-    'DetectTextOptions.postprocess contains an unknown key.'
+    postDetection,
+    POST_DETECTION_KEYS,
+    'OcrRunOptions.postDetection contains an unknown key.'
   );
   for (const key of ['threshold', 'boxThreshold'] as const) {
-    const value = postprocess[key];
+    const value = postDetection[key];
     if (
       value !== undefined &&
       (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1)
     )
-      throw new TypeError(`DetectTextOptions.postprocess.${key} must be in [0, 1].`);
+      throw new TypeError(`OcrRunOptions.postDetection.${key} must be in [0, 1].`);
   }
-  const maxCandidates = postprocess.maxCandidates;
+  const maxCandidates = postDetection.maxCandidates;
   if (
     maxCandidates !== undefined &&
     (typeof maxCandidates !== 'number' || !Number.isInteger(maxCandidates) || maxCandidates < 1)
   )
-    throw new TypeError('DetectTextOptions.postprocess.maxCandidates must be an integer >= 1.');
+    throw new TypeError('OcrRunOptions.postDetection.maxCandidates must be an integer >= 1.');
   if (
-    postprocess.unclipRatio !== undefined &&
-    (typeof postprocess.unclipRatio !== 'number' ||
-      !Number.isFinite(postprocess.unclipRatio) ||
-      postprocess.unclipRatio <= 0)
+    postDetection.unclipRatio !== undefined &&
+    (typeof postDetection.unclipRatio !== 'number' ||
+      !Number.isFinite(postDetection.unclipRatio) ||
+      postDetection.unclipRatio <= 0)
   )
-    throw new TypeError('DetectTextOptions.postprocess.unclipRatio must be > 0.');
-  if (postprocess.useDilation !== undefined && typeof postprocess.useDilation !== 'boolean')
-    throw new TypeError('DetectTextOptions.postprocess.useDilation must be a boolean.');
+    throw new TypeError('OcrRunOptions.postDetection.unclipRatio must be > 0.');
+  if (postDetection.useDilation !== undefined && typeof postDetection.useDilation !== 'boolean')
+    throw new TypeError('OcrRunOptions.postDetection.useDilation must be a boolean.');
   if (
-    postprocess.scoreMode !== undefined &&
-    postprocess.scoreMode !== 'fast' &&
-    postprocess.scoreMode !== 'slow'
+    postDetection.scoreMode !== undefined &&
+    postDetection.scoreMode !== 'fast' &&
+    postDetection.scoreMode !== 'slow'
   )
-    throw new TypeError('DetectTextOptions.postprocess.scoreMode must be "fast" or "slow".');
+    throw new TypeError('OcrRunOptions.postDetection.scoreMode must be "fast" or "slow".');
+  for (const key of ['minHeight', 'maxSideLen', 'minSideLen'] as const) {
+    const val = postDetection[key];
+    if (val !== undefined && (typeof val !== 'number' || !Number.isFinite(val) || val <= 0))
+      throw new TypeError(`OcrRunOptions.postDetection.${key} must be a finite number > 0.`);
+  }
+  const ratio = postDetection.widthHeightRatio;
+  if (ratio !== undefined && (typeof ratio !== 'number' || !Number.isFinite(ratio) || (ratio <= 0 && ratio !== -1)))
+    throw new TypeError('OcrRunOptions.postDetection.widthHeightRatio must be > 0 or -1.');
+  const minSideLen = postDetection.minSideLen;
+  const maxSideLen = postDetection.maxSideLen;
+  if (typeof minSideLen === 'number' && typeof maxSideLen === 'number' && minSideLen > maxSideLen)
+    throw new TypeError('OcrRunOptions.postDetection.minSideLen must be <= maxSideLen.');
 }
-function normalizeCalibrationOptions(calibration: unknown): void {
-  if (calibration === undefined) return;
-  if (!isObject(calibration)) throw new TypeError('DetectTextOptions.calibration must be an object.');
+
+function normalizePreRecognitionOptions(preRecognition: unknown): void {
+  if (preRecognition === undefined) return;
+  if (!isObject(preRecognition)) throw new TypeError('OcrRunOptions.preRecognition must be an object.');
   requireOnlyKeys(
-    calibration,
-    CALIBRATION_KEYS,
-    'DetectTextOptions.calibration contains an unknown key.'
+    preRecognition,
+    PRE_RECOGNITION_KEYS,
+    'OcrRunOptions.preRecognition contains an unknown key.'
   );
-  const descreen = calibration.descreenStrength;
-  if (
-    descreen !== undefined &&
-    (typeof descreen !== 'number' || !Number.isFinite(descreen) || descreen < 0 || descreen > 1)
-  )
-    throw new TypeError('DetectTextOptions.calibration.descreenStrength must be in [0, 1].');
-}
-function normalizeOptimizationOptions(optimization: unknown): void {
-  if (optimization === undefined) return;
-  if (!isObject(optimization)) throw new TypeError('DetectTextOptions.optimization must be an object.');
-  requireOnlyKeys(
-    optimization,
-    OPTIMIZATION_KEYS,
-    'DetectTextOptions.optimization contains an unknown key.'
-  );
-  if (optimization.enabled !== undefined && typeof optimization.enabled !== 'boolean')
-    throw new TypeError('DetectTextOptions.optimization.enabled must be a boolean.');
-  const target = optimization.targetMaxSide;
-  if (
-    target !== undefined &&
-    (typeof target !== 'number' || !Number.isInteger(target) || target < 1)
-  )
-    throw new TypeError('DetectTextOptions.optimization.targetMaxSide must be an integer >= 1.');
-  for (const key of ['cropPaddingX', 'cropPaddingY'] as const) {
-    const pad = optimization[key];
-    if (pad !== undefined && (typeof pad !== 'number' || !Number.isFinite(pad) || pad < 0 || pad > 1))
-      throw new TypeError(`DetectTextOptions.optimization.${key} must be in [0, 1].`);
+  for (const key of ['lineYThreshold', 'wordXThreshold'] as const) {
+    const val = preRecognition[key];
+    if (val !== undefined && (typeof val !== 'number' || !Number.isFinite(val) || val < 0))
+      throw new TypeError(`OcrRunOptions.preRecognition.${key} must be a finite number >= 0.`);
   }
 }
-function normalizeOptions(options: DetectTextOptions | undefined): DetectTextOptions {
+
+function normalizeRecognitionOptions(recognition: unknown): void {
+  if (recognition === undefined) return;
+  if (!isObject(recognition)) throw new TypeError('OcrRunOptions.recognition must be an object.');
+  requireOnlyKeys(
+    recognition,
+    RECOGNITION_KEYS,
+    'OcrRunOptions.recognition contains an unknown key.'
+  );
+  const batchSize = recognition.batchSize;
+  if (batchSize !== undefined && (typeof batchSize !== 'number' || !Number.isInteger(batchSize) || batchSize < 1))
+    throw new TypeError('OcrRunOptions.recognition.batchSize must be an integer >= 1.');
+}
+
+function normalizePostRecognitionOptions(postRecognition: unknown): void {
+  if (postRecognition === undefined) return;
+  if (!isObject(postRecognition)) throw new TypeError('OcrRunOptions.postRecognition must be an object.');
+  requireOnlyKeys(
+    postRecognition,
+    POST_RECOGNITION_KEYS,
+    'OcrRunOptions.postRecognition contains an unknown key.'
+  );
+  const score = postRecognition.scoreThreshold;
+  if (score !== undefined && (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 1))
+    throw new TypeError('OcrRunOptions.postRecognition.scoreThreshold must be a finite number from 0 to 1.');
+}
+
+function normalizeOptions(options: OcrRunOptions | undefined): OcrRunOptions {
   if (options === undefined) return {};
-  if (!isObject(options)) throw new TypeError('DetectTextOptions must be an object.');
-  requireOnlyKeys(options, OPTION_KEYS, 'DetectTextOptions contains an unknown key.');
+  if (!isObject(options)) throw new TypeError('OcrRunOptions must be an object.');
+  requireOnlyKeys(options, OPTION_KEYS, 'OcrRunOptions contains an unknown key.');
   const output = options.output;
   if (output !== undefined && !['lines', 'words', 'spatial'].includes(output as string))
-    throw new TypeError('DetectTextOptions.output is invalid.');
-  for (const key of ['lineYThreshold', 'wordXThreshold'] as const) {
-    const value = options[key];
-    if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0))
-      throw new TypeError(`DetectTextOptions.${key} must be a finite number >= 0.`);
-  }
-  const score = options.textScore;
-  if (
-    score !== undefined &&
-    (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 1)
-  )
-    throw new TypeError('DetectTextOptions.textScore must be a finite number from 0 to 1.');
-  for (const key of ['classification', 'orientation', 'unwarp', 'layout'] as const) {
+    throw new TypeError('OcrRunOptions.output is invalid.');
+  for (const key of [
+    'autoUnwarp',
+    'layoutReading',
+    'orientationDetection',
+    'lineClassification',
+  ] as const) {
     const value = options[key];
     if (value !== undefined && typeof value !== 'boolean')
-      throw new TypeError(`DetectTextOptions.${key} must be a boolean.`);
+      throw new TypeError(`OcrRunOptions.${key} must be a boolean.`);
   }
-  for (const key of ['minHeight', 'maxSideLen', 'minSideLen'] as const) {
-    const value = options[key];
-    if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value <= 0))
-      throw new TypeError(`DetectTextOptions.${key} must be a finite number > 0.`);
-  }
-  const ratio = options.widthHeightRatio;
-  if (
-    ratio !== undefined &&
-    (typeof ratio !== 'number' || !Number.isFinite(ratio) || (ratio <= 0 && ratio !== -1))
-  )
-    throw new TypeError('DetectTextOptions.widthHeightRatio must be > 0 or -1.');
-  const minSideLen = options.minSideLen;
-  const maxSideLen = options.maxSideLen;
-  if (typeof minSideLen === 'number' && typeof maxSideLen === 'number' && minSideLen > maxSideLen)
-    throw new TypeError('DetectTextOptions.minSideLen must be <= maxSideLen.');
-  const batchNum = options.recBatchNum;
-  if (
-    batchNum !== undefined &&
-    (typeof batchNum !== 'number' || !Number.isInteger(batchNum) || batchNum < 1)
-  )
-    throw new TypeError('DetectTextOptions.recBatchNum must be an integer >= 1.');
+
+  normalizePreDetectionOptions(options.preDetection);
   normalizeDetectionOptions(options.detection);
-  normalizePostprocessOptions(options.postprocess);
-  normalizeCalibrationOptions(options.calibration);
-  normalizeOptimizationOptions(options.optimization);
+  normalizePostDetectionOptions(options.postDetection);
+  normalizePreRecognitionOptions(options.preRecognition);
+  normalizeRecognitionOptions(options.recognition);
+  normalizePostRecognitionOptions(options.postRecognition);
   return options;
 }
+
 function normalizeInitializeConfig(config: InitializeConfig | undefined): InitializeConfig {
   if (config === undefined) return {};
   if (!isObject(config)) throw new TypeError('InitializeConfig must be an object.');
@@ -553,6 +555,136 @@ function normalizeInitializeConfig(config: InitializeConfig | undefined): Initia
 }
 
 /**
+ * Fluent builder for chaining text detection options and running inference in React Native.
+ */
+export class DetectTextBuilder<TResult = TextResult[]> {
+  private _source: { uri?: string; base64?: string } | null;
+  private _options: OcrRunOptions;
+
+  constructor(source: { uri?: string; base64?: string } | null = null) {
+    this._source = source;
+    this._options = {};
+  }
+
+  /** Specify the image source. */
+  image(source: ImageSource): this {
+    this._source = normalizeSource(source);
+    return this;
+  }
+
+  /** Enable or disable document unwarping. */
+  withAutoUnwarp(enabled = true): this {
+    this._options.autoUnwarp = enabled;
+    return this;
+  }
+
+  /** Enable or disable document layout reading order analysis. */
+  withLayoutReading(enabled = true): this {
+    this._options.layoutReading = enabled;
+    return this;
+  }
+
+  /** Enable or disable document orientation detection. */
+  withOrientationDetection(enabled = true): this {
+    this._options.orientationDetection = enabled;
+    return this;
+  }
+
+  /** Enable or disable text line orientation classification. */
+  withLineClassification(enabled = true): this {
+    this._options.lineClassification = enabled;
+    return this;
+  }
+
+  /** Configure pre-detection options. */
+  withPreDetection(options: PreDetectionOptions): this {
+    this._options.preDetection = { ...this._options.preDetection, ...options };
+    return this;
+  }
+
+  /** Configure detection inference options. */
+  withDetection(options: DetectionRunOptions): this {
+    this._options.detection = { ...this._options.detection, ...options };
+    return this;
+  }
+
+  /** Configure post-detection filtering options. */
+  withPostDetection(options: PostDetectionOptions): this {
+    this._options.postDetection = { ...this._options.postDetection, ...options };
+    return this;
+  }
+
+  /** Configure pre-recognition clustering options. */
+  withPreRecognition(options: PreRecognitionOptions): this {
+    this._options.preRecognition = { ...this._options.preRecognition, ...options };
+    return this;
+  }
+
+  /** Configure recognition inference options. */
+  withRecognition(options: RecognitionRunOptions): this {
+    this._options.recognition = { ...this._options.recognition, ...options };
+    return this;
+  }
+
+  /** Configure post-recognition filtering options. */
+  withPostRecognition(options: PostRecognitionOptions): this {
+    this._options.postRecognition = { ...this._options.postRecognition, ...options };
+    return this;
+  }
+
+  /** Set output format to line-level results. */
+  asLines(): DetectTextBuilder<TextResult[]> {
+    this._options.output = 'lines';
+    return this as unknown as DetectTextBuilder<TextResult[]>;
+  }
+
+  /** Set output format to word-level results. */
+  asWords(): DetectTextBuilder<TextResult[]> {
+    this._options.output = 'words';
+    return this as unknown as DetectTextBuilder<TextResult[]>;
+  }
+
+  /** Set output format to 2D spatial text layout. */
+  asSpatial(): DetectTextBuilder<string> {
+    this._options.output = 'spatial';
+    return this as unknown as DetectTextBuilder<string>;
+  }
+
+  /** Set output format to TSV (tab-separated values). */
+  asTsv(): DetectTextBuilder<string> {
+    this._options.output = 'tsv';
+    return this as unknown as DetectTextBuilder<string>;
+  }
+
+  /** Set output granularity. */
+  withOutput(granularity: 'spatial' | 'tsv'): DetectTextBuilder<string>;
+  withOutput(granularity: 'lines' | 'words'): DetectTextBuilder<TextResult[]>;
+  withOutput(granularity: OutputGranularity): DetectTextBuilder<TextResult[] | string>;
+  withOutput(granularity: OutputGranularity): DetectTextBuilder<TextResult[] | string> {
+    this._options.output = granularity;
+    return this as unknown as DetectTextBuilder<TextResult[] | string>;
+  }
+
+  /** Merge multiple options. */
+  withOptions(options: OcrRunOptions & { output: 'spatial' | 'tsv' }): DetectTextBuilder<string>;
+  withOptions(options: OcrRunOptions & { output: 'lines' | 'words' }): DetectTextBuilder<TextResult[]>;
+  withOptions(options: OcrRunOptions): this;
+  withOptions(options: OcrRunOptions): DetectTextBuilder<any> {
+    this._options = { ...this._options, ...options };
+    return this;
+  }
+
+  /** Execute OCR detection with chained options. */
+  run(source?: ImageSource): Promise<TResult> {
+    const src = source !== undefined ? normalizeSource(source) : this._source;
+    if (src === null || src === undefined) {
+      throw new Error('Image source must be provided to detectText() or run()');
+    }
+    return Rusto.detectText(src, normalizeOptions(this._options)) as Promise<TResult>;
+  }
+}
+
+/**
  * Initializes the native RustO OCR engine in React Native.
  *
  * @param config - Optional configuration with preset ('ppv6', etc.) and custom model paths.
@@ -563,54 +695,66 @@ export function initialize(config: InitializeConfig = {}): Promise<void> {
 }
 
 /**
- * Runs OCR text recognition on an image source with reconstructed 2D spatial text output.
- *
- * @param source - Image source object ({ uri }, { base64 }, or { bytes }).
- * @param options - Execution options with `output: 'spatial'`.
- * @returns Formatted 2D multi-line text layout.
+ * Closes the native RustO OCR engine and releases resources.
  */
-export function detectText(
-  source: ImageSource,
-  options: DetectTextOptions & { output: 'spatial' }
-): Promise<string>;
-
-/**
- * Runs OCR text recognition on an image source with structured line or word candidates.
- *
- * @param source - Image source object ({ uri }, { base64 }, or { bytes }).
- * @param options - Execution options with `output: 'lines'` or `output: 'words'`.
- * @returns Array of structured TextResult objects.
- */
-export function detectText(
-  source: ImageSource,
-  options?: DetectTextOptions & { output?: 'lines' | 'words' }
-): Promise<TextResult[]>;
-
-/**
- * Runs OCR text recognition on an image source.
- *
- * @param source - Image source object ({ uri }, { base64 }, or { bytes }).
- * @param options - Optional execution options.
- * @returns Structured TextResult array or spatial string depending on output option.
- */
-export function detectText(
-  source: ImageSource,
-  options?: DetectTextOptions
-): Promise<TextResult[] | string>;
-
-export function detectText(
-  source: ImageSource,
-  options: DetectTextOptions = {}
-): Promise<TextResult[] | string> {
-  return Rusto.detectText(normalizeSource(source), normalizeOptions(options));
+export function close(): Promise<void> {
+  return Rusto.close ? Rusto.close() : Promise.resolve();
 }
 
 /**
- * Runs document layout analysis on an image source.
- *
- * @param source - Image source object ({ uri }, { base64 }, or { bytes }).
- * @returns Array of detected LayoutRegion objects.
+ * Checks whether the native RustO OCR engine is ready for inference.
  */
-export function detectLayout(source: ImageSource): Promise<LayoutRegion[]> {
-  return Rusto.detectLayout(normalizeSource(source));
+export function isReady(): Promise<boolean> {
+  return Rusto.isReady ? Rusto.isReady() : Promise.resolve(true);
+}
+
+/**
+ * Returns the underlying RustO engine version string.
+ */
+export function version(): Promise<string> {
+  return Rusto.version ? Rusto.version() : Promise.resolve('0.4.0');
+}
+
+
+/**
+ * Starts fluent builder chaining for OCR text detection.
+ */
+export function detectText(): DetectTextBuilder;
+/**
+ * Starts fluent builder chaining for OCR text detection with image source.
+ */
+export function detectText(source: ImageSource): DetectTextBuilder;
+/**
+ * Runs OCR text recognition on an image source with reconstructed 2D spatial text output.
+ */
+export function detectText(
+  source: ImageSource,
+  options: OcrRunOptions & { output: 'spatial' }
+): Promise<string>;
+/**
+ * Runs OCR text recognition on an image source with structured line or word candidates.
+ */
+export function detectText(
+  source: ImageSource,
+  options?: OcrRunOptions & { output?: 'lines' | 'words' }
+): Promise<TextResult[]>;
+/**
+ * Runs OCR text recognition on an image source.
+ */
+export function detectText(
+  source: ImageSource,
+  options?: OcrRunOptions
+): Promise<TextResult[] | string>;
+export function detectText(
+  source?: ImageSource,
+  options?: OcrRunOptions
+): DetectTextBuilder | Promise<TextResult[] | string> {
+  if (arguments.length === 0) {
+    return new DetectTextBuilder();
+  }
+  const normSource = normalizeSource(source!);
+  if (options !== undefined) {
+    return Rusto.detectText(normSource, normalizeOptions(options));
+  }
+  return new DetectTextBuilder(normSource);
 }

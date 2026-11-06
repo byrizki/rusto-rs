@@ -1,6 +1,6 @@
 [package]
 name = "rusto-node"
-version = "0.3.2"
+version = "0.4.0"
 edition = "2021"
 
 [lib]
@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 [dependencies]
 napi = { version = "2.16", default-features = false, features = ["napi4"] }
 napi-derive = "2.16"
-rusto-rs = { package = "rusto-rs", path = "../..", default-features = false }
+rusto-rs = { package = "rusto-rs", path = "../..", default-features = false, features = ["rten"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 

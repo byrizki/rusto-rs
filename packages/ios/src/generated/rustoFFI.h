@@ -263,16 +263,6 @@ uint64_t uniffi_rusto_fn_constructor_rusto_initialize(RustBuffer config, RustCal
 uint64_t uniffi_rusto_fn_constructor_rusto_initialize_from_json(RustBuffer config_json, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_DETECT_LAYOUT
-#define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_DETECT_LAYOUT
-RustBuffer uniffi_rusto_fn_method_rusto_detect_layout(uint64_t ptr, RustBuffer source, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_DETECT_LAYOUT_RGB
-#define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_DETECT_LAYOUT_RGB
-RustBuffer uniffi_rusto_fn_method_rusto_detect_layout_rgb(uint64_t ptr, RustBuffer pixels, uint32_t width, uint32_t height, uint64_t stride, RustCallStatus *_Nonnull out_status
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_DETECT_TEXT
 #define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_DETECT_TEXT
 RustBuffer uniffi_rusto_fn_method_rusto_detect_text(uint64_t ptr, RustBuffer source, RustBuffer options, RustCallStatus *_Nonnull out_status
@@ -283,14 +273,9 @@ RustBuffer uniffi_rusto_fn_method_rusto_detect_text(uint64_t ptr, RustBuffer sou
 RustBuffer uniffi_rusto_fn_method_rusto_detect_text_rgb(uint64_t ptr, RustBuffer pixels, uint32_t width, uint32_t height, uint64_t stride, RustBuffer options, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_UNWARP_IMAGE
-#define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_UNWARP_IMAGE
-RustBuffer uniffi_rusto_fn_method_rusto_unwarp_image(uint64_t ptr, RustBuffer source, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_UNWARP_IMAGE_RGB
-#define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_UNWARP_IMAGE_RGB
-RustBuffer uniffi_rusto_fn_method_rusto_unwarp_image_rgb(uint64_t ptr, RustBuffer pixels, uint32_t width, uint32_t height, uint64_t stride, RustCallStatus *_Nonnull out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_IS_READY
+#define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_IS_READY
+int8_t uniffi_rusto_fn_method_rusto_is_ready(uint64_t ptr, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_METHOD_RUSTO_VERSION
@@ -317,11 +302,6 @@ RustBuffer uniffi_rusto_fn_func_create_initialize_config_ppv6(RustBuffer det_mod
 #define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_DEFAULT_OCR_RUN_OPTIONS
 RustBuffer uniffi_rusto_fn_func_default_ocr_run_options(RustCallStatus *_Nonnull out_status
     
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_DOWNLOAD_ALL_MODELS
-#define UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_DOWNLOAD_ALL_MODELS
-RustBuffer uniffi_rusto_fn_func_download_all_models(RustBuffer cache_dir, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_FN_FUNC_DOWNLOAD_MODEL
@@ -619,12 +599,6 @@ uint16_t uniffi_rusto_checksum_func_default_ocr_run_options(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_DOWNLOAD_ALL_MODELS
-#define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_DOWNLOAD_ALL_MODELS
-uint16_t uniffi_rusto_checksum_func_download_all_models(void
-    
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_DOWNLOAD_MODEL
 #define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_DOWNLOAD_MODEL
 uint16_t uniffi_rusto_checksum_func_download_model(void
@@ -634,18 +608,6 @@ uint16_t uniffi_rusto_checksum_func_download_model(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_RUSTO_VERSION
 #define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_FUNC_RUSTO_VERSION
 uint16_t uniffi_rusto_checksum_func_rusto_version(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_DETECT_LAYOUT
-#define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_DETECT_LAYOUT
-uint16_t uniffi_rusto_checksum_method_rusto_detect_layout(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_DETECT_LAYOUT_RGB
-#define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_DETECT_LAYOUT_RGB
-uint16_t uniffi_rusto_checksum_method_rusto_detect_layout_rgb(void
     
 );
 #endif
@@ -661,15 +623,9 @@ uint16_t uniffi_rusto_checksum_method_rusto_detect_text_rgb(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_UNWARP_IMAGE
-#define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_UNWARP_IMAGE
-uint16_t uniffi_rusto_checksum_method_rusto_unwarp_image(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_UNWARP_IMAGE_RGB
-#define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_UNWARP_IMAGE_RGB
-uint16_t uniffi_rusto_checksum_method_rusto_unwarp_image_rgb(void
+#ifndef UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_IS_READY
+#define UNIFFI_FFIDEF_UNIFFI_RUSTO_CHECKSUM_METHOD_RUSTO_IS_READY
+uint16_t uniffi_rusto_checksum_method_rusto_is_ready(void
     
 );
 #endif

@@ -1,54 +1,207 @@
 import type {
-  DetectTextOptions,
+  OcrRunOptions,
   InitializeConfig,
   ImageSource,
   TextResult,
+  PreDetectionOptions,
+  DetectionRunOptions,
+  PostDetectionOptions,
+  PreRecognitionOptions,
+  RecognitionRunOptions,
+  PostRecognitionOptions,
+  OutputGranularity,
 } from '../types/index.js';
-import {
-  normalizeInitializeConfig,
-  normalizeOptions,
-  validateImageSource,
-} from '../utils/validator.js';
-import { extractImageData, type RawImageData } from '../utils/imageUtils.js';
-import {
-  calculateFrameFromQuad,
-  clusterLineSegments,
-  formatSpatialText,
-  groupCandidatesIntoLines,
-  sortCandidatesReadingOrder,
-  type QuadPoints,
-} from '../utils/geometry.js';
-import { orderWithTransformer } from '../utils/readingOrder.js';
+import { extractImageData } from '../utils/imageUtils.js';
 import {
   loadModelAssets,
   initWasmRuntime,
   RtenOcrPipeline,
-  RtenModel,
   type LoadedModels,
 } from './wasmLoader.js';
 import { OcrWorkerBridge } from './workerBridge.js';
+
+interface RgbSource {
+  pixels: Uint8Array | ArrayBuffer;
+  width: number;
+  height: number;
+  stride?: number | null;
+}
+
+/**
+ * Fluent builder for chaining text detection options and running inference.
+ */
+export class DetectTextBuilder<TResult = TextResult[]> {
+  private _engine: WebOcrEngine;
+  private _source: ImageSource | null = null;
+  private _rgbSource: RgbSource | null = null;
+  private _options: OcrRunOptions = {};
+
+  constructor(engine: WebOcrEngine, source: ImageSource | null = null) {
+    this._engine = engine;
+    this._source = source;
+  }
+
+  /** Specify the image source (file path, URL, Blob, Canvas, ImageData, or byte buffer). */
+  image(source: ImageSource): this {
+    this._source = source;
+    this._rgbSource = null;
+    return this;
+  }
+
+  /** Specify raw interleaved 24-bit RGB pixel buffer. */
+  rgb(
+    pixels: Uint8Array | ArrayBuffer,
+    width: number,
+    height: number,
+    stride?: number | null
+  ): this {
+    this._rgbSource = { pixels, width, height, stride };
+    this._source = null;
+    return this;
+  }
+
+  /** Enable or disable document unwarping. */
+  withAutoUnwarp(enabled = true): this {
+    this._options.autoUnwarp = enabled;
+    return this;
+  }
+
+  /** Enable or disable document layout reading order analysis. */
+  withLayoutReading(enabled = true): this {
+    this._options.layoutReading = enabled;
+    return this;
+  }
+
+  /** Enable or disable document orientation detection. */
+  withOrientationDetection(enabled = true): this {
+    this._options.orientationDetection = enabled;
+    return this;
+  }
+
+  /** Enable or disable text line orientation classification. */
+  withLineClassification(enabled = true): this {
+    this._options.lineClassification = enabled;
+    return this;
+  }
+
+  /** Configure pre-detection options. */
+  withPreDetection(options: PreDetectionOptions): this {
+    this._options.preDetection = { ...this._options.preDetection, ...options };
+    return this;
+  }
+
+  /** Configure detection inference options. */
+  withDetection(options: DetectionRunOptions): this {
+    this._options.detection = { ...this._options.detection, ...options };
+    return this;
+  }
+
+  /** Configure post-detection filtering options. */
+  withPostDetection(options: PostDetectionOptions): this {
+    this._options.postDetection = { ...this._options.postDetection, ...options };
+    return this;
+  }
+
+  /** Configure pre-recognition clustering options. */
+  withPreRecognition(options: PreRecognitionOptions): this {
+    this._options.preRecognition = { ...this._options.preRecognition, ...options };
+    return this;
+  }
+
+  /** Configure recognition inference options. */
+  withRecognition(options: RecognitionRunOptions): this {
+    this._options.recognition = { ...this._options.recognition, ...options };
+    return this;
+  }
+
+  /** Configure post-recognition filtering options. */
+  withPostRecognition(options: PostRecognitionOptions): this {
+    this._options.postRecognition = { ...this._options.postRecognition, ...options };
+    return this;
+  }
+
+  /** Set output format to line-level results. */
+  asLines(): DetectTextBuilder<TextResult[]> {
+    this._options.output = 'lines';
+    return this as unknown as DetectTextBuilder<TextResult[]>;
+  }
+
+  /** Set output format to word-level results. */
+  asWords(): DetectTextBuilder<TextResult[]> {
+    this._options.output = 'words';
+    return this as unknown as DetectTextBuilder<TextResult[]>;
+  }
+
+  /** Set output format to 2D spatial text layout. */
+  asSpatial(): DetectTextBuilder<string> {
+    this._options.output = 'spatial';
+    return this as unknown as DetectTextBuilder<string>;
+  }
+
+  /** Set output format to TSV (tab-separated values). */
+  asTsv(): DetectTextBuilder<string> {
+    this._options.output = 'tsv';
+    return this as unknown as DetectTextBuilder<string>;
+  }
+
+  /** Set output granularity. */
+  withOutput(granularity: 'spatial' | 'tsv'): DetectTextBuilder<string>;
+  withOutput(granularity: 'lines' | 'words'): DetectTextBuilder<TextResult[]>;
+  withOutput(granularity: OutputGranularity): DetectTextBuilder<TextResult[] | string>;
+  withOutput(granularity: OutputGranularity): DetectTextBuilder<TextResult[] | string> {
+    this._options.output = granularity;
+    return this as unknown as DetectTextBuilder<TextResult[] | string>;
+  }
+
+  /** Merge multiple options. */
+  withOptions(options: OcrRunOptions & { output: 'spatial' | 'tsv' }): DetectTextBuilder<string>;
+  withOptions(options: OcrRunOptions & { output: 'lines' | 'words' }): DetectTextBuilder<TextResult[]>;
+  withOptions(options: OcrRunOptions): this;
+  withOptions(options: OcrRunOptions): DetectTextBuilder<any> {
+    this._options = { ...this._options, ...options };
+    return this;
+  }
+
+  /** Execute OCR detection with chained options. */
+  async run(source?: ImageSource): Promise<TResult> {
+    if (source !== undefined) {
+      return this._engine.executeDetectText(source, this._options) as Promise<TResult>;
+    }
+    if (this._rgbSource !== null) {
+      return this._engine.executeDetectTextRgb(
+        this._rgbSource.pixels,
+        this._rgbSource.width,
+        this._rgbSource.height,
+        this._rgbSource.stride,
+        this._options
+      ) as Promise<TResult>;
+    }
+    if (this._source !== null) {
+      return this._engine.executeDetectText(this._source, this._options) as Promise<TResult>;
+    }
+    throw new Error('Image source or RGB buffer must be provided to detectText() or run()');
+  }
+}
 
 export class WebOcrEngine {
   private initialized = false;
   private currentConfig: InitializeConfig = {};
   private loadedModels: LoadedModels = {};
   private pipeline: RtenOcrPipeline | null = null;
-  private orderModel: RtenModel | null = null;
   private workerBridge: OcrWorkerBridge = new OcrWorkerBridge();
 
   /**
    * Initializes the Web OCR engine with RTen WebAssembly runtime and models.
    */
   public async initialize(config: InitializeConfig = {}): Promise<void> {
-    const validConfig = normalizeInitializeConfig(config);
-    this.currentConfig = { ...validConfig };
+    this.currentConfig = { ...config };
 
     // 1. Initialize WebAssembly RTen runtime
-    await initWasmRuntime(validConfig.wasmUrl);
+    await initWasmRuntime(config.wasmUrl);
 
     // 2. Load model buffers if provided
-    if (validConfig.models) {
-      this.loadedModels = await loadModelAssets(validConfig.models);
+    if (config.models) {
+      this.loadedModels = await loadModelAssets(config.models);
     }
 
     // 3. Construct RTen OCR Pipeline if models and dictionary are present
@@ -64,19 +217,10 @@ export class WebOcrEngine {
       );
     }
 
-    // 4. Construct Neural Reading Order Model if order asset is present
-    if (this.loadedModels.order) {
+    // 4. Initialize worker bridge if enabled and in browser environment
+    if (config.worker && typeof Worker !== 'undefined') {
       try {
-        this.orderModel = new RtenModel(this.loadedModels.order);
-      } catch (err) {
-        console.warn('Failed to initialize neural reading order model:', err);
-      }
-    }
-
-    // 5. Initialize worker bridge if enabled and in browser environment
-    if (validConfig.worker && typeof Worker !== 'undefined') {
-      try {
-        await this.workerBridge.initialize(validConfig);
+        await this.workerBridge.initialize(config);
       } catch (err) {
         console.warn('Worker initialization failed; falling back to main-thread RTen engine:', err);
       }
@@ -86,30 +230,125 @@ export class WebOcrEngine {
   }
 
   /**
-   * Checks if the engine has been successfully initialized.
+   * Checks if the engine has been successfully initialized and is ready for inference.
    */
-  public isInitialized(): boolean {
+  public isReady(): boolean {
     return this.initialized;
   }
 
   /**
+   * Checks if the engine has been successfully initialized.
+   */
+  public isInitialized(): boolean {
+    return this.isReady();
+  }
+
+  /**
+   * Returns the Web OCR engine library version string.
+   */
+  public version(): string {
+    return '0.4.0';
+  }
+
+  /**
+   * Downloads or pre-fetches model asset URLs for a specific pipeline ahead of time.
+   */
+  public async downloadModel(model = 'indraocr', _lang?: string, _cacheDir?: string): Promise<string[]> {
+    return [
+      `https://huggingface.co/byrizki/rusto-models/resolve/main/${model}/det.rten`,
+      `https://huggingface.co/byrizki/rusto-models/resolve/main/${model}/rec.rten`,
+      `https://huggingface.co/byrizki/rusto-models/resolve/main/${model}/meta.json`,
+    ];
+  }
+
+  /**
+   * Returns a fluent builder for chaining detection options.
+   */
+  public detectText(): DetectTextBuilder;
+  /**
+   * Returns a fluent builder for chaining detection options for a given source.
+   */
+  public detectText(source: ImageSource): DetectTextBuilder;
+  /**
+   * Runs text detection and recognition on an image source returning spatial layout.
+   */
+  public detectText(
+    source: ImageSource,
+    options: OcrRunOptions & { output: 'spatial' }
+  ): Promise<string>;
+  /**
+   * Runs text detection and recognition on an image source returning lines or words.
+   */
+  public detectText(
+    source: ImageSource,
+    options?: OcrRunOptions & { output?: 'lines' | 'words' }
+  ): Promise<TextResult[]>;
+  /**
    * Runs text detection and recognition on an image source.
    */
-  public async detectText(
+  public detectText(
     source: ImageSource,
-    options: DetectTextOptions & { output: 'spatial' }
-  ): Promise<string>;
-  public async detectText(
-    source: ImageSource,
-    options?: DetectTextOptions & { output?: 'lines' | 'words' }
-  ): Promise<TextResult[]>;
-  public async detectText(
-    source: ImageSource,
-    options?: DetectTextOptions
+    options?: OcrRunOptions
   ): Promise<TextResult[] | string>;
-  public async detectText(
+  public detectText(
+    source?: ImageSource,
+    options?: OcrRunOptions
+  ): DetectTextBuilder | Promise<TextResult[] | string> {
+    if (arguments.length === 0) {
+      return new DetectTextBuilder(this);
+    }
+    if (arguments.length === 1 || options === undefined) {
+      return new DetectTextBuilder(this, source!);
+    }
+    return this.executeDetectText(source!, options);
+  }
+
+  /**
+   * Detects text from raw interleaved 24-bit RGB pixel buffer returning spatial layout.
+   */
+  public detectTextRgb(
+    pixels: Uint8Array | ArrayBuffer,
+    width: number,
+    height: number,
+    stride: number | null | undefined,
+    options: OcrRunOptions & { output: 'spatial' }
+  ): Promise<string>;
+  /**
+   * Detects text from raw interleaved 24-bit RGB pixel buffer returning lines or words.
+   */
+  public detectTextRgb(
+    pixels: Uint8Array | ArrayBuffer,
+    width: number,
+    height: number,
+    stride?: number | null,
+    options?: OcrRunOptions & { output?: 'lines' | 'words' }
+  ): Promise<TextResult[]>;
+  /**
+   * Detects text from raw interleaved 24-bit RGB pixel buffer.
+   */
+  public detectTextRgb(
+    pixels: Uint8Array | ArrayBuffer,
+    width: number,
+    height: number,
+    stride?: number | null,
+    options?: OcrRunOptions
+  ): Promise<TextResult[] | string>;
+  public detectTextRgb(
+    pixels: Uint8Array | ArrayBuffer,
+    width: number,
+    height: number,
+    stride?: number | null,
+    options?: OcrRunOptions
+  ): Promise<TextResult[] | string> {
+    return this.executeDetectTextRgb(pixels, width, height, stride, options);
+  }
+
+  /**
+   * Direct execution of text detection on an image source with given options.
+   */
+  public async executeDetectText(
     source: ImageSource,
-    options: DetectTextOptions = {}
+    options: OcrRunOptions = {}
   ): Promise<TextResult[] | string> {
     if (!this.initialized) {
       throw new Error(
@@ -117,202 +356,92 @@ export class WebOcrEngine {
       );
     }
 
-    validateImageSource(source);
-    const validOptions = normalizeOptions(options);
-
-    // 1. Extract raw pixel data and dimensions
     const rawImage = await extractImageData(source);
 
-    // 2. If worker bridge is active, delegate execution to worker thread (prevents UI freeze)
     if (this.workerBridge.isAvailable()) {
-      return await this.workerBridge.detect(rawImage, validOptions);
+      return await this.workerBridge.detect(rawImage, options);
     }
 
-    // 3. Main-thread execution with event-loop yield
-    return await this.executePipeline(rawImage, validOptions);
+    return await this.executePipeline(rawImage.data, rawImage.width, rawImage.height, rawImage.channels, null, options);
   }
 
   /**
-   * Pipeline execution running RTen model inference and post-processing.
+   * Direct execution of text detection on raw RGB pixels with given options.
+   */
+  public async executeDetectTextRgb(
+    pixels: Uint8Array | ArrayBuffer,
+    width: number,
+    height: number,
+    stride?: number | null,
+    options: OcrRunOptions = {}
+  ): Promise<TextResult[] | string> {
+    if (!this.initialized) {
+      throw new Error(
+        'Rusto Web engine is not initialized. Call initialize() before calling detectText().'
+      );
+    }
+
+    if (this.workerBridge.isAvailable()) {
+      return await this.workerBridge.detectRgb(pixels, width, height, stride, options);
+    }
+
+    return await this.executePipeline(pixels, width, height, 3, stride, options);
+  }
+
+  /**
+   * Pipeline execution running RTen model inference and post-processing in WebAssembly.
    * Yields to the event loop so that animations/render frames remain fluid.
    */
   private async executePipeline(
-    image: RawImageData,
-    options: DetectTextOptions
+    pixels: Uint8Array | Uint8ClampedArray | ArrayBuffer,
+    width: number,
+    height: number,
+    channels: number,
+    stride: number | null | undefined,
+    options: OcrRunOptions = {}
   ): Promise<TextResult[] | string> {
-    const outputMode = options.output ?? 'lines';
-    const lineYThreshold = options.lineYThreshold ?? 0.5;
-    const wordXThreshold = options.wordXThreshold ?? 0.4;
-    const minScore = typeof options.textScore === 'number' ? options.textScore : 0.5;
+    if (!this.pipeline) {
+      return options.output === 'spatial' ? '' : [];
+    }
 
-    let rawCandidates: TextResult[] = [];
-
-    if (this.pipeline) {
-      // Yield to the event loop once before heavy computation to allow the browser to paint loading states
-      await new Promise<void>((resolve) => {
-        if (typeof setTimeout === 'function') {
-          setTimeout(resolve, 0);
-        } else {
-          resolve();
-        }
-      });
-
-      const detThresh = options.postprocess?.threshold ?? 0.3;
-      const boxThresh = options.postprocess?.boxThreshold ?? 0.5;
-      const unclipRatio = options.postprocess?.unclipRatio ?? 1.8;
-      const applyCalibration =
-        options.calibration?.enabled ??
-        options.calibration?.descreenBackground ??
-        this.currentConfig.calibration?.enabled ??
-        true;
-      const maxSideLen = options.detection?.limitSideLen ?? options.maxSideLen ?? 960;
-
-      const pixelBytes =
-        image.data instanceof Uint8Array
-          ? image.data
-          : new Uint8Array(image.data.buffer, image.data.byteOffset, image.data.byteLength);
-
-      const descreenStrength =
-        options.calibration?.descreenStrength ??
-        this.currentConfig.calibration?.descreenStrength ??
-        1.15;
-
-      const jsonStr = this.pipeline.detectAndRecognize(
-        pixelBytes,
-        image.width,
-        image.height,
-        detThresh,
-        boxThresh,
-        unclipRatio,
-        applyCalibration,
-        maxSideLen,
-        descreenStrength
-      );
-
-      try {
-        const parsed = JSON.parse(jsonStr) as Array<{
-          text: string;
-          score: number;
-          box_points: [[number, number], [number, number], [number, number], [number, number]];
-          frame: { left: number; top: number; width: number; height: number };
-        }>;
-        rawCandidates = parsed.map((item) => ({
-          text: item.text,
-          score: item.score,
-          box_points: item.box_points as QuadPoints,
-          frame: { ...item.frame },
-        }));
-      } catch (err) {
-        console.error('Failed to parse RTen OCR results:', err);
-        rawCandidates = [];
+    // Yield to the event loop once before computation to allow the browser to paint
+    await new Promise<void>((resolve) => {
+      if (typeof setTimeout === 'function') {
+        setTimeout(resolve, 0);
+      } else {
+        resolve();
       }
+    });
+
+    const pixelBytes =
+      pixels instanceof Uint8Array
+        ? pixels
+        : pixels instanceof Uint8ClampedArray
+          ? new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength)
+          : new Uint8Array(pixels);
+
+    const optionsJson = options ? JSON.stringify(options) : null;
+    const jsonStr = this.pipeline.detectText(
+      pixelBytes,
+      width,
+      height,
+      channels,
+      stride ?? null,
+      optionsJson
+    );
+
+    try {
+      const parsed = JSON.parse(jsonStr);
+      return parsed as TextResult[] | string;
+    } catch {
+      return jsonStr;
     }
-
-    // Filter by score threshold
-    const filteredCandidates = rawCandidates.filter((item) => item.score >= minScore);
-
-    const enableReadingOrder =
-      Boolean(options.enableReadingOrder ?? this.currentConfig.enableReadingOrder) ||
-      (options.layoutModel !== undefined && options.layoutModel !== 'none');
-
-    // Group into rows based on vertical center tolerance or multi-column reading order
-    let groupedLines: TextResult[][];
-    if (enableReadingOrder) {
-      const isIndraLayout =
-        options.layoutModel === 'indra' || this.currentConfig.layoutModel === 'indra';
-      const useNeural =
-        Boolean(this.orderModel) && (isIndraLayout || options.enableReadingOrder);
-
-      const orderedCandidates =
-        useNeural && this.orderModel && filteredCandidates.length >= 2
-          ? orderWithTransformer(filteredCandidates, this.orderModel, image.width, image.height)
-          : sortCandidatesReadingOrder(
-              filteredCandidates,
-              lineYThreshold,
-              image.width
-            );
-      groupedLines = [];
-      let currentLine: TextResult[] = [];
-      let currentAvgY = 0;
-      for (const item of orderedCandidates) {
-        const itemCenterY = item.frame.top + item.frame.height / 2;
-        if (currentLine.length === 0) {
-          currentLine = [item];
-          currentAvgY = itemCenterY;
-        } else {
-          const avgY = currentAvgY / currentLine.length;
-          const avgH = currentLine.reduce((s, c) => s + c.frame.height, 0) / currentLine.length;
-          const tolerance = Math.max(1, avgH * lineYThreshold);
-          const prev = currentLine[currentLine.length - 1]!;
-          const gap = item.frame.left - (prev.frame.left + prev.frame.width);
-          if (
-            Math.abs(itemCenterY - avgY) <= tolerance &&
-            gap <= avgH * (options.wordXThreshold ?? 0.4) * 2.5
-          ) {
-            currentLine.push(item);
-            currentAvgY += itemCenterY;
-          } else {
-            groupedLines.push(currentLine);
-            currentLine = [item];
-            currentAvgY = itemCenterY;
-          }
-        }
-      }
-      if (currentLine.length > 0) groupedLines.push(currentLine);
-    } else {
-      groupedLines = groupCandidatesIntoLines(filteredCandidates, lineYThreshold);
-    }
-
-    if (outputMode === 'spatial') {
-      return formatSpatialText(groupedLines, wordXThreshold);
-    }
-
-    if (outputMode === 'words') {
-      const words: TextResult[] = [];
-      for (const line of groupedLines) {
-        for (const item of line) {
-          const parts = item.text.split(/\s+/).filter(Boolean);
-          if (parts.length <= 1) {
-            words.push(item);
-          } else {
-            const charWidth = item.frame.width / Math.max(1, item.text.length);
-            let currentLeft = item.frame.left;
-            for (const part of parts) {
-              const partWidth = Math.max(1, part.length * charWidth);
-              const partQuad: QuadPoints = [
-                [currentLeft, item.frame.top],
-                [currentLeft + partWidth, item.frame.top],
-                [currentLeft + partWidth, item.frame.top + item.frame.height],
-                [currentLeft, item.frame.top + item.frame.height],
-              ];
-              words.push({
-                text: part,
-                score: item.score,
-                box_points: partQuad,
-                frame: calculateFrameFromQuad(partQuad),
-              });
-              currentLeft += partWidth + charWidth;
-            }
-          }
-        }
-      }
-      return words;
-    }
-
-    // Default 'lines': return clustered line-level candidates
-    const flatLines: TextResult[] = [];
-    for (const line of groupedLines) {
-      const segments = clusterLineSegments(line, wordXThreshold);
-      flatLines.push(...segments);
-    }
-
-    return flatLines;
   }
 
   /**
-   * Terminates active workers and cleans up engine resources.
+   * Closes the engine and cleans up worker and model resources.
    */
-  public terminate(): void {
+  public close(): void {
     this.workerBridge.terminate();
     if (this.pipeline) {
       this.pipeline.free();

@@ -24,38 +24,43 @@ export const defaultProgressState: ProgressState = {
 };
 
 export interface OcrConfig {
-  // Confidence & filtering
+  // Phase 6: Post-recognition filtering
   textScore: number;
-  // Layout & reading order
+  // Phase 4: Pre-recognition grouping
   lineYThreshold: number;
   wordXThreshold: number;
+  // Auxiliary: Layout & reading order
+  layoutReading: boolean;
   enableReadingOrder: boolean;
   layoutModel: LayoutModelId;
-  // Recognition batching
+  // Phase 5: Recognition batching
   recBatchNum: number;
-  // Stages
-  classification: boolean;
-  orientation: boolean;
-  // Resizing overrides
+  // Auxiliary: Document & line transforms
+  autoUnwarp: boolean;
+  lineClassification: boolean;
+  classification?: boolean;
+  orientationDetection: boolean;
+  orientation?: boolean;
+  // Phase 3: Post-detection overrides & resizing
   enableResize: boolean;
   minHeight: number;
   maxSideLen: number;
   minSideLen: number;
   widthHeightRatio: number;
-  // Detection overrides
+  // Phase 2: Detection overrides
   detectionLimitSideLen: number;
   detectionLimitType: 'max' | 'min';
-  // Postprocess overrides
+  // Phase 3: Post-detection DBNet thresholds
   postprocessThreshold: number;
   postprocessBoxThreshold: number;
   postprocessUnclipRatio: number;
   postprocessMaxCandidates: number;
   postprocessUseDilation: boolean;
-  // Calibration overrides
+  // Phase 1: Pre-detection overrides (calibration & descreening)
   calibrationEnabled: boolean;
   descreenBackground: boolean;
   descreenStrength: number;
-  // Optimization overrides
+  // Phase 1: Pre-detection optimization & downscale
   optimizationEnabled: boolean;
   optimizationTargetMaxSide: number;
   cropPaddingX: number;
@@ -68,10 +73,14 @@ export const defaultOcrConfig: OcrConfig = {
   textScore: 0.5,
   lineYThreshold: 0.5,
   wordXThreshold: 0.4,
+  layoutReading: false,
   enableReadingOrder: false,
   layoutModel: 'heuristic',
   recBatchNum: 1,
+  autoUnwarp: false,
+  lineClassification: false,
   classification: false,
+  orientationDetection: false,
   orientation: false,
   enableResize: false,
   minHeight: 32,
@@ -107,16 +116,38 @@ export interface ActiveRunConfig {
   rawConfig: OcrConfig;
 }
 
-function applyResizeOptions(opts: DetectTextOptions, config: OcrConfig): void {
-  if (!config.enableResize) return;
-  if (config.minHeight > 0) opts.minHeight = config.minHeight;
-  if (config.maxSideLen > 0) opts.maxSideLen = config.maxSideLen;
-  if (config.minSideLen > 0 && config.minSideLen <= (config.maxSideLen || Infinity)) {
-    opts.minSideLen = config.minSideLen;
+function buildPreDetectionConfig(config: OcrConfig): Record<string, unknown> | undefined {
+  const pre: Record<string, unknown> = {};
+  if (config.calibrationEnabled && config.descreenBackground && config.descreenStrength > 0) {
+    pre.descreenStrength = config.descreenStrength;
   }
-  if (config.widthHeightRatio > 0 || config.widthHeightRatio === -1) {
-    opts.widthHeightRatio = config.widthHeightRatio;
+  if (config.optimizationEnabled && config.optimizationTargetMaxSide > 0) {
+    pre.targetMaxSide = config.optimizationTargetMaxSide;
   }
+  if (config.cropPaddingX > 0) pre.cropPaddingX = config.cropPaddingX;
+  if (config.cropPaddingY > 0) pre.cropPaddingY = config.cropPaddingY;
+  return Object.keys(pre).length > 0 ? pre : undefined;
+}
+
+function buildPostDetectionConfig(config: OcrConfig): Record<string, unknown> {
+  const post: Record<string, unknown> = {
+    threshold: config.postprocessThreshold,
+    boxThreshold: config.postprocessBoxThreshold,
+    unclipRatio: config.postprocessUnclipRatio,
+    maxCandidates: config.postprocessMaxCandidates,
+    useDilation: config.postprocessUseDilation,
+  };
+  if (config.enableResize) {
+    if (config.minHeight > 0) post.minHeight = config.minHeight;
+    if (config.maxSideLen > 0) post.maxSideLen = config.maxSideLen;
+    if (config.minSideLen > 0 && config.minSideLen <= (config.maxSideLen || Infinity)) {
+      post.minSideLen = config.minSideLen;
+    }
+    if (config.widthHeightRatio > 0 || config.widthHeightRatio === -1) {
+      post.widthHeightRatio = config.widthHeightRatio;
+    }
+  }
+  return post;
 }
 
 export function buildDetectTextOptions(
@@ -124,43 +155,34 @@ export function buildDetectTextOptions(
   outputMode: OutputGranularity
 ): DetectTextOptions {
   const isSpatial = outputMode === 'spatial';
-  const isReadingOrderActive =
+  const isReadingOrderActive = Boolean(
+    config.layoutReading ||
     config.enableReadingOrder ||
-    (config.layoutModel !== undefined && config.layoutModel !== 'none');
-  const opts: DetectTextOptions = {
+    (config.layoutModel !== undefined && config.layoutModel !== 'none')
+  );
+
+  return {
     output: (isSpatial ? 'lines' : outputMode) as OutputGranularity,
-    textScore: config.textScore,
-    lineYThreshold: config.lineYThreshold,
-    wordXThreshold: config.wordXThreshold,
-    enableReadingOrder: isReadingOrderActive,
-    layoutModel: config.layoutModel,
-    classification: config.classification,
-    orientation: config.orientation,
+    autoUnwarp: Boolean(config.autoUnwarp),
+    layoutReading: isReadingOrderActive,
+    orientationDetection: Boolean(config.orientationDetection ?? config.orientation),
+    lineClassification: Boolean(config.lineClassification ?? config.classification),
+    preDetection: buildPreDetectionConfig(config),
     detection: {
       limitSideLen: config.detectionLimitSideLen,
       limitType: config.detectionLimitType,
     },
-    postprocess: {
-      threshold: config.postprocessThreshold,
-      boxThreshold: config.postprocessBoxThreshold,
-      unclipRatio: config.postprocessUnclipRatio,
-      maxCandidates: config.postprocessMaxCandidates,
-      useDilation: config.postprocessUseDilation,
+    postDetection: buildPostDetectionConfig(config),
+    preRecognition: {
+      lineYThreshold: config.lineYThreshold,
+      wordXThreshold: config.wordXThreshold,
     },
-    calibration: {
-      enabled: config.calibrationEnabled,
-      descreenBackground: config.descreenBackground,
-      descreenStrength: config.descreenStrength,
+    recognition: {
+      batchSize: config.recBatchNum,
     },
-    optimization: {
-      enabled: config.optimizationEnabled,
-      targetMaxSide: config.optimizationTargetMaxSide,
-      cropPaddingX: config.cropPaddingX,
-      cropPaddingY: config.cropPaddingY,
+    postRecognition: {
+      scoreThreshold: config.textScore,
     },
-    webgpu: config.useWebGpu,
+    webgpu: Boolean(config.useWebGpu),
   };
-
-  applyResizeOptions(opts, config);
-  return opts;
 }

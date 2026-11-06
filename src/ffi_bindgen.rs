@@ -83,6 +83,8 @@ pub enum OutputGranularity {
     Words,
     /// Reconstruct a 2D spatial text layout preserving visual arrangement.
     Spatial,
+    /// Export formatted TSV (tab-separated values).
+    Tsv,
 }
 
 /// Universal image input source for OCR detection.
@@ -103,22 +105,18 @@ pub enum DetectTextResult {
     Spatial { text: String },
 }
 
-/// Post-processing options for DBNet polygon detection and binarization.
+/// Pre-detection image conditioning and resolution optimization options.
 #[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PostprocessRunOptions {
-    /// Binarization probability cutoff threshold. Default: 0.3.
-    pub threshold: Option<f32>,
-    /// Polygon contour score confidence threshold. Default: 0.6.
-    pub box_threshold: Option<f32>,
-    /// Maximum candidate text boxes to detect per image. Default: 1000.
-    pub max_candidates: Option<i32>,
-    /// Polygon unclip expansion ratio. Default: 1.5 - 2.0.
-    pub unclip_ratio: Option<f32>,
-    /// Enable morphological dilation to connect broken text strokes.
-    pub use_dilation: Option<bool>,
-    /// DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
-    pub score_mode: Option<String>,
+pub struct PreDetectionOptions {
+    /// Descreen filtering strength (0.0 - 1.0).
+    pub descreen_strength: Option<f32>,
+    /// Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
+    pub target_max_side: Option<u32>,
+    /// Horizontal padding around bounding box crops in pixels.
+    pub crop_padding_x: Option<f32>,
+    /// Vertical padding around bounding box crops in pixels.
+    pub crop_padding_y: Option<f32>,
 }
 
 /// Image detection stage options.
@@ -133,30 +131,58 @@ pub struct DetectionRunOptions {
     pub mean: Option<Vec<f32>>,
     /// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
     pub std: Option<Vec<f32>>,
-    /// Post-processing options for detection.
-    pub postprocess: Option<PostprocessRunOptions>,
 }
 
-/// Pre-OCR image calibration options for descreening patterned backgrounds.
+/// Post-detection polygon extraction, thresholding, and box filtering options.
 #[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CalibrationOptions {
-    /// Descreen filtering strength (0.0 - 1.0).
-    pub descreen_strength: Option<f32>,
+pub struct PostDetectionOptions {
+    /// Binarization probability cutoff threshold. Default: 0.3.
+    pub threshold: Option<f32>,
+    /// Polygon contour score confidence threshold. Default: 0.6.
+    pub box_threshold: Option<f32>,
+    /// Polygon unclip expansion ratio. Default: 1.5 - 2.0.
+    pub unclip_ratio: Option<f32>,
+    /// Enable morphological dilation to connect broken text strokes.
+    pub use_dilation: Option<bool>,
+    /// DB score calculation mode: "fast" (bounding box mean) or "slow" (polygon contour mean).
+    pub score_mode: Option<String>,
+    /// Maximum candidate text boxes to detect per image. Default: 1000.
+    pub max_candidates: Option<i32>,
+    /// Minimum box pixel height filter.
+    pub min_height: Option<f32>,
+    /// Minimum box side length filter.
+    pub min_side_len: Option<f32>,
+    /// Maximum box side length filter.
+    pub max_side_len: Option<f32>,
+    /// Width-to-height aspect ratio padding override.
+    pub width_height_ratio: Option<f32>,
 }
 
-/// Runtime crop and resolution optimization options.
+/// Pre-recognition text line/word clustering tolerances.
 #[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OptimizationOptions {
-    /// Enable or disable image optimization.
-    pub enabled: Option<bool>,
-    /// Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).
-    pub target_max_side: Option<u32>,
-    /// Horizontal padding around bounding box crops in pixels.
-    pub crop_padding_x: Option<f32>,
-    /// Vertical padding around bounding box crops in pixels.
-    pub crop_padding_y: Option<f32>,
+pub struct PreRecognitionOptions {
+    /// Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
+    pub line_y_threshold: Option<f32>,
+    /// Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
+    pub word_x_threshold: Option<f32>,
+}
+
+/// Text recognition inference parameters.
+#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecognitionRunOptions {
+    /// Recognition batch size. Default: 10.
+    pub batch_size: Option<i32>,
+}
+
+/// Post-recognition confidence score filtering.
+#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PostRecognitionOptions {
+    /// Minimum recognition confidence score threshold [0.0 - 1.0].
+    pub score_threshold: Option<f32>,
 }
 
 /// Per-request execution options for text detection.
@@ -165,38 +191,26 @@ pub struct OptimizationOptions {
 pub struct OcrRunOptions {
     /// Output format granularity: Lines (default), Words, or Spatial.
     pub output: OutputGranularity,
-    /// Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
-    pub line_y_threshold: Option<f32>,
-    /// Horizontal gap tolerance multiplier for same-word grouping. Default: 0.4.
-    pub word_x_threshold: Option<f32>,
-    /// Minimum recognition confidence score threshold [0.0 - 1.0].
-    pub text_score: Option<f32>,
-    /// Enable text line orientation classifier stage.
-    pub classification: Option<bool>,
-    /// Enable document orientation angle correction stage.
-    pub orientation: Option<bool>,
     /// Enable document unwarping stage.
-    pub unwarp: Option<bool>,
-    /// Enable document layout analysis stage.
-    pub layout: Option<bool>,
-    /// Request-local minimum height resize override.
-    pub min_height: Option<f32>,
-    /// Request-local maximum side length resize override.
-    pub max_side_len: Option<f32>,
-    /// Request-local minimum side length resize override.
-    pub min_side_len: Option<f32>,
-    /// Width-to-height aspect ratio padding override.
-    pub width_height_ratio: Option<f32>,
+    pub auto_unwarp: Option<bool>,
+    /// Enable document layout analysis and reading order stage.
+    pub layout_reading: Option<bool>,
+    /// Enable document orientation angle correction stage.
+    pub orientation_detection: Option<bool>,
+    /// Enable text line orientation classifier stage.
+    pub line_classification: Option<bool>,
+    /// Pre-detection calibration & optimization options.
+    pub pre_detection: Option<PreDetectionOptions>,
     /// Detection stage options.
     pub detection: Option<DetectionRunOptions>,
-    /// Post-processing options.
-    pub postprocess: Option<PostprocessRunOptions>,
-    /// Pre-OCR background descreening calibration options.
-    pub calibration: Option<CalibrationOptions>,
-    /// Runtime crop and resolution optimization options.
-    pub optimization: Option<OptimizationOptions>,
-    /// Request-local recognition batch size override.
-    pub rec_batch_num: Option<i32>,
+    /// Post-detection binarization, expansion, and filtering options.
+    pub post_detection: Option<PostDetectionOptions>,
+    /// Pre-recognition clustering options.
+    pub pre_recognition: Option<PreRecognitionOptions>,
+    /// Recognition stage options.
+    pub recognition: Option<RecognitionRunOptions>,
+    /// Post-recognition filtering options.
+    pub post_recognition: Option<PostRecognitionOptions>,
 }
 
 /// Text detection model configuration.
@@ -286,30 +300,6 @@ pub enum LayoutType {
     Equation,
 }
 
-/// Bounding box coordinates for a detected document layout region.
-#[derive(uniffi::Record, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LayoutBBox {
-    /// Minimum horizontal coordinate (left).
-    pub x_min: i32,
-    /// Minimum vertical coordinate (top).
-    pub y_min: i32,
-    /// Maximum horizontal coordinate (right).
-    pub x_max: i32,
-    /// Maximum vertical coordinate (bottom).
-    pub y_max: i32,
-}
-
-/// Detected document layout region with category, bounding box, and confidence score.
-#[derive(uniffi::Record, Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct LayoutRegion {
-    /// Axis-aligned bounding box.
-    pub bbox: LayoutBBox,
-    /// Semantic layout category.
-    pub layout_type: LayoutType,
-    /// Classification confidence score [0.0 - 1.0].
-    pub confidence: f32,
-}
-
 /// Document layout analysis model configuration.
 #[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -326,17 +316,6 @@ pub struct LayoutConfig {
     pub target_height: Option<i32>,
     /// Target input width for resizing.
     pub target_width: Option<i32>,
-}
-
-/// Unwarped image result with raw RGB8 pixel buffer and dimensions.
-#[derive(uniffi::Record, Clone, Debug, PartialEq)]
-pub struct UnwarpedImageResult {
-    /// Interleaved 24-bit RGB pixel bytes.
-    pub pixels: Vec<u8>,
-    /// Image width in pixels.
-    pub width: u32,
-    /// Image height in pixels.
-    pub height: u32,
 }
 
 /// Engine initialization configuration specifying model paths, preset, and optional extensions.
@@ -394,7 +373,7 @@ impl RustO {
     #[uniffi::constructor]
     pub fn initialize_from_json(config_json: String) -> Result<Arc<Self>, RustoBindingError> {
         crate::ensure_rten_registered();
-        let internal_config = rusto_core::config::InitializeConfig::from_json(&config_json)
+        let internal_config = crate::download::parse_config_with_auto_download(&config_json)
             .map_err(|e| RustoBindingError::Initialization { msg: e.to_string() })?;
         let ocr = crate::engine::RustO::initialize(internal_config)?;
         Ok(Arc::new(Self {
@@ -437,71 +416,14 @@ impl RustO {
         Ok(convert_result(result))
     }
 
-    /// Detects document layout regions from an image source.
-    pub fn detect_layout(
-        &self,
-        source: ImageSource,
-    ) -> Result<Vec<LayoutRegion>, RustoBindingError> {
-        let internal_source = convert_source(&source)?;
-        let mut guard = self.inner.lock().map_err(|_| RustoBindingError::Inference {
-            msg: "Internal engine lock poisoned".into(),
-        })?;
-        let regions = guard.detect_layout(&internal_source)?;
-        Ok(regions.into_iter().map(convert_layout_region).collect())
-    }
-
-    /// Detects document layout regions from raw decoded interleaved 24-bit RGB pixel bytes.
-    pub fn detect_layout_rgb(
-        &self,
-        pixels: Vec<u8>,
-        width: u32,
-        height: u32,
-        stride: u64,
-    ) -> Result<Vec<LayoutRegion>, RustoBindingError> {
-        let mut guard = self.inner.lock().map_err(|_| RustoBindingError::Inference {
-            msg: "Internal engine lock poisoned".into(),
-        })?;
-        let stride_usize = usize::try_from(stride).map_err(|_| RustoBindingError::InvalidInput {
-            msg: "stride exceeds platform address space".into(),
-        })?;
-        let regions = guard.detect_layout_rgb(&pixels, width, height, stride_usize)?;
-        Ok(regions.into_iter().map(convert_layout_region).collect())
-    }
-
-    /// Unwarps a distorted or curved document image from an image source.
-    pub fn unwarp_image(
-        &self,
-        source: ImageSource,
-    ) -> Result<UnwarpedImageResult, RustoBindingError> {
-        let internal_source = convert_source(&source)?;
-        let mut guard = self.inner.lock().map_err(|_| RustoBindingError::Inference {
-            msg: "Internal engine lock poisoned".into(),
-        })?;
-        let mat = guard.unwarp_image(&internal_source)?;
-        convert_mat_to_unwarped(mat)
-    }
-
-    /// Unwarps a distorted or curved document image from raw decoded interleaved 24-bit RGB pixel bytes.
-    pub fn unwarp_image_rgb(
-        &self,
-        pixels: Vec<u8>,
-        width: u32,
-        height: u32,
-        stride: u64,
-    ) -> Result<UnwarpedImageResult, RustoBindingError> {
-        let mut guard = self.inner.lock().map_err(|_| RustoBindingError::Inference {
-            msg: "Internal engine lock poisoned".into(),
-        })?;
-        let stride_usize = usize::try_from(stride).map_err(|_| RustoBindingError::InvalidInput {
-            msg: "stride exceeds platform address space".into(),
-        })?;
-        let mat = guard.unwarp_image_rgb(&pixels, width, height, stride_usize)?;
-        convert_mat_to_unwarped(mat)
-    }
-
     /// Returns the engine library version string.
     pub fn version(&self) -> String {
         env!("CARGO_PKG_VERSION").to_string()
+    }
+
+    /// Returns whether the engine is ready for inference.
+    pub fn is_ready(&self) -> bool {
+        self.inner.lock().is_ok()
     }
 }
 
@@ -575,14 +497,13 @@ pub fn create_initialize_config_for_model(
 
 /// Downloads model assets for a specific OCR pipeline ahead of time.
 #[uniffi::export]
-#[allow(deprecated)]
 pub fn download_model(
     model: Option<String>,
     lang: Option<String>,
     cache_dir: Option<String>,
 ) -> Result<Vec<String>, RustoBindingError> {
-    let cache_path = crate::model_manager::get_cache_dir(cache_dir.as_deref().map(std::path::Path::new));
-    let downloaded = crate::model_manager::download_model_pipeline(
+    let cache_path = rusto_core::models::get_cache_dir(cache_dir.as_deref().map(std::path::Path::new));
+    let downloaded = crate::download::download_model_pipeline(
         model.as_deref(),
         lang.as_deref(),
         false,
@@ -592,18 +513,6 @@ pub fn download_model(
         false,
         &cache_path,
     ).map_err(|e| RustoBindingError::Initialization { msg: e.to_string() })?;
-    Ok(downloaded.into_iter().map(|p| p.to_string_lossy().to_string()).collect())
-}
-
-/// Downloads all available canonical models to the cache directory ahead of time.
-#[uniffi::export]
-#[allow(deprecated)]
-pub fn download_all_models(
-    cache_dir: Option<String>,
-) -> Result<Vec<String>, RustoBindingError> {
-    let cache_path = crate::model_manager::get_cache_dir(cache_dir.as_deref().map(std::path::Path::new));
-    let downloaded = crate::model_manager::download_all_models(&cache_path)
-        .map_err(|e| RustoBindingError::Initialization { msg: e.to_string() })?;
     Ok(downloaded.into_iter().map(|p| p.to_string_lossy().to_string()).collect())
 }
 
@@ -618,7 +527,7 @@ pub fn default_ocr_run_options() -> OcrRunOptions {
 fn convert_init_config(config: &InitializeConfig) -> Result<rusto_core::config::InitializeConfig, RustoBindingError> {
     let json = serde_json::to_string(config)
         .map_err(|e| RustoBindingError::Initialization { msg: e.to_string() })?;
-    rusto_core::config::InitializeConfig::from_json(&json)
+    crate::download::parse_config_with_auto_download(&json)
         .map_err(|e| RustoBindingError::Initialization { msg: e.to_string() })
 }
 
@@ -644,7 +553,14 @@ fn convert_options(opts: &OcrRunOptions) -> Result<rusto_core::types::OcrRunOpti
         OutputGranularity::Lines => rusto_core::types::OutputGranularity::Lines,
         OutputGranularity::Words => rusto_core::types::OutputGranularity::Words,
         OutputGranularity::Spatial => rusto_core::types::OutputGranularity::Spatial,
+        OutputGranularity::Tsv => rusto_core::types::OutputGranularity::Tsv,
     };
+    let pre_detection = opts.pre_detection.as_ref().map(|p| rusto_core::types::PreDetectionOptions {
+        descreen_strength: p.descreen_strength,
+        target_max_side: p.target_max_side,
+        crop_padding_x: p.crop_padding_x,
+        crop_padding_y: p.crop_padding_y,
+    });
     let detection = opts.detection.as_ref().map(|d| {
         let mean = d.mean.as_ref().and_then(|m| {
             if m.len() == 3 { Some([m[0], m[1], m[2]]) } else { None }
@@ -652,59 +568,49 @@ fn convert_options(opts: &OcrRunOptions) -> Result<rusto_core::types::OcrRunOpti
         let std = d.std.as_ref().and_then(|s| {
             if s.len() == 3 { Some([s[0], s[1], s[2]]) } else { None }
         });
-        let postprocess = d.postprocess.as_ref().map(|p| rusto_core::types::PostprocessRunOptions {
-            threshold: p.threshold,
-            box_threshold: p.box_threshold,
-            max_candidates: p.max_candidates,
-            unclip_ratio: p.unclip_ratio,
-            use_dilation: p.use_dilation,
-            score_mode: p.score_mode.clone(),
-        });
         rusto_core::types::DetectionRunOptions {
             limit_side_len: d.limit_side_len,
             limit_type: d.limit_type.clone(),
             mean,
             std,
-            postprocess,
+            postprocess: None,
         }
     });
-    let postprocess = opts.postprocess.as_ref().map(|p| rusto_core::types::PostprocessRunOptions {
+    let post_detection = opts.post_detection.as_ref().map(|p| rusto_core::types::PostDetectionOptions {
         threshold: p.threshold,
         box_threshold: p.box_threshold,
-        max_candidates: p.max_candidates,
         unclip_ratio: p.unclip_ratio,
         use_dilation: p.use_dilation,
         score_mode: p.score_mode.clone(),
+        max_candidates: p.max_candidates,
+        min_height: p.min_height,
+        min_side_len: p.min_side_len,
+        max_side_len: p.max_side_len,
+        width_height_ratio: p.width_height_ratio,
     });
-    let calibration = opts.calibration.as_ref().map(|c| rusto_core::calibration::CalibrationOptions {
-        descreen_strength: c.descreen_strength,
-        ..Default::default()
+    let pre_recognition = opts.pre_recognition.as_ref().map(|p| rusto_core::types::PreRecognitionOptions {
+        line_y_threshold: p.line_y_threshold,
+        word_x_threshold: p.word_x_threshold,
     });
-    let optimization = opts.optimization.as_ref().map(|o| rusto_core::calibration::OptimizationOptions {
-        enabled: o.enabled,
-        target_max_side: o.target_max_side,
-        crop_padding_x: o.crop_padding_x,
-        crop_padding_y: o.crop_padding_y,
+    let recognition = opts.recognition.as_ref().map(|r| rusto_core::types::RecognitionRunOptions {
+        batch_size: r.batch_size,
+    });
+    let post_recognition = opts.post_recognition.as_ref().map(|p| rusto_core::types::PostRecognitionOptions {
+        score_threshold: p.score_threshold,
     });
 
     let internal = rusto_core::types::OcrRunOptions {
         output,
-        line_y_threshold: opts.line_y_threshold,
-        word_x_threshold: opts.word_x_threshold,
-        text_score: opts.text_score,
-        classification: opts.classification,
-        orientation: opts.orientation,
-        unwarp: opts.unwarp,
-        layout: opts.layout,
-        min_height: opts.min_height,
-        max_side_len: opts.max_side_len,
-        min_side_len: opts.min_side_len,
-        width_height_ratio: opts.width_height_ratio,
+        auto_unwarp: opts.auto_unwarp,
+        layout_reading: opts.layout_reading,
+        orientation_detection: opts.orientation_detection,
+        line_classification: opts.line_classification,
+        pre_detection,
         detection,
-        postprocess,
-        calibration,
-        optimization,
-        rec_batch_num: opts.rec_batch_num,
+        post_detection,
+        pre_recognition,
+        recognition,
+        post_recognition,
     };
     internal.validate().map_err(RustoBindingError::from)?;
     Ok(internal)
@@ -740,51 +646,19 @@ fn convert_result(res: rusto_core::types::DetectTextResult) -> DetectTextResult 
     }
 }
 
-fn convert_layout_type(t: crate::layout::LayoutType) -> LayoutType {
+fn convert_layout_type(t: rusto_core::layout::LayoutType) -> LayoutType {
     match t {
-        crate::layout::LayoutType::Text => LayoutType::Text,
-        crate::layout::LayoutType::Title => LayoutType::Title,
-        crate::layout::LayoutType::Figure => LayoutType::Figure,
-        crate::layout::LayoutType::FigureCaption => LayoutType::FigureCaption,
-        crate::layout::LayoutType::Table => LayoutType::Table,
-        crate::layout::LayoutType::TableCaption => LayoutType::TableCaption,
-        crate::layout::LayoutType::Header => LayoutType::Header,
-        crate::layout::LayoutType::Footer => LayoutType::Footer,
-        crate::layout::LayoutType::Reference => LayoutType::Reference,
-        crate::layout::LayoutType::Equation => LayoutType::Equation,
+        rusto_core::layout::LayoutType::Text => LayoutType::Text,
+        rusto_core::layout::LayoutType::Title => LayoutType::Title,
+        rusto_core::layout::LayoutType::Figure => LayoutType::Figure,
+        rusto_core::layout::LayoutType::FigureCaption => LayoutType::FigureCaption,
+        rusto_core::layout::LayoutType::Table => LayoutType::Table,
+        rusto_core::layout::LayoutType::TableCaption => LayoutType::TableCaption,
+        rusto_core::layout::LayoutType::Header => LayoutType::Header,
+        rusto_core::layout::LayoutType::Footer => LayoutType::Footer,
+        rusto_core::layout::LayoutType::Reference => LayoutType::Reference,
+        rusto_core::layout::LayoutType::Equation => LayoutType::Equation,
     }
-}
-
-fn convert_layout_region(r: crate::layout::LayoutRegion) -> LayoutRegion {
-    LayoutRegion {
-        bbox: LayoutBBox {
-            x_min: r.bbox.x_min,
-            y_min: r.bbox.y_min,
-            x_max: r.bbox.x_max,
-            y_max: r.bbox.y_max,
-        },
-        layout_type: convert_layout_type(r.layout_type),
-        confidence: r.confidence,
-    }
-}
-
-#[cfg(not(feature = "use-opencv"))]
-fn convert_mat_to_unwarped(mat: rusto_core::image::Mat) -> Result<UnwarpedImageResult, RustoBindingError> {
-    let width = mat.cols() as u32;
-    let height = mat.rows() as u32;
-    let rgb = mat.to_rgb8();
-    Ok(UnwarpedImageResult {
-        pixels: rgb.into_raw(),
-        width,
-        height,
-    })
-}
-
-#[cfg(feature = "use-opencv")]
-fn convert_mat_to_unwarped(_mat: opencv::core::Mat) -> Result<UnwarpedImageResult, RustoBindingError> {
-    Err(RustoBindingError::InvalidInput {
-        msg: "RGB unwarped image export requires the pure Rust image backend".into(),
-    })
 }
 
 /// # Safety
@@ -815,17 +689,16 @@ mod tests {
     fn test_uniffi_binding_types() {
         let mut options = default_ocr_run_options();
         assert_eq!(options.output, OutputGranularity::Lines);
-        options.rec_batch_num = Some(12);
-        options.optimization = Some(OptimizationOptions {
-            enabled: Some(true),
+        options.recognition = Some(RecognitionRunOptions { batch_size: Some(12) });
+        options.pre_detection = Some(PreDetectionOptions {
+            descreen_strength: None,
             target_max_side: Some(960),
             crop_padding_x: Some(0.05),
             crop_padding_y: Some(0.08),
         });
         let converted = convert_options(&options).expect("convert_options should succeed");
-        assert_eq!(converted.rec_batch_num, Some(12));
-        let opt = converted.optimization.expect("optimization should be present");
-        assert_eq!(opt.enabled, Some(true));
+        assert_eq!(converted.recognition.as_ref().unwrap().batch_size, Some(12));
+        let opt = converted.pre_detection.expect("pre_detection should be present");
         assert_eq!(opt.target_max_side, Some(960));
         assert_eq!(opt.crop_padding_x, Some(0.05));
         assert_eq!(opt.crop_padding_y, Some(0.08));
@@ -844,8 +717,10 @@ mod tests {
             Some("models/PPOCR_v6_tiny".to_string()),
         );
         let converted_init = convert_init_config(&model_cfg).expect("convert_init_config should succeed");
-        assert_eq!(converted_init.det.model_path, std::path::PathBuf::from("models/PPOCR_v6_tiny/det.mnn"));
-        assert_eq!(converted_init.rec.model_path, std::path::PathBuf::from("models/PPOCR_v6_tiny/rec.mnn"));
+        let det_str = converted_init.det.model_path.to_string_lossy();
+        let rec_str = converted_init.rec.model_path.to_string_lossy();
+        assert!(det_str.starts_with("models/PPOCR_v6_tiny/det."));
+        assert!(rec_str.starts_with("models/PPOCR_v6_tiny/rec."));
         assert_eq!(converted_init.rec.rec_keys_path, Some(std::path::PathBuf::from("models/PPOCR_v6_tiny/dict.txt")));
     }
 }

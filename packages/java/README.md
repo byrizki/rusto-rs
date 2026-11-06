@@ -1,32 +1,31 @@
-# rusto-java
+# RustO! Java SDK (`rusto-java`)
 
-[![JitPack](https://jitpack.io/v/byrizki/rusto-rs.svg)](https://jitpack.io/#byrizki/rusto-rs)
-[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Pure Java / JVM bindings (via JNA) for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
 
-Pure-Rust Optical Character Recognition (OCR) engine for JVM environments (Java, Kotlin, Scala) via JNA.
-
-> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
+> Looking for the Android AAR with `Context` asset resolution? See [`packages/android`](../android/README.md) (`rusto-android`).
 
 ## Features
 
-- **Zero JNI Boilerplate**: Clean Java Native Access (JNA) bindings directly invoking RustO C ABI.
-- **AutoCloseable**: Implements `AutoCloseable` for clean `try-with-resources` memory reclamation.
-- **Rich Document Models**: Immutable records/classes for `TextResult`, `Frame`, and bounding boxes.
-- **Spatial Formatting**: Extract structured bounding boxes or reconstructed 2D visual layouts.
+- **Zero-Config Indra OCR**: `RustO.initialize()` automatically downloads and caches the default `indraocr` `.rten` models on first run.
+- **`AutoCloseable` Lifecycle**: Safe, deterministic native handle cleanup with Java `try-with-resources`.
+- **Document Intelligence**: Enable UVDoc unwarping (`withAutoUnwarp()`), 4-way page orientation correction (`withOrientationDetection()`), and neural layout reading order (`withLayoutReading()`).
+- **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, or `.withOutput(...)` into a single `.run()` terminal method returning `RustO.DetectTextResult`.
+- **Flexible Inputs**: File paths, `byte[]` encoded images, or raw 24-bit RGB pixel buffers via `.rgb(...)`.
 
-## Installation
+## Installation (JitPack)
 
-### Gradle (Kotlin DSL)
+### Gradle (Kotlin / Groovy DSL)
 
-```kotlin
+Add the JitPack repository and the `rusto-java` dependency:
+
+```groovy
 repositories {
     mavenCentral()
-    maven { url = uri("https://jitpack.io") }
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
-    implementation("com.github.byrizki.rusto-rs:rusto-java:0.3.2")
+    implementation 'com.github.byrizki.rusto-rs:rusto-java:0.4.0'
 }
 ```
 
@@ -40,53 +39,135 @@ dependencies {
     </repository>
 </repositories>
 
-<dependency>
-    <groupId>com.github.byrizki.rusto-rs</groupId>
-    <artifactId>rusto-java</artifactId>
-    <version>0.3.2</version>
-</dependency>
+<dependencies>
+    <dependency>
+        <groupId>com.github.byrizki.rusto-rs</groupId>
+        <artifactId>rusto-java</artifactId>
+        <version>0.4.0</version>
+    </dependency>
+</dependencies>
 ```
 
-Ensure `librusto` is in your `java.library.path` or `jna.library.path`.
+> Ensure the native `librusto` library (`librusto.so`, `librusto.dylib`, or `rusto.dll`) is on `-Djna.library.path` or your system library path when running locally.
 
-## Quick Start
+## Quick Start (Zero-Config)
 
 ```java
 import com.byrizki.rusto.RustO;
 import com.byrizki.rusto.TextResult;
-import java.util.List;
 
-public class Main {
+public class Example {
     public static void main(String[] args) {
-        String config = """
-            {
-                "detection": { "model_path": "models/PPOCR_v6/det.rten" },
-                "recognition": { "model_path": "models/PPOCR_v6/rec.rten", "dict_path": "models/PPOCR_v6/dict.txt" }
-            }
-            """;
+        try (RustO engine = RustO.initialize()) {
+            // Structured line-level recognition with unwarping & layout reading order
+            RustO.DetectTextResult res = engine.detectText("invoice.png")
+                .withAutoUnwarp()
+                .withLayoutReading()
+                .asLines()
+                .run();
 
-        try (RustO engine = RustO.initialize(config)) {
-            // Structured OCR
-            List<TextResult> results = engine.detectTextFile("invoice.png", "{}");
-            for (TextResult r : results) {
-                System.out.printf("[%0.2f] %s%n", r.score(), r.text());
+            for (TextResult item : res.results()) {
+                System.out.printf(
+                    "[%.2f] (%s #%s) %s%n",
+                    item.score(),
+                    item.layoutType() != null ? item.layoutType() : "line",
+                    item.regionId() != null ? item.regionId() : "-",
+                    item.text()
+                );
             }
 
-            // Spatial OCR
-            String spatial = engine.detectTextFileSpatial("invoice.png", "{}");
-            System.out.println("--- Spatial Text ---");
-            System.out.println(spatial);
+            // 2D spatial layout reconstruction
+            RustO.DetectTextResult spatial = engine.detectText("invoice.png")
+                .asSpatial()
+                .run();
+
+            if (spatial.isSpatial()) {
+                System.out.println(spatial.text());
+            }
         }
     }
 }
 ```
 
-## 📖 Documentation
+## Custom Initialization & Offline `.rten` Models
 
-For full documentation, guides, and API reference:
-- [Java Guide](https://byrizki.com/rusto-rs/how-to/use-java)
-- [Full Documentation](https://byrizki.com/rusto-rs/)
+Pass a JSON configuration string to `RustO.initialize(configJson)` to select another preset (`"ppocrv6-tiny"`, `"ppocrv5-mobile"`, etc.) or local `.rten` files:
+
+```java
+String offlineConfig = """
+    {
+      "template": "indra",
+      "enableReadingOrder": true,
+      "detection": {
+        "enabled": true,
+        "modelPath": "./models/indra_det.rten"
+      },
+      "recognition": {
+        "enabled": true,
+        "modelPath": "./models/indra_rec.rten",
+        "dictPath": "./models/indra_meta.json"
+      },
+      "unwarp": {
+        "enabled": true,
+        "modelPath": "./models/uvdoc.rten"
+      },
+      "layout": {
+        "enabled": true,
+        "modelPath": "./models/layout_cdla.rten"
+      }
+    }
+    """;
+
+try (RustO engine = RustO.initialize(offlineConfig)) {
+    RustO.DetectTextResult words = engine.detectText("document.png")
+        .asWords()
+        .run();
+}
+```
+
+## Encoded Bytes & Raw RGB Buffers
+
+```java
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+try (RustO engine = RustO.initialize()) {
+    // 1. Encoded PNG/JPEG bytes
+    byte[] pngBytes = Files.readAllBytes(Path.of("receipt.png"));
+    RustO.DetectTextResult fromBytes = engine.detectText(pngBytes)
+        .asLines()
+        .run();
+
+    // 2. Raw interleaved 24-bit RGB buffer
+    int width = 1280;
+    int height = 720;
+    long stride = width * 3L;
+    byte[] rgbPixels = new byte[(int) (stride * height)];
+
+    RustO.DetectTextResult fromRgb = engine.detectText()
+        .rgb(rgbPixels, width, height, stride)
+        .asLines()
+        .run();
+}
+```
+
+## Result Reference
+
+### `RustO.DetectTextResult`
+
+- `res.isStructured()` / `res.isSpatial()`: Indicates whether the result holds structured `TextResult` records or a 2D spatial string.
+- `res.results()`: Returns `List<TextResult>` for `.asLines()` and `.asWords()`.
+- `res.text()`: Returns `String` for `.asSpatial()`.
+
+### `TextResult` Record
+
+- `String text()`: Recognized UTF-8 text.
+- `float score()`: Recognition confidence (`0.0f` – `1.0f`).
+- `float[][] boxPoints()`: 4-corner polygon vertices `[[x1, y1], [x2, y2], [x3, y3], [x4, y4]]`.
+- `Frame frame()`: Axis-aligned bounding box (`width()`, `height()`, `top()`, `left()`).
+- `Integer regionId()`: Detected layout region index when `withLayoutReading()` is enabled, or `null`.
+- `String layoutType()`: Semantic layout category (`"text"`, `"title"`, `"table"`, `"header"`, `"footer"`, `"figure"`, etc.) or `null`.
 
 ## License
 
-MIT License
+Apache-2.0 OR MIT

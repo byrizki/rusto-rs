@@ -49,11 +49,10 @@ packages:
   rusto:
     dependency: "direct main"
     description:
-      name: rusto
-      sha256: d79d8e14d0c83fb51d2979eaf6c1db19ac7763fb60476797cab12979e7ca926b
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.3.2"
+      path: "../dart"
+      relative: true
+    source: path
+    version: "0.4.0"
   sky_engine:
     dependency: transitive
     description: flutter

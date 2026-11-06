@@ -1,5 +1,5 @@
-use rusto::calibration::{expand_box_padding, CalibrationOptions, OptimizationOptions};
-use rusto::image_impl::Point2f;
+use rusto_core::calibration::{expand_box_padding, CalibrationOptions, OptimizationOptions};
+use rusto_core::image::Point2f;
 use rusto::{DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, RustO};
 use std::path::Path;
 
@@ -42,16 +42,19 @@ fn test_optimization_options_serde() {
 #[test]
 fn test_runtime_options_with_calibration_and_optimization() {
     let options = OcrRunOptions {
-        calibration: Some(CalibrationOptions::for_id_card()),
-        optimization: Some(OptimizationOptions::for_id_card()),
+        pre_detection: Some(rusto::PreDetectionOptions {
+            descreen_strength: Some(0.5),
+            target_max_side: Some(800),
+            crop_padding_x: Some(0.05),
+            crop_padding_y: Some(0.05),
+        }),
         ..Default::default()
     };
 
     options.validate().expect("options should be valid");
     let json = serde_json::to_string(&options).expect("serialize OcrRunOptions");
-    assert!(json.contains("\"calibration\""));
-    assert!(json.contains("\"optimization\""));
-    assert!(json.contains("\"descreenBackground\":true"));
+    assert!(json.contains("\"preDetection\""));
+    assert!(json.contains("\"descreenStrength\":0.5"));
     assert!(json.contains("\"targetMaxSide\":800"));
 }
 
@@ -59,7 +62,7 @@ fn test_runtime_options_with_calibration_and_optimization() {
 fn test_runtime_options_validation_rejections() {
     // Negative descreen strength
     let opt_neg = OcrRunOptions {
-        calibration: Some(CalibrationOptions {
+        pre_detection: Some(rusto::PreDetectionOptions {
             descreen_strength: Some(-1.0),
             ..Default::default()
         }),
@@ -69,7 +72,7 @@ fn test_runtime_options_validation_rejections() {
 
     // Invalid crop padding (> 1.0)
     let opt_overflow = OcrRunOptions {
-        optimization: Some(OptimizationOptions {
+        pre_detection: Some(rusto::PreDetectionOptions {
             crop_padding_x: Some(1.5),
             ..Default::default()
         }),

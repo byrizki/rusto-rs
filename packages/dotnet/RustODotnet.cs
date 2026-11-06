@@ -59,6 +59,10 @@ namespace RustODotnet
         public Point2D[] BoxPoints { get; set; }
         /// <summary>Axis-aligned bounding box frame.</summary>
         public Frame Frame { get; set; }
+        /// <summary>Detected document layout region index when layout reading is enabled.</summary>
+        public int? RegionId { get; set; }
+        /// <summary>Detected semantic layout category when layout reading is enabled.</summary>
+        public string LayoutType { get; set; }
     }
 
     /// <summary>
@@ -72,7 +76,9 @@ namespace RustODotnet
         /// <summary>Return individual word tokens.</summary>
         Words,
         /// <summary>Return a reconstructed 2D spatial text layout.</summary>
-        Spatial
+        Spatial,
+        /// <summary>Return formatted TSV (tab-separated values).</summary>
+        Tsv
     }
 
     public class DetectionConfig
@@ -187,67 +193,151 @@ namespace RustODotnet
         public static InitializeConfig ForModel(string model = "indraocr", string lang = null, string modelPath = null) =>
             new() { Model = model, Lang = lang, ModelPath = modelPath };
 
+        /// <summary>Creates a preset configuration for IndraOCR (high-accuracy default).</summary>
+        public static InitializeConfig Indra(string detModelPath = null, string recModelPath = null, string dictPath = null) =>
+            CreatePreset("indra", detModelPath, recModelPath, dictPath, recBatchNum: 1);
+
         /// <summary>Creates a preset configuration for PP-OCRv3.</summary>
-        public static InitializeConfig Ppv3() => new() { Template = "ppv3" };
+        public static InitializeConfig Ppv3(string detModelPath = null, string recModelPath = null, string dictPath = null) =>
+            CreatePreset("ppv3", detModelPath, recModelPath, dictPath);
+
         /// <summary>Creates a preset configuration for PP-OCRv4.</summary>
-        public static InitializeConfig Ppv4() => new() { Template = "ppv4" };
+        public static InitializeConfig Ppv4(string detModelPath = null, string recModelPath = null, string dictPath = null) =>
+            CreatePreset("ppv4", detModelPath, recModelPath, dictPath);
+
         /// <summary>Creates a preset configuration for PP-OCRv5.</summary>
-        public static InitializeConfig Ppv5() => new() { Template = "ppv5" };
+        public static InitializeConfig Ppv5(string detModelPath = null, string recModelPath = null, string dictPath = null) =>
+            CreatePreset("ppv5", detModelPath, recModelPath, dictPath);
+
         /// <summary>Creates a preset configuration for PP-OCRv6 (50+ languages unified).</summary>
-        public static InitializeConfig Ppv6() => new() { Template = "ppv6" };
-    }
+        public static InitializeConfig Ppv6(string detModelPath = null, string recModelPath = null, string dictPath = null) =>
+            CreatePreset("ppv6", detModelPath, recModelPath, dictPath);
 
-    public class PostprocessRunOptions
-    {
-        [JsonPropertyName("thresh")] public float? Threshold { get; set; }
-        [JsonPropertyName("boxThresh")] public float? BoxThreshold { get; set; }
-        [JsonPropertyName("maxCandidates")] public int? MaxCandidates { get; set; }
-        [JsonPropertyName("unclipRatio")] public float? UnclipRatio { get; set; }
-        [JsonPropertyName("useDilation")] public bool? UseDilation { get; set; }
-        [JsonPropertyName("scoreMode")] public string ScoreMode { get; set; }
-    }
-
-    public class DetectionRunOptions
-    {
-        [JsonPropertyName("limitSideLen")] public int? LimitSideLen { get; set; }
-        [JsonPropertyName("limitType")] public string LimitType { get; set; }
-        [JsonPropertyName("mean")] public float[] Mean { get; set; }
-        [JsonPropertyName("std")] public float[] Std { get; set; }
-        [JsonPropertyName("postprocess")] public PostprocessRunOptions Postprocess { get; set; }
+        private static InitializeConfig CreatePreset(string template, string detModelPath, string recModelPath, string dictPath, int? recBatchNum = null)
+        {
+            var cfg = new InitializeConfig { Template = template };
+            if (!string.IsNullOrEmpty(detModelPath))
+            {
+                cfg.Detection = new DetectionConfig { ModelPath = detModelPath };
+            }
+            if (!string.IsNullOrEmpty(recModelPath) || !string.IsNullOrEmpty(dictPath))
+            {
+                cfg.Recognition = new RecognitionConfig
+                {
+                    ModelPath = recModelPath,
+                    DictPath = dictPath,
+                    RecBatchNum = recBatchNum
+                };
+            }
+            return cfg;
+        }
     }
 
     /// <summary>
-    /// Pre-OCR image calibration options for descreening patterned backgrounds.
+    /// Phase 1: Pre-detection options (descreen, downscale, padding).
     /// </summary>
-    public class CalibrationOptions
+    public class PreDetectionOptions
     {
-        /// <summary>Descreen filtering strength (0.0 - 1.0).</summary>
         [JsonPropertyName("descreenStrength")]
         public float? DescreenStrength { get; set; }
-    }
 
-    /// <summary>
-    /// Runtime crop and resolution optimization options.
-    /// </summary>
-    public class OptimizationOptions
-    {
-        /// <summary>Enable or disable image optimization.</summary>
-        [JsonPropertyName("enabled")]
-        public bool? Enabled { get; set; }
-
-        /// <summary>Optimal target maximum side dimension for downscaling (e.g. 960 or 1024).</summary>
         [JsonPropertyName("targetMaxSide")]
         public uint? TargetMaxSide { get; set; }
 
-        /// <summary>Horizontal padding around bounding box crops in pixels.</summary>
         [JsonPropertyName("cropPaddingX")]
         public float? CropPaddingX { get; set; }
 
-        /// <summary>Vertical padding around bounding box crops in pixels.</summary>
         [JsonPropertyName("cropPaddingY")]
         public float? CropPaddingY { get; set; }
     }
 
+    /// <summary>
+    /// Phase 2: Detection inference options (limits, normalization).
+    /// </summary>
+    public class DetectionRunOptions
+    {
+        [JsonPropertyName("limitSideLen")]
+        public int? LimitSideLen { get; set; }
+
+        [JsonPropertyName("limitType")]
+        public string LimitType { get; set; }
+
+        [JsonPropertyName("mean")]
+        public float[] Mean { get; set; }
+
+        [JsonPropertyName("std")]
+        public float[] Std { get; set; }
+    }
+
+    /// <summary>
+    /// Phase 3: Post-detection options (thresholds, unclip, dilation, box geometry).
+    /// </summary>
+    public class PostDetectionOptions
+    {
+        [JsonPropertyName("threshold")]
+        public float? Threshold { get; set; }
+
+        [JsonPropertyName("boxThreshold")]
+        public float? BoxThreshold { get; set; }
+
+        [JsonPropertyName("unclipRatio")]
+        public float? UnclipRatio { get; set; }
+
+        [JsonPropertyName("useDilation")]
+        public bool? UseDilation { get; set; }
+
+        [JsonPropertyName("scoreMode")]
+        public string ScoreMode { get; set; }
+
+        [JsonPropertyName("maxCandidates")]
+        public int? MaxCandidates { get; set; }
+
+        [JsonPropertyName("minHeight")]
+        public float? MinHeight { get; set; }
+
+        [JsonPropertyName("minSideLen")]
+        public float? MinSideLen { get; set; }
+
+        [JsonPropertyName("maxSideLen")]
+        public float? MaxSideLen { get; set; }
+
+        [JsonPropertyName("widthHeightRatio")]
+        public float? WidthHeightRatio { get; set; }
+    }
+
+    /// <summary>
+    /// Phase 4: Pre-recognition grouping options (line_y, word_x tolerances).
+    /// </summary>
+    public class PreRecognitionOptions
+    {
+        [JsonPropertyName("lineYThreshold")]
+        public float? LineYThreshold { get; set; }
+
+        [JsonPropertyName("wordXThreshold")]
+        public float? WordXThreshold { get; set; }
+    }
+
+    /// <summary>
+    /// Phase 5: Recognition inference options (batch size).
+    /// </summary>
+    public class RecognitionRunOptions
+    {
+        [JsonPropertyName("batchSize")]
+        public int? BatchSize { get; set; }
+    }
+
+    /// <summary>
+    /// Phase 6: Post-recognition filtering options (score threshold).
+    /// </summary>
+    public class PostRecognitionOptions
+    {
+        [JsonPropertyName("scoreThreshold")]
+        public float? ScoreThreshold { get; set; }
+    }
+
+    /// <summary>
+    /// Per-request OCR runtime execution options.
+    /// </summary>
     public class OcrRunOptions
     {
         [JsonIgnore]
@@ -256,29 +346,35 @@ namespace RustODotnet
         [JsonPropertyName("output")]
         public string OutputWireValue => Output.ToString().ToLowerInvariant();
 
-        [JsonPropertyName("lineYThreshold")]
-        public float? LineYThreshold { get; set; }
-        [JsonPropertyName("wordXThreshold")]
-        public float? WordXThreshold { get; set; }
-        [JsonPropertyName("textScore")]
-        public float? TextScore { get; set; }
-        [JsonPropertyName("classification")]
-        public bool? Classification { get; set; }
-        [JsonPropertyName("orientation")]
-        public bool? Orientation { get; set; }
-        [JsonPropertyName("unwarp")]
-        public bool? Unwarp { get; set; }
-        [JsonPropertyName("layout")]
-        public bool? Layout { get; set; }
-        [JsonPropertyName("minHeight")] public float? MinHeight { get; set; }
-        [JsonPropertyName("maxSideLen")] public float? MaxSideLen { get; set; }
-        [JsonPropertyName("minSideLen")] public float? MinSideLen { get; set; }
-        [JsonPropertyName("widthHeightRatio")] public float? WidthHeightRatio { get; set; }
-        [JsonPropertyName("detection")] public DetectionRunOptions Detection { get; set; }
-        [JsonPropertyName("postprocess")] public PostprocessRunOptions Postprocess { get; set; }
-        [JsonPropertyName("recBatchNum")] public int? RecBatchNum { get; set; }
-        [JsonPropertyName("calibration")] public CalibrationOptions Calibration { get; set; }
-        [JsonPropertyName("optimization")] public OptimizationOptions Optimization { get; set; }
+        [JsonPropertyName("autoUnwarp")]
+        public bool? AutoUnwarp { get; set; }
+
+        [JsonPropertyName("layoutReading")]
+        public bool? LayoutReading { get; set; }
+
+        [JsonPropertyName("orientationDetection")]
+        public bool? OrientationDetection { get; set; }
+
+        [JsonPropertyName("lineClassification")]
+        public bool? LineClassification { get; set; }
+
+        [JsonPropertyName("preDetection")]
+        public PreDetectionOptions PreDetection { get; set; }
+
+        [JsonPropertyName("detection")]
+        public DetectionRunOptions Detection { get; set; }
+
+        [JsonPropertyName("postDetection")]
+        public PostDetectionOptions PostDetection { get; set; }
+
+        [JsonPropertyName("preRecognition")]
+        public PreRecognitionOptions PreRecognition { get; set; }
+
+        [JsonPropertyName("recognition")]
+        public RecognitionRunOptions Recognition { get; set; }
+
+        [JsonPropertyName("postRecognition")]
+        public PostRecognitionOptions PostRecognition { get; set; }
     }
 
     /// <summary>
@@ -345,6 +441,189 @@ namespace RustODotnet
     }
 
     /// <summary>
+    /// Fluent builder for chained text detection configuration and execution.
+    /// </summary>
+    public class DetectTextBuilder
+    {
+        private readonly RustO _engine;
+        private ImageSource _source;
+        private byte[] _rgbPixels;
+        private uint _rgbWidth;
+        private uint _rgbHeight;
+        private ulong _rgbStride;
+        private OcrRunOptions _options = new();
+
+        public DetectTextBuilder(RustO engine, ImageSource source = null)
+        {
+            _engine = engine ?? throw new ArgumentNullException(nameof(engine));
+            _source = source;
+        }
+
+        public DetectTextBuilder Image(string pathOrUri)
+        {
+            _source = new UriImageSource(pathOrUri);
+            _rgbPixels = null;
+            return this;
+        }
+
+        public DetectTextBuilder Data(byte[] bytes)
+        {
+            _source = new BytesImageSource(bytes);
+            _rgbPixels = null;
+            return this;
+        }
+
+        public DetectTextBuilder Rgb(byte[] pixels, uint width, uint height, ulong? stride = null)
+        {
+            _rgbPixels = pixels ?? throw new ArgumentNullException(nameof(pixels));
+            _rgbWidth = width;
+            _rgbHeight = height;
+            _rgbStride = stride ?? ((ulong)width * 3UL);
+            _source = null;
+            return this;
+        }
+
+        public DetectTextBuilder Source(ImageSource source)
+        {
+            _source = source ?? throw new ArgumentNullException(nameof(source));
+            _rgbPixels = null;
+            return this;
+        }
+
+        public DetectTextBuilder WithOptions(OcrRunOptions options)
+        {
+            _options = options ?? throw new ArgumentNullException(nameof(options));
+            return this;
+        }
+
+        public DetectTextBuilder WithAutoUnwarp(bool enabled = true)
+        {
+            _options.AutoUnwarp = enabled;
+            return this;
+        }
+
+        public DetectTextBuilder WithLayoutReading(bool enabled = true)
+        {
+            _options.LayoutReading = enabled;
+            return this;
+        }
+
+        public DetectTextBuilder WithOrientationDetection(bool enabled = true)
+        {
+            _options.OrientationDetection = enabled;
+            return this;
+        }
+
+        public DetectTextBuilder WithLineClassification(bool enabled = true)
+        {
+            _options.LineClassification = enabled;
+            return this;
+        }
+
+        public DetectTextBuilder WithPreDetection(PreDetectionOptions preDetection)
+        {
+            _options.PreDetection = preDetection;
+            return this;
+        }
+
+        public DetectTextBuilder WithPreDetection(Action<PreDetectionOptions> configure)
+        {
+            _options.PreDetection ??= new PreDetectionOptions();
+            configure?.Invoke(_options.PreDetection);
+            return this;
+        }
+
+        public DetectTextBuilder WithDetection(DetectionRunOptions detection)
+        {
+            _options.Detection = detection;
+            return this;
+        }
+
+        public DetectTextBuilder WithDetection(Action<DetectionRunOptions> configure)
+        {
+            _options.Detection ??= new DetectionRunOptions();
+            configure?.Invoke(_options.Detection);
+            return this;
+        }
+
+        public DetectTextBuilder WithPostDetection(PostDetectionOptions postDetection)
+        {
+            _options.PostDetection = postDetection;
+            return this;
+        }
+
+        public DetectTextBuilder WithPostDetection(Action<PostDetectionOptions> configure)
+        {
+            _options.PostDetection ??= new PostDetectionOptions();
+            configure?.Invoke(_options.PostDetection);
+            return this;
+        }
+
+        public DetectTextBuilder WithPreRecognition(PreRecognitionOptions preRecognition)
+        {
+            _options.PreRecognition = preRecognition;
+            return this;
+        }
+
+        public DetectTextBuilder WithPreRecognition(Action<PreRecognitionOptions> configure)
+        {
+            _options.PreRecognition ??= new PreRecognitionOptions();
+            configure?.Invoke(_options.PreRecognition);
+            return this;
+        }
+
+        public DetectTextBuilder WithRecognition(RecognitionRunOptions recognition)
+        {
+            _options.Recognition = recognition;
+            return this;
+        }
+
+        public DetectTextBuilder WithRecognition(Action<RecognitionRunOptions> configure)
+        {
+            _options.Recognition ??= new RecognitionRunOptions();
+            configure?.Invoke(_options.Recognition);
+            return this;
+        }
+
+        public DetectTextBuilder WithPostRecognition(PostRecognitionOptions postRecognition)
+        {
+            _options.PostRecognition = postRecognition;
+            return this;
+        }
+
+        public DetectTextBuilder WithPostRecognition(Action<PostRecognitionOptions> configure)
+        {
+            _options.PostRecognition ??= new PostRecognitionOptions();
+            configure?.Invoke(_options.PostRecognition);
+            return this;
+        }
+
+        public DetectTextBuilder WithOutput(OutputGranularity granularity)
+        {
+            _options.Output = granularity;
+            return this;
+        }
+
+        public DetectTextBuilder AsLines() => WithOutput(OutputGranularity.Lines);
+        public DetectTextBuilder AsWords() => WithOutput(OutputGranularity.Words);
+        public DetectTextBuilder AsSpatial() => WithOutput(OutputGranularity.Spatial);
+        public DetectTextBuilder AsTsv() => WithOutput(OutputGranularity.Tsv);
+
+        public DetectTextResult Run()
+        {
+            if (_rgbPixels != null)
+            {
+                return _engine.DetectTextRgb(_rgbPixels, _rgbWidth, _rgbHeight, _rgbStride, _options);
+            }
+            if (_source == null)
+            {
+                throw new InvalidOperationException("Image source must be specified before calling Run().");
+            }
+            return _engine.DetectText(_source, _options);
+        }
+    }
+
+    /// <summary>
     /// High-performance, pure-Rust OCR engine wrapper for .NET.
     /// </summary>
     public class RustO : IDisposable
@@ -397,6 +676,11 @@ namespace RustODotnet
         /// </summary>
         public static string Version => RustODotnet.Generated.RustoMethods.RustoVersion();
 
+        /// <summary>
+        /// Returns whether the specified engine is ready for inference.
+        /// </summary>
+        public static bool IsReady(RustO engine) => engine != null && engine.IsReady();
+
         private RustO(InitializeConfig config)
         {
             config ??= new InitializeConfig();
@@ -417,18 +701,30 @@ namespace RustODotnet
                 if (!string.IsNullOrEmpty(config.Recognition?.DictPath))
                     config.Recognition.DictPath = ResolveModelPath(config.Recognition.DictPath);
             }
+            else if (config.Detection != null || config.Recognition != null)
+            {
+                if (!string.IsNullOrEmpty(config.Detection?.ModelPath))
+                    config.Detection.ModelPath = ResolveModelPath(config.Detection.ModelPath);
+
+                if (!string.IsNullOrEmpty(config.Recognition?.ModelPath))
+                    config.Recognition.ModelPath = ResolveModelPath(config.Recognition.ModelPath);
+
+                if (!string.IsNullOrEmpty(config.Recognition?.DictPath))
+                    config.Recognition.DictPath = ResolveModelPath(config.Recognition.DictPath);
+            }
             else
             {
-                config.Detection ??= new DetectionConfig();
-                config.Recognition ??= new RecognitionConfig();
-
-                var detName = config.Detection.ModelPath ?? "det.rten";
-                var recName = config.Recognition.ModelPath ?? "rec.rten";
-                var dictName = config.Recognition.DictPath ?? "dict.txt";
-
-                config.Detection.ModelPath = ResolveModelPath(detName);
-                config.Recognition.ModelPath = ResolveModelPath(recName);
-                config.Recognition.DictPath = ResolveModelPath(dictName);
+                var bundledDet = ResolveModelPath("det.rten");
+                var bundledRec = ResolveModelPath("rec.rten");
+                if (File.Exists(bundledDet) && File.Exists(bundledRec))
+                {
+                    config.Detection = new DetectionConfig { ModelPath = bundledDet };
+                    config.Recognition = new RecognitionConfig
+                    {
+                        ModelPath = bundledRec,
+                        DictPath = ResolveModelPath("dict.txt")
+                    };
+                }
             }
 
             if (config.Classification?.ModelPath != null)
@@ -466,12 +762,14 @@ namespace RustODotnet
             RustODotnet.Generated.RustoMethods.DownloadModel(model, lang, cacheDir);
 
         /// <summary>
-        /// Downloads all available canonical models to the cache directory ahead of time.
+        /// Returns whether the engine is ready for inference.
         /// </summary>
-        /// <param name="cacheDir">Optional custom cache directory.</param>
-        /// <returns>Array of downloaded local model paths.</returns>
-        public static string[] DownloadAllModels(string cacheDir = null) =>
-            RustODotnet.Generated.RustoMethods.DownloadAllModels(cacheDir);
+        public bool IsReady() => !_disposed && _inner.IsReady();
+
+        /// <summary>
+        /// Returns the engine library version string.
+        /// </summary>
+        public string GetVersion() => _inner.Version();
 
         /// <summary>
         /// Initializes a new RustO OCR engine instance with model session configuration.
@@ -513,12 +811,37 @@ namespace RustODotnet
         }
 
         /// <summary>
+        /// Creates a fluent DetectTextBuilder for text detection and recognition.
+        /// </summary>
+        public DetectTextBuilder DetectText() => new DetectTextBuilder(this);
+
+        /// <summary>
+        /// Creates a fluent DetectTextBuilder with the given image file path or URI.
+        /// </summary>
+        public DetectTextBuilder DetectText(string pathOrUri) => new DetectTextBuilder(this).Image(pathOrUri);
+
+        /// <summary>
+        /// Creates a fluent DetectTextBuilder with the given byte array.
+        /// </summary>
+        public DetectTextBuilder DetectText(byte[] bytes) => new DetectTextBuilder(this).Data(bytes);
+
+        /// <summary>
+        /// Creates a fluent DetectTextBuilder with the given ImageSource.
+        /// </summary>
+        public DetectTextBuilder DetectText(ImageSource source) => new DetectTextBuilder(this, source);
+
+        /// <summary>
+        /// Creates a fluent DetectTextBuilder for text detection and recognition.
+        /// </summary>
+        public DetectTextBuilder DetectTextBuilder() => new DetectTextBuilder(this);
+
+        /// <summary>
         /// Detects text in an image source (file path/URI or byte array) with the specified runtime options.
         /// </summary>
         /// <param name="source">ImageSource specifying image path or in-memory byte buffer.</param>
-        /// <param name="options">Optional runtime execution options.</param>
+        /// <param name="options">Runtime execution options.</param>
         /// <returns>StructuredDetectTextResult or SpatialDetectTextResult depending on output option.</returns>
-        public DetectTextResult DetectText(ImageSource source, OcrRunOptions options = null)
+        public DetectTextResult DetectText(ImageSource source, OcrRunOptions options)
         {
             ThrowIfDisposed();
             options ??= new OcrRunOptions();
@@ -535,21 +858,7 @@ namespace RustODotnet
 
             try
             {
-                var result = _inner.DetectText(uniffiSource, uniffiOpts);
-                return result switch
-                {
-                    RustODotnet.Generated.DetectTextResult.Structured structured => new StructuredDetectTextResult(
-                        structured.Results.Select(r => new TextResult
-                        {
-                            Text = r.Text,
-                            Score = r.Score,
-                            BoxPoints = r.BoxPoints.Select(p => new Point2D(p.X, p.Y)).ToArray(),
-                            Frame = new Frame(r.Frame.Width, r.Frame.Height, r.Frame.Top, r.Frame.Left)
-                        }).ToArray()
-                    ),
-                    RustODotnet.Generated.DetectTextResult.Spatial spatial => new SpatialDetectTextResult(spatial.Text),
-                    _ => throw new RustOException("Unexpected detection result format")
-                };
+                return MapDetectTextResult(_inner.DetectText(uniffiSource, uniffiOpts));
             }
             catch (Exception ex)
             {
@@ -576,27 +885,48 @@ namespace RustODotnet
 
             try
             {
-                var result = _inner.DetectTextRgb(pixels, width, height, stride, uniffiOpts);
-                return result switch
-                {
-                    RustODotnet.Generated.DetectTextResult.Structured structured => new StructuredDetectTextResult(
-                        structured.Results.Select(r => new TextResult
-                        {
-                            Text = r.Text,
-                            Score = r.Score,
-                            BoxPoints = r.BoxPoints.Select(p => new Point2D(p.X, p.Y)).ToArray(),
-                            Frame = new Frame(r.Frame.Width, r.Frame.Height, r.Frame.Top, r.Frame.Left)
-                        }).ToArray()
-                    ),
-                    RustODotnet.Generated.DetectTextResult.Spatial spatial => new SpatialDetectTextResult(spatial.Text),
-                    _ => throw new RustOException("Unexpected detection result format")
-                };
+                return MapDetectTextResult(_inner.DetectTextRgb(pixels, width, height, stride, uniffiOpts));
             }
             catch (Exception ex)
             {
                 throw new RustOException($"Text detection failed: {ex.Message}");
             }
         }
+
+        private static DetectTextResult MapDetectTextResult(RustODotnet.Generated.DetectTextResult result) =>
+            result switch
+            {
+                RustODotnet.Generated.DetectTextResult.Structured structured => new StructuredDetectTextResult(
+                    structured.Results.Select(r => new TextResult
+                    {
+                        Text = r.Text,
+                        Score = r.Score,
+                        BoxPoints = r.BoxPoints.Select(p => new Point2D(p.X, p.Y)).ToArray(),
+                        Frame = new Frame(r.Frame.Width, r.Frame.Height, r.Frame.Top, r.Frame.Left),
+                        RegionId = r.RegionId,
+                        LayoutType = FormatLayoutType(r.LayoutType)
+                    }).ToArray()
+                ),
+                RustODotnet.Generated.DetectTextResult.Spatial spatial => new SpatialDetectTextResult(spatial.Text),
+                _ => throw new RustOException("Unexpected detection result format")
+            };
+
+        private static string FormatLayoutType(RustODotnet.Generated.LayoutType? layoutType) =>
+            layoutType switch
+            {
+                null => null,
+                RustODotnet.Generated.LayoutType.Text => "text",
+                RustODotnet.Generated.LayoutType.Title => "title",
+                RustODotnet.Generated.LayoutType.Figure => "figure",
+                RustODotnet.Generated.LayoutType.FigureCaption => "figureCaption",
+                RustODotnet.Generated.LayoutType.Table => "table",
+                RustODotnet.Generated.LayoutType.TableCaption => "tableCaption",
+                RustODotnet.Generated.LayoutType.Header => "header",
+                RustODotnet.Generated.LayoutType.Footer => "footer",
+                RustODotnet.Generated.LayoutType.Reference => "reference",
+                RustODotnet.Generated.LayoutType.Equation => "equation",
+                _ => null
+            };
 
         private static RustODotnet.Generated.OcrRunOptions BuildUniffiOptions(OcrRunOptions options)
         {
@@ -605,45 +935,51 @@ namespace RustODotnet
             {
                 OutputGranularity.Words => RustODotnet.Generated.OutputGranularity.Words,
                 OutputGranularity.Spatial => RustODotnet.Generated.OutputGranularity.Spatial,
+                OutputGranularity.Tsv => RustODotnet.Generated.OutputGranularity.Tsv,
                 _ => RustODotnet.Generated.OutputGranularity.Lines
             };
 
             return defaultOpts with
             {
                 Output = uniffiOutput,
-                LineYThreshold = options.LineYThreshold,
-                WordXThreshold = options.WordXThreshold,
-                TextScore = options.TextScore,
-                Classification = options.Classification,
-                Orientation = options.Orientation,
-                Unwarp = options.Unwarp,
-                Layout = options.Layout,
-                MinHeight = options.MinHeight,
-                MaxSideLen = options.MaxSideLen,
-                MinSideLen = options.MinSideLen,
-                WidthHeightRatio = options.WidthHeightRatio,
+                AutoUnwarp = options.AutoUnwarp,
+                LayoutReading = options.LayoutReading,
+                OrientationDetection = options.OrientationDetection,
+                LineClassification = options.LineClassification,
+                PreDetection = options.PreDetection != null ? new RustODotnet.Generated.PreDetectionOptions(
+                    options.PreDetection.DescreenStrength,
+                    options.PreDetection.TargetMaxSide,
+                    options.PreDetection.CropPaddingX,
+                    options.PreDetection.CropPaddingY
+                ) : defaultOpts.PreDetection,
                 Detection = options.Detection != null ? new RustODotnet.Generated.DetectionRunOptions(
                     options.Detection.LimitSideLen,
                     options.Detection.LimitType,
                     options.Detection.Mean,
-                    options.Detection.Std,
-                    options.Detection.Postprocess != null ? new RustODotnet.Generated.PostprocessRunOptions(
-                        options.Detection.Postprocess.Threshold,
-                        options.Detection.Postprocess.BoxThreshold,
-                        options.Detection.Postprocess.MaxCandidates,
-                        options.Detection.Postprocess.UnclipRatio,
-                        options.Detection.Postprocess.UseDilation,
-                        options.Detection.Postprocess.ScoreMode
-                    ) : null
+                    options.Detection.Std
                 ) : defaultOpts.Detection,
-                Postprocess = options.Postprocess != null ? new RustODotnet.Generated.PostprocessRunOptions(
-                    options.Postprocess.Threshold,
-                    options.Postprocess.BoxThreshold,
-                    options.Postprocess.MaxCandidates,
-                    options.Postprocess.UnclipRatio,
-                    options.Postprocess.UseDilation,
-                    options.Postprocess.ScoreMode
-                ) : defaultOpts.Postprocess
+                PostDetection = options.PostDetection != null ? new RustODotnet.Generated.PostDetectionOptions(
+                    options.PostDetection.Threshold,
+                    options.PostDetection.BoxThreshold,
+                    options.PostDetection.UnclipRatio,
+                    options.PostDetection.UseDilation,
+                    options.PostDetection.ScoreMode,
+                    options.PostDetection.MaxCandidates,
+                    options.PostDetection.MinHeight,
+                    options.PostDetection.MinSideLen,
+                    options.PostDetection.MaxSideLen,
+                    options.PostDetection.WidthHeightRatio
+                ) : defaultOpts.PostDetection,
+                PreRecognition = options.PreRecognition != null ? new RustODotnet.Generated.PreRecognitionOptions(
+                    options.PreRecognition.LineYThreshold,
+                    options.PreRecognition.WordXThreshold
+                ) : defaultOpts.PreRecognition,
+                Recognition = options.Recognition != null ? new RustODotnet.Generated.RecognitionRunOptions(
+                    options.Recognition.BatchSize
+                ) : defaultOpts.Recognition,
+                PostRecognition = options.PostRecognition != null ? new RustODotnet.Generated.PostRecognitionOptions(
+                    options.PostRecognition.ScoreThreshold
+                ) : defaultOpts.PostRecognition
             };
         }
 
@@ -659,37 +995,54 @@ namespace RustODotnet
             {
                 throw new RustOException($"Invalid output '{output}'. Use OutputGranularity.Lines or OutputGranularity.Words.");
             }
-            ValidateNonNegative(options.LineYThreshold, nameof(options.LineYThreshold));
-            ValidateNonNegative(options.WordXThreshold, nameof(options.WordXThreshold));
-            if (options.TextScore.HasValue && (!float.IsFinite(options.TextScore.Value) || options.TextScore.Value < 0 || options.TextScore.Value > 1))
+            if (options.PreDetection != null)
             {
-                throw new RustOException("TextScore must be finite and between 0 and 1.");
+                ValidateProbability(options.PreDetection.DescreenStrength, nameof(options.PreDetection.DescreenStrength));
+                ValidateNonNegative(options.PreDetection.CropPaddingX, nameof(options.PreDetection.CropPaddingX));
+                ValidateNonNegative(options.PreDetection.CropPaddingY, nameof(options.PreDetection.CropPaddingY));
             }
-            ValidatePositive(options.MinHeight, nameof(options.MinHeight));
-            ValidatePositive(options.MaxSideLen, nameof(options.MaxSideLen));
-            ValidatePositive(options.MinSideLen, nameof(options.MinSideLen));
-            if (options.WidthHeightRatio.HasValue && (!float.IsFinite(options.WidthHeightRatio.Value) || (options.WidthHeightRatio.Value <= 0 && options.WidthHeightRatio.Value != -1))) throw new RustOException("WidthHeightRatio must be positive or -1.");
-            if (options.MinSideLen.HasValue && options.MaxSideLen.HasValue && options.MinSideLen.Value > options.MaxSideLen.Value) throw new RustOException("MinSideLen must not exceed MaxSideLen.");
-            var detection = options.Detection;
-            if (detection != null)
+            if (options.Detection != null)
             {
-                if (detection.LimitSideLen.HasValue && (detection.LimitSideLen.Value < 1 || detection.LimitSideLen.Value > 32767)) throw new RustOException("LimitSideLen must be between 1 and 32767.");
-                if (detection.LimitType != null && detection.LimitType != "min" && detection.LimitType != "max") throw new RustOException("LimitType must be min or max.");
-                ValidateVector(detection.Mean, false, "Mean");
-                ValidateVector(detection.Std, true, "Std");
-                ValidatePostprocess(detection.Postprocess);
+                var d = options.Detection;
+                if (d.LimitSideLen.HasValue && (d.LimitSideLen.Value < 1 || d.LimitSideLen.Value > 32767))
+                    throw new RustOException("LimitSideLen must be between 1 and 32767.");
+                if (d.LimitType != null && d.LimitType != "min" && d.LimitType != "max")
+                    throw new RustOException("LimitType must be min or max.");
+                ValidateVector(d.Mean, false, "Mean");
+                ValidateVector(d.Std, true, "Std");
             }
-            ValidatePostprocess(options.Postprocess);
-        }
-
-        private static void ValidatePostprocess(PostprocessRunOptions postprocess)
-        {
-            if (postprocess == null) return;
-            ValidateProbability(postprocess.Threshold, "Threshold");
-            ValidateProbability(postprocess.BoxThreshold, "BoxThreshold");
-            if (postprocess.MaxCandidates.HasValue && postprocess.MaxCandidates.Value < 1) throw new RustOException("MaxCandidates must be at least one.");
-            ValidatePositive(postprocess.UnclipRatio, "UnclipRatio");
-            if (postprocess.ScoreMode != null && postprocess.ScoreMode != "fast" && postprocess.ScoreMode != "slow") throw new RustOException("ScoreMode must be fast or slow.");
+            if (options.PostDetection != null)
+            {
+                var pd = options.PostDetection;
+                ValidateProbability(pd.Threshold, "Threshold");
+                ValidateProbability(pd.BoxThreshold, "BoxThreshold");
+                if (pd.MaxCandidates.HasValue && pd.MaxCandidates.Value < 1)
+                    throw new RustOException("MaxCandidates must be at least one.");
+                ValidatePositive(pd.UnclipRatio, "UnclipRatio");
+                if (pd.ScoreMode != null && pd.ScoreMode != "fast" && pd.ScoreMode != "slow")
+                    throw new RustOException("ScoreMode must be fast or slow.");
+                ValidatePositive(pd.MinHeight, "MinHeight");
+                ValidatePositive(pd.MaxSideLen, "MaxSideLen");
+                ValidatePositive(pd.MinSideLen, "MinSideLen");
+                if (pd.WidthHeightRatio.HasValue && (!float.IsFinite(pd.WidthHeightRatio.Value) || (pd.WidthHeightRatio.Value <= 0 && pd.WidthHeightRatio.Value != -1)))
+                    throw new RustOException("WidthHeightRatio must be positive or -1.");
+                if (pd.MinSideLen.HasValue && pd.MaxSideLen.HasValue && pd.MinSideLen.Value > pd.MaxSideLen.Value)
+                    throw new RustOException("MinSideLen must not exceed MaxSideLen.");
+            }
+            if (options.PreRecognition != null)
+            {
+                ValidateNonNegative(options.PreRecognition.LineYThreshold, nameof(options.PreRecognition.LineYThreshold));
+                ValidateNonNegative(options.PreRecognition.WordXThreshold, nameof(options.PreRecognition.WordXThreshold));
+            }
+            if (options.Recognition != null)
+            {
+                if (options.Recognition.BatchSize.HasValue && options.Recognition.BatchSize.Value < 1)
+                    throw new RustOException("BatchSize must be at least one.");
+            }
+            if (options.PostRecognition != null)
+            {
+                ValidateProbability(options.PostRecognition.ScoreThreshold, nameof(options.PostRecognition.ScoreThreshold));
+            }
         }
 
         private static void ValidateVector(float[] values, bool nonZero, string name)
@@ -723,6 +1076,11 @@ namespace RustODotnet
                 throw new ObjectDisposedException(nameof(RustO));
             }
         }
+
+        /// <summary>
+        /// Releases native engine resources.
+        /// </summary>
+        public void Close() => Dispose();
 
         /// <summary>
         /// Releases native engine resources.

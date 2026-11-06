@@ -1,45 +1,37 @@
-import {
-  type DetectTextOptions,
-  type TextResult,
-  formatSpatialText,
-  groupCandidatesIntoLines,
-  sortCandidatesReadingOrder,
+import type {
+  DetectTextOptions,
+  TextResult,
 } from '@rustors/web';
 import type { OcrModelOption } from '../types/ocrModels';
 import { type ActiveRunConfig, type OcrConfig, buildDetectTextOptions } from '../types/ocrConfig';
 
 export function processOcrOutput(
   output: TextResult[] | string,
-  lineYThreshold: number,
-  wordXThreshold: number,
-  enableReadingOrder: boolean = false
+  _lineYThreshold?: number,
+  _wordXThreshold?: number,
+  _enableReadingOrder: boolean = false
 ): { results: TextResult[]; spatialText: string } {
   if (Array.isArray(output)) {
-    const ordered = enableReadingOrder
-      ? sortCandidatesReadingOrder(output, lineYThreshold)
-      : output;
     return {
-      results: ordered,
-      spatialText: formatSpatialText(
-        groupCandidatesIntoLines(ordered, lineYThreshold),
-        wordXThreshold
-      ),
+      results: output,
+      spatialText: output.map((r) => r.text).join('\n'),
     };
   }
   return { results: [], spatialText: output };
 }
 
-export function formatResultsCsv(
+
+export function formatResultsTsv(
   results: Array<{
     text: string;
     score: number;
     frame: { left: number; top: number; width: number; height: number };
   }>
 ): string {
-  const header = 'text,score,left,top,width,height';
+  const header = ['text', 'score', 'left', 'top', 'width', 'height'].join('\t');
   const rows = results.map(
     (r) =>
-      `"${r.text.replaceAll('"', '""')}",${r.score.toFixed(4)},${r.frame.left},${r.frame.top},${r.frame.width},${r.frame.height}`
+      `${r.text.replace(/[\t\n\r]/g, ' ')}\t${r.score.toFixed(4)}\t${r.frame.left}\t${r.frame.top}\t${r.frame.width}\t${r.frame.height}`
   );
   return [header, ...rows].join('\n');
 }
@@ -50,6 +42,61 @@ export function formatActiveConfigJson(
   options: unknown
 ): string {
   return JSON.stringify({ model: modelName, granularity: outputMode, options }, null, 2);
+}
+
+function appendBuilderStages(lines: string[], options: DetectTextOptions): void {
+  if (options.autoUnwarp) lines.push(`  .withAutoUnwarp()`);
+  if (options.layoutReading) lines.push(`  .withLayoutReading()`);
+  if (options.orientationDetection) lines.push(`  .withOrientationDetection()`);
+  if (options.lineClassification) lines.push(`  .withLineClassification()`);
+  if (options.preDetection && Object.keys(options.preDetection).length > 0) {
+    lines.push(`  .withPreDetection(${JSON.stringify(options.preDetection)})`);
+  }
+  if (options.detection) lines.push(`  .withDetection(${JSON.stringify(options.detection)})`);
+  if (options.postDetection)
+    lines.push(`  .withPostDetection(${JSON.stringify(options.postDetection)})`);
+  if (options.preRecognition)
+    lines.push(`  .withPreRecognition(${JSON.stringify(options.preRecognition)})`);
+  if (options.recognition) lines.push(`  .withRecognition(${JSON.stringify(options.recognition)})`);
+  if (options.postRecognition)
+    lines.push(`  .withPostRecognition(${JSON.stringify(options.postRecognition)})`);
+}
+
+export function formatFluentBuilderSnippet(
+  outputMode: 'lines' | 'words' | 'spatial' | 'tsv',
+  options: DetectTextOptions
+): string {
+  const lines: string[] = [
+    `import { detectText } from '@rustors/web';`,
+    ``,
+    `// Execute OCR with fluent builder chaining`,
+    `const results = await detectText()`,
+    `  .image(imageSource)`,
+  ];
+
+  appendBuilderStages(lines, options);
+
+  if (outputMode === 'words') {
+    lines.push(`  .asWords()`);
+  } else if (outputMode === 'spatial') {
+    lines.push(`  .asSpatial()`);
+  } else if (outputMode === 'tsv') {
+    lines.push(`  .asTsv()`);
+  } else {
+    lines.push(`  .asLines()`);
+  }
+
+  lines.push(`  .run();`);
+  return lines.join('\n');
+}
+
+export function formatOptionsSnippet(options: DetectTextOptions): string {
+  return [
+    `import { detectText } from '@rustors/web';`,
+    ``,
+    `// Execute OCR with structured OcrRunOptions`,
+    `const results = await detectText(imageSource, ${JSON.stringify(options, null, 2)});`,
+  ].join('\n');
 }
 
 export function buildActiveConfigJson(

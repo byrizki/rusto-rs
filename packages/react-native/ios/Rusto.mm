@@ -34,10 +34,37 @@ char *rocr_detect_text_data_spatial(ROCRHandle handle, const void *data, size_t 
 void rocr_free_string(char *s);
 void rocr_free_results(void *results, size_t count);
 void rocr_free(ROCRHandle handle);
+const char *rocr_version(void);
+int rocr_is_ready(ROCRHandle handle);
+
 
 #ifdef __cplusplus
 }
 #endif
+
+static NSString *layoutTypeNameFromCode(int code) {
+    switch (code) {
+        case 0: return @"text";
+        case 1: return @"title";
+        case 2: return @"figure";
+        case 3: return @"figureCaption";
+        case 4: return @"table";
+        case 5: return @"tableCaption";
+        case 6: return @"header";
+        case 7: return @"footer";
+        case 8: return @"reference";
+        case 9: return @"equation";
+        default: return nil;
+    }
+}
+
+static BOOL isJsonBoolean(id value) {
+    return [value isKindOfClass:[NSNumber class]] && CFGetTypeID((__bridge CFTypeRef)value) == CFBooleanGetTypeID();
+}
+
+static BOOL isJsonNumber(id value) {
+    return [value isKindOfClass:[NSNumber class]] && CFGetTypeID((__bridge CFTypeRef)value) != CFBooleanGetTypeID();
+}
 
 @interface Rusto () {
     ROCRHandle _rustoInstance;
@@ -117,7 +144,7 @@ static NSError *makeValidationError(NSString *message) {
     NSString *ext = [filename pathExtension];
     NSMutableArray<NSString *> *candidateExts = [NSMutableArray array];
     if (ext.length > 0) [candidateExts addObject:ext];
-    for (NSString *candidate in @[@"rten", @"onnx", @"mnn", @"txt"]) {
+    for (NSString *candidate in @[@"rten", @"onnx", @"mnn", @"txt", @"json"]) {
         if (![candidateExts containsObject:candidate]) {
             [candidateExts addObject:candidate];
         }
@@ -125,6 +152,7 @@ static NSError *makeValidationError(NSString *message) {
 
     NSArray<NSString *> *bundleNames = @[
         @"RustOModels", @"RustoModels",
+        @"RustOModels_Indra",
         @"RustOModels_PPOCRv6_Tiny", @"RustOModels_PPOCRv6_Small", @"RustOModels_PPOCRv6_Medium",
         @"RustOModels_PPOCRv5_Mobile", @"RustOModels_PPOCRv5_Server",
         @"RustOModels_PPOCRv4_Mobile", @"RustOModels_PPOCRv4_Server"
@@ -178,7 +206,9 @@ static NSError *makeValidationError(NSString *message) {
         }
     }
 
-    NSSet *allowed = [NSSet setWithObjects:@"preset", @"models", nil];
+    NSSet *allowed = [NSSet setWithObjects:@"preset", @"model", @"modelPath", @"lang",
+                                           @"cacheDir", @"enableReadingOrder", @"layoutVariant",
+                                           @"recBatchNum", @"models", nil];
     NSSet *keys = [NSSet setWithArray:config.allKeys];
     if (![keys isSubsetOfSet:allowed]) {
         if (error) *error = makeValidationError(@"unknown key");
@@ -188,8 +218,46 @@ static NSError *makeValidationError(NSString *message) {
     if (config[@"preset"] != nil) {
         id preset = config[@"preset"];
         if (![preset isKindOfClass:[NSString class]] ||
-            ![@[@"ppv6", @"ppv5", @"ppv4", @"ppv3"] containsObject:preset]) {
+            ![@[@"indra", @"ppv6", @"ppv5", @"ppv4", @"ppv3"] containsObject:preset]) {
             if (error) *error = makeValidationError(@"preset is invalid");
+            return nil;
+        }
+    }
+
+    for (NSString *strKey in @[@"model", @"modelPath", @"lang", @"cacheDir"]) {
+        if (config[strKey] != nil) {
+            id val = config[strKey];
+            if (![val isKindOfClass:[NSString class]] ||
+                [[val stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] length] == 0) {
+                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ must be a non-empty string", strKey]);
+                return nil;
+            }
+        }
+    }
+
+    if (config[@"enableReadingOrder"] != nil && !isJsonBoolean(config[@"enableReadingOrder"])) {
+        if (error) *error = makeValidationError(@"enableReadingOrder must be a boolean");
+        return nil;
+    }
+
+    if (config[@"layoutVariant"] != nil) {
+        id variant = config[@"layoutVariant"];
+        if (![variant isKindOfClass:[NSString class]] ||
+            (![variant isEqualToString:@"cdla"] && ![variant isEqualToString:@"publaynet"])) {
+            if (error) *error = makeValidationError(@"layoutVariant is invalid");
+            return nil;
+        }
+    }
+
+    if (config[@"recBatchNum"] != nil) {
+        id val = config[@"recBatchNum"];
+        if (!isJsonNumber(val)) {
+            if (error) *error = makeValidationError(@"recBatchNum is invalid");
+            return nil;
+        }
+        double d = [val doubleValue];
+        if (!isfinite(d) || d < 1.0 || floor(d) != d) {
+            if (error) *error = makeValidationError(@"recBatchNum is invalid");
             return nil;
         }
     }
@@ -202,7 +270,8 @@ static NSError *makeValidationError(NSString *message) {
             return nil;
         }
         NSDictionary *models = (NSDictionary *)rawModels;
-        NSSet *allowedModels = [NSSet setWithObjects:@"detection", @"recognition", @"dictionary", @"classification", @"orientation", nil];
+        NSSet *allowedModels = [NSSet setWithObjects:@"detection", @"recognition", @"dictionary",
+                                                     @"classification", @"orientation", @"unwarp", @"layout", nil];
         NSSet *modelKeys = [NSSet setWithArray:models.allKeys];
         if (![modelKeys isSubsetOfSet:allowedModels]) {
             if (error) *error = makeValidationError(@"models contains an unknown key");
@@ -225,6 +294,40 @@ static NSError *makeValidationError(NSString *message) {
     return validated;
 }
 
+- (NSDictionary *)validatedPreDetection:(id)raw error:(NSError **)error {
+    if (![raw isKindOfClass:[NSDictionary class]]) {
+        if (error) *error = makeValidationError(@"preDetection must be an object");
+        return nil;
+    }
+    NSDictionary *pre = (NSDictionary *)raw;
+    NSSet *allowed = [NSSet setWithObjects:@"descreenStrength", @"targetMaxSide", @"cropPaddingX", @"cropPaddingY", nil];
+    if (![[NSSet setWithArray:pre.allKeys] isSubsetOfSet:allowed]) {
+        if (error) *error = makeValidationError(@"preDetection contains an unknown key");
+        return nil;
+    }
+    NSMutableDictionary *result = [NSMutableDictionary dictionary];
+    for (NSString *key in @[@"descreenStrength", @"cropPaddingX", @"cropPaddingY"]) {
+        if (pre[key] != nil) {
+            id val = pre[key];
+            if (!isJsonNumber(val) || !isfinite([val doubleValue]) || [val doubleValue] < 0.0) {
+                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ is invalid", key]);
+                return nil;
+            }
+            result[key] = val;
+        }
+    }
+    if (pre[@"targetMaxSide"] != nil) {
+        id val = pre[@"targetMaxSide"];
+        double d = isJsonNumber(val) ? [val doubleValue] : -1.0;
+        if (!isfinite(d) || d < 1.0 || floor(d) != d) {
+            if (error) *error = makeValidationError(@"targetMaxSide is invalid");
+            return nil;
+        }
+        result[@"targetMaxSide"] = val;
+    }
+    return result;
+}
+
 - (NSDictionary *)validatedRuntimeDetection:(id)raw error:(NSError **)error {
     if (![raw isKindOfClass:[NSDictionary class]]) {
         if (error) *error = makeValidationError(@"detection must be an object");
@@ -232,20 +335,14 @@ static NSError *makeValidationError(NSString *message) {
     }
     NSDictionary *detection = (NSDictionary *)raw;
     NSSet *allowed = [NSSet setWithObjects:@"limitSideLen", @"limitType", @"mean", @"std", nil];
-    NSSet *keys = [NSSet setWithArray:detection.allKeys];
-    if (![keys isSubsetOfSet:allowed]) {
+    if (![[NSSet setWithArray:detection.allKeys] isSubsetOfSet:allowed]) {
         if (error) *error = makeValidationError(@"detection contains an unknown key");
         return nil;
     }
     NSMutableDictionary *result = [NSMutableDictionary dictionary];
     if (detection[@"limitSideLen"] != nil) {
         id rawVal = detection[@"limitSideLen"];
-        if (![rawVal isKindOfClass:[NSNumber class]] || [rawVal isKindOfClass:[@YES class]] ||
-            CFGetTypeID((__bridge CFTypeRef)rawVal) == CFBooleanGetTypeID()) {
-            if (error) *error = makeValidationError(@"limitSideLen is invalid");
-            return nil;
-        }
-        double val = [rawVal doubleValue];
+        double val = isJsonNumber(rawVal) ? [rawVal doubleValue] : -1.0;
         if (!isfinite(val) || val <= 0 || val > 32767 || floor(val) != val) {
             if (error) *error = makeValidationError(@"limitSideLen is invalid");
             return nil;
@@ -268,7 +365,7 @@ static NSError *makeValidationError(NSString *message) {
                 return nil;
             }
             for (id item in rawVal) {
-                if (![item isKindOfClass:[NSNumber class]] || CFGetTypeID((__bridge CFTypeRef)item) == CFBooleanGetTypeID()) {
+                if (!isJsonNumber(item)) {
                     if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ contains an invalid value", key]);
                     return nil;
                 }
@@ -284,27 +381,24 @@ static NSError *makeValidationError(NSString *message) {
     return result;
 }
 
-- (NSDictionary *)validatedRuntimePostprocess:(id)raw error:(NSError **)error {
+- (NSDictionary *)validatedPostDetection:(id)raw error:(NSError **)error {
     if (![raw isKindOfClass:[NSDictionary class]]) {
-        if (error) *error = makeValidationError(@"postprocess must be an object");
+        if (error) *error = makeValidationError(@"postDetection must be an object");
         return nil;
     }
-    NSDictionary *postprocess = (NSDictionary *)raw;
-    NSSet *allowed = [NSSet setWithObjects:@"threshold", @"boxThreshold", @"maxCandidates", @"unclipRatio", @"useDilation", @"scoreMode", nil];
-    NSSet *keys = [NSSet setWithArray:postprocess.allKeys];
-    if (![keys isSubsetOfSet:allowed]) {
-        if (error) *error = makeValidationError(@"postprocess contains an unknown key");
+    NSDictionary *post = (NSDictionary *)raw;
+    NSSet *allowed = [NSSet setWithObjects:@"threshold", @"boxThreshold", @"unclipRatio", @"useDilation",
+                                           @"scoreMode", @"maxCandidates", @"minHeight", @"minSideLen",
+                                           @"maxSideLen", @"widthHeightRatio", nil];
+    if (![[NSSet setWithArray:post.allKeys] isSubsetOfSet:allowed]) {
+        if (error) *error = makeValidationError(@"postDetection contains an unknown key");
         return nil;
     }
     NSMutableDictionary *result = [NSMutableDictionary dictionary];
     for (NSString *key in @[@"threshold", @"boxThreshold"]) {
-        if (postprocess[key] != nil) {
-            id val = postprocess[key];
-            if (![val isKindOfClass:[NSNumber class]] || CFGetTypeID((__bridge CFTypeRef)val) == CFBooleanGetTypeID()) {
-                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ is invalid", key]);
-                return nil;
-            }
-            double d = [val doubleValue];
+        if (post[key] != nil) {
+            id val = post[key];
+            double d = isJsonNumber(val) ? [val doubleValue] : -1.0;
             if (!isfinite(d) || d < 0.0 || d > 1.0) {
                 if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ is invalid", key]);
                 return nil;
@@ -312,47 +406,128 @@ static NSError *makeValidationError(NSString *message) {
             result[key] = val;
         }
     }
-    if (postprocess[@"maxCandidates"] != nil) {
-        id val = postprocess[@"maxCandidates"];
-        if (![val isKindOfClass:[NSNumber class]] || CFGetTypeID((__bridge CFTypeRef)val) == CFBooleanGetTypeID()) {
-            if (error) *error = makeValidationError(@"maxCandidates is invalid");
-            return nil;
-        }
-        double d = [val doubleValue];
+    if (post[@"maxCandidates"] != nil) {
+        id val = post[@"maxCandidates"];
+        double d = isJsonNumber(val) ? [val doubleValue] : -1.0;
         if (!isfinite(d) || d < 1.0 || floor(d) != d) {
             if (error) *error = makeValidationError(@"maxCandidates is invalid");
             return nil;
         }
         result[@"maxCandidates"] = val;
     }
-    if (postprocess[@"unclipRatio"] != nil) {
-        id val = postprocess[@"unclipRatio"];
-        if (![val isKindOfClass:[NSNumber class]] || CFGetTypeID((__bridge CFTypeRef)val) == CFBooleanGetTypeID()) {
-            if (error) *error = makeValidationError(@"unclipRatio is invalid");
-            return nil;
+    for (NSString *key in @[@"unclipRatio", @"minHeight", @"minSideLen", @"maxSideLen"]) {
+        if (post[key] != nil) {
+            id val = post[key];
+            double d = isJsonNumber(val) ? [val doubleValue] : -1.0;
+            if (!isfinite(d) || d <= 0.0) {
+                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ is invalid", key]);
+                return nil;
+            }
+            result[key] = val;
         }
-        double d = [val doubleValue];
-        if (!isfinite(d) || d <= 0.0) {
-            if (error) *error = makeValidationError(@"unclipRatio is invalid");
-            return nil;
-        }
-        result[@"unclipRatio"] = val;
     }
-    if (postprocess[@"useDilation"] != nil) {
-        id val = postprocess[@"useDilation"];
-        if (![val isKindOfClass:[NSNumber class]] || CFGetTypeID((__bridge CFTypeRef)val) != CFBooleanGetTypeID()) {
+    if (post[@"minSideLen"] != nil && post[@"maxSideLen"] != nil &&
+        [post[@"minSideLen"] doubleValue] > [post[@"maxSideLen"] doubleValue]) {
+        if (error) *error = makeValidationError(@"minSideLen must be <= maxSideLen");
+        return nil;
+    }
+    if (post[@"widthHeightRatio"] != nil) {
+        id val = post[@"widthHeightRatio"];
+        double d = isJsonNumber(val) ? [val doubleValue] : 0.0;
+        if (!isfinite(d) || (d <= 0.0 && d != -1.0)) {
+            if (error) *error = makeValidationError(@"widthHeightRatio is invalid");
+            return nil;
+        }
+        result[@"widthHeightRatio"] = val;
+    }
+    if (post[@"useDilation"] != nil) {
+        if (!isJsonBoolean(post[@"useDilation"])) {
             if (error) *error = makeValidationError(@"useDilation must be a boolean");
             return nil;
         }
-        result[@"useDilation"] = val;
+        result[@"useDilation"] = post[@"useDilation"];
     }
-    if (postprocess[@"scoreMode"] != nil) {
-        id val = postprocess[@"scoreMode"];
+    if (post[@"scoreMode"] != nil) {
+        id val = post[@"scoreMode"];
         if (![val isKindOfClass:[NSString class]] || (![val isEqualToString:@"fast"] && ![val isEqualToString:@"slow"])) {
             if (error) *error = makeValidationError(@"scoreMode is invalid");
             return nil;
         }
         result[@"scoreMode"] = val;
+    }
+    return result;
+}
+
+- (NSDictionary *)validatedPreRecognition:(id)raw error:(NSError **)error {
+    if (![raw isKindOfClass:[NSDictionary class]]) {
+        if (error) *error = makeValidationError(@"preRecognition must be an object");
+        return nil;
+    }
+    NSDictionary *pre = (NSDictionary *)raw;
+    NSSet *allowed = [NSSet setWithObjects:@"lineYThreshold", @"wordXThreshold", nil];
+    if (![[NSSet setWithArray:pre.allKeys] isSubsetOfSet:allowed]) {
+        if (error) *error = makeValidationError(@"preRecognition contains an unknown key");
+        return nil;
+    }
+    NSMutableDictionary *result = [NSMutableDictionary dictionary];
+    for (NSString *key in @[@"lineYThreshold", @"wordXThreshold"]) {
+        if (pre[key] != nil) {
+            id val = pre[key];
+            double d = isJsonNumber(val) ? [val doubleValue] : -1.0;
+            if (!isfinite(d) || d < 0.0) {
+                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ is invalid", key]);
+                return nil;
+            }
+            result[key] = val;
+        }
+    }
+    return result;
+}
+
+- (NSDictionary *)validatedRecognition:(id)raw error:(NSError **)error {
+    if (![raw isKindOfClass:[NSDictionary class]]) {
+        if (error) *error = makeValidationError(@"recognition must be an object");
+        return nil;
+    }
+    NSDictionary *rec = (NSDictionary *)raw;
+    NSSet *allowed = [NSSet setWithObjects:@"batchSize", nil];
+    if (![[NSSet setWithArray:rec.allKeys] isSubsetOfSet:allowed]) {
+        if (error) *error = makeValidationError(@"recognition contains an unknown key");
+        return nil;
+    }
+    NSMutableDictionary *result = [NSMutableDictionary dictionary];
+    if (rec[@"batchSize"] != nil) {
+        id val = rec[@"batchSize"];
+        double d = isJsonNumber(val) ? [val doubleValue] : -1.0;
+        if (!isfinite(d) || d < 1.0 || floor(d) != d) {
+            if (error) *error = makeValidationError(@"batchSize is invalid");
+            return nil;
+        }
+        result[@"batchSize"] = val;
+    }
+    return result;
+}
+
+- (NSDictionary *)validatedPostRecognition:(id)raw error:(NSError **)error {
+    if (![raw isKindOfClass:[NSDictionary class]]) {
+        if (error) *error = makeValidationError(@"postRecognition must be an object");
+        return nil;
+    }
+    NSDictionary *post = (NSDictionary *)raw;
+    NSSet *allowed = [NSSet setWithObjects:@"scoreThreshold", nil];
+    if (![[NSSet setWithArray:post.allKeys] isSubsetOfSet:allowed]) {
+        if (error) *error = makeValidationError(@"postRecognition contains an unknown key");
+        return nil;
+    }
+    NSMutableDictionary *result = [NSMutableDictionary dictionary];
+    if (post[@"scoreThreshold"] != nil) {
+        id val = post[@"scoreThreshold"];
+        double d = isJsonNumber(val) ? [val doubleValue] : -1.0;
+        if (!isfinite(d) || d < 0.0 || d > 1.0) {
+            if (error) *error = makeValidationError(@"scoreThreshold is invalid");
+            return nil;
+        }
+        result[@"scoreThreshold"] = val;
     }
     return result;
 }
@@ -365,12 +540,11 @@ static NSError *makeValidationError(NSString *message) {
             return nil;
         }
     }
-    NSSet *allowed = [NSSet setWithObjects:@"output", @"lineYThreshold", @"wordXThreshold",
-                                          @"textScore", @"classification", @"orientation",
-                                          @"minHeight", @"maxSideLen", @"minSideLen",
-                                          @"widthHeightRatio", @"detection", @"postprocess", nil];
-    NSSet *keys = [NSSet setWithArray:options.allKeys];
-    if (![keys isSubsetOfSet:allowed]) {
+    NSSet *allowed = [NSSet setWithObjects:@"output", @"autoUnwarp", @"layoutReading",
+                                          @"orientationDetection", @"lineClassification",
+                                          @"preDetection", @"detection", @"postDetection",
+                                          @"preRecognition", @"recognition", @"postRecognition", nil];
+    if (![[NSSet setWithArray:options.allKeys] isSubsetOfSet:allowed]) {
         if (error) *error = makeValidationError(@"unknown key");
         return nil;
     }
@@ -386,90 +560,42 @@ static NSError *makeValidationError(NSString *message) {
         options[@"output"] = @"lines";
     }
 
-    for (NSString *key in @[@"lineYThreshold", @"wordXThreshold"]) {
-        if (options[key] != nil) {
-            id val = options[key];
-            if (![val isKindOfClass:[NSNumber class]] || CFGetTypeID((__bridge CFTypeRef)val) == CFBooleanGetTypeID()) {
-                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ is invalid", key]);
-                return nil;
-            }
-            double d = [val doubleValue];
-            if (!isfinite(d) || d < 0.0) {
-                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ is invalid", key]);
-                return nil;
-            }
-        }
-    }
-
-    if (options[@"textScore"] != nil) {
-        id val = options[@"textScore"];
-        if (![val isKindOfClass:[NSNumber class]] || CFGetTypeID((__bridge CFTypeRef)val) == CFBooleanGetTypeID()) {
-            if (error) *error = makeValidationError(@"textScore is invalid");
-            return nil;
-        }
-        double d = [val doubleValue];
-        if (!isfinite(d) || d < 0.0 || d > 1.0) {
-            if (error) *error = makeValidationError(@"textScore is invalid");
+    for (NSString *key in @[@"autoUnwarp", @"layoutReading", @"orientationDetection", @"lineClassification"]) {
+        if (options[key] != nil && !isJsonBoolean(options[key])) {
+            if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ must be a boolean", key]);
             return nil;
         }
     }
 
-    for (NSString *key in @[@"classification", @"orientation"]) {
-        if (options[key] != nil) {
-            id val = options[key];
-            if (![val isKindOfClass:[NSNumber class]] || CFGetTypeID((__bridge CFTypeRef)val) != CFBooleanGetTypeID()) {
-                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ must be a boolean", key]);
-                return nil;
-            }
-        }
+    if (options[@"preDetection"] != nil) {
+        NSDictionary *sub = [self validatedPreDetection:options[@"preDetection"] error:error];
+        if (sub == nil) return nil;
+        options[@"preDetection"] = sub;
     }
-
-    NSNumber *(^checkNum)(NSString *, BOOL) = ^NSNumber *(NSString *key, BOOL allowNegOne) {
-        id raw = options[key];
-        if (raw == nil) return nil;
-        if (![raw isKindOfClass:[NSNumber class]] || CFGetTypeID((__bridge CFTypeRef)raw) == CFBooleanGetTypeID()) {
-            return nil;
-        }
-        double d = [raw doubleValue];
-        if (!isfinite(d) || (d <= 0.0 && !(allowNegOne && d == -1.0))) {
-            return nil;
-        }
-        return raw;
-    };
-
-    if (options[@"maxSideLen"] != nil && checkNum(@"maxSideLen", NO) == nil) {
-        if (error) *error = makeValidationError(@"maxSideLen is invalid");
-        return nil;
-    }
-    if (options[@"minSideLen"] != nil && checkNum(@"minSideLen", NO) == nil) {
-        if (error) *error = makeValidationError(@"minSideLen is invalid");
-        return nil;
-    }
-    if (options[@"minHeight"] != nil && checkNum(@"minHeight", NO) == nil) {
-        if (error) *error = makeValidationError(@"minHeight is invalid");
-        return nil;
-    }
-    if (options[@"widthHeightRatio"] != nil && checkNum(@"widthHeightRatio", YES) == nil) {
-        if (error) *error = makeValidationError(@"widthHeightRatio is invalid");
-        return nil;
-    }
-
-    if (options[@"minSideLen"] != nil && options[@"maxSideLen"] != nil) {
-        if ([options[@"minSideLen"] doubleValue] > [options[@"maxSideLen"] doubleValue]) {
-            if (error) *error = makeValidationError(@"minSideLen must be <= maxSideLen");
-            return nil;
-        }
-    }
-
     if (options[@"detection"] != nil) {
-        NSDictionary *det = [self validatedRuntimeDetection:options[@"detection"] error:error];
-        if (det == nil) return nil;
-        options[@"detection"] = det;
+        NSDictionary *sub = [self validatedRuntimeDetection:options[@"detection"] error:error];
+        if (sub == nil) return nil;
+        options[@"detection"] = sub;
     }
-    if (options[@"postprocess"] != nil) {
-        NSDictionary *pp = [self validatedRuntimePostprocess:options[@"postprocess"] error:error];
-        if (pp == nil) return nil;
-        options[@"postprocess"] = pp;
+    if (options[@"postDetection"] != nil) {
+        NSDictionary *sub = [self validatedPostDetection:options[@"postDetection"] error:error];
+        if (sub == nil) return nil;
+        options[@"postDetection"] = sub;
+    }
+    if (options[@"preRecognition"] != nil) {
+        NSDictionary *sub = [self validatedPreRecognition:options[@"preRecognition"] error:error];
+        if (sub == nil) return nil;
+        options[@"preRecognition"] = sub;
+    }
+    if (options[@"recognition"] != nil) {
+        NSDictionary *sub = [self validatedRecognition:options[@"recognition"] error:error];
+        if (sub == nil) return nil;
+        options[@"recognition"] = sub;
+    }
+    if (options[@"postRecognition"] != nil) {
+        NSDictionary *sub = [self validatedPostRecognition:options[@"postRecognition"] error:error];
+        if (sub == nil) return nil;
+        options[@"postRecognition"] = sub;
     }
 
     return options;
@@ -483,12 +609,7 @@ static NSError *makeValidationError(NSString *message) {
         CTextResult *res = &results[i];
         NSString *textString = res->text ? [NSString stringWithUTF8String:res->text] : @"";
 
-        float minX = MIN(MIN(res->box_x1, res->box_x2), MIN(res->box_x3, res->box_x4));
-        float maxX = MAX(MAX(res->box_x1, res->box_x2), MAX(res->box_x3, res->box_x4));
-        float minY = MIN(MIN(res->box_y1, res->box_y2), MIN(res->box_y3, res->box_y4));
-        float maxY = MAX(MAX(res->box_y1, res->box_y2), MAX(res->box_y3, res->box_y4));
-
-        NSDictionary *dict = @{
+        NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithDictionary:@{
             @"text": textString,
             @"score": @((double)res->score),
             @"box_points": @[
@@ -498,12 +619,19 @@ static NSError *makeValidationError(NSString *message) {
                 @[@((double)res->box_x4), @((double)res->box_y4)]
             ],
             @"frame": @{
-                @"width": @((double)(maxX - minX)),
-                @"height": @((double)(maxY - minY)),
-                @"top": @((double)minY),
-                @"left": @((double)minX)
+                @"width": @((double)res->frame_width),
+                @"height": @((double)res->frame_height),
+                @"top": @((double)res->frame_top),
+                @"left": @((double)res->frame_left)
             }
-        };
+        }];
+        if (res->region_id >= 0) {
+            dict[@"region_id"] = @(res->region_id);
+        }
+        NSString *layoutName = layoutTypeNameFromCode(res->layout_type);
+        if (layoutName != nil) {
+            dict[@"layout_type"] = layoutName;
+        }
         [resultArray addObject:dict];
     }
     return resultArray;
@@ -521,32 +649,66 @@ RCT_EXPORT_METHOD(initialize:(nullable NSDictionary *)configDict
     }
 
     NSDictionary *models = config[@"models"] ?: @{};
-    NSString *(^resolveModel)(NSString *, NSString *) = ^NSString *(NSString *key, NSString *fallback) {
-        NSString *val = models[key] ?: fallback;
+    NSString *(^resolveModel)(NSString *) = ^NSString *(NSString *key) {
+        NSString *val = models[key];
         if (val == nil) return nil;
         NSString *resolved = [self getResourcePath:val];
         return resolved ?: val;
     };
 
-    NSString *preset = config[@"preset"] ?: @"ppv6";
-    NSString *detModel = resolveModel(@"detection", @"det.rten");
-    NSString *recModel = resolveModel(@"recognition", @"rec.rten");
-    NSString *dictPath = resolveModel(@"dictionary", @"dict.txt");
+    NSMutableDictionary *resolvedConfig = [NSMutableDictionary dictionary];
+    if (config[@"preset"] != nil) resolvedConfig[@"template"] = config[@"preset"];
+    if (config[@"model"] != nil) resolvedConfig[@"model"] = config[@"model"];
+    if (config[@"modelPath"] != nil) resolvedConfig[@"modelPath"] = config[@"modelPath"];
+    if (config[@"lang"] != nil) resolvedConfig[@"lang"] = config[@"lang"];
+    if (config[@"enableReadingOrder"] != nil) resolvedConfig[@"enableReadingOrder"] = config[@"enableReadingOrder"];
+    if (config[@"layoutVariant"] != nil) resolvedConfig[@"layoutVariant"] = config[@"layoutVariant"];
 
-    NSMutableDictionary *resolvedConfig = [NSMutableDictionary dictionaryWithDictionary:@{
-        @"template": preset,
-        @"detection": @{ @"modelPath": detModel ?: @"" },
-        @"recognition": @{ @"modelPath": recModel ?: @"", @"dictPath": dictPath ?: @"" }
-    }];
+    NSString *cacheDir = config[@"cacheDir"];
+    if (cacheDir == nil) {
+        NSArray *cachePaths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+        if (cachePaths.count > 0) {
+            cacheDir = [cachePaths[0] stringByAppendingPathComponent:@"rusto/models"];
+        }
+    }
+    if (cacheDir != nil) {
+        resolvedConfig[@"cacheDir"] = cacheDir;
+    }
 
-    NSString *clsPath = resolveModel(@"classification", nil);
-    if (clsPath) {
-        resolvedConfig[@"classification"] = @{ @"enabled": @YES, @"modelPath": clsPath };
+    NSString *detModel = resolveModel(@"detection");
+    NSString *recModel = resolveModel(@"recognition");
+    NSString *dictPath = resolveModel(@"dictionary");
+
+    if (detModel == nil && recModel == nil && config[@"model"] == nil && config[@"modelPath"] == nil) {
+        NSString *bundledDet = [self getResourcePath:@"det.rten"];
+        NSString *bundledRec = [self getResourcePath:@"rec.rten"];
+        NSString *bundledDict = [self getResourcePath:@"dict.txt"];
+        if (bundledDet != nil && bundledRec != nil && bundledDict != nil) {
+            detModel = bundledDet;
+            recModel = bundledRec;
+            dictPath = bundledDict;
+        }
     }
-    NSString *oriPath = resolveModel(@"orientation", nil);
-    if (oriPath) {
-        resolvedConfig[@"orientation"] = @{ @"enabled": @YES, @"modelPath": oriPath };
+
+    if (detModel != nil) {
+        resolvedConfig[@"detection"] = @{ @"modelPath": detModel };
     }
+    if (recModel != nil || dictPath != nil || config[@"recBatchNum"] != nil) {
+        NSMutableDictionary *recDict = [NSMutableDictionary dictionary];
+        if (recModel != nil) recDict[@"modelPath"] = recModel;
+        if (dictPath != nil) recDict[@"dictPath"] = dictPath;
+        if (config[@"recBatchNum"] != nil) recDict[@"recBatchNum"] = config[@"recBatchNum"];
+        resolvedConfig[@"recognition"] = recDict;
+    }
+
+    NSString *clsPath = resolveModel(@"classification");
+    if (clsPath) resolvedConfig[@"classification"] = @{ @"enabled": @YES, @"modelPath": clsPath };
+    NSString *oriPath = resolveModel(@"orientation");
+    if (oriPath) resolvedConfig[@"orientation"] = @{ @"enabled": @YES, @"modelPath": oriPath };
+    NSString *unwarpPath = resolveModel(@"unwarp");
+    if (unwarpPath) resolvedConfig[@"unwarp"] = @{ @"enabled": @YES, @"modelPath": unwarpPath };
+    NSString *layoutPath = resolveModel(@"layout");
+    if (layoutPath) resolvedConfig[@"layout"] = @{ @"enabled": @YES, @"modelPath": layoutPath };
 
     NSData *jsonData = [NSJSONSerialization dataWithJSONObject:resolvedConfig options:0 error:&error];
     if (jsonData == nil) {
@@ -567,6 +729,31 @@ RCT_EXPORT_METHOD(initialize:(nullable NSDictionary *)configDict
     _rustoInstance = replacement;
     resolve(nil);
 }
+
+RCT_EXPORT_METHOD(close:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    if (_rustoInstance != NULL) {
+        rocr_free(_rustoInstance);
+        _rustoInstance = NULL;
+    }
+    resolve(nil);
+}
+
+RCT_EXPORT_METHOD(isReady:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    BOOL ready = (_rustoInstance != NULL && rocr_is_ready(_rustoInstance) != 0);
+    resolve(@(ready));
+}
+
+RCT_EXPORT_METHOD(version:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+    const char *v = rocr_version();
+    resolve(v != NULL ? [NSString stringWithUTF8String:v] : @"0.4.0");
+}
+
 
 RCT_EXPORT_METHOD(detectText:(NSDictionary *)source
                   options:(nullable NSDictionary *)options
@@ -651,7 +838,6 @@ RCT_EXPORT_METHOD(detectText:(NSDictionary *)source
         return;
     }
 
-    // URI handling
     if (![value hasPrefix:@"file:"] && ![value hasPrefix:@"/"]) {
         reject(@"INVALID_SOURCE", @"Unsupported iOS URI scheme.", nil);
         return;

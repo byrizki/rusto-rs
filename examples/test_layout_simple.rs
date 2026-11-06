@@ -23,12 +23,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let img = image::open(&args.image)?;
     let img_rgb = img.to_rgb8();
     
-    // Convert to Mat
     #[cfg(not(feature = "use-opencv"))]
-    let mat = rusto::image_impl::Mat::from_rgb8(
+    let mat = rusto_core::image::Mat::from_rgb8(
         img_rgb.width(), 
         img_rgb.height(), 
         img_rgb.into_raw()
+    )?;
+    #[cfg(feature = "use-opencv")]
+    let mat = rusto_cpp::image::Mat::from_rgb8(
+        img_rgb.width(),
+        img_rgb.height(),
+        img_rgb.into_raw(),
     )?;
     
     println!("Running detection...");

@@ -53,14 +53,18 @@ void main() {
           '{"detection":{"model_path":"${det.absolute.path}"},"recognition":{"model_path":"${rec.absolute.path}","dict_path":"${dict.absolute.path}"}}';
       final engine = RustO.initialize(config);
 
-      final results = engine.detectTextFile(img.absolute.path);
-      expect(results, isNotEmpty);
-      expect(results.any((r) => r.text.contains('INVOICE')), isTrue);
+      final structured = (engine.detectText(img.absolute.path) as DetectTextBuilder)
+          .asLines()
+          .run() as DetectTextResultStructured;
+      expect(structured.results, isNotEmpty);
+      expect(structured.results.any((r) => r.text.contains('INVOICE')), isTrue);
 
-      final spatial = engine.detectTextFileSpatial(img.absolute.path);
-      expect(spatial, contains('INVOICE'));
+      final spatial = (engine.detectText(img.absolute.path) as DetectTextBuilder)
+          .asSpatial()
+          .run() as DetectTextResultSpatial;
+      expect(spatial.text, contains('INVOICE'));
 
-      engine.dispose();
+      engine.close();
     });
 
     test('UniFFI typed config and options inference', () {
@@ -119,34 +123,48 @@ void main() {
         "layout": {"modelPath": "${layout.absolute.path}", "enabled": true}
       }''');
 
-      var options = defaultOcrRunOptions();
-      options = OcrRunOptions(
-        output: options.output,
-        lineYThreshold: options.lineYThreshold,
-        wordXThreshold: options.wordXThreshold,
-        textScore: options.textScore,
-        classification: options.classification,
-        orientation: options.orientation,
-        minHeight: options.minHeight,
-        maxSideLen: options.maxSideLen,
-        minSideLen: options.minSideLen,
-        widthHeightRatio: options.widthHeightRatio,
-        detection: options.detection,
-        postprocess: options.postprocess,
-        recBatchNum: options.recBatchNum,
-        unwarp: options.unwarp,
-        layout: true,
-        optimization: options.optimization,
-        calibration: options.calibration,
-      );
-
-      final res = engine.detectText(ImageSourcePath(path: img.absolute.path), options);
+      final res = engine
+          .detectTextBuilder()
+          .image(img.absolute.path)
+          .withLayoutReading(true)
+          .asLines()
+          .run();
       expect(res, isA<DetectTextResultStructured>());
       final structured = res as DetectTextResultStructured;
       expect(structured.results.length, equals(153));
       expect(structured.results[0].text, equals('All Orders in our'));
       expect(structured.results[0].regionId, isNotNull);
       expect(structured.results[0].layoutType, isNotNull);
+
+      engine.close();
+    });
+
+    test('Fluent builder chaining execution', () {
+      final det = File('../../models/PPOCR_v6/det.rten');
+      final rec = File('../../models/PPOCR_v6/rec.rten');
+      final dict = File('../../models/PPOCR_v6/dict.txt');
+      final img = File('../../models/test_images/example1.png');
+
+      if (!det.existsSync() || !img.existsSync()) {
+        return;
+      }
+
+      final config =
+          '{"detection":{"model_path":"${det.absolute.path}"},"recognition":{"model_path":"${rec.absolute.path}","dict_path":"${dict.absolute.path}"}}';
+      final engine = RustO.initialize(config);
+
+      final res = engine
+          .detectTextBuilder()
+          .image(img.absolute.path)
+          .withAutoUnwarp(false)
+          .withLayoutReading(false)
+          .asLines()
+          .run();
+
+      expect(res, isA<DetectTextResultStructured>());
+      final structured = res as DetectTextResultStructured;
+      expect(structured.results, isNotEmpty);
+      expect(structured.results.any((r) => r.text.contains('INVOICE')), isTrue);
 
       engine.close();
     });

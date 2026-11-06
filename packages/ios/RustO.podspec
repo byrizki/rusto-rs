@@ -1,11 +1,11 @@
 Pod::Spec.new do |s|
   s.name             = 'RustO'
-  s.version          = '0.3.2'
+  s.version          = '0.4.0'
   s.summary          = 'RustO! - Pure Rust OCR library for iOS'
   s.description      = <<-DESC
-    RustO! is a high-performance OCR (Optical Character Recognition) library 
-    written in pure Rust, based on RapidOCR and powered by PaddleOCR models 
-    with ONNX Runtime inference. This pod provides Swift bindings for iOS.
+    RustO! is a high-performance OCR (Optical Character Recognition) library
+    written in pure Rust, powered by Indra OCR and PaddleOCR models with
+    pure-Rust RTen inference. This pod provides Swift bindings for iOS.
   DESC
 
   s.homepage         = 'https://github.com/byrizki/rusto-rs'

@@ -1,6 +1,6 @@
 {
   "name": "@rustors/node",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Node.js N-API bindings for RustO! OCR library",
   "main": "index.js",
   "types": "index.d.ts",

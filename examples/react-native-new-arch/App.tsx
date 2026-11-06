@@ -20,15 +20,18 @@ export default function App(): React.ReactElement {
     await initialize(config);
 
     // Keep canonical source/output overloads checked by TypeScript.
-    const lines: TextResult[] = await detectText({uri: '/tmp/invoice.png'});
-    const words: TextResult[] = await detectText(
-      {base64: 'iVBORw0KGgo='},
-      {output: 'words', lineYThreshold: 0.5, wordXThreshold: 0.4},
-    );
-    const spatial: string = await detectText(
-      {bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47])},
-      {output: 'spatial'},
-    );
+    const lines: TextResult[] = await detectText({uri: '/tmp/invoice.png'})
+      .asLines()
+      .run();
+    const words: TextResult[] = await detectText({base64: 'iVBORw0KGgo='})
+      .withPreRecognition({lineYThreshold: 0.5, wordXThreshold: 0.4})
+      .asWords()
+      .run();
+    const spatial: string = await detectText({
+      bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+    })
+      .asSpatial()
+      .run();
 
     setStatus(
       `API verified: ${lines.length + words.length} items, ${spatial.length} chars`,

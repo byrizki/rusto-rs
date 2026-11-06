@@ -848,6 +848,16 @@ impl RustO {
         self
     }
 
+    /// Returns whether the engine instance is initialized and ready for inference.
+    pub fn is_ready(&self) -> bool {
+        true
+    }
+
+    /// Returns the engine library version string.
+    pub fn version(&self) -> &'static str {
+        crate::version()
+    }
+
     pub fn predict(
         &mut self,
         image_source: ImageSource,
@@ -872,9 +882,17 @@ impl RustO {
             }
         };
         match options.output {
-            OutputGranularity::Spatial => Ok(DetectTextResult::Spatial(
-                output.to_spatial_text(options.line_y_threshold, options.word_x_threshold),
-            )),
+            OutputGranularity::Spatial => {
+                let (line_y, word_x) = options.pre_recognition.as_ref().map_or((None, None), |pr| {
+                    (pr.line_y_threshold, pr.word_x_threshold)
+                });
+                Ok(DetectTextResult::Spatial(
+                    output.to_spatial_text(line_y, word_x),
+                ))
+            }
+            OutputGranularity::Tsv => {
+                Ok(DetectTextResult::Spatial(output.to_tsv()))
+            }
             OutputGranularity::Lines | OutputGranularity::Words => Ok(
                 DetectTextResult::Structured(output.to_text_results_with_options(options)),
             ),
@@ -894,70 +912,21 @@ impl RustO {
             .map_err(|e| EngineError::ImageError(e.to_string()))?;
         let output = self.run_on_mat_with_options(&mat, options)?;
         match options.output {
-            OutputGranularity::Spatial => Ok(DetectTextResult::Spatial(
-                output.to_spatial_text(options.line_y_threshold, options.word_x_threshold),
-            )),
+            OutputGranularity::Spatial => {
+                let (line_y, word_x) = options.pre_recognition.as_ref().map_or((None, None), |pr| {
+                    (pr.line_y_threshold, pr.word_x_threshold)
+                });
+                Ok(DetectTextResult::Spatial(
+                    output.to_spatial_text(line_y, word_x),
+                ))
+            }
+            OutputGranularity::Tsv => {
+                Ok(DetectTextResult::Spatial(output.to_tsv()))
+            }
             OutputGranularity::Lines | OutputGranularity::Words => Ok(
                 DetectTextResult::Structured(output.to_text_results_with_options(options)),
             ),
         }
-    }
-
-    pub fn detect_layout(
-        &mut self,
-        source: &ImageSource,
-    ) -> Result<Vec<LayoutRegion>, EngineError> {
-        match source {
-            ImageSource::Path(path) => {
-                let img = imread(path)?;
-                Ok(self.pipeline.detect_layout(&img)?)
-            }
-            ImageSource::Bytes(bytes) => {
-                let image = ::image::load_from_memory(bytes)
-                    .map_err(|error| EngineError::ImageError(error.to_string()))?;
-                let mat = Mat::new(image);
-                Ok(self.pipeline.detect_layout(&mat)?)
-            }
-        }
-    }
-
-    pub fn detect_layout_rgb(
-        &mut self,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-        stride: usize,
-    ) -> Result<Vec<LayoutRegion>, EngineError> {
-        let mat = Mat::from_rgb_stride(width, height, stride, pixels)
-            .map_err(|e| EngineError::ImageError(e.to_string()))?;
-        Ok(self.pipeline.detect_layout(&mat)?)
-    }
-
-    pub fn unwarp_image(&mut self, source: &ImageSource) -> Result<Mat, EngineError> {
-        match source {
-            ImageSource::Path(path) => {
-                let img = imread(path)?;
-                Ok(self.pipeline.unwarp_image(&img)?)
-            }
-            ImageSource::Bytes(bytes) => {
-                let image = ::image::load_from_memory(bytes)
-                    .map_err(|error| EngineError::ImageError(error.to_string()))?;
-                let mat = Mat::new(image);
-                Ok(self.pipeline.unwarp_image(&mat)?)
-            }
-        }
-    }
-
-    pub fn unwarp_image_rgb(
-        &mut self,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-        stride: usize,
-    ) -> Result<Mat, EngineError> {
-        let mat = Mat::from_rgb_stride(width, height, stride, pixels)
-            .map_err(|e| EngineError::ImageError(e.to_string()))?;
-        Ok(self.pipeline.unwarp_image(&mat)?)
     }
 
     pub fn run_with_options<P: AsRef<Path>>(

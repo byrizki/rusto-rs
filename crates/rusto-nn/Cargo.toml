@@ -1,6 +1,6 @@
 [package]
 name = "rusto-nn"
-version = "0.3.2"
+version = "0.4.0"
 edition = "2021"
 description = "Lightweight, zero-bloat, 100% pure Rust inference engine for Alibaba MNN models"
 license = "MIT OR Apache-2.0"

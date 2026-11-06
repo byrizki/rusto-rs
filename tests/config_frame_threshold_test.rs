@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use rusto::{DetectTextResult, DetectionRunOptions, Frame, ImageSource, InitializeConfig, OcrRunOptions, OutputGranularity, PostprocessRunOptions, TextResult};
+use rusto::{DetectTextResult, DetectionRunOptions, Frame, ImageSource, InitializeConfig, OcrRunOptions, OutputGranularity, TextResult};
 
 #[test]
 fn test_frame_from_points_upright() {
@@ -70,31 +70,37 @@ fn test_rusto_config_builders() {
 #[test]
 fn test_rusto_runtime_options_are_root_level_and_serialize() {
     let options = OcrRunOptions {
-        min_height: Some(24.0),
-        max_side_len: Some(1600.0),
-        min_side_len: Some(48.0),
-        width_height_ratio: Some(8.0),
+        post_detection: Some(rusto::PostDetectionOptions {
+            min_height: Some(24.0),
+            max_side_len: Some(1600.0),
+            min_side_len: Some(48.0),
+            width_height_ratio: Some(8.0),
+            use_dilation: Some(false),
+            ..Default::default()
+        }),
         detection: Some(DetectionRunOptions {
             limit_side_len: Some(960),
             limit_type: Some("min".into()),
             ..Default::default()
         }),
-        postprocess: Some(PostprocessRunOptions { use_dilation: Some(false), ..Default::default() }),
         ..Default::default()
     };
     options.validate().expect("valid runtime options");
     let json = serde_json::to_string(&options).expect("Serialize options");
+    assert!(json.contains("\"postDetection\""));
     assert!(json.contains("\"minHeight\":24.0"));
     assert!(json.contains("\"detection\""));
-    assert!(json.contains("\"postprocess\""));
     assert!(json.contains("\"useDilation\":false"));
 }
 
 #[test]
 fn test_rusto_runtime_options_reject_invalid_bounds() {
     let options = OcrRunOptions {
-        min_side_len: Some(100.0),
-        max_side_len: Some(50.0),
+        post_detection: Some(rusto::PostDetectionOptions {
+            min_side_len: Some(100.0),
+            max_side_len: Some(50.0),
+            ..Default::default()
+        }),
         ..Default::default()
     };
     assert!(options.validate().is_err());

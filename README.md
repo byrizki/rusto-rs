@@ -23,17 +23,17 @@
 
 </div>
 
-**RustO!** is a pure-Rust Optical Character Recognition (OCR) engine and multi-platform toolkit. Powered by PaddleOCR models and the [RTen](https://github.com/robertknight/rten) inference engine (`.rten` & `.onnx`), RustO! delivers fast, memory-safe text extraction with zero C++ or OpenCV dependencies.
+**RustO!** is a pure-Rust Optical Character Recognition (OCR) engine and multi-platform toolkit. Powered by [DataLab Indra OCR](https://github.com/datalab-to/indra-ocr) and PaddleOCR models running on RustO's pure-Rust neural inference runtime and [RTen](https://github.com/robertknight/rten) (`.rten`), RustO! delivers fast, memory-safe text extraction and document layout understanding with zero C++ or OpenCV dependencies.
 
 ---
 
 ## 🎯 Key Features
 
 - **Pure Rust Engine** — Zero C++ or OpenCV runtime dependencies. Build directly with `cargo build`.
-- **Fast & Lightweight** — SIMD-accelerated inference, ~5.4 MB CLI binary, and ~85–120 MB peak RAM.
-- **PP-OCR Model Tiers** — PP-OCRv6 (50+ languages unified), PP-OCRv5, and PP-OCRv4 (FP32 & INT8).
-- **Document Layouts** — Outputs bounding boxes, line/word tokens, or formatted 2D spatial text layouts.
-- **Cross-Platform SDKs** — First-class libraries for Rust, Web (WASM), React, React Native, iOS, Android, and .NET.
+- **Flagship Indra OCR + PP-OCRv6** — DataLab Indra OCR (~5.5 MB, 439 ms OmniDocBench latency) by default alongside PP-OCRv6 (50+ languages unified), PP-OCRv5, and PP-OCRv4 (FP32 & INT8).
+- **End-to-End Document Pipeline** — Built-in 3D UVDoc unwarping, orientation detection, PicoDet layout region classification (`regionId` / `layoutType`), and neural graph reading order (`indra_order.rten`).
+- **Unified Fluent Builder API** — Consistent `.withAutoUnwarp()`, `.withLayoutReading()`, `.asLines()` / `.asWords()` / `.asSpatial()`, and single `.run()` terminal execution across every SDK.
+- **12 Cross-Platform SDKs + CLI** — First-class libraries for Rust, Node.js, Python, Go, Java, .NET, Dart, Flutter, Web (WASM), React, React Native, iOS, Android, and C FFI, plus the `rusto` CLI.
 
 ---
 
@@ -58,19 +58,21 @@
 
 ---
 
-## ⚠️ Notable Breaking Changes in v0.3.0
+## ⚠️ Notable Breaking Changes in v0.4.0
 
-Upgrading from **v0.2.x** to **v0.3.0** transitions the core engine to pure Rust with zero C++ toolchain dependencies:
+Upgrading from **v0.3.x** to **v0.4.0** introduces a unified fluent builder API, 6-phase pipeline options, pipelined document layout/unwarping, and Indra OCR as the default flagship engine:
 
-| Aspect | v0.2.x | v0.3.0 (Current) |
+| Aspect | v0.3.x | v0.4.0 (Current) |
 |---|---|---|
-| **Inference Engine** | Alibaba MNN (requires C++ / CMake) | **Pure Rust RTen** (zero native toolchain) |
-| **Model Formats** | Proprietary `.mnn` models | High-performance **`.rten`** (FlatBuffers) or **`.onnx`** |
-| **Session API** | `MnnSession` | **`EngineSession`** (pluggable `InferenceSession`) |
-| **Configuration** | Nested `preprocessing` block | Decoupled **`InitializeConfig`** & **`OcrRunOptions`** |
-| **NPM Scope** | Standalone names (`react-rusto`, etc.) | Unified **`@rustors/*`** scope |
+| **Default Model** | PP-OCRv6 Tiny (~6 MB) | **DataLab Indra OCR** (~5.5 MB, **439.2 ms** latency) |
+| **Model Assets** | Bundled / platform model packages | **Decoupled standalone `.rten` files** with zero-config auto-download |
+| **API Paradigm** | Monolithic `detectText(source, options)` | **Unified fluent builder chaining** ending in `.run()` / `.Run()` |
+| **Output Granularity** | Separate `*Spatial` methods | **`.asLines()` / `.asWords()` / `.asSpatial()`** (`as_*` / `As*`) |
+| **Layout & Unwarp** | Disjoint separate engine methods | **Pipelined directly** via `.withLayoutReading()`, `.withAutoUnwarp()` |
+| **Run Options** | Ad-hoc nested options object | **6-Phase structured pipeline** + 4 boolean toggles |
+| **CLI Binary** | `rusto-rs` | **`rusto`** (`rusto <IMAGE>`, `rusto ocr`, `rusto download`) |
 
-👉 **[Read the Complete v0.2 → v0.3 Migration Guide](https://byrizki.com/rusto-rs/en/advance-guide/migration-guide)** for code comparisons, API changes, and step-by-step instructions.
+👉 **[Read the Complete v0.3 → v0.4 Migration Guide](https://byrizki.com/rusto-rs/en/advance-guide/migration-guide)** for code comparisons, API changes, and step-by-step instructions.
 
 ---
 
@@ -79,10 +81,15 @@ Upgrading from **v0.2.x** to **v0.3.0** transitions the core engine to pure Rust
 ### 1. Rust
 
 ```rust
-use rusto::{ImageSource, InitializeConfig, OcrRunOptions, RustO};
+use rusto::{DetectTextBuilderExt, ImageSource, InitializeConfig, RustO};
 
-let mut ocr = RustO::initialize(InitializeConfig::ppv6("det.rten", "rec.rten", "dict.txt"))?;
-let result = ocr.detect_text(&ImageSource::Path("document.jpg".into()), &OcrRunOptions::default())?;
+let mut ocr = RustO::initialize(InitializeConfig::default())?;
+let result = ocr
+    .detect_text_builder(ImageSource::Path("document.jpg".into()))
+    .with_auto_unwarp(true)
+    .with_layout_reading(true)
+    .as_lines()
+    .run()?;
 println!("{result:?}");
 ```
 
@@ -93,8 +100,12 @@ println!("{result:?}");
 ```csharp
 using RustODotnet;
 
-using var ocr = RustO.Initialize(InitializeConfig.Ppv6());
-var result = ocr.DetectText(new UriImageSource("invoice.jpg"), new OcrRunOptions());
+using var ocr = RustO.Initialize();
+var result = ocr.DetectText("invoice.jpg")
+    .WithAutoUnwarp()
+    .WithLayoutReading()
+    .AsLines()
+    .Run();
 
 if (result is StructuredDetectTextResult structured) {
     foreach (var item in structured.Items) {
@@ -115,15 +126,20 @@ npm install @rustors/web
 import { initialize, detectText } from '@rustors/web';
 
 await initialize({
-  preset: 'ppv6',
+  preset: 'indra',
   models: {
-    detection: '/models/ppocrv6-tiny/det.rten',
-    recognition: '/models/ppocrv6-tiny/rec.rten',
-    dictionary: '/models/ppocrv6-tiny/dict.txt',
+    detection: '/models/indraocr/det.rten',
+    recognition: '/models/indraocr/rec.rten',
+    dictionary: '/models/indraocr/dict.txt',
   },
 });
 
-const results = await detectText(document.querySelector('img')!);
+const results = await detectText(document.querySelector('img')!)
+  .withAutoUnwarp()
+  .withLayoutReading()
+  .asLines()
+  .run();
+
 results.forEach((r) => console.log(`${r.text} (${r.score})`));
 ```
 
@@ -139,9 +155,9 @@ npm install @rustors/react @rustors/web
 import { RustoProvider, useOcr } from '@rustors/react';
 
 const models = {
-  detection: '/models/ppocrv6-tiny/det.rten',
-  recognition: '/models/ppocrv6-tiny/rec.rten',
-  dictionary: '/models/ppocrv6-tiny/dict.txt',
+  detection: '/models/indraocr/det.rten',
+  recognition: '/models/indraocr/rec.rten',
+  dictionary: '/models/indraocr/dict.txt',
 };
 
 function OcrScanner() {
@@ -149,16 +165,26 @@ function OcrScanner() {
 
   return (
     <div>
-      <input type="file" onChange={(e) => e.target.files?.[0] && detect(e.target.files[0])} />
+      <input
+        type="file"
+        onChange={(e) =>
+          e.target.files?.[0] &&
+          detect(e.target.files[0], { autoUnwarp: true, layoutReading: true })
+        }
+      />
       {isProcessing && <p>Scanning...</p>}
-      {results.map((r, i) => <p key={i}>{r.text} ({r.score.toFixed(2)})</p>)}
+      {results.map((r, i) => (
+        <p key={i}>
+          {r.text} ({r.score.toFixed(2)})
+        </p>
+      ))}
     </div>
   );
 }
 
 export function App() {
   return (
-    <RustoProvider config={{ preset: 'ppv6', models }}>
+    <RustoProvider config={{ preset: 'indra', models }}>
       <OcrScanner />
     </RustoProvider>
   );
@@ -177,7 +203,12 @@ npm install @rustors/react-native
 import { initialize, detectText } from '@rustors/react-native';
 
 await initialize();
-const results = await detectText({ uri: 'file:///path/to/image.jpg' });
+const results = await detectText({ uri: 'file:///path/to/image.jpg' })
+  .withAutoUnwarp()
+  .withLayoutReading()
+  .asLines()
+  .run();
+
 results.forEach((r) => console.log(`${r.text} (${r.score})`));
 ```
 
@@ -186,8 +217,12 @@ results.forEach((r) => console.log(`${r.text} (${r.score})`));
 ### 6. iOS (Swift)
 
 ```swift
-let ocr = try RustO.initialize(config: .ppv6())
-let result = try ocr.detectText(.uri("receipt.jpg"))
+let ocr = try RustO.initialize()
+let result = try ocr.detectText(image: "receipt.jpg")
+    .withAutoUnwarp()
+    .withLayoutReading()
+    .asLines()
+    .run()
 
 if case .structured(let items) = result {
     items.forEach { print("\($0.text) (\($0.score))") }
@@ -200,14 +235,17 @@ if case .structured(let items) = result {
 
 ```kotlin
 RustO.initialize(context).use { ocr ->
-    val result = ocr.detectText(ImageSource.Uri("/path/to/image.jpg"))
+    val result = ocr.detectText("/path/to/image.jpg")
+        .withAutoUnwarp()
+        .withLayoutReading()
+        .asLines()
+        .run()
+
     if (result is DetectTextResult.Structured) {
         result.items.forEach { println("${it.text} (${it.score})") }
     }
 }
 ```
-
----
 
 ---
 
@@ -220,13 +258,16 @@ npm install @rustors/node
 ```javascript
 const { RustO } = require('@rustors/node');
 
-const engine = new RustO(JSON.stringify({
-  detection: { model_path: 'models/PPOCR_v6/det.rten' },
-  recognition: { model_path: 'models/PPOCR_v6/rec.rten', dict_path: 'models/PPOCR_v6/dict.txt' }
-}));
+const engine = RustO.initialize();
+const results = engine
+  .detectText('invoice.png')
+  .withAutoUnwarp()
+  .withLayoutReading()
+  .asLines()
+  .run();
 
-const results = engine.detectTextFile('invoice.png', JSON.stringify({}));
-results.forEach(r => console.log(`${r.text} (${(r.score * 100).toFixed(1)}%)`));
+results.forEach((r) => console.log(`${r.text} (${(r.score * 100).toFixed(1)}%)`));
+engine.close();
 ```
 
 ---
@@ -238,14 +279,20 @@ pip install rusto
 ```
 
 ```python
-from rusto import RustO, InitializeConfig, OcrRunOptions
-from rusto.generated.rusto import ImageSource
+from rusto import RustO
 
-engine = RustO.initialize(InitializeConfig.ppv6("det.rten", "rec.rten", "dict.txt"))
-result = engine.detect_text(ImageSource.PATH("invoice.png"), OcrRunOptions())
-if result.is_STRUCTURED():
-    for item in result.results:
-        print(f"{item.text} ({item.score:.2f})")
+with RustO.initialize() as engine:
+    result = (
+        engine.detect_text("invoice.png")
+        .with_auto_unwarp()
+        .with_layout_reading()
+        .as_lines()
+        .run()
+    )
+
+    if result.is_STRUCTURED():
+        for item in result.results:
+            print(f"{item.text} ({item.score:.2f})")
 ```
 
 ---
@@ -265,12 +312,18 @@ import (
 )
 
 func main() {
-    engine, err := rusto.New(`{"detection":{"model_path":"det.rten"},"recognition":{"model_path":"rec.rten","dict_path":"dict.txt"}}`)
+    engine, err := rusto.Initialize()
     if err != nil { panic(err) }
     defer engine.Close()
 
-    results, _ := engine.DetectTextFile("invoice.png", "{}")
-    for _, r := range results {
+    res, err := engine.DetectText("invoice.png").
+        WithAutoUnwarp(true).
+        WithLayoutReading(true).
+        AsLines().
+        Run()
+    if err != nil { panic(err) }
+
+    for _, r := range res.Results {
         fmt.Printf("[%0.2f] %s\n", r.Score, r.Text)
     }
 }
@@ -286,9 +339,13 @@ import com.byrizki.rusto.TextResult;
 
 public class App {
     public static void main(String[] args) {
-        String config = "{\"detection\":{\"model_path\":\"det.rten\"},\"recognition\":{\"model_path\":\"rec.rten\",\"dict_path\":\"dict.txt\"}}";
-        try (RustO engine = RustO.initialize(config)) {
-            for (TextResult r : engine.detectTextFile("invoice.png", "{}")) {
+        try (RustO engine = RustO.initialize()) {
+            RustO.DetectTextResult res = engine.detectText("invoice.png")
+                .withAutoUnwarp()
+                .withLayoutReading()
+                .asLines()
+                .run();
+            for (TextResult r : res.results()) {
                 System.out.printf("[%0.2f] %s%n", r.score(), r.text());
             }
         }
@@ -303,10 +360,18 @@ public class App {
 ```dart
 import 'package:rusto/rusto.dart';
 
-final engine = RustO.initialize('{"detection":{"model_path":"det.rten"},"recognition":{"model_path":"rec.rten","dict_path":"dict.txt"}}');
-final results = engine.detectTextFile('invoice.png');
-for (final line in results) {
-  print('${line.text} (${line.score})');
+final engine = RustO.initialize();
+final result = engine
+    .detectText('invoice.png')
+    .withAutoUnwarp()
+    .withLayoutReading()
+    .asLines()
+    .run();
+
+if (result is DetectTextResultStructured) {
+  for (final line in result.results) {
+    print('${line.text} (${line.score})');
+  }
 }
 engine.close();
 ```
@@ -316,22 +381,26 @@ engine.close();
 ### 13. Command Line Interface (CLI)
 
 ```bash
-# JSON output
-cargo run --release -- --det-model det.rten --rec-model rec.rten --dict dict.txt image.jpg
+# Zero-config OCR (auto-downloads Indra OCR models on first run)
+rusto image.jpg
 
-# Formatted text output
-cargo run --release -- --det-model det.rten --rec-model rec.rten --dict dict.txt --format text-ordered image.jpg
+# Multi-column layout reading order & 2D spatial text reconstruction
+rusto --enable-unwarp --enable-layout --format spatial image.jpg
+
+# Pre-download standalone RTen models for offline environments
+rusto download --model indraocr
 ```
 
 ---
 
 ## 🧠 Supported OCR Models & Tiers
 
-RustO! supports PP-OCRv6 (recognizing 50+ languages simultaneously with a unified dictionary) alongside legacy v5/v4 models:
+RustO! supports DataLab Indra OCR as its default flagship engine alongside PP-OCRv6 (recognizing 50+ languages simultaneously) and legacy v5/v4 models:
 
-| Tier | Standard (FP32) | Quantized (INT8) | Best For |
+| Model / Tier | Standard (FP32) | Quantized (INT8) | Best For |
 |---|:---:|:---:|---|
-| **PP-OCRv6 Tiny** (Default) | ~6.0 MB | **~3.4 MB** | Web (WASM), mobile, IoT & embedded edge |
+| **Indra OCR** (Default) | **~5.5 MB** | — | **Flagship default**: 2.5x faster (439 ms OmniDocBench), superior Latin/ID |
+| **PP-OCRv6 Tiny** | ~6.0 MB | **~3.4 MB** | Lightweight edge, WASM, and IoT |
 | **PP-OCRv6 Small** | ~30 MB | **~16.2 MB** | Balanced accuracy for mobile & desktop |
 | **PP-OCRv6 Medium** | ~134 MB | **~75.7 MB** | Server-grade accuracy workloads |
 | **PP-OCRv5 / v4** | ~23–28 MB (Mobile) | — | Legacy pipelines & single-language packs |
@@ -347,28 +416,25 @@ Pre-converted RTen models are distributed as standalone release assets on [GitHu
 RustO separates static initialization from per-request execution:
 
 1. **`InitializeConfig`** — Configures model sessions, vocabulary dictionary, and hardware threads.
-2. **`OcrRunOptions`** — Configures per-image options: output shape (`lines`, `words`, `spatial`), score threshold, resize bounds, and postprocessing.
+2. **`DetectTextBuilder` / `OcrRunOptions`** — Configures per-image options via fluent chaining: 4 toggles (`autoUnwarp`, `layoutReading`, `orientationDetection`, `lineClassification`) and 6 phases (`preDetection`, `detection`, `postDetection`, `preRecognition`, `recognition`, `postRecognition`).
 
 ```rust
-use rusto::{InitializeConfig, OcrRunOptions, OutputGranularity, RustO};
+use rusto::{DetectTextBuilderExt, ImageSource, InitializeConfig, RustO};
 
-// 1. Initialize engine once
-let mut ocr = RustO::initialize(InitializeConfig::ppv6(
+// 1. Initialize engine once (or RustO::initialize(InitializeConfig::default())? for auto-download)
+let mut ocr = RustO::initialize(InitializeConfig::indra(
     "models/det.rten",
     "models/rec.rten",
     "models/dict.txt",
 ))?;
 
-// 2. Configure per request without mutating engine state
-let result = ocr.detect_text(
-    &ImageSource::Path("document.jpg".into()),
-    &OcrRunOptions {
-        output: OutputGranularity::Spatial,
-        text_score: Some(0.55),
-        max_side_len: Some(1600.0),
-        ..Default::default()
-    },
-)?;
+// 2. Configure per request via fluent builder chaining
+let result = ocr
+    .detect_text_builder(ImageSource::Path("document.jpg".into()))
+    .with_auto_unwarp(true)
+    .with_layout_reading(true)
+    .as_spatial()
+    .run()?;
 ```
 
 👉 **[Read the Full API Reference & Option Specifications](https://byrizki.com/rusto-rs/en/api-reference/ocr-run-options)**
@@ -389,7 +455,7 @@ Explore deep-dive guides and comprehensive references on the [RustO! Documentati
 | **Decoded RGB Input** | Zero-copy direct OCR from uncompressed interleaved RGB8 pixel buffers | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/use-decoded-rgb) |
 | **Performance & Benchmarks** | Latency, memory footprint, and parity benchmarks across x86-64, ARM64, and mobile | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/performance-and-benchmarks) |
 | **Troubleshooting Guide** | Resolving model paths, Android JNI linking, React Native pods, and high-resolution camera OOM | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/troubleshooting) |
-| **v0.2 → v0.3 Migration Guide** | Upgrading to pure-Rust RTen, .rten model formats, EngineSession, and @rustors scope | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/migration-guide) |
+| **v0.3 → v0.4 Migration Guide** | Upgrading to fluent builder API, 6-phase pipeline, Indra OCR default, and decoupled .rten models | [Read Guide](https://byrizki.com/rusto-rs/en/advance-guide/migration-guide) |
 | **API Reference** | Specifications for `InitializeConfig`, `OcrRunOptions`, and `TextResult` across all platforms | [API Reference](https://byrizki.com/rusto-rs/en/api-reference/initialize-config) |
 
 ---
@@ -421,27 +487,31 @@ Empirically evaluated against official PaddleOCR and RapidOCR (C++ ONNX Runtime)
 
 ```
 rusto-rs/
-├── src/                        # Rust Core Engine
-│   ├── lib.rs                  # Public API & exports
-│   ├── config.rs               # InitializeConfig & template presets (PPV6, PPV5, PPV4, PPV3)
-│   ├── det.rs                  # DBNet text detection
-│   ├── rec.rs                  # CTC text recognition
-│   ├── orient.rs               # Orientation classification
-│   ├── preprocess.rs           # Pure Rust image preprocessing & normalization
-│   ├── postprocess.rs          # Polygon unpacking & spatial layout reconstruction
-│   ├── contours.rs             # Pure Rust contour detection (OpenCV-free)
-│   ├── geometry.rs             # Geometric transforms, box rectification & NMS
-│   └── ffi.rs                  # C FFI shared library interface
+├── crates/
+│   ├── rusto-nn/               # Pure-Rust neural inference runtime & hardware backends
+│   ├── rusto-core/             # Core OCR pipeline (DBNet, CTC, UVDoc unwarp, PicoDet layout, reading order)
+│   ├── rusto-rten/             # RTen (.rten) session backend
+│   ├── rusto-mnn/              # Optional MNN C++ session backend
+│   ├── rusto-node/             # Native Node.js N-API addon crate
+│   └── rten-wasm/              # Browser WebAssembly OCR & layout runtime
+├── src/                        # Workspace root crate, UniFFI/C FFI bridges & `rusto` CLI
+├── include/                    # Canonical C header (`rusto.h`)
 ├── packages/
-│   ├── dotnet/                 # .NET / C# SDK (RustODotnet + Model Packages)
-│   ├── react-native/           # React Native TypeScript + iOS/Android Bridge
-│   ├── android/                # Android Kotlin SDK + Modular Model AARs
-│   └── ios/                    # iOS Swift SDK + Modular Model Podspecs
-├── scripts/
-│   └── download_models.sh      # Direct ModelScope model downloader
-└── .github/workflows/
-    ├── build.yml               # Parallel CI build & artifact packaging
-    └── publish.yml             # Automated multi-registry package publishing
+│   ├── node/                   # @rustors/node (Node.js N-API SDK)
+│   ├── python/                 # rusto (Python UniFFI SDK)
+│   ├── go/                     # Go Cgo module
+│   ├── java/                   # rusto-java (JVM JNA SDK)
+│   ├── dotnet/                 # RustODotnet (.NET / C# SDK)
+│   ├── dart/                   # rusto (Pure Dart FFI SDK)
+│   ├── flutter/                # rusto_flutter (Flutter plugin)
+│   ├── web/                    # @rustors/web (Browser WASM SDK)
+│   ├── react/                  # @rustors/react (React hooks & components)
+│   ├── react-native/           # @rustors/react-native (iOS & Android bridge)
+│   ├── android/                # rusto-android (Kotlin Android AAR)
+│   └── ios/                    # RustO (Swift Package Manager & CocoaPods)
+├── docs/                       # Bilingual documentation site & live WASM demo (EN / ID)
+├── scripts/                    # Version bump, UniFFI codegen & package verification scripts
+└── .github/workflows/          # CI, cross-platform artifact build & automated registry publishing
 ```
 
 ---
@@ -449,17 +519,14 @@ rusto-rs/
 ## 🛠️ Development & Testing
 
 ```bash
-# Run unit & integration tests
-cargo test
+# Run core library unit tests across the workspace
+cargo test --workspace --lib
 
-# Run tests with optional OpenCV verification backend
-cargo test --features use-opencv
-
-# Run benchmarks
-cargo bench
+# Build the `rusto` CLI in release mode
+cargo build --release --bin rusto
 
 # Run linter & formatter
-cargo clippy
+cargo clippy --workspace
 cargo fmt --check
 ```
 

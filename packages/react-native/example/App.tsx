@@ -136,10 +136,10 @@ export const App = (): React.JSX.Element => {
     // Test 3: Text Detection Pipeline
     updateTestStatus("detect", "running");
     try {
-      const results: TextResult[] = await detectText(
-        { base64: EXAMPLE1_PNG_BASE64 },
-        { output: "lines", textScore: 0.3 }
-      );
+      const results: TextResult[] = await detectText({ base64: EXAMPLE1_PNG_BASE64 })
+        .withPostRecognition({ scoreThreshold: 0.3 })
+        .asLines()
+        .run();
 
       setDetectedCount(results.length);
       updateTestStatus(
@@ -157,10 +157,9 @@ export const App = (): React.JSX.Element => {
     // Test 4: Spatial Layout Generation
     updateTestStatus("spatial", "running");
     try {
-      const spatialText: string = await detectText(
-        { base64: EXAMPLE1_PNG_BASE64 },
-        { output: "spatial" }
-      );
+      const spatialText: string = await detectText({ base64: EXAMPLE1_PNG_BASE64 })
+        .asSpatial()
+        .run();
 
       setOcrText(spatialText);
       updateTestStatus("spatial", "success", "Spatial layout verified");

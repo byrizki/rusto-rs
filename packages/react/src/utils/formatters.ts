@@ -8,13 +8,13 @@ export function resultsToText(results: TextResult[]): string {
 }
 
 /**
- * Formats OCR results into standard CSV with bounding box coordinates and scores.
+ * Formats OCR results into standard TSV (tab-separated values) with bounding box coordinates and scores.
  */
-export function resultsToCsv(results: TextResult[]): string {
-  const header = 'text,score,left,top,width,height';
+export function resultsToTsv(results: TextResult[]): string {
+  const header = ['text', 'score', 'left', 'top', 'width', 'height'].join('\t');
   const rows = results.map((r) => {
-    const escapedText = `"${r.text.replace(/"/g, '""')}"`;
-    return `${escapedText},${r.score.toFixed(4)},${r.frame.left},${r.frame.top},${r.frame.width},${r.frame.height}`;
+    const safeText = r.text.replace(/[\t\n\r]/g, ' ');
+    return `${safeText}\t${r.score.toFixed(4)}\t${r.frame.left}\t${r.frame.top}\t${r.frame.width}\t${r.frame.height}`;
   });
   return [header, ...rows].join('\n');
 }

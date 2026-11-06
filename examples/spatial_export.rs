@@ -1,5 +1,8 @@
 /// Spatial text detection example.
-use rusto::{DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, OutputGranularity, RustO};
+use rusto::{
+    DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, OutputGranularity,
+    PreRecognitionOptions, RustO,
+};
 use std::error::Error;
 use std::path::Path;
 
@@ -18,8 +21,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         &ImageSource::Path(test_image.into()),
         &OcrRunOptions {
             output: OutputGranularity::Spatial,
-            line_y_threshold: Some(0.5),
-            word_x_threshold: Some(0.4),
+            pre_recognition: Some(PreRecognitionOptions {
+                line_y_threshold: Some(0.5),
+                word_x_threshold: Some(0.4),
+            }),
             ..Default::default()
         },
     )?;

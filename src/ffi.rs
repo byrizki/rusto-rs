@@ -1,7 +1,7 @@
 // FFI bindings for C/C++/C#
 #![allow(clippy::missing_safety_doc, clippy::needless_borrow)]
 
-use crate::{DetectTextResult, ImageSource, OcrRunOptions, OutputGranularity, RustO, InitializeConfig};
+use crate::{DetectTextResult, ImageSource, OcrRunOptions, OutputGranularity, RustO};
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int};
 use std::slice;
@@ -47,17 +47,6 @@ pub struct CTextResult {
     pub layout_type: c_int,
 }
 
-/// C-compatible detected document layout region structure
-#[repr(C)]
-pub struct CLayoutRegion {
-    pub x_min: c_int,
-    pub y_min: c_int,
-    pub x_max: c_int,
-    pub y_max: c_int,
-    pub layout_type: c_int,
-    pub confidence: c_float,
-}
-
 /// Create a new RustO instance with JSON configuration
 ///
 /// # Safety
@@ -74,7 +63,7 @@ pub unsafe extern "C" fn rocr_initialize(config_json: *const c_char) -> *mut ROC
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let config = match InitializeConfig::from_json(json_str) {
+    let config = match crate::download::parse_config_with_auto_download(json_str) {
         Ok(c) => c,
         Err(_) => return std::ptr::null_mut(),
     };
@@ -110,7 +99,7 @@ pub unsafe extern "C" fn rocr_detect_text_file(
         Ok(value) => value,
         Err(code) => return code,
     };
-    if options.output == OutputGranularity::Spatial {
+    if options.output == OutputGranularity::Spatial || options.output == OutputGranularity::Tsv {
         return -5;
     }
     let detected = match (*handle)
@@ -161,6 +150,38 @@ pub unsafe extern "C" fn rocr_detect_text_file_spatial(
     CString::new(text).map_or(std::ptr::null_mut(), CString::into_raw)
 }
 
+/// Run OCR on an image file and return TSV text with runtime options.
+#[no_mangle]
+pub unsafe extern "C" fn rocr_detect_text_file_tsv(
+    handle: *mut ROCRHandle,
+    image_path: *const c_char,
+    options_json: *const c_char,
+) -> *mut c_char {
+    if handle.is_null() || image_path.is_null() || options_json.is_null() {
+        return std::ptr::null_mut();
+    }
+    let path = match CStr::from_ptr(image_path).to_str() {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let mut options = match parse_run_options(options_json) {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    options.output = OutputGranularity::Tsv;
+    let detected = match (*handle)
+        .inner
+        .detect_text(&ImageSource::Path(path.into()), &options)
+    {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let DetectTextResult::Spatial(text) = detected else {
+        return std::ptr::null_mut();
+    };
+    CString::new(text).map_or(std::ptr::null_mut(), CString::into_raw)
+}
+
 /// Run OCR on image data with runtime output options.
 #[no_mangle]
 pub unsafe extern "C" fn rocr_detect_text_data(
@@ -183,7 +204,7 @@ pub unsafe extern "C" fn rocr_detect_text_data(
         Ok(value) => value,
         Err(code) => return code,
     };
-    if options.output == OutputGranularity::Spatial {
+    if options.output == OutputGranularity::Spatial || options.output == OutputGranularity::Tsv {
         return -5;
     }
     let detected = match (*handle).inner.detect_text(
@@ -244,7 +265,7 @@ pub unsafe extern "C" fn rocr_detect_text_rgb(
         Ok(value) => value,
         Err(code) => return code,
     };
-    if options.output == OutputGranularity::Spatial { return -5; }
+    if options.output == OutputGranularity::Spatial || options.output == OutputGranularity::Tsv { return -5; }
     let detected = match (*handle).inner.detect_text_rgb(
         slice::from_raw_parts(image_data, required), width, height, stride, &options,
     ) {
@@ -306,6 +327,45 @@ pub unsafe extern "C" fn rocr_detect_text_rgb_spatial(
     CString::new(text).map_or(std::ptr::null_mut(), CString::into_raw)
 }
 
+/// Run OCR on decoded, interleaved RGB8 pixels and return TSV text with runtime options.
+#[no_mangle]
+pub unsafe extern "C" fn rocr_detect_text_rgb_tsv(
+    handle: *mut ROCRHandle,
+    image_data: *const u8,
+    image_len: usize,
+    width: u32,
+    height: u32,
+    stride: usize,
+    options_json: *const c_char,
+) -> *mut c_char {
+    if handle.is_null() || image_data.is_null() || options_json.is_null() {
+        return std::ptr::null_mut();
+    }
+    let (_, required) = match rusto_core::image::rgb_layout(width, height, stride) {
+        Ok(layout) if image_len >= layout.1 => layout,
+        _ => return std::ptr::null_mut(),
+    };
+    let mut options = match parse_run_options(options_json) {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    options.output = OutputGranularity::Tsv;
+    let detected = match (*handle).inner.detect_text_rgb(
+        slice::from_raw_parts(image_data, required),
+        width,
+        height,
+        stride,
+        &options,
+    ) {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let DetectTextResult::Spatial(text) = detected else {
+        return std::ptr::null_mut();
+    };
+    CString::new(text).map_or(std::ptr::null_mut(), CString::into_raw)
+}
+
 /// Run OCR on image data and return spatial text with runtime options.
 #[no_mangle]
 pub unsafe extern "C" fn rocr_detect_text_data_spatial(
@@ -322,6 +382,35 @@ pub unsafe extern "C" fn rocr_detect_text_data_spatial(
         Err(_) => return std::ptr::null_mut(),
     };
     options.output = OutputGranularity::Spatial;
+    let detected = match (*handle).inner.detect_text(
+        &ImageSource::Bytes(slice::from_raw_parts(image_data, image_len).to_vec()),
+        &options,
+    ) {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let DetectTextResult::Spatial(text) = detected else {
+        return std::ptr::null_mut();
+    };
+    CString::new(text).map_or(std::ptr::null_mut(), CString::into_raw)
+}
+
+/// Run OCR on image data and return TSV text with runtime options.
+#[no_mangle]
+pub unsafe extern "C" fn rocr_detect_text_data_tsv(
+    handle: *mut ROCRHandle,
+    image_data: *const u8,
+    image_len: usize,
+    options_json: *const c_char,
+) -> *mut c_char {
+    if handle.is_null() || image_data.is_null() || options_json.is_null() {
+        return std::ptr::null_mut();
+    }
+    let mut options = match parse_run_options(options_json) {
+        Ok(value) => value,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    options.output = OutputGranularity::Tsv;
     let detected = match (*handle).inner.detect_text(
         &ImageSource::Bytes(slice::from_raw_parts(image_data, image_len).to_vec()),
         &options,
@@ -385,6 +474,73 @@ pub extern "C" fn rocr_version() -> *const c_char {
     VERSION.as_ptr() as *const c_char
 }
 
+/// Check if the engine handle is non-null and ready for inference
+#[no_mangle]
+pub unsafe extern "C" fn rocr_is_ready(handle: *const ROCRHandle) -> c_int {
+    if handle.is_null() {
+        0
+    } else {
+        1
+    }
+}
+
+/// Downloads model assets for a specific OCR pipeline ahead of time.
+/// Returns a JSON array string of downloaded asset paths, or NULL on error.
+/// Caller must free returned string with rocr_free_string.
+#[no_mangle]
+pub unsafe extern "C" fn rocr_download_model(
+    model: *const c_char,
+    lang: *const c_char,
+    cache_dir: *const c_char,
+) -> *mut c_char {
+    let model_opt = if model.is_null() {
+        None
+    } else {
+        match CStr::from_ptr(model).to_str() {
+            Ok(s) => Some(s),
+            Err(_) => return std::ptr::null_mut(),
+        }
+    };
+    let lang_opt = if lang.is_null() {
+        None
+    } else {
+        match CStr::from_ptr(lang).to_str() {
+            Ok(s) => Some(s),
+            Err(_) => return std::ptr::null_mut(),
+        }
+    };
+    let cache_path = if cache_dir.is_null() {
+        crate::models::get_cache_dir(None)
+    } else {
+        match CStr::from_ptr(cache_dir).to_str() {
+            Ok(s) => std::path::PathBuf::from(s),
+            Err(_) => return std::ptr::null_mut(),
+        }
+    };
+
+    match crate::download::download_model_pipeline(
+        model_opt,
+        lang_opt,
+        false,
+        false,
+        false,
+        None,
+        false,
+        &cache_path,
+    ) {
+        Ok(paths) => {
+            let str_paths: Vec<String> = paths
+                .into_iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect();
+            let json = serde_json::to_string(&str_paths).unwrap_or_else(|_| "[]".to_string());
+            CString::new(json).unwrap_or_default().into_raw()
+        }
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+
 fn text_results_to_c(results: &[crate::TextResult]) -> Box<[CTextResult]> {
     results
         .iter()
@@ -413,93 +569,4 @@ fn text_results_to_c(results: &[crate::TextResult]) -> Box<[CTextResult]> {
         })
         .collect::<Vec<_>>()
         .into_boxed_slice()
-}
-
-/// Detect document layout regions from an image file path.
-///
-/// Returns 0 on success, negative error code on failure.
-/// Free returned regions with `rocr_free_layout_regions`.
-#[no_mangle]
-pub unsafe extern "C" fn rocr_detect_layout_file(
-    handle: *mut ROCRHandle,
-    image_path: *const c_char,
-    regions_out: *mut *mut CLayoutRegion,
-    count_out: *mut usize,
-) -> c_int {
-    if handle.is_null() || image_path.is_null() || regions_out.is_null() || count_out.is_null() {
-        return -1;
-    }
-    let path = match CStr::from_ptr(image_path).to_str() {
-        Ok(value) => value,
-        Err(_) => return -2,
-    };
-    let regions = match (*handle).inner.detect_layout(&ImageSource::Path(path.into())) {
-        Ok(value) => value,
-        Err(_) => return -3,
-    };
-    let c_regions: Vec<CLayoutRegion> = regions
-        .into_iter()
-        .map(|r| CLayoutRegion {
-            x_min: r.bbox.x_min,
-            y_min: r.bbox.y_min,
-            x_max: r.bbox.x_max,
-            y_max: r.bbox.y_max,
-            layout_type: r.layout_type as c_int,
-            confidence: r.confidence,
-        })
-        .collect();
-    *count_out = c_regions.len();
-    *regions_out = Box::into_raw(c_regions.into_boxed_slice()) as *mut CLayoutRegion;
-    0
-}
-
-/// Detect document layout regions from decoded, interleaved RGB8 pixels.
-///
-/// Returns 0 on success, negative error code on failure.
-/// Free returned regions with `rocr_free_layout_regions`.
-#[no_mangle]
-pub unsafe extern "C" fn rocr_detect_layout_rgb(
-    handle: *mut ROCRHandle,
-    image_data: *const u8,
-    image_len: usize,
-    width: u32,
-    height: u32,
-    stride: usize,
-    regions_out: *mut *mut CLayoutRegion,
-    count_out: *mut usize,
-) -> c_int {
-    if handle.is_null() || image_data.is_null() || regions_out.is_null() || count_out.is_null() {
-        return -1;
-    }
-    let (_, required) = match rusto_core::image::rgb_layout(width, height, stride) {
-        Ok(layout) if image_len >= layout.1 => layout,
-        _ => return -2,
-    };
-    let pixels = slice::from_raw_parts(image_data, required);
-    let regions = match (*handle).inner.detect_layout_rgb(pixels, width, height, stride) {
-        Ok(value) => value,
-        Err(_) => return -3,
-    };
-    let c_regions: Vec<CLayoutRegion> = regions
-        .into_iter()
-        .map(|r| CLayoutRegion {
-            x_min: r.bbox.x_min,
-            y_min: r.bbox.y_min,
-            x_max: r.bbox.x_max,
-            y_max: r.bbox.y_max,
-            layout_type: r.layout_type as c_int,
-            confidence: r.confidence,
-        })
-        .collect();
-    *count_out = c_regions.len();
-    *regions_out = Box::into_raw(c_regions.into_boxed_slice()) as *mut CLayoutRegion;
-    0
-}
-
-/// Free layout region results returned by `rocr_detect_layout_*`.
-#[no_mangle]
-pub unsafe extern "C" fn rocr_free_layout_regions(regions: *mut CLayoutRegion, count: usize) {
-    if !regions.is_null() && count > 0 {
-        let _ = Box::from_raw(std::ptr::slice_from_raw_parts_mut(regions, count));
-    }
 }

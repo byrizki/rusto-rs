@@ -59,12 +59,15 @@ impl PipelineOutput {
     }
 
     pub fn to_text_results_with_options(&self, options: &OcrRunOptions) -> Vec<TextResult> {
+        let (line_y, word_x) = options.pre_recognition.as_ref().map_or((0.5, 0.4), |pr| {
+            (pr.line_y_threshold.unwrap_or(0.5), pr.word_x_threshold.unwrap_or(0.4))
+        });
         if options.output == OutputGranularity::Words {
             let word_lines = build_word_results(&self.word_results);
             let grouped = group_words(
                 word_lines,
-                options.line_y_threshold.unwrap_or(0.5),
-                options.word_x_threshold.unwrap_or(0.4),
+                line_y,
+                word_x,
             );
             if let Some(regions) = &self.layout_regions {
                 if !regions.is_empty() {
@@ -76,8 +79,8 @@ impl PipelineOutput {
             let entries = self.to_text_results();
             let segments = crate::spatial::cluster_text_results_into_lines(
                 entries,
-                options.line_y_threshold.unwrap_or(0.5),
-                options.word_x_threshold.unwrap_or(0.4),
+                line_y,
+                word_x,
             );
             if let Some(regions) = &self.layout_regions {
                 if !regions.is_empty() {
@@ -102,8 +105,8 @@ impl PipelineOutput {
         crate::spatial::to_raw(&self.boxes, &self.txts, &self.scores)
     }
 
-    pub fn to_csv(&self) -> String {
-        crate::spatial::to_csv(&self.boxes, &self.txts)
+    pub fn to_tsv(&self) -> String {
+        crate::spatial::to_tsv(&self.boxes, &self.txts)
     }
 
     pub fn to_text_with_position(&self) -> String {
@@ -185,23 +188,44 @@ impl OcrPipeline {
         let mut effective = self.global.clone();
         effective.return_word_box = options.output == OutputGranularity::Words;
         effective.return_single_char_box = false;
-        effective.use_cls = options.classification.unwrap_or(self.global.use_cls) && self.cls.is_some();
-        effective.use_orient = options.orientation.unwrap_or(self.global.use_orient) && self.orient.is_some();
-        effective.use_unwarp = options.unwarp.unwrap_or(self.global.use_unwarp) && self.unwarp.is_some();
-        effective.use_layout = options.layout.unwrap_or(self.global.use_layout) && self.layout.is_some();
-        if let Some(value) = options.text_score { effective.text_score = value; }
-        if let Some(value) = options.min_height { effective.min_height = value; }
-        if let Some(value) = options.max_side_len { effective.max_side_len = value; }
-        if let Some(value) = options.min_side_len { effective.min_side_len = value; }
-        if let Some(value) = options.width_height_ratio { effective.width_height_ratio = value; }
-        if let Some(calib) = &options.calibration { effective.calibration = Some(calib.clone()); }
-        if let Some(opt) = &options.optimization { effective.optimization = Some(opt.clone()); }
+        effective.use_cls = options.line_classification.unwrap_or(self.global.use_cls) && self.cls.is_some();
+        effective.use_orient = options.orientation_detection.unwrap_or(self.global.use_orient) && self.orient.is_some();
+        effective.use_unwarp = options.auto_unwarp.unwrap_or(self.global.use_unwarp) && self.unwarp.is_some();
+        effective.use_layout = options.layout_reading.unwrap_or(self.global.use_layout) && self.layout.is_some();
+
+        if let Some(post_rec) = &options.post_recognition {
+            if let Some(value) = post_rec.score_threshold {
+                effective.text_score = value;
+            }
+        }
+        if let Some(post_det) = &options.post_detection {
+            if let Some(value) = post_det.min_height { effective.min_height = value; }
+            if let Some(value) = post_det.max_side_len { effective.max_side_len = value; }
+            if let Some(value) = post_det.min_side_len { effective.min_side_len = value; }
+            if let Some(value) = post_det.width_height_ratio { effective.width_height_ratio = value; }
+        }
+        if let Some(pre_det) = &options.pre_detection {
+            if let Some(calib) = pre_det.to_calibration_options() {
+                effective.calibration = Some(calib);
+            }
+            if let Some(opt) = pre_det.to_optimization_options() {
+                effective.optimization = Some(opt);
+            }
+        }
 
         let orig_rec_batch_num = self.rec_batch_num;
-        if let Some(batch_num) = options.rec_batch_num {
-            self.rec_batch_num = batch_num.max(1) as usize;
+        if let Some(rec) = &options.recognition {
+            if let Some(batch_num) = rec.batch_size {
+                self.rec_batch_num = batch_num.max(1) as usize;
+            }
         }
-        let result = self.run_pipeline_internal(img, &effective, options.detection.as_ref(), options.postprocess.as_ref());
+        let postprocess_options = options.post_detection.as_ref().map(|p| p.to_postprocess_run_options());
+        let result = self.run_pipeline_internal(
+            img,
+            &effective,
+            options.detection.as_ref(),
+            postprocess_options.as_ref(),
+        );
         self.rec_batch_num = orig_rec_batch_num;
         result
     }
@@ -622,9 +646,17 @@ impl OcrPipeline {
     ) -> Result<DetectTextResult, CoreError> {
         let output = self.run_with_options(img, options)?;
         match options.output {
-            OutputGranularity::Spatial => Ok(DetectTextResult::Spatial(
-                output.to_spatial_text(options.line_y_threshold, options.word_x_threshold),
-            )),
+            OutputGranularity::Spatial => {
+                let (line_y, word_x) = options.pre_recognition.as_ref().map_or((None, None), |pr| {
+                    (pr.line_y_threshold, pr.word_x_threshold)
+                });
+                Ok(DetectTextResult::Spatial(
+                    output.to_spatial_text(line_y, word_x),
+                ))
+            }
+            OutputGranularity::Tsv => {
+                Ok(DetectTextResult::Spatial(output.to_tsv()))
+            }
             OutputGranularity::Lines | OutputGranularity::Words => Ok(
                 DetectTextResult::Structured(output.to_text_results_with_options(options)),
             ),
@@ -641,95 +673,5 @@ impl OcrPipeline {
     ) -> Result<DetectTextResult, CoreError> {
         let mat = Mat::from_rgb_stride(width, height, stride, pixels)?;
         self.detect_text(&mat, options)
-    }
-
-    pub fn detect_layout(&mut self, img: &Mat) -> Result<Vec<LayoutRegion>, CoreError> {
-        let layout_config = self.layout_config.clone().unwrap_or_else(|| {
-            LayoutConfig::default(PathBuf::new())
-        });
-        let layout_session = self.layout.as_mut().ok_or_else(|| {
-            CoreError::Model("Layout detector model is not initialized or configured".into())
-        })?;
-        let (orig_h, orig_w) = (img.rows(), img.cols());
-        let (new_h, new_w) = resolve_layout_target_dimensions(
-            &layout_config.model_path,
-            layout_config.target_height,
-            layout_config.target_width,
-            layout_config.target_size,
-        );
-        let (input_tensor, scale_w, scale_h) = preprocess_layout_image(
-            img,
-            new_w,
-            new_h,
-            layout_config.mean,
-            layout_config.std,
-        )?;
-        let inputs = build_layout_model_inputs(
-            input_tensor,
-            &layout_config.model_path,
-            new_h,
-            new_w,
-            scale_h,
-            scale_w,
-        )?;
-        let outputs = layout_session.run_with_inputs(inputs)?;
-        let regions = if let Some(regions) = postprocess_direct_layout_boxes(
-            &outputs,
-            orig_w,
-            orig_h,
-            scale_w,
-            scale_h,
-            layout_config.conf_thresh,
-            layout_config.iou_thresh,
-        ) {
-            regions
-        } else {
-            let chars_opt = layout_session.get_character_list("character");
-            postprocess_picodet(PicoDetInput {
-                outputs: &outputs,
-                orig_w,
-                orig_h,
-                new_w,
-                new_h,
-                scale_w,
-                scale_h,
-                conf_thresh: layout_config.conf_thresh,
-                iou_thresh: layout_config.iou_thresh,
-                labels: chars_opt.as_deref(),
-            })?
-        };
-        Ok(regions)
-    }
-
-    pub fn detect_layout_rgb(
-        &mut self,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-        stride: usize,
-    ) -> Result<Vec<LayoutRegion>, CoreError> {
-        let mat = Mat::from_rgb_stride(width, height, stride, pixels)?;
-        self.detect_layout(&mat)
-    }
-
-    pub fn unwarp_image(&mut self, img: &Mat) -> Result<Mat, CoreError> {
-        let unwarp_session = self.unwarp.as_mut().ok_or_else(|| {
-            CoreError::Model("Document unwarper model is not initialized or configured".into())
-        })?;
-        let (orig_h, orig_w) = (img.rows(), img.cols());
-        let input_tensor = preprocess_unwarp(img, 512, 512)?;
-        let output = unwarp_session.run(input_tensor.into_dyn())?;
-        postprocess_unwarp(img, &output, orig_w, orig_h)
-    }
-
-    pub fn unwarp_image_rgb(
-        &mut self,
-        pixels: &[u8],
-        width: u32,
-        height: u32,
-        stride: usize,
-    ) -> Result<Mat, CoreError> {
-        let mat = Mat::from_rgb_stride(width, height, stride, pixels)?;
-        self.unwarp_image(&mat)
     }
 }

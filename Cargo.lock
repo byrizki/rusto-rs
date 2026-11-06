@@ -1959,7 +1959,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-core"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "clipper2-rust",
  "dirs",
@@ -1974,7 +1974,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-cpp"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "clipper2-rust",
  "ndarray",
@@ -1985,7 +1985,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-mnn"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "cc",
  "ndarray",
@@ -1995,7 +1995,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-nn"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "flatbuffers 0.6.1",
  "memmap2",
@@ -2008,7 +2008,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-nn-cuda"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "cudarc",
  "libloading 0.9.0",
@@ -2018,7 +2018,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-nn-webgpu"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "pollster",
  "rusto-nn",
@@ -2028,7 +2028,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-node"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "napi",
  "napi-build",
@@ -2040,7 +2040,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-rs"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "cbindgen",
  "clap",
@@ -2068,7 +2068,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-rten"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "ndarray",
  "rten",
@@ -2079,7 +2079,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-rten-wasm"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "image",
  "rusto-core",

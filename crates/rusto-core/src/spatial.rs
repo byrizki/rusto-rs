@@ -307,11 +307,11 @@ pub fn to_raw(boxes: &[[Point2f; 4]], texts: &[String], scores: &[f32]) -> Strin
     result
 }
 
-/// Export OCR results as CSV format.
-/// Format: `line_id,column_id,text`
-pub fn to_csv(boxes: &[[Point2f; 4]], texts: &[String]) -> String {
+/// Export OCR results as TSV format (tab-separated values).
+/// Format: `line_id\tcolumn_id\ttext`
+pub fn to_tsv(boxes: &[[Point2f; 4]], texts: &[String]) -> String {
     if boxes.is_empty() {
-        return "line_id,column_id,text\n".to_string();
+        return "line_id\tcolumn_id\ttext\n".to_string();
     }
 
     #[derive(Debug, Clone)]
@@ -373,12 +373,12 @@ pub fn to_csv(boxes: &[[Point2f; 4]], texts: &[String]) -> String {
         lines.push(current_line);
     }
 
-    let mut csv_rows = Vec::new();
+    let mut tsv_rows = Vec::new();
     for (line_id, mut line) in lines.into_iter().enumerate() {
         line.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
 
         if line.len() == 1 {
-            csv_rows.push((line_id, 0, line[0].text.clone()));
+            tsv_rows.push((line_id, 0, line[0].text.clone()));
             continue;
         }
 
@@ -411,14 +411,14 @@ pub fn to_csv(boxes: &[[Point2f; 4]], texts: &[String]) -> String {
                 .map(|t| t.text.as_str())
                 .collect::<Vec<_>>()
                 .join(" ");
-            csv_rows.push((line_id, col_id, text));
+            tsv_rows.push((line_id, col_id, text));
         }
     }
 
-    let mut result = String::from("line_id,column_id,text\n");
-    for (line_id, col_id, text) in csv_rows {
-        let safe_text = text.replace('"', "\"\"");
-        result.push_str(&format!("{},{},\"{}\"\n", line_id, col_id, safe_text));
+    let mut result = String::from("line_id\tcolumn_id\ttext\n");
+    for (line_id, col_id, text) in tsv_rows {
+        let safe_text = text.replace('\t', " ").replace('\n', " ");
+        result.push_str(&format!("{}\t{}\t{}\n", line_id, col_id, safe_text));
     }
     result
 }

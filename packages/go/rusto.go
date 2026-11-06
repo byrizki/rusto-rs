@@ -9,6 +9,7 @@ package rusto
 */
 import "C"
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime"
@@ -53,20 +54,14 @@ type TextResult struct {
 	LayoutType int32 `json:"layout_type"`
 }
 
-// LayoutRegion represents a detected document layout region.
-type LayoutRegion struct {
-	// XMin is the left coordinate of the bounding box.
-	XMin int `json:"x_min"`
-	// YMin is the top coordinate of the bounding box.
-	YMin int `json:"y_min"`
-	// XMax is the right coordinate of the bounding box.
-	XMax int `json:"x_max"`
-	// YMax is the bottom coordinate of the bounding box.
-	YMax int `json:"y_max"`
-	// LayoutType is the category identifier (e.g. 0=Text, 1=Title, 2=Figure, etc.).
-	LayoutType int `json:"layout_type"`
-	// Confidence is the detection confidence score between 0.0 and 1.0.
-	Confidence float32 `json:"confidence"`
+// DetectTextResult holds either structured recognition items or a reconstructed 2D spatial layout string.
+type DetectTextResult struct {
+	// Results contains structured lines or words when IsSpatial is false.
+	Results []TextResult `json:"results,omitempty"`
+	// Text contains the formatted 2D spatial layout string when IsSpatial is true.
+	Text string `json:"text,omitempty"`
+	// IsSpatial indicates whether this result was produced with AsSpatial().
+	IsSpatial bool `json:"is_spatial"`
 }
 
 // Engine wraps an active RustO OCR instance with thread-safe synchronization.
@@ -75,9 +70,23 @@ type Engine struct {
 	handle *C.ROCRHandle
 }
 
-// New creates and initializes a new OCR engine instance using JSON configuration.
-func New(configJSON string) (*Engine, error) {
-	cConfig := C.CString(configJSON)
+// RustO is an alias to Engine representing an initialized OCR pipeline instance.
+type RustO = Engine
+
+// Initialize creates and initializes a new OCR engine instance using optional JSON configuration.
+// When omitted, defaults to "{}" which initializes IndraOCR (auto-downloading models if needed).
+func Initialize(configJSON ...string) (*RustO, error) {
+	return New(configJSON...)
+}
+
+// New creates and initializes a new OCR engine instance using optional JSON configuration.
+func New(configJSON ...string) (*Engine, error) {
+	cfg := "{}"
+	if len(configJSON) > 0 {
+		cfg = configJSON[0]
+	}
+
+	cConfig := C.CString(cfg)
 	defer C.free(unsafe.Pointer(cConfig))
 
 	handle := C.rocr_initialize(cConfig)
@@ -102,6 +111,57 @@ func (e *Engine) Close() {
 		e.handle = nil
 	}
 }
+
+// Version returns the engine library version string.
+func Version() string {
+	cV := C.rocr_version()
+	if cV == nil {
+		return "0.4.0"
+	}
+	return C.GoString(cV)
+}
+
+// Version returns the engine library version string.
+func (e *Engine) Version() string {
+	return Version()
+}
+
+// IsReady returns true if the engine handle is initialized and ready for inference.
+func (e *Engine) IsReady() bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.handle != nil && C.rocr_is_ready(e.handle) != 0
+}
+
+// DownloadModel downloads model assets for a specific OCR pipeline ahead of time.
+func DownloadModel(model, lang, cacheDir string) ([]string, error) {
+	var cModel, cLang, cCacheDir *C.char
+	if model != "" {
+		cModel = C.CString(model)
+		defer C.free(unsafe.Pointer(cModel))
+	}
+	if lang != "" {
+		cLang = C.CString(lang)
+		defer C.free(unsafe.Pointer(cLang))
+	}
+	if cacheDir != "" {
+		cCacheDir = C.CString(cacheDir)
+		defer C.free(unsafe.Pointer(cCacheDir))
+	}
+
+	cJson := C.rocr_download_model(cModel, cLang, cCacheDir)
+	if cJson == nil {
+		return nil, errors.New("rusto: failed to download model")
+	}
+	defer C.rocr_free_string(cJson)
+
+	var paths []string
+	if err := json.Unmarshal([]byte(C.GoString(cJson)), &paths); err != nil {
+		return nil, fmt.Errorf("rusto: failed to parse downloaded paths: %w", err)
+	}
+	return paths, nil
+}
+
 
 func (e *Engine) convertResults(cResults *C.CTextResult, count C.size_t) []TextResult {
 	if cResults == nil || count == 0 {
@@ -140,8 +200,7 @@ func (e *Engine) convertResults(cResults *C.CTextResult, count C.size_t) []TextR
 	return out
 }
 
-// DetectTextFile detects text from an image file at the given path.
-func (e *Engine) DetectTextFile(path string, optionsJSON string) ([]TextResult, error) {
+func (e *Engine) detectTextFile(path string, optionsJSON string) ([]TextResult, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -167,8 +226,7 @@ func (e *Engine) DetectTextFile(path string, optionsJSON string) ([]TextResult, 
 	return e.convertResults(results, count), nil
 }
 
-// DetectTextData detects text from raw in-memory image bytes.
-func (e *Engine) DetectTextData(data []byte, optionsJSON string) ([]TextResult, error) {
+func (e *Engine) detectTextData(data []byte, optionsJSON string) ([]TextResult, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -201,8 +259,7 @@ func (e *Engine) DetectTextData(data []byte, optionsJSON string) ([]TextResult, 
 	return e.convertResults(results, count), nil
 }
 
-// DetectTextFileSpatial exports spatial text layout from an image file.
-func (e *Engine) DetectTextFileSpatial(path string, optionsJSON string) (string, error) {
+func (e *Engine) detectTextFileSpatial(path string, optionsJSON string) (string, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -225,8 +282,30 @@ func (e *Engine) DetectTextFileSpatial(path string, optionsJSON string) (string,
 	return C.GoString(cText), nil
 }
 
-// DetectTextDataSpatial exports spatial text layout from raw in-memory image bytes.
-func (e *Engine) DetectTextDataSpatial(data []byte, optionsJSON string) (string, error) {
+func (e *Engine) detectTextFileTsv(path string, optionsJSON string) (string, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if e.handle == nil {
+		return "", ErrEngineClosed
+	}
+
+	cPath := C.CString(path)
+	defer C.free(unsafe.Pointer(cPath))
+
+	cOptions := C.CString(optionsJSON)
+	defer C.free(unsafe.Pointer(cOptions))
+
+	cText := C.rocr_detect_text_file_tsv(e.handle, cPath, cOptions)
+	if cText == nil {
+		return "", ErrDetectionFailed
+	}
+	defer C.rocr_free_string(cText)
+
+	return C.GoString(cText), nil
+}
+
+func (e *Engine) detectTextDataSpatial(data []byte, optionsJSON string) (string, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -254,8 +333,35 @@ func (e *Engine) DetectTextDataSpatial(data []byte, optionsJSON string) (string,
 	return C.GoString(cText), nil
 }
 
-// DetectTextRGB detects text from raw decoded interleaved RGB8 pixel bytes.
-func (e *Engine) DetectTextRGB(pixels []byte, width, height uint32, stride uint, optionsJSON string) ([]TextResult, error) {
+func (e *Engine) detectTextDataTsv(data []byte, optionsJSON string) (string, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if e.handle == nil {
+		return "", ErrEngineClosed
+	}
+	if len(data) == 0 {
+		return "", nil
+	}
+
+	cOptions := C.CString(optionsJSON)
+	defer C.free(unsafe.Pointer(cOptions))
+
+	cText := C.rocr_detect_text_data_tsv(
+		e.handle,
+		(*C.uint8_t)(unsafe.Pointer(&data[0])),
+		C.size_t(len(data)),
+		cOptions,
+	)
+	if cText == nil {
+		return "", ErrDetectionFailed
+	}
+	defer C.rocr_free_string(cText)
+
+	return C.GoString(cText), nil
+}
+
+func (e *Engine) detectTextRGB(pixels []byte, width, height uint32, stride uint, optionsJSON string) ([]TextResult, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -291,8 +397,7 @@ func (e *Engine) DetectTextRGB(pixels []byte, width, height uint32, stride uint,
 	return e.convertResults(results, count), nil
 }
 
-// DetectTextRGBSpatial exports spatial text layout from raw decoded interleaved RGB8 pixel bytes.
-func (e *Engine) DetectTextRGBSpatial(pixels []byte, width, height uint32, stride uint, optionsJSON string) (string, error) {
+func (e *Engine) detectTextRGBSpatial(pixels []byte, width, height uint32, stride uint, optionsJSON string) (string, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -323,81 +428,333 @@ func (e *Engine) DetectTextRGBSpatial(pixels []byte, width, height uint32, strid
 	return C.GoString(cText), nil
 }
 
-// DetectLayoutFile detects document layout regions from an image file at the given path.
-func (e *Engine) DetectLayoutFile(path string) ([]LayoutRegion, error) {
+func (e *Engine) detectTextRGBTsv(pixels []byte, width, height uint32, stride uint, optionsJSON string) (string, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
 	if e.handle == nil {
-		return nil, ErrEngineClosed
-	}
-
-	cPath := C.CString(path)
-	defer C.free(unsafe.Pointer(cPath))
-
-	var cRegions *C.CLayoutRegion
-	var count C.size_t
-
-	ret := C.rocr_detect_layout_file(e.handle, cPath, &cRegions, &count)
-	if ret != 0 {
-		return nil, ErrDetectionFailed
-	}
-	defer C.rocr_free_layout_regions(cRegions, count)
-
-	return convertLayoutRegions(cRegions, count), nil
-}
-
-// DetectLayoutRGB detects document layout regions from raw decoded interleaved RGB8 pixel bytes.
-func (e *Engine) DetectLayoutRGB(pixels []byte, width, height uint32, stride uint) ([]LayoutRegion, error) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	if e.handle == nil {
-		return nil, ErrEngineClosed
+		return "", ErrEngineClosed
 	}
 	if len(pixels) == 0 {
-		return []LayoutRegion{}, nil
+		return "", nil
 	}
 
-	var cRegions *C.CLayoutRegion
-	var count C.size_t
+	cOptions := C.CString(optionsJSON)
+	defer C.free(unsafe.Pointer(cOptions))
 
-	ret := C.rocr_detect_layout_rgb(
+	cText := C.rocr_detect_text_rgb_tsv(
 		e.handle,
 		(*C.uint8_t)(unsafe.Pointer(&pixels[0])),
 		C.size_t(len(pixels)),
 		C.uint32_t(width),
 		C.uint32_t(height),
 		C.size_t(stride),
-		&cRegions,
-		&count,
+		cOptions,
 	)
-	if ret != 0 {
-		return nil, ErrDetectionFailed
+	if cText == nil {
+		return "", ErrDetectionFailed
 	}
-	defer C.rocr_free_layout_regions(cRegions, count)
+	defer C.rocr_free_string(cText)
 
-	return convertLayoutRegions(cRegions, count), nil
+	return C.GoString(cText), nil
 }
 
-func convertLayoutRegions(cRegions *C.CLayoutRegion, count C.size_t) []LayoutRegion {
-	if cRegions == nil || count == 0 {
-		return []LayoutRegion{}
+// PreDetectionOptions contains conditioning and downscale parameters.
+type PreDetectionOptions struct {
+	DescreenStrength *float32 `json:"descreenStrength,omitempty"`
+	TargetMaxSide    *uint32  `json:"targetMaxSide,omitempty"`
+	CropPaddingX     *float32 `json:"cropPaddingX,omitempty"`
+	CropPaddingY     *float32 `json:"cropPaddingY,omitempty"`
+}
+
+// DetectionRunOptions contains DBNet detection parameters.
+type DetectionRunOptions struct {
+	LimitSideLen *int32      `json:"limitSideLen,omitempty"`
+	LimitType    *string     `json:"limitType,omitempty"`
+	Mean         *[3]float32 `json:"mean,omitempty"`
+	Std          *[3]float32 `json:"std,omitempty"`
+}
+
+// PostDetectionOptions contains polygon filtering parameters.
+type PostDetectionOptions struct {
+	Threshold        *float32 `json:"threshold,omitempty"`
+	BoxThreshold     *float32 `json:"boxThreshold,omitempty"`
+	UnclipRatio      *float32 `json:"unclipRatio,omitempty"`
+	UseDilation      *bool    `json:"useDilation,omitempty"`
+	ScoreMode        *string  `json:"scoreMode,omitempty"`
+	MaxCandidates    *int32   `json:"maxCandidates,omitempty"`
+	MinHeight        *float32 `json:"minHeight,omitempty"`
+	MinSideLen       *float32 `json:"minSideLen,omitempty"`
+	MaxSideLen       *float32 `json:"maxSideLen,omitempty"`
+	WidthHeightRatio *float32 `json:"widthHeightRatio,omitempty"`
+}
+
+// PreRecognitionOptions contains grouping tolerances.
+type PreRecognitionOptions struct {
+	LineYThreshold *float32 `json:"lineYThreshold,omitempty"`
+	WordXThreshold *float32 `json:"wordXThreshold,omitempty"`
+}
+
+// RecognitionRunOptions contains recognition batching parameters.
+type RecognitionRunOptions struct {
+	BatchSize *int32 `json:"batchSize,omitempty"`
+}
+
+// PostRecognitionOptions contains recognition score filtering.
+type PostRecognitionOptions struct {
+	ScoreThreshold *float32 `json:"scoreThreshold,omitempty"`
+}
+
+// OcrRunOptions encapsulates all detection and recognition options across 6 phases and 4 toggles.
+type OcrRunOptions struct {
+	Output               string                  `json:"output,omitempty"`
+	AutoUnwarp           *bool                   `json:"autoUnwarp,omitempty"`
+	LayoutReading        *bool                   `json:"layoutReading,omitempty"`
+	OrientationDetection *bool                   `json:"orientationDetection,omitempty"`
+	LineClassification   *bool                   `json:"lineClassification,omitempty"`
+	PreDetection         *PreDetectionOptions    `json:"preDetection,omitempty"`
+	Detection            *DetectionRunOptions    `json:"detection,omitempty"`
+	PostDetection        *PostDetectionOptions   `json:"postDetection,omitempty"`
+	PreRecognition       *PreRecognitionOptions  `json:"preRecognition,omitempty"`
+	Recognition          *RecognitionRunOptions  `json:"recognition,omitempty"`
+	PostRecognition      *PostRecognitionOptions `json:"postRecognition,omitempty"`
+}
+
+// DetectTextBuilder provides a fluent interface for chaining detection options.
+type DetectTextBuilder struct {
+	engine    *Engine
+	filePath  string
+	data      []byte
+	hasData   bool
+	pixels    []byte
+	hasPixels bool
+	width     uint32
+	height    uint32
+	stride    uint
+	options   OcrRunOptions
+}
+
+// DetectText creates a fluent builder for chaining text detection options, with an optional image path.
+func (e *Engine) DetectText(imagePath ...string) *DetectTextBuilder {
+	b := &DetectTextBuilder{engine: e}
+	if len(imagePath) > 0 && imagePath[0] != "" {
+		b.filePath = imagePath[0]
 	}
+	return b
+}
 
-	regionsSlice := (*[1 << 28]C.CLayoutRegion)(unsafe.Pointer(cRegions))[:count:count]
-	out := make([]LayoutRegion, count)
+// DetectTextBuilder creates a fluent builder for chaining text detection options.
+func (e *Engine) DetectTextBuilder() *DetectTextBuilder {
+	return &DetectTextBuilder{engine: e}
+}
 
-	for i := 0; i < int(count); i++ {
-		r := regionsSlice[i]
-		out[i] = LayoutRegion{
-			XMin:       int(r.x_min),
-			YMin:       int(r.y_min),
-			XMax:       int(r.x_max),
-			YMax:       int(r.y_max),
-			LayoutType: int(r.layout_type),
-			Confidence: float32(r.confidence),
+// Image specifies the image file path.
+func (b *DetectTextBuilder) Image(path string) *DetectTextBuilder {
+	b.filePath = path
+	b.hasData = false
+	b.hasPixels = false
+	return b
+}
+
+// Data specifies in-memory image bytes (e.g. PNG, JPEG).
+func (b *DetectTextBuilder) Data(data []byte) *DetectTextBuilder {
+	b.data = data
+	b.hasData = true
+	b.filePath = ""
+	b.hasPixels = false
+	return b
+}
+
+// RGB specifies raw interleaved RGB pixel bytes with dimensions.
+func (b *DetectTextBuilder) RGB(pixels []byte, width, height uint32, stride uint) *DetectTextBuilder {
+	b.pixels = pixels
+	b.hasPixels = true
+	b.width = width
+	b.height = height
+	if stride == 0 {
+		b.stride = uint(width) * 3
+	} else {
+		b.stride = stride
+	}
+	b.filePath = ""
+	b.hasData = false
+	return b
+}
+
+// WithAutoUnwarp enables or disables document unwarping.
+func (b *DetectTextBuilder) WithAutoUnwarp(enabled bool) *DetectTextBuilder {
+	b.options.AutoUnwarp = &enabled
+	return b
+}
+
+// WithLayoutReading enables or disables document layout reading order analysis.
+func (b *DetectTextBuilder) WithLayoutReading(enabled bool) *DetectTextBuilder {
+	b.options.LayoutReading = &enabled
+	return b
+}
+
+// WithOrientationDetection enables or disables document orientation detection.
+func (b *DetectTextBuilder) WithOrientationDetection(enabled bool) *DetectTextBuilder {
+	b.options.OrientationDetection = &enabled
+	return b
+}
+
+// WithLineClassification enables or disables text line orientation classification.
+func (b *DetectTextBuilder) WithLineClassification(enabled bool) *DetectTextBuilder {
+	b.options.LineClassification = &enabled
+	return b
+}
+
+// WithPreDetection configures phase 1 pre-detection options.
+func (b *DetectTextBuilder) WithPreDetection(opts PreDetectionOptions) *DetectTextBuilder {
+	b.options.PreDetection = &opts
+	return b
+}
+
+// WithDetection configures phase 2 detection inference options.
+func (b *DetectTextBuilder) WithDetection(opts DetectionRunOptions) *DetectTextBuilder {
+	b.options.Detection = &opts
+	return b
+}
+
+// WithPostDetection configures phase 3 post-detection options.
+func (b *DetectTextBuilder) WithPostDetection(opts PostDetectionOptions) *DetectTextBuilder {
+	b.options.PostDetection = &opts
+	return b
+}
+
+// WithPreRecognition configures phase 4 pre-recognition options.
+func (b *DetectTextBuilder) WithPreRecognition(opts PreRecognitionOptions) *DetectTextBuilder {
+	b.options.PreRecognition = &opts
+	return b
+}
+
+// WithRecognition configures phase 5 recognition inference options.
+func (b *DetectTextBuilder) WithRecognition(opts RecognitionRunOptions) *DetectTextBuilder {
+	b.options.Recognition = &opts
+	return b
+}
+
+// WithPostRecognition configures phase 6 post-recognition options.
+func (b *DetectTextBuilder) WithPostRecognition(opts PostRecognitionOptions) *DetectTextBuilder {
+	b.options.PostRecognition = &opts
+	return b
+}
+
+// AsLines sets output format to coherent text lines.
+func (b *DetectTextBuilder) AsLines() *DetectTextBuilder {
+	b.options.Output = "lines"
+	return b
+}
+
+// AsWords sets output format to word-level tokens.
+func (b *DetectTextBuilder) AsWords() *DetectTextBuilder {
+	b.options.Output = "words"
+	return b
+}
+
+// AsSpatial sets output format to 2D spatial layout.
+func (b *DetectTextBuilder) AsSpatial() *DetectTextBuilder {
+	b.options.Output = "spatial"
+	return b
+}
+
+// AsTsv sets output format to TSV (tab-separated values).
+func (b *DetectTextBuilder) AsTsv() *DetectTextBuilder {
+	b.options.Output = "tsv"
+	return b
+}
+
+// WithOutput sets output granularity ("lines", "words", or "spatial").
+func (b *DetectTextBuilder) WithOutput(output string) *DetectTextBuilder {
+	b.options.Output = output
+	return b
+}
+
+// WithOptions merges options from an OcrRunOptions struct.
+func (b *DetectTextBuilder) WithOptions(opts OcrRunOptions) *DetectTextBuilder {
+	b.options = opts
+	return b
+}
+
+// Run executes detection with chained options and returns a DetectTextResult.
+func (b *DetectTextBuilder) Run() (*DetectTextResult, error) {
+	bytes, err := json.Marshal(b.options)
+	if err != nil {
+		return nil, err
+	}
+	optsJSON := string(bytes)
+
+	if b.options.Output == "spatial" {
+		if b.filePath != "" {
+			text, err := b.engine.detectTextFileSpatial(b.filePath, optsJSON)
+			if err != nil {
+				return nil, err
+			}
+			return &DetectTextResult{Text: text, IsSpatial: true}, nil
 		}
+		if b.hasData {
+			text, err := b.engine.detectTextDataSpatial(b.data, optsJSON)
+			if err != nil {
+				return nil, err
+			}
+			return &DetectTextResult{Text: text, IsSpatial: true}, nil
+		}
+		if b.hasPixels {
+			text, err := b.engine.detectTextRGBSpatial(b.pixels, b.width, b.height, b.stride, optsJSON)
+			if err != nil {
+				return nil, err
+			}
+			return &DetectTextResult{Text: text, IsSpatial: true}, nil
+		}
+		return nil, errors.New("rusto: no image source provided to DetectTextBuilder")
 	}
-	return out
+
+	if b.options.Output == "tsv" {
+		if b.filePath != "" {
+			text, err := b.engine.detectTextFileTsv(b.filePath, optsJSON)
+			if err != nil {
+				return nil, err
+			}
+			return &DetectTextResult{Text: text, IsSpatial: true}, nil
+		}
+		if b.hasData {
+			text, err := b.engine.detectTextDataTsv(b.data, optsJSON)
+			if err != nil {
+				return nil, err
+			}
+			return &DetectTextResult{Text: text, IsSpatial: true}, nil
+		}
+		if b.hasPixels {
+			text, err := b.engine.detectTextRGBTsv(b.pixels, b.width, b.height, b.stride, optsJSON)
+			if err != nil {
+				return nil, err
+			}
+			return &DetectTextResult{Text: text, IsSpatial: true}, nil
+		}
+		return nil, errors.New("rusto: no image source provided to DetectTextBuilder")
+	}
+
+	if b.filePath != "" {
+		items, err := b.engine.detectTextFile(b.filePath, optsJSON)
+		if err != nil {
+			return nil, err
+		}
+		return &DetectTextResult{Results: items, IsSpatial: false}, nil
+	}
+	if b.hasData {
+		items, err := b.engine.detectTextData(b.data, optsJSON)
+		if err != nil {
+			return nil, err
+		}
+		return &DetectTextResult{Results: items, IsSpatial: false}, nil
+	}
+	if b.hasPixels {
+		items, err := b.engine.detectTextRGB(b.pixels, b.width, b.height, b.stride, optsJSON)
+		if err != nil {
+			return nil, err
+		}
+		return &DetectTextResult{Results: items, IsSpatial: false}, nil
+	}
+	return nil, errors.New("rusto: no image source provided to DetectTextBuilder")
 }

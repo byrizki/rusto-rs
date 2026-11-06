@@ -12,6 +12,7 @@ pub mod cal_rec_boxes;
 pub mod layout;
 pub mod orient;
 pub mod table;
+#[doc(hidden)]
 pub mod spatial;
 pub mod unwarp;
 pub mod models;
@@ -43,8 +44,10 @@ pub use table::{
     TableStructureConfig,
 };
 pub use unwarp::UnwarpOutput;
-pub use spatial::{
-    cluster_line_segments, cluster_text_results_into_lines, group_candidates_into_lines,
-    group_words, merge_text_results, to_csv, to_raw, to_spatial_text, to_text_with_position,
-};
 pub use engine::*;
+
+/// Returns the engine library version string.
+pub fn version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+

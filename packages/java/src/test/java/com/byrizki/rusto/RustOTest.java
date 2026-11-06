@@ -2,7 +2,6 @@ package com.byrizki.rusto;
 
 import org.junit.jupiter.api.Test;
 import java.io.File;
-import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class RustOTest {
@@ -30,10 +29,12 @@ public class RustOTest {
         float[][] box = new float[][] {
             { 10f, 5f }, { 110f, 5f }, { 110f, 25f }, { 10f, 25f }
         };
-        TextResult result = new TextResult("Hello World", 0.98f, box, frame);
+        TextResult result = new TextResult("Hello World", 0.98f, box, frame, 1, "title");
         assertEquals("Hello World", result.text());
         assertEquals(0.98f, result.score());
         assertEquals(frame, result.frame());
+        assertEquals(1, result.regionId());
+        assertEquals("title", result.layoutType());
     }
 
     @Test
@@ -53,14 +54,35 @@ public class RustOTest {
         );
 
         try (RustO engine = RustO.initialize(config)) {
-            List<TextResult> results = engine.detectTextFile(img.getAbsolutePath(), "{}");
-            assertNotNull(results);
-            assertFalse(results.isEmpty());
-            assertTrue(results.stream().anyMatch(r -> r.text().contains("INVOICE")));
+            RustO.DetectTextResult directStructured = engine.detectText(img.getAbsolutePath(), "{}");
+            assertTrue(directStructured.isStructured());
+            assertFalse(directStructured.results().isEmpty());
+            assertTrue(directStructured.results().stream().anyMatch(r -> r.text().contains("INVOICE")));
 
-            String spatial = engine.detectTextFileSpatial(img.getAbsolutePath(), "{}");
-            assertNotNull(spatial);
-            assertTrue(spatial.contains("INVOICE"));
+            RustO.DetectTextResult directSpatial = engine.detectText(img.getAbsolutePath(), "{\"output\":\"spatial\"}");
+            assertTrue(directSpatial.isSpatial());
+            assertTrue(directSpatial.text().contains("INVOICE"));
+
+            RustO.DetectTextResult builderResults = engine.detectText()
+                .image(img.getAbsolutePath())
+                .withAutoUnwarp(true)
+                .withLayoutReading(true)
+                .withOrientationDetection(true)
+                .withLineClassification(true)
+                .withPreDetection(0.1, 960, 0.05, 0.08)
+                .withRecognition(6)
+                .withPostRecognition(0.3)
+                .asLines()
+                .run();
+            assertTrue(builderResults.isStructured());
+            assertFalse(builderResults.results().isEmpty());
+            assertTrue(builderResults.results().stream().anyMatch(r -> r.text().contains("INVOICE")));
+
+            RustO.DetectTextResult builderSpatial = engine.detectText(img.getAbsolutePath())
+                .asSpatial()
+                .run();
+            assertTrue(builderSpatial.isSpatial());
+            assertTrue(builderSpatial.text().contains("INVOICE"));
         }
     }
 }

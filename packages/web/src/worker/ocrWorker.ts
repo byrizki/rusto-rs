@@ -4,7 +4,7 @@ import type { WorkerMessageRequest, WorkerMessageResponse } from '../engine/work
 let engine: WebOcrEngine | null = null;
 
 self.onmessage = async (event: MessageEvent<WorkerMessageRequest>) => {
-  const { id, type, config, image, options } = event.data;
+  const { id, type, config, image, rgb, options } = event.data;
 
   try {
     if (type === 'INIT') {
@@ -32,9 +32,26 @@ self.onmessage = async (event: MessageEvent<WorkerMessageRequest>) => {
       );
       const response: WorkerMessageResponse = { id, type: 'DETECT_SUCCESS', results };
       self.postMessage(response);
+    } else if (type === 'DETECT_RGB') {
+      if (!engine || !engine.isInitialized()) {
+        throw new Error('Worker OCR engine has not been initialized.');
+      }
+      if (!rgb) {
+        throw new Error('Missing RGB pixel buffer payload for text detection.');
+      }
+
+      const results = await engine.detectTextRgb(
+        rgb.pixels,
+        rgb.width,
+        rgb.height,
+        rgb.stride,
+        options
+      );
+      const response: WorkerMessageResponse = { id, type: 'DETECT_SUCCESS', results };
+      self.postMessage(response);
     } else if (type === 'TERMINATE') {
       if (engine) {
-        engine.terminate();
+        engine.close();
         engine = null;
       }
     }

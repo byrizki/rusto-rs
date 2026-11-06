@@ -1,6 +1,6 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use rusto_rs::{DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, RustO};
+use rusto_rs::{DetectTextResult, ImageSource, OcrRunOptions, RustO};
 
 #[napi(js_name = "RustO")]
 pub struct JsRustO {
@@ -12,8 +12,8 @@ impl JsRustO {
     #[napi(factory)]
     pub fn initialize(config_json: String) -> Result<Self> {
         rusto_rs::ensure_rten_registered();
-        let config = InitializeConfig::from_json(&config_json)
-            .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid config JSON: {e}")))?;
+        let config = rusto_rs::download::parse_config_with_auto_download(&config_json)
+            .map_err(|e| Error::new(Status::InvalidArg, format!("{e}")))?;
 
         let inner = RustO::initialize(config)
             .map_err(|e| Error::new(Status::GenericFailure, format!("Failed to initialize RustO: {e}")))?;
@@ -22,14 +22,13 @@ impl JsRustO {
     }
 
     #[napi]
-    #[allow(deprecated)]
     pub fn download_model(
         model: Option<String>,
         lang: Option<String>,
         cache_dir: Option<String>,
     ) -> Result<Vec<String>> {
-        let cache_path = rusto_rs::model_manager::get_cache_dir(cache_dir.as_deref().map(std::path::Path::new));
-        let downloaded = rusto_rs::model_manager::download_model_pipeline(
+        let cache_path = rusto_rs::models::get_cache_dir(cache_dir.as_deref().map(std::path::Path::new));
+        let downloaded = rusto_rs::download::download_model_pipeline(
             model.as_deref(),
             lang.as_deref(),
             false,
@@ -43,12 +42,8 @@ impl JsRustO {
     }
 
     #[napi]
-    #[allow(deprecated)]
-    pub fn download_all_models(cache_dir: Option<String>) -> Result<Vec<String>> {
-        let cache_path = rusto_rs::model_manager::get_cache_dir(cache_dir.as_deref().map(std::path::Path::new));
-        let downloaded = rusto_rs::model_manager::download_all_models(&cache_path)
-            .map_err(|e| Error::new(Status::GenericFailure, format!("Failed to download all models: {e}")))?;
-        Ok(downloaded.into_iter().map(|p| p.to_string_lossy().to_string()).collect())
+    pub fn is_ready(&self) -> bool {
+        self.inner.is_ready()
     }
 
     #[napi]
@@ -109,7 +104,42 @@ impl JsRustO {
     }
 
     #[napi]
+    pub fn detect_text_rgb(
+        &mut self,
+        pixels: Buffer,
+        width: u32,
+        height: u32,
+        stride: Option<u32>,
+        options_json: Option<String>,
+    ) -> Result<String> {
+        let options = match options_json {
+            Some(json) if !json.trim().is_empty() => serde_json::from_str::<OcrRunOptions>(&json)
+                .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid options JSON: {e}")))?,
+            _ => OcrRunOptions::default(),
+        };
+
+        let effective_stride = stride.unwrap_or(width.saturating_mul(3)) as usize;
+        let result = self
+            .inner
+            .detect_text_rgb(pixels.as_ref(), width, height, effective_stride, &options)
+            .map_err(|e| Error::new(Status::GenericFailure, format!("RGB detection failed: {e}")))?;
+
+        match result {
+            DetectTextResult::Structured(items) => serde_json::to_string(&items)
+                .map_err(|e| Error::new(Status::GenericFailure, format!("Serialization failed: {e}"))),
+            DetectTextResult::Spatial(text) => serde_json::to_string(&text)
+                .map_err(|e| Error::new(Status::GenericFailure, format!("Serialization failed: {e}"))),
+        }
+    }
+
+    #[napi]
     pub fn version(&self) -> String {
         env!("CARGO_PKG_VERSION").to_string()
     }
 }
+
+#[napi]
+pub fn rusto_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+

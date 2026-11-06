@@ -1,7 +1,7 @@
 ---
 seo:
   title: RustO! - High-Performance Pure Rust OCR Library & Toolkit
-  description: RustO! is a pure Rust OCR engine and cross-platform toolkit, powered by PaddleOCR models and RTen inference.
+  description: RustO! is a pure Rust OCR engine and cross-platform toolkit powered by DataLab Indra OCR, PaddleOCR models, and pure-Rust RTen inference.
 ---
 
 ::u-page-hero
@@ -9,7 +9,7 @@ seo:
 High-Performance, Pure Rust OCR Engine
 
 #description
-RustO! is an Optical Character Recognition engine and multi-platform toolkit written in pure Rust. Powered by RapidOCR, PaddleOCR models, and pure-Rust RTen inference engine, delivering sub-second inference with zero OpenCV dependency.
+RustO! is an Optical Character Recognition engine and multi-platform toolkit written in pure Rust. Powered by DataLab Indra OCR, PaddleOCR models, and a pure-Rust neural inference runtime with RTen, delivering sub-second document OCR, 3D unwarping, and layout reading across 12 SDKs with zero OpenCV dependency.
 
 #links
 :::u-button
@@ -60,6 +60,18 @@ icon: simple-icons-rust
 ---
 
 crates.io
+:::
+
+:::u-button{class="mr-2"}
+---
+
+size: sm
+to: https://www.npmjs.com/package/@rustors/node
+variant: outline
+icon: simple-icons-nodedotjs
+---
+
+npm
 :::
 
 :::u-button{class="mr-2"}

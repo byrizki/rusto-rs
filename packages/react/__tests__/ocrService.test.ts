@@ -9,7 +9,7 @@ describe('OcrService tests', () => {
     await service.init({ preset: 'ppv6' });
     expect(service.isReady()).toBe(true);
 
-    service.terminate();
+    service.close();
     expect(service.isReady()).toBe(false);
   });
 

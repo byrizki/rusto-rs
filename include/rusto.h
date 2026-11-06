@@ -36,20 +36,6 @@ typedef struct {
     int layout_type;
 } CTextResult;
 
-/**
- * C-compatible detected document layout region structure
- */
-typedef struct {
-    int x_min;
-    int y_min;
-    int x_max;
-    int y_max;
-    int layout_type;
-    float confidence;
-} CLayoutRegion;
-
-#define DEFAULT_BASE_URL DEFAULT_HF_BASE_URL
-
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -77,6 +63,13 @@ int rocr_detect_text_file(ROCRHandle *handle,
 char *rocr_detect_text_file_spatial(ROCRHandle *handle,
                                     const char *image_path,
                                     const char *options_json);
+
+/**
+ * Run OCR on an image file and return TSV text with runtime options.
+ */
+char *rocr_detect_text_file_tsv(ROCRHandle *handle,
+                                const char *image_path,
+                                const char *options_json);
 
 /**
  * Run OCR on image data with runtime output options.
@@ -135,12 +128,31 @@ char *rocr_detect_text_rgb_spatial(ROCRHandle *handle,
                                    const char *options_json);
 
 /**
+ * Run OCR on decoded, interleaved RGB8 pixels and return TSV text with runtime options.
+ */
+char *rocr_detect_text_rgb_tsv(ROCRHandle *handle,
+                               const uint8_t *image_data,
+                               size_t image_len,
+                               uint32_t width,
+                               uint32_t height,
+                               size_t stride,
+                               const char *options_json);
+
+/**
  * Run OCR on image data and return spatial text with runtime options.
  */
 char *rocr_detect_text_data_spatial(ROCRHandle *handle,
                                     const uint8_t *image_data,
                                     size_t image_len,
                                     const char *options_json);
+
+/**
+ * Run OCR on image data and return TSV text with runtime options.
+ */
+char *rocr_detect_text_data_tsv(ROCRHandle *handle,
+                                const uint8_t *image_data,
+                                size_t image_len,
+                                const char *options_json);
 
 /**
  * Free string returned from export functions
@@ -173,35 +185,16 @@ void rocr_free(ROCRHandle *handle);
 const char *rocr_version(void);
 
 /**
- * Detect document layout regions from an image file path.
- *
- * Returns 0 on success, negative error code on failure.
- * Free returned regions with `rocr_free_layout_regions`.
+ * Check if the engine handle is non-null and ready for inference
  */
-int rocr_detect_layout_file(ROCRHandle *handle,
-                            const char *image_path,
-                            CLayoutRegion **regions_out,
-                            size_t *count_out);
+int rocr_is_ready(const ROCRHandle *handle);
 
 /**
- * Detect document layout regions from decoded, interleaved RGB8 pixels.
- *
- * Returns 0 on success, negative error code on failure.
- * Free returned regions with `rocr_free_layout_regions`.
+ * Downloads model assets for a specific OCR pipeline ahead of time.
+ * Returns a JSON array string of downloaded asset paths, or NULL on error.
+ * Caller must free returned string with rocr_free_string.
  */
-int rocr_detect_layout_rgb(ROCRHandle *handle,
-                           const uint8_t *image_data,
-                           size_t image_len,
-                           uint32_t width,
-                           uint32_t height,
-                           size_t stride,
-                           CLayoutRegion **regions_out,
-                           size_t *count_out);
-
-/**
- * Free layout region results returned by `rocr_detect_layout_*`.
- */
-void rocr_free_layout_regions(CLayoutRegion *regions, size_t count);
+char *rocr_download_model(const char *model, const char *lang, const char *cache_dir);
 
 #ifdef __cplusplus
 }  // extern "C"

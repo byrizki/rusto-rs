@@ -31,6 +31,8 @@ exclude = [
     "INTER_CUBIC",
     "BORDER_REPLICATE",
     "ROTATE_90_CLOCKWISE",
+    "DEFAULT_BASE_URL",
+    "DEFAULT_HF_BASE_URL",
     "ffi_uniffi_rusto_rustbuffer_from_bytes",
     "ffi_uniffi_rusto_rustbuffer_free",
 ]

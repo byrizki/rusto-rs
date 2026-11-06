@@ -20,7 +20,7 @@ import {
   HUGGINGFACE_BASE,
 } from '../../utils/ocrReleaseModels';
 import {
-  formatResultsCsv,
+  formatResultsTsv,
   buildActiveConfigJson,
   isRunConfigModified,
   getImageDimensions,
@@ -67,7 +67,8 @@ function onLayoutModelChange() {
 const selectedSample = ref<string>('invoice');
 const imageSrc = ref<string>(defaultSample.url);
 const outputMode = ref<'lines' | 'words'>('lines');
-const activeTab = ref<'structured' | 'spatial' | 'csv' | 'json' | 'config'>('structured');
+const activeTab = ref<'structured' | 'spatial' | 'tsv' | 'json' | 'config'>('structured');
+const tsvViewMode = ref<'table' | 'raw'>('table');
 const copied = ref<boolean>(false);
 const isWebGpuSupported = ref<boolean>(false);
 
@@ -98,6 +99,15 @@ const {
 const isConfigModifiedSinceRun = computed(() =>
   isRunConfigModified(activeRunConfig.value, selectedModel.value, outputMode.value, ocrConfig.value)
 );
+
+const activeScorePercent = computed(() => {
+  if (!activeRunConfig.value) return 50;
+  const score =
+    activeRunConfig.value.options.postRecognition?.scoreThreshold ??
+    activeRunConfig.value.rawConfig.textScore ??
+    0.5;
+  return Math.round(score * 100);
+});
 
 const imgRef = ref<HTMLImageElement | null>(null);
 const imgDims = ref({ naturalW: 1, naturalH: 1, renderW: 1, renderH: 1 });
@@ -161,7 +171,7 @@ async function copyToClipboard(text: string) {
   }
 }
 
-const csvExport = computed(() => formatResultsCsv(results.value));
+const tsvExport = computed(() => formatResultsTsv(results.value));
 const jsonExport = computed(() => JSON.stringify(results.value, null, 2));
 const activeConfigJson = computed(() =>
   buildActiveConfigJson(
@@ -1039,26 +1049,51 @@ onUnmounted(() => {
                 </p>
               </div>
 
-              <!-- Classification & Orientation Toggles -->
-              <div class="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+              <!-- Pipeline Auxiliaries: Unwarp, Classification & Orientation -->
+              <div class="space-y-2.5 pt-2 border-t border-neutral-100 dark:border-neutral-800">
                 <label class="flex items-center justify-between cursor-pointer">
-                  <span class="text-neutral-700 dark:text-neutral-300">
-                    Orientation Classifier (0° / 180°)
-                  </span>
+                  <div>
+                    <span class="text-neutral-700 dark:text-neutral-300 font-medium">
+                      Document Auto-Unwarp (withAutoUnwarp)
+                    </span>
+                    <p class="text-[10px] text-neutral-400">
+                      3D mesh flattening for curved book pages and folded documents.
+                    </p>
+                  </div>
                   <input
                     type="checkbox"
-                    v-model="ocrConfig.classification"
-                    class="rounded accent-primary w-4 h-4 cursor-pointer"
+                    v-model="ocrConfig.autoUnwarp"
+                    class="rounded accent-primary w-4 h-4 cursor-pointer shrink-0"
                   />
                 </label>
                 <label class="flex items-center justify-between cursor-pointer">
-                  <span class="text-neutral-700 dark:text-neutral-300">
-                    4-Way Direction Correction (orientation)
-                  </span>
+                  <div>
+                    <span class="text-neutral-700 dark:text-neutral-300 font-medium">
+                      Line Orientation Classifier (withLineClassification)
+                    </span>
+                    <p class="text-[10px] text-neutral-400">
+                      Detects and rotates upside-down text lines (0° / 180°).
+                    </p>
+                  </div>
                   <input
                     type="checkbox"
-                    v-model="ocrConfig.orientation"
-                    class="rounded accent-primary w-4 h-4 cursor-pointer"
+                    v-model="ocrConfig.lineClassification"
+                    class="rounded accent-primary w-4 h-4 cursor-pointer shrink-0"
+                  />
+                </label>
+                <label class="flex items-center justify-between cursor-pointer">
+                  <div>
+                    <span class="text-neutral-700 dark:text-neutral-300 font-medium">
+                      Page Orientation Detection (withOrientationDetection)
+                    </span>
+                    <p class="text-[10px] text-neutral-400">
+                      Full-page 4-way rotation correction (0°, 90°, 180°, 270°).
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    v-model="ocrConfig.orientationDetection"
+                    class="rounded accent-primary w-4 h-4 cursor-pointer shrink-0"
                   />
                 </label>
               </div>
@@ -1575,8 +1610,8 @@ onUnmounted(() => {
               copyToClipboard(
                 activeTab === 'spatial'
                   ? spatialText
-                  : activeTab === 'csv'
-                    ? csvExport
+                  : activeTab === 'tsv'
+                    ? tsvExport
                     : activeTab === 'json'
                       ? jsonExport
                       : activeTab === 'config'
@@ -1620,15 +1655,16 @@ onUnmounted(() => {
           </button>
           <button
             type="button"
-            @click="activeTab = 'csv'"
-            class="px-3 py-1.5 border-b-2 font-medium transition-all cursor-pointer whitespace-nowrap"
+            @click="activeTab = 'tsv'"
+            class="px-3 py-1.5 border-b-2 font-medium transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5"
             :class="
-              activeTab === 'csv'
+              activeTab === 'tsv'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'
             "
           >
-            CSV
+            <span>TSV</span>
+            <span class="text-[9px] px-1 py-0.2 rounded bg-neutral-200/80 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 font-mono">Sheets/Excel</span>
           </button>
           <button
             type="button"
@@ -1807,17 +1843,82 @@ onUnmounted(() => {
                 spatialText || 'Run detection to see reconstructed 2D spatial text layout.'
               }}</pre>
 
-            <!-- CSV view -->
-            <pre
-              v-else-if="activeTab === 'csv'"
-              class="whitespace-pre overflow-x-auto text-neutral-700 dark:text-neutral-300 p-3 rounded-lg bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 font-mono text-xs leading-relaxed select-text"
-              style="
-                font-family:
-                  ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-                  'Courier New', monospace;
-                tab-size: 4;
-              "
-              >{{ csvExport }}</pre>
+            <!-- TSV view with Table Grid & Raw toggle -->
+            <div v-else-if="activeTab === 'tsv'" class="space-y-2">
+              <div class="flex items-center justify-between pb-1 text-[11px]">
+                <div class="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-900 p-0.5 rounded-md border border-neutral-200 dark:border-neutral-800">
+                  <button
+                    type="button"
+                    @click="tsvViewMode = 'table'"
+                    class="px-2 py-0.5 rounded transition-all cursor-pointer"
+                    :class="tsvViewMode === 'table' ? 'bg-white dark:bg-neutral-800 font-medium text-neutral-900 dark:text-neutral-100 shadow-sm' : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
+                  >
+                    Table Grid
+                  </button>
+                  <button
+                    type="button"
+                    @click="tsvViewMode = 'raw'"
+                    class="px-2 py-0.5 rounded transition-all cursor-pointer"
+                    :class="tsvViewMode === 'raw' ? 'bg-white dark:bg-neutral-800 font-medium text-neutral-900 dark:text-neutral-100 shadow-sm' : 'text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
+                  >
+                    Raw TSV
+                  </button>
+                </div>
+                <span class="text-[10px] text-neutral-500 dark:text-neutral-400">
+                  Tab-delimited: ready to paste into Sheets / Excel
+                </span>
+              </div>
+
+              <!-- Table Grid View -->
+              <div v-if="tsvViewMode === 'table'" class="overflow-x-auto border border-neutral-200 dark:border-neutral-800 rounded-lg shadow-sm">
+                <table class="w-full text-left text-[11px] border-collapse">
+                  <thead>
+                    <tr class="bg-neutral-100/80 dark:bg-neutral-900/80 border-b border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 font-semibold uppercase tracking-wider text-[10px]">
+                      <th class="py-1.5 px-2.5 w-10">#</th>
+                      <th class="py-1.5 px-2.5">Text</th>
+                      <th class="py-1.5 px-2.5 w-20">Score</th>
+                      <th class="py-1.5 px-2.5 w-36">Box (X, Y, W, H)</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800/60 font-sans">
+                    <tr
+                      v-for="(row, idx) in results"
+                      :key="idx"
+                      @mouseenter="hoveredIndex = idx"
+                      @mouseleave="hoveredIndex = null"
+                      class="transition-colors cursor-pointer hover:bg-primary/5 dark:hover:bg-primary/10"
+                      :class="hoveredIndex === idx ? 'bg-primary/10 dark:bg-primary/20' : ''"
+                    >
+                      <td class="py-1.5 px-2.5 text-neutral-400 font-mono text-[10px]">{{ idx + 1 }}</td>
+                      <td class="py-1.5 px-2.5 font-medium text-neutral-800 dark:text-neutral-200 select-text">{{ row.text }}</td>
+                      <td class="py-1.5 px-2.5 font-mono text-[10px]">
+                        <span
+                          class="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                          :class="row.score >= 0.9 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400' : row.score >= 0.75 ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400'"
+                        >
+                          {{ (row.score * 100).toFixed(1) }}%
+                        </span>
+                      </td>
+                      <td class="py-1.5 px-2.5 text-neutral-500 dark:text-neutral-400 font-mono text-[10px]">
+                        {{ Math.round(row.frame.left) }}, {{ Math.round(row.frame.top) }}, {{ Math.round(row.frame.width) }}, {{ Math.round(row.frame.height) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Raw TSV view -->
+              <pre
+                v-else
+                class="whitespace-pre overflow-x-auto text-neutral-700 dark:text-neutral-300 p-3 rounded-lg bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 font-mono text-xs leading-relaxed select-text"
+                style="
+                  font-family:
+                    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+                    'Courier New', monospace;
+                  tab-size: 4;
+                "
+              >{{ tsvExport }}</pre>
+            </div>
 
             <!-- JSON view -->
             <pre
@@ -1851,10 +1952,11 @@ onUnmounted(() => {
             <span
               v-if="activeRunConfig"
               class="truncate font-mono text-[10px] text-neutral-700 dark:text-neutral-300"
-              :title="`${activeRunConfig.modelName} • ${activeRunConfig.outputMode} • score ≥ ${Math.round((activeRunConfig.options.textScore ?? 0) * 100)}%`"
+              :title="`${activeRunConfig.modelName} • ${activeRunConfig.outputMode === 'words' ? 'asWords()' : 'asLines()'} • score ≥ ${activeScorePercent}%`"
             >
-              {{ activeRunConfig.modelName }} • {{ activeRunConfig.outputMode }} • score ≥
-              {{ Math.round((activeRunConfig.options.textScore ?? 0) * 100) }}%
+              {{ activeRunConfig.modelName }} •
+              {{ activeRunConfig.outputMode === 'words' ? 'asWords()' : 'asLines()' }} • score ≥
+              {{ activeScorePercent }}%
             </span>
             <span v-else class="text-neutral-400 italic">No run yet</span>
             <span

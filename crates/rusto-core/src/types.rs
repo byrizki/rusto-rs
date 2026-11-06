@@ -91,9 +91,10 @@ pub enum OutputGranularity {
     Lines,
     Words,
     Spatial,
+    Tsv,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PostprocessRunOptions {
     pub threshold: Option<f32>,
@@ -104,7 +105,7 @@ pub struct PostprocessRunOptions {
     pub score_mode: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DetectionRunOptions {
     pub limit_side_len: Option<i32>,
@@ -558,30 +559,186 @@ pub enum DetectTextResult {
     Spatial(String),
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Pre-detection image conditioning and resolution optimization options.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PreDetectionOptions {
+    pub descreen_strength: Option<f32>,
+    pub target_max_side: Option<u32>,
+    pub crop_padding_x: Option<f32>,
+    pub crop_padding_y: Option<f32>,
+}
+
+impl PreDetectionOptions {
+    pub fn to_calibration_options(&self) -> Option<CalibrationOptions> {
+        self.descreen_strength.map(|strength| CalibrationOptions {
+            enabled: Some(true),
+            descreen_strength: Some(strength),
+            ..Default::default()
+        })
+    }
+
+    pub fn to_optimization_options(&self) -> Option<OptimizationOptions> {
+        if self.target_max_side.is_some()
+            || self.crop_padding_x.is_some()
+            || self.crop_padding_y.is_some()
+        {
+            Some(OptimizationOptions {
+                enabled: Some(true),
+                target_max_side: self.target_max_side,
+                crop_padding_x: self.crop_padding_x,
+                crop_padding_y: self.crop_padding_y,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+/// Post-detection polygon extraction, thresholding, and box filtering options.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PostDetectionOptions {
+    pub threshold: Option<f32>,
+    pub box_threshold: Option<f32>,
+    pub unclip_ratio: Option<f32>,
+    pub use_dilation: Option<bool>,
+    pub score_mode: Option<String>,
+    pub max_candidates: Option<i32>,
+    pub min_height: Option<f32>,
+    pub min_side_len: Option<f32>,
+    pub max_side_len: Option<f32>,
+    pub width_height_ratio: Option<f32>,
+}
+
+impl PostDetectionOptions {
+    pub fn to_postprocess_run_options(&self) -> PostprocessRunOptions {
+        PostprocessRunOptions {
+            threshold: self.threshold,
+            box_threshold: self.box_threshold,
+            max_candidates: self.max_candidates,
+            unclip_ratio: self.unclip_ratio,
+            use_dilation: self.use_dilation,
+            score_mode: self.score_mode.clone(),
+        }
+    }
+}
+
+/// Pre-recognition text line/word clustering tolerances.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PreRecognitionOptions {
+    pub line_y_threshold: Option<f32>,
+    pub word_x_threshold: Option<f32>,
+}
+
+/// Text recognition inference parameters.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RecognitionRunOptions {
+    pub batch_size: Option<i32>,
+}
+
+/// Post-recognition confidence score filtering.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PostRecognitionOptions {
+    pub score_threshold: Option<f32>,
+}
+
+/// Unified runtime execution options for text detection.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct OcrRunOptions {
     #[serde(default)]
     pub output: OutputGranularity,
-    pub line_y_threshold: Option<f32>,
-    pub word_x_threshold: Option<f32>,
-    pub text_score: Option<f32>,
-    pub classification: Option<bool>,
-    pub orientation: Option<bool>,
-    pub unwarp: Option<bool>,
-    pub layout: Option<bool>,
-    pub min_height: Option<f32>,
-    pub max_side_len: Option<f32>,
-    pub min_side_len: Option<f32>,
-    pub width_height_ratio: Option<f32>,
+    pub auto_unwarp: Option<bool>,
+    pub layout_reading: Option<bool>,
+    pub orientation_detection: Option<bool>,
+    pub line_classification: Option<bool>,
+    pub pre_detection: Option<PreDetectionOptions>,
     pub detection: Option<DetectionRunOptions>,
-    pub postprocess: Option<PostprocessRunOptions>,
-    pub calibration: Option<CalibrationOptions>,
-    pub optimization: Option<OptimizationOptions>,
-    pub rec_batch_num: Option<i32>,
+    pub post_detection: Option<PostDetectionOptions>,
+    pub pre_recognition: Option<PreRecognitionOptions>,
+    pub recognition: Option<RecognitionRunOptions>,
+    pub post_recognition: Option<PostRecognitionOptions>,
 }
 
 impl OcrRunOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_auto_unwarp(mut self, enabled: bool) -> Self {
+        self.auto_unwarp = Some(enabled);
+        self
+    }
+
+    pub fn with_layout_reading(mut self, enabled: bool) -> Self {
+        self.layout_reading = Some(enabled);
+        self
+    }
+
+    pub fn with_orientation_detection(mut self, enabled: bool) -> Self {
+        self.orientation_detection = Some(enabled);
+        self
+    }
+
+    pub fn with_line_classification(mut self, enabled: bool) -> Self {
+        self.line_classification = Some(enabled);
+        self
+    }
+
+    pub fn with_pre_detection(mut self, opts: PreDetectionOptions) -> Self {
+        self.pre_detection = Some(opts);
+        self
+    }
+
+    pub fn with_detection(mut self, opts: DetectionRunOptions) -> Self {
+        self.detection = Some(opts);
+        self
+    }
+
+    pub fn with_post_detection(mut self, opts: PostDetectionOptions) -> Self {
+        self.post_detection = Some(opts);
+        self
+    }
+
+    pub fn with_pre_recognition(mut self, opts: PreRecognitionOptions) -> Self {
+        self.pre_recognition = Some(opts);
+        self
+    }
+
+    pub fn with_recognition(mut self, opts: RecognitionRunOptions) -> Self {
+        self.recognition = Some(opts);
+        self
+    }
+
+    pub fn with_post_recognition(mut self, opts: PostRecognitionOptions) -> Self {
+        self.post_recognition = Some(opts);
+        self
+    }
+
+    pub fn as_lines(mut self) -> Self {
+        self.output = OutputGranularity::Lines;
+        self
+    }
+
+    pub fn as_words(mut self) -> Self {
+        self.output = OutputGranularity::Words;
+        self
+    }
+
+    pub fn as_spatial(mut self) -> Self {
+        self.output = OutputGranularity::Spatial;
+        self
+    }
+
+    pub fn with_output(mut self, output: OutputGranularity) -> Self {
+        self.output = output;
+        self
+    }
+
     /// Validate per-request options before execution.
     pub fn validate(&self) -> Result<(), crate::error::CoreError> {
         let finite = |name: &str, value: Option<f32>, range: fn(f32) -> bool| {
@@ -592,76 +749,85 @@ impl OcrRunOptions {
                 _ => Ok(()),
             }
         };
-        finite("lineYThreshold", self.line_y_threshold, |value| value >= 0.0)?;
-        finite("wordXThreshold", self.word_x_threshold, |value| value >= 0.0)?;
-        finite("textScore", self.text_score, |value| (0.0..=1.0).contains(&value))?;
-        finite("minHeight", self.min_height, |value| value > 0.0)?;
-        finite("maxSideLen", self.max_side_len, |value| value > 0.0)?;
-        finite("minSideLen", self.min_side_len, |value| value > 0.0)?;
-        finite("widthHeightRatio", self.width_height_ratio, |value| value > 0.0 || value == -1.0)?;
-        if let (Some(min), Some(max)) = (self.min_side_len, self.max_side_len) {
-            if min > max {
-                return Err(crate::error::CoreError::Preprocess("minSideLen must be <= maxSideLen".into()));
+
+        if let Some(pre_det) = &self.pre_detection {
+            finite("preDetection.descreenStrength", pre_det.descreen_strength, |v| v >= 0.0)?;
+            if let Some(target) = pre_det.target_max_side {
+                if target == 0 {
+                    return Err(crate::error::CoreError::Preprocess("preDetection.targetMaxSide must be > 0".into()));
+                }
             }
+            finite("preDetection.cropPaddingX", pre_det.crop_padding_x, |v| (0.0..=1.0).contains(&v))?;
+            finite("preDetection.cropPaddingY", pre_det.crop_padding_y, |v| (0.0..=1.0).contains(&v))?;
         }
-        if let Some(detection) = &self.detection {
-            if detection.limit_side_len.is_some_and(|value| value <= 0) {
+
+        if let Some(det) = &self.detection {
+            if det.limit_side_len.is_some_and(|v| v <= 0) {
                 return Err(crate::error::CoreError::Preprocess("detection.limitSideLen must be > 0".into()));
             }
-            if detection.limit_type.as_deref().is_some_and(|value| value != "min" && value != "max") {
+            if det.limit_type.as_deref().is_some_and(|v| v != "min" && v != "max") {
                 return Err(crate::error::CoreError::Preprocess("detection.limitType must be min or max".into()));
             }
-            for (name, values, allow_zero) in [("mean", detection.mean, true), ("std", detection.std, false)] {
+            for (name, values, allow_zero) in [("mean", det.mean, true), ("std", det.std, false)] {
                 if let Some(values) = values {
                     if values.iter().any(|value| !value.is_finite() || (!allow_zero && *value == 0.0)) {
                         return Err(crate::error::CoreError::Preprocess(format!("detection.{name} is invalid")));
                     }
                 }
             }
-            if let Some(postprocess) = &detection.postprocess {
-                finite("detection.postprocess.threshold", postprocess.threshold, |value| (0.0..=1.0).contains(&value))?;
-                finite("detection.postprocess.boxThreshold", postprocess.box_threshold, |value| (0.0..=1.0).contains(&value))?;
-                finite("detection.postprocess.unclipRatio", postprocess.unclip_ratio, |value| value > 0.0)?;
-                if postprocess.max_candidates.is_some_and(|value| value < 1) {
+            if let Some(pp) = &det.postprocess {
+                finite("detection.postprocess.threshold", pp.threshold, |v| (0.0..=1.0).contains(&v))?;
+                finite("detection.postprocess.boxThreshold", pp.box_threshold, |v| (0.0..=1.0).contains(&v))?;
+                finite("detection.postprocess.unclipRatio", pp.unclip_ratio, |v| v > 0.0)?;
+                if pp.max_candidates.is_some_and(|v| v < 1) {
                     return Err(crate::error::CoreError::Preprocess("detection.postprocess.maxCandidates must be >= 1".into()));
                 }
-                if let Some(mode) = &postprocess.score_mode {
+                if let Some(mode) = &pp.score_mode {
                     if mode != "fast" && mode != "slow" {
                         return Err(crate::error::CoreError::Preprocess("detection.postprocess.scoreMode must be 'fast' or 'slow'".into()));
                     }
                 }
             }
         }
-        if let Some(postprocess) = &self.postprocess {
-            finite("postprocess.threshold", postprocess.threshold, |value| (0.0..=1.0).contains(&value))?;
-            finite("postprocess.boxThreshold", postprocess.box_threshold, |value| (0.0..=1.0).contains(&value))?;
-            finite("postprocess.unclipRatio", postprocess.unclip_ratio, |value| value > 0.0)?;
-            if postprocess.max_candidates.is_some_and(|value| value < 1) {
-                return Err(crate::error::CoreError::Preprocess("postprocess.maxCandidates must be >= 1".into()));
+
+        if let Some(post_det) = &self.post_detection {
+            finite("postDetection.threshold", post_det.threshold, |v| (0.0..=1.0).contains(&v))?;
+            finite("postDetection.boxThreshold", post_det.box_threshold, |v| (0.0..=1.0).contains(&v))?;
+            finite("postDetection.unclipRatio", post_det.unclip_ratio, |v| v > 0.0)?;
+            if post_det.max_candidates.is_some_and(|v| v < 1) {
+                return Err(crate::error::CoreError::Preprocess("postDetection.maxCandidates must be >= 1".into()));
             }
-            if let Some(mode) = &postprocess.score_mode {
+            if let Some(mode) = &post_det.score_mode {
                 if mode != "fast" && mode != "slow" {
-                    return Err(crate::error::CoreError::Preprocess("postprocess.scoreMode must be 'fast' or 'slow'".into()));
+                    return Err(crate::error::CoreError::Preprocess("postDetection.scoreMode must be 'fast' or 'slow'".into()));
+                }
+            }
+            finite("postDetection.minHeight", post_det.min_height, |v| v > 0.0)?;
+            finite("postDetection.maxSideLen", post_det.max_side_len, |v| v > 0.0)?;
+            finite("postDetection.minSideLen", post_det.min_side_len, |v| v > 0.0)?;
+            finite("postDetection.widthHeightRatio", post_det.width_height_ratio, |v| v > 0.0 || v == -1.0)?;
+            if let (Some(min), Some(max)) = (post_det.min_side_len, post_det.max_side_len) {
+                if min > max {
+                    return Err(crate::error::CoreError::Preprocess("postDetection.minSideLen must be <= maxSideLen".into()));
                 }
             }
         }
-        if let Some(calib) = &self.calibration {
-            finite("calibration.descreenStrength", calib.descreen_strength, |value| value >= 0.0)?;
+
+        if let Some(pre_rec) = &self.pre_recognition {
+            finite("preRecognition.lineYThreshold", pre_rec.line_y_threshold, |v| v >= 0.0)?;
+            finite("preRecognition.wordXThreshold", pre_rec.word_x_threshold, |v| v >= 0.0)?;
         }
-        if let Some(opt) = &self.optimization {
-            if let Some(target) = opt.target_max_side {
-                if target == 0 {
-                    return Err(crate::error::CoreError::Preprocess("optimization.targetMaxSide must be > 0".into()));
-                }
-            }
-            finite("optimization.cropPaddingX", opt.crop_padding_x, |value| (0.0..=1.0).contains(&value))?;
-            finite("optimization.cropPaddingY", opt.crop_padding_y, |value| (0.0..=1.0).contains(&value))?;
-        }
-        if let Some(batch_num) = self.rec_batch_num {
-            if batch_num <= 0 {
-                return Err(crate::error::CoreError::Preprocess("recBatchNum must be > 0".into()));
+
+        if let Some(rec) = &self.recognition {
+            if rec.batch_size.is_some_and(|v| v <= 0) {
+                return Err(crate::error::CoreError::Preprocess("recognition.batchSize must be > 0".into()));
             }
         }
+
+        if let Some(post_rec) = &self.post_recognition {
+            finite("postRecognition.scoreThreshold", post_rec.score_threshold, |v| (0.0..=1.0).contains(&v))?;
+        }
+
         Ok(())
     }
 }

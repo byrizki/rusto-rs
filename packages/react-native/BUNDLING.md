@@ -1,242 +1,140 @@
-# Bundling Model Files with React Native RustO
+# Model Provisioning & Offline Bundling (`@rustors/react-native`)
 
-This guide explains how to bundle OCR model files with your React Native application for both Android and iOS platforms.
+`@rustors/react-native` executes pure-Rust **`.rten`** OCR models natively on iOS and Android. You can choose between **zero-config automatic download** (smallest app binary) and **offline asset bundling** (zero network dependency on first launch).
 
-## Overview
-
-The React Native RustO package supports bundling model files directly into your application, eliminating the need to download models at runtime or manually specify file paths.
-
-## Default Model Files
-
-The package expects these default model files:
-
-- `det.onnx` - Detection model
-- `rec.onnx` - Recognition model
-- `dict.txt` - Character dictionary
-
-These files should be placed in the appropriate directories for each platform.
+> Deprecated v0.3 npm model wrapper packages and legacy model formats are no longer used in v0.4.0+. All pipelines run on standalone `.rten` models and vocabulary files.
 
 ---
 
-## Android Setup
+## Strategy 1: Zero-Config On-Demand Download (Recommended Default)
 
-### Option 1: Bundle with Main Android Package
+Calling `await initialize()` with no file paths automatically downloads and caches the default **Indra OCR** (`indraocr`) `.rten` assets on first run:
 
-Place model files in `packages/android/src/main/assets/`:
+- **Android cache location**: `<context.cacheDir>/rusto/models`
+- **iOS cache location**: `<Library/Caches>/rusto/models`
 
-```
-packages/android/src/main/assets/
-├── det.onnx
-├── rec.onnx
-└── dict.txt
-```
+Subsequent app launches load directly from the on-device cache with zero network traffic.
 
-The React Native package will automatically include these assets through the dependency link.
+```ts
+import { close, detectText, initialize } from '@rustors/react-native';
 
-### Option 2: Bundle with React Native Package
-
-Place model files in `packages/react-native/android/src/main/assets/`:
-
-```
-packages/react-native/android/src/main/assets/
-├── det.onnx
-├── rec.onnx
-└── dict.txt
-```
-
-### How It Works
-
-The Android `build.gradle` is configured to include assets from both locations:
-
-```gradle
-sourceSets {
-  main {
-    assets.srcDirs = [
-      'src/main/assets',
-      '../../../android/src/main/assets'
-    ]
-  }
-}
-```
-
-When the app runs, the `RustO.initialize()` method automatically extracts these assets from the APK to the app's cache directory.
-
----
-
-## iOS Setup
-
-### 1. Create Models Directory
-
-Create a `models` directory inside `packages/react-native/ios/`:
-
-```bash
-mkdir -p packages/react-native/ios/models
-```
-
-### 2. Copy Model Files
-
-Place your model files in this directory:
-
-```
-packages/react-native/ios/models/
-├── det.onnx
-├── rec.onnx
-└── dict.txt
-```
-
-### 3. Bundle Configuration
-
-The `.podspec` file is already configured to bundle these models as resources:
-
-```ruby
-s.resource_bundles = {
-  'RustoModels' => [
-    'ios/models/*.onnx',
-    'ios/models/*.txt'
-  ]
-}
-```
-
-### How It Works
-
-When the app runs, the Swift module checks the `RustoModels.bundle` resource bundle first, then falls back to the main bundle and documents directory.
-
----
-
-## Usage
-
-### With Bundled Models (Recommended)
-
-Simply call `initialize()` without parameters to use the bundled default models:
-
-```typescript
-import { initialize, detectText } from '@rustors/react-native';
-
-// Initialize with bundled models
+// Default high-accuracy Indra OCR pipeline
 await initialize();
 
-// Perform OCR. `{ uri }` accepts an absolute filesystem path or file: URI.
-const results = await detectText({ uri: '/path/to/image.jpg' });
+// Or select lightweight PP-OCRv6 Tiny for minimal download size (~8 MB total)
+await initialize({
+  model: 'ppocrv6-tiny',
+  lang: 'latin',
+});
+
+const lines = await detectText({ uri: 'file:///path/to/receipt.jpg' })
+  .asLines()
+  .run();
+
+await close();
 ```
 
-### With Custom Model Paths
+---
 
-You can specify custom model paths in config:
+## Strategy 2: Offline Bundling (`.rten` + Dictionary Assets)
 
-```typescript
-// Initialize with custom models.
+If your app must work completely offline from the very first launch (field inspection, point-of-sale, medical/government scanning), bundle standalone `.rten` files directly in your native Android and iOS projects.
+
+### 1. Download Standalone `.rten` Assets
+
+Download the `.rten` models and dictionary for your chosen pipeline from [Hugging Face (`byrizki/rten-models`)](https://huggingface.co/byrizki/rten-models) or the [`models-rten-v0.4.0` GitHub Release](https://github.com/byrizki/rusto-rs/releases/tag/models-rten-v0.4.0):
+
+| Pipeline | Required Files | Optional Auxiliary Files |
+| :--- | :--- | :--- |
+| **Indra OCR (`preset: 'indra'`)** | `indra_det.rten`, `indra_rec.rten`, `indra_meta.json` | `uvdoc.rten`, `indra_orient.rten`, `layout_cdla.rten`, `indra_order.rten` |
+| **PP-OCRv6 Tiny (`preset: 'ppv6'`)** | `ppocrv6_tiny_det.rten`, `ppocrv6_tiny_rec.rten`, `ppocrv6_dict.txt` | `uvdoc.rten`, `ppocr_orient.rten`, `ppocr_cls.rten`, `layout_cdla.rten` |
+
+> **Tip (Convention-Based Zero-Config Offline)**: If you rename the three core files to `det.rten`, `rec.rten`, and `dict.txt` and place them at the root of Android `assets/` and iOS Bundle Resources, calling `await initialize()` automatically detects and uses them offline without extra configuration!
+
+### 2. Android Asset Placement (`assets/models/`)
+
+Place your `.rten` and dictionary files under `android/app/src/main/assets/models/`:
+
+```text
+android/app/src/main/assets/
+└── models/
+    ├── ppocrv6_tiny_det.rten
+    ├── ppocrv6_tiny_rec.rten
+    ├── ppocrv6_dict.txt
+    └── uvdoc.rten
+```
+
+Optionally prevent Gradle from re-compressing `.rten` binaries in `android/app/build.gradle`:
+
+```groovy
+android {
+    androidResources {
+        noCompress += ["rten"]
+    }
+}
+```
+
+At runtime, `rusto-android` automatically extracts referenced APK assets into `context.cacheDir` on first initialization.
+
+### 3. iOS Bundle Resource Placement
+
+Add the `.rten` and dictionary files to your iOS target in Xcode:
+
+1. Open `ios/<YourApp>.xcworkspace` in Xcode.
+2. Drag your `.rten` and `.txt` / `.json` files (or a `RustoModels.bundle` folder) into the project navigator.
+3. Ensure **"Add to targets: `<YourApp>`"** is checked so they appear under **Build Phases -> Copy Bundle Resources**.
+
+> Note: `RustO.resolveModelPath` on iOS resolves files placed in the main app bundle (`Bundle.main`), inside `RustoModels.bundle` / `RustOModels.bundle`, or in the app's `Documents` directory by filename.
+
+### 4. Initialize & Run in JavaScript / TypeScript
+
+When bundling inside `assets/models/` on Android and main bundle / `RustoModels.bundle` on iOS:
+
+```ts
+import { Platform } from 'react-native';
+import { close, detectText, initialize } from '@rustors/react-native';
+
+const assetPrefix = Platform.OS === 'android' ? 'models/' : '';
+
 await initialize({
+  preset: 'ppv6',
   models: {
-    detection: '/custom/path/det_model.onnx',
-    recognition: '/custom/path/rec_model.onnx',
-    dictionary: '/custom/path/dictionary.txt',
+    detection: `${assetPrefix}ppocrv6_tiny_det.rten`,
+    recognition: `${assetPrefix}ppocrv6_tiny_rec.rten`,
+    dictionary: `${assetPrefix}ppocrv6_dict.txt`,
+    unwarp: `${assetPrefix}uvdoc.rten`,
+  },
+});
+
+// Structured line output
+const results = await detectText({ uri: imageUri })
+  .withAutoUnwarp()
+  .asLines()
+  .run();
+
+// 2D spatial text layout
+const spatialLayout = await detectText({ uri: imageUri })
+  .asSpatial()
+  .run();
+
+await close();
+```
+
+*(If you place the files directly at the root of `android/app/src/main/assets/` on Android and Copy Bundle Resources on iOS, you can omit `assetPrefix` and pass identical filenames such as `'ppocrv6_tiny_det.rten'` on both platforms.)*
+
+---
+
+## Strategy 3: Custom App-Managed Download Directory
+
+If your app downloads `.rten` models from your own authenticated backend (e.g., via `react-native-blob-util` or `expo-file-system`), pass absolute filesystem paths in `models` or `modelPath`:
+
+```ts
+await initialize({
+  preset: 'indra',
+  models: {
+    detection: `${appSupportDir}/indra_det.rten`,
+    recognition: `${appSupportDir}/indra_rec.rten`,
+    dictionary: `${appSupportDir}/indra_meta.json`,
   },
 });
 ```
-
-### Partial Override
-
-You can override only specific models:
-
-```typescript
-// Use bundled detector and recognizer, but custom dictionary.
-await initialize({ models: { dictionary: '/custom/path/my_dict.txt' } });
-
-// Or use custom detector with bundled recognizer and dictionary.
-await initialize({ models: { detection: '/custom/det.onnx' } });
-```
-
----
-
-## File Size Considerations
-
-Model files can be large (typically 5-50 MB each). Consider:
-
-1. **APK/IPA Size**: Bundled models increase your app's download size
-2. **Compression**: Both Android and iOS compress assets, reducing the impact
-3. **On-Demand Loading**: For smaller app sizes, download models on first launch instead
-
----
-
-## Copying Models from Source
-
-To copy the default PPOCR_v5 models from the source repository:
-
-### Android
-
-```bash
-# From the repository root
-cp models/PPOCR_v5/det.onnx packages/android/src/main/assets/
-cp models/PPOCR_v5/rec.onnx packages/android/src/main/assets/
-cp models/PPOCR_v5/dict.txt packages/android/src/main/assets/
-```
-
-### iOS
-
-```bash
-# From the repository root
-mkdir -p packages/react-native/ios/models
-cp models/PPOCR_v5/det.onnx packages/react-native/ios/models/
-cp models/PPOCR_v5/rec.onnx packages/react-native/ios/models/
-cp models/PPOCR_v5/dict.txt packages/react-native/ios/models/
-```
-
----
-
-## Verification
-
-### Android
-
-Build and inspect the AAR:
-
-```bash
-cd packages/react-native/android
-./gradlew assembleRelease
-
-# Inspect the AAR contents
-unzip -l build/outputs/aar/android-release.aar | grep assets
-```
-
-You should see:
-
-```
-assets/det.onnx
-assets/rec.onnx
-assets/dict.txt
-```
-
-### iOS
-
-Build and inspect the app:
-
-```bash
-cd ios
-pod install
-```
-
-The models will be bundled in `RustoModels.bundle` within your app's frameworks.
-
----
-
-## Troubleshooting
-
-### Models Not Found (Android)
-
-1. Verify files are in `src/main/assets/`
-2. Clean and rebuild: `./gradlew clean assembleRelease`
-3. Check LogCat for "Failed to find model files" errors
-
-### Models Not Found (iOS)
-
-1. Verify files are in `ios/models/`
-2. Run `pod install` to update the bundle
-3. Clean build folder in Xcode (Cmd+Shift+K)
-4. Check Xcode logs for resource bundle errors
-
-### Large App Size
-
-If bundled models make your app too large, consider:
-
-1. Using smaller model variants
-2. Downloading models on first launch
-3. Using on-demand resources (iOS) or app bundles (Android)

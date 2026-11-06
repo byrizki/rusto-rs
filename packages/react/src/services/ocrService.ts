@@ -18,21 +18,21 @@ export class OcrService {
   }
 
   public isReady(): boolean {
-    return this.engine.isInitialized();
+    return this.engine.isReady();
   }
 
   public async detect(
     source: ImageSource,
     options?: DetectTextOptions
   ): Promise<TextResult[] | string> {
-    if (!this.engine.isInitialized()) {
+    if (!this.engine.isReady()) {
       throw new Error('OCR Service engine is not ready. Call init() first.');
     }
-    return this.engine.detectText(source, options);
+    return this.engine.executeDetectText(source, options);
   }
 
-  public terminate(): void {
-    this.engine.terminate();
+  public close(): void {
+    this.engine.close();
   }
 
   public getEngine(): WebOcrEngine {

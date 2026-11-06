@@ -1,6 +1,6 @@
 {
   "name": "@rustors/react",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "React hooks, provider, and UI components for RustO! OCR engine",
   "keywords": [
     "ocr",
@@ -50,7 +50,7 @@
   },
   "peerDependencies": {
     "react": ">=18.0.0",
-    "@rustors/web": ">=0.2.5"
+    "@rustors/web": ">=0.4.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

@@ -1,37 +1,50 @@
 import { NativeModules } from 'react-native';
 
 jest.mock('react-native', () => ({
-  NativeModules: { Rusto: { initialize: jest.fn(), detectText: jest.fn(), detectLayout: jest.fn() } },
+  NativeModules: {
+    Rusto: {
+      initialize: jest.fn(),
+      detectText: jest.fn(),
+      close: jest.fn(),
+      isReady: jest.fn(),
+      version: jest.fn(),
+    },
+  },
   Platform: { select: jest.fn() },
 }));
 
-import { detectLayout, detectText, initialize } from '../index';
+import { detectText, initialize, close, isReady, version, DetectTextBuilder } from '../index';
+
 
 describe('React Native API', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('forwards shallow initialization config', async () => {
-    (NativeModules.Rusto.initialize as jest.Mock).mockResolvedValue();
+  it('forwards shallow initialization config including indra preset', async () => {
+    (NativeModules.Rusto.initialize as jest.Mock).mockResolvedValue(undefined);
     await initialize({
-      preset: 'ppv6',
-      models: { recognition: 'rec.onnx' },
+      preset: 'indra',
+      models: { recognition: 'rec.rten' },
     });
     expect(NativeModules.Rusto.initialize).toHaveBeenCalledWith({
-      preset: 'ppv6',
-      models: { recognition: 'rec.onnx' },
+      preset: 'indra',
+      models: { recognition: 'rec.rten' },
     });
   });
 
-  it('forwards root runtime resize, detection, and postprocess options', async () => {
+  it('forwards root runtime options across phases', async () => {
     (NativeModules.Rusto.detectText as jest.Mock).mockResolvedValue([]);
     const options = {
       output: 'lines' as const,
-      lineYThreshold: 0.5,
-      minHeight: 24,
-      maxSideLen: 1600,
-      minSideLen: 48,
+      autoUnwarp: true,
+      layoutReading: true,
+      orientationDetection: true,
+      lineClassification: true,
+      preDetection: { targetMaxSide: 960 },
       detection: { limitType: 'min' as const },
-      postprocess: { useDilation: false },
+      postDetection: { useDilation: false },
+      preRecognition: { lineYThreshold: 0.5 },
+      recognition: { batchSize: 8 },
+      postRecognition: { scoreThreshold: 0.3 },
     };
     await detectText({ uri: '/tmp/image.png' }, options);
     expect(NativeModules.Rusto.detectText).toHaveBeenCalledWith({ uri: '/tmp/image.png' }, options);
@@ -44,9 +57,9 @@ describe('React Native API', () => {
     );
   });
 
-  it('normalizes surrounding whitespace in string sources', async () => {
+  it('normalizes surrounding whitespace in string sources when run() is called', async () => {
     (NativeModules.Rusto.detectText as jest.Mock).mockResolvedValue([]);
-    await detectText({ uri: ' /tmp/image.png ' });
+    await detectText({ uri: ' /tmp/image.png ' }).run();
     expect(NativeModules.Rusto.detectText).toHaveBeenCalledWith({ uri: '/tmp/image.png' }, {});
   });
 
@@ -70,10 +83,10 @@ describe('React Native API', () => {
     });
 
     (NativeModules.Rusto.detectText as jest.Mock).mockResolvedValue([]);
-    await detectText({ uri: '/tmp/test.png' }, { unwarp: true, layout: true });
+    await detectText({ uri: '/tmp/test.png' }, { autoUnwarp: true, layoutReading: true });
     expect(NativeModules.Rusto.detectText).toHaveBeenCalledWith(
       { uri: '/tmp/test.png' },
-      { unwarp: true, layout: true }
+      { autoUnwarp: true, layoutReading: true }
     );
   });
 
@@ -91,29 +104,52 @@ describe('React Native API', () => {
     expect(NativeModules.Rusto.initialize).toHaveBeenCalledWith(config);
   });
 
-  it('forwards detectLayout request', async () => {
-    const mockRegions = [
+  it('supports fluent builder chaining with detectText().with...().asLines().run()', async () => {
+    (NativeModules.Rusto.detectText as jest.Mock).mockResolvedValue([]);
+
+    const builder = detectText()
+      .image({ uri: '/tmp/image.png' })
+      .withAutoUnwarp(true)
+      .withLayoutReading(true)
+      .withOrientationDetection(true)
+      .withLineClassification(true)
+      .withPreDetection({ descreenStrength: 0.1 })
+      .withDetection({ limitSideLen: 960 })
+      .withPostDetection({ threshold: 0.3 })
+      .withPreRecognition({ lineYThreshold: 0.5 })
+      .withRecognition({ batchSize: 4 })
+      .withPostRecognition({ scoreThreshold: 0.6 })
+      .asLines();
+
+    expect(builder).toBeInstanceOf(DetectTextBuilder);
+    const res = await builder.run();
+    expect(res).toEqual([]);
+    expect(NativeModules.Rusto.detectText).toHaveBeenCalledWith(
+      { uri: '/tmp/image.png' },
       {
-        bbox: { xMin: 10, yMin: 20, xMax: 200, yMax: 60 },
-        layoutType: 'title',
-        confidence: 0.95,
-      },
-    ];
-    (NativeModules.Rusto.detectLayout as jest.Mock).mockResolvedValue(mockRegions);
-    const result = await detectLayout({ uri: '/tmp/doc.png' });
-    expect(result).toEqual(mockRegions);
-    expect(NativeModules.Rusto.detectLayout).toHaveBeenCalledWith({ uri: '/tmp/doc.png' });
+        autoUnwarp: true,
+        layoutReading: true,
+        orientationDetection: true,
+        lineClassification: true,
+        preDetection: { descreenStrength: 0.1 },
+        detection: { limitSideLen: 960 },
+        postDetection: { threshold: 0.3 },
+        preRecognition: { lineYThreshold: 0.5 },
+        recognition: { batchSize: 4 },
+        postRecognition: { scoreThreshold: 0.6 },
+        output: 'lines',
+      }
+    );
+
+    (NativeModules.Rusto.detectText as jest.Mock).mockResolvedValue('spatial output');
+    const spatial = await detectText({ uri: '/tmp/image.png' }).asSpatial().run();
+    expect(spatial).toBe('spatial output');
   });
 
-  it('forwards configurable options (recBatchNum, calibration, optimization)', async () => {
-    (NativeModules.Rusto.detectText as jest.Mock).mockResolvedValue([]);
-    const options = {
-      recBatchNum: 8,
-      calibration: { descreenStrength: 0.5 },
-      optimization: { enabled: true, targetMaxSide: 960, cropPaddingX: 0.05, cropPaddingY: 0.08 },
-    };
-    await detectText({ uri: '/tmp/test.png' }, options);
-    expect(NativeModules.Rusto.detectText).toHaveBeenCalledWith({ uri: '/tmp/test.png' }, options);
+  it('calls close() correctly', async () => {
+    (NativeModules.Rusto.close as jest.Mock).mockResolvedValue(undefined);
+    await close();
+    expect(NativeModules.Rusto.close).toHaveBeenCalled();
   });
 
   it.each([
@@ -142,22 +178,19 @@ describe('React Native API', () => {
     null,
     { output: null },
     { output: 'columns' },
-    { lineYThreshold: -1 },
-    { wordXThreshold: Number.NaN },
-    { textScore: 2 },
-    { classification: 'true' },
-    { minHeight: 0 },
+    { autoUnwarp: 'true' },
     { detection: { limitType: 'other' } },
     { detection: { mean: [0.5, 0.5] } },
     { detection: { std: [0.5, 0, 0.5] } },
-    { postprocess: { useDilation: 'true' } },
-    { postprocess: { scoreMode: 'invalid' } },
-    // obsolete nested key must reject
-    { preprocessing: { minHeight: 24 } },
+    { postDetection: { useDilation: 'true' } },
+    { postDetection: { scoreMode: 'invalid' } },
+    { preRecognition: { lineYThreshold: -1 } },
+    { recognition: { batchSize: 0 } },
+    { postRecognition: { scoreThreshold: 2 } },
     { unknown: true },
   ])('rejects invalid runtime options %# before native invocation', (options) => {
     expect(() => detectText({ uri: '/tmp/image.png' }, options as never)).toThrow(
-      /DetectTextOptions/u
+      /OcrRunOptions/u
     );
     expect(NativeModules.Rusto.detectText).not.toHaveBeenCalled();
   });
@@ -171,11 +204,17 @@ describe('React Native API', () => {
     { models: 'invalid' },
     { models: { unknown: 'model.mnn' } },
     { models: { recognition: '' } },
-    // obsolete nested key must reject
     { preprocessing: null },
     { unknown: true },
   ])('rejects invalid initialization config %# before native invocation', (config) => {
     expect(() => initialize(config as never)).toThrow(/InitializeConfig/u);
     expect(NativeModules.Rusto.initialize).not.toHaveBeenCalled();
+  });
+
+  it('exposes version and isReady inquiries', async () => {
+    (NativeModules.Rusto.version as jest.Mock).mockResolvedValue('0.4.0');
+    (NativeModules.Rusto.isReady as jest.Mock).mockResolvedValue(true);
+    await expect(version()).resolves.toBe('0.4.0');
+    await expect(isReady()).resolves.toBe(true);
   });
 });

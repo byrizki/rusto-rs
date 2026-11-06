@@ -120,10 +120,13 @@ class RustO {
     _bindingsConfigured = true;
   }
 
-  /// Initialize engine with either JSON config string or structured InitializeConfig.
-  static RustO initialize(dynamic config, {Object? bindings}) {
+  /// Initialize engine with optional JSON config string or structured InitializeConfig.
+  /// Defaults to '{}' (IndraOCR auto-download).
+  static RustO initialize([dynamic config = '{}', Object? bindings]) {
     _initBindingsIfNeeded();
-    if (config is generated.InitializeConfig) {
+    if (config == null) {
+      return RustO._(generated.RustO.initializeFromJson('{}'));
+    } else if (config is generated.InitializeConfig) {
       return RustO._(generated.RustO.initialize(config));
     } else if (config is String) {
       try {
@@ -138,7 +141,7 @@ class RustO {
   }
 
   /// Initialize engine from JSON configuration string.
-  static RustO initializeFromJson(String configJson) {
+  static RustO initializeFromJson([String configJson = '{}']) {
     _initBindingsIfNeeded();
     return RustO._(generated.RustO.initializeFromJson(configJson));
   }
@@ -153,142 +156,305 @@ class RustO {
     return generated.downloadModel(model, lang, cacheDir);
   }
 
-  /// Downloads all available canonical models to the cache directory ahead of time.
-  static List<String> downloadAllModels({String? cacheDir}) {
+  /// Returns the underlying engine library version string.
+  static String version() {
     _initBindingsIfNeeded();
-    return generated.downloadAllModels(cacheDir);
+    return generated.rustoVersion();
   }
 
-  /// Detect text from file path with structured results.
-  List<generated.TextResult> detectTextFile(String imagePath,
-      [dynamic options]) {
-    final ocrOpts = _resolveOptions(options, spatial: false);
-    final res =
-        _inner.detectText(generated.ImageSourcePath(path: imagePath), ocrOpts);
-    if (res is generated.DetectTextResultStructured) {
-      return res.results;
-    }
-    return const [];
-  }
+  /// Returns whether this engine instance is ready for inference.
+  bool isReady() => true;
 
-  /// Detect text from file path formatted as spatial string.
-  String detectTextFileSpatial(String imagePath, [dynamic options]) {
-    final ocrOpts = _resolveOptions(options, spatial: true);
-    final res =
-        _inner.detectText(generated.ImageSourcePath(path: imagePath), ocrOpts);
-    if (res is generated.DetectTextResultSpatial) {
-      return res.text;
-    }
-    return '';
-  }
+  /// Returns the underlying engine library version string.
+  String getVersion() => version();
 
-  /// Detect text from memory bytes with structured results.
-  List<generated.TextResult> detectTextData(Uint8List bytes,
-      [dynamic options]) {
-    final ocrOpts = _resolveOptions(options, spatial: false);
-    final res =
-        _inner.detectText(generated.ImageSourceBytes(data: bytes), ocrOpts);
-    if (res is generated.DetectTextResultStructured) {
-      return res.results;
-    }
-    return const [];
-  }
 
-  /// Detect text from memory bytes formatted as spatial string.
-  String detectTextDataSpatial(Uint8List bytes, [dynamic options]) {
-    final ocrOpts = _resolveOptions(options, spatial: true);
-    final res =
-        _inner.detectText(generated.ImageSourceBytes(data: bytes), ocrOpts);
-    if (res is generated.DetectTextResultSpatial) {
-      return res.text;
-    }
-    return '';
-  }
-
-  /// Detect text from raw RGB pixel buffer with structured results.
-  List<generated.TextResult> detectTextRgb(
+  /// Detect text from raw RGB pixel buffer.
+  generated.DetectTextResult detectTextRgb(
     Uint8List pixels,
     int width,
-    int height,
-    int stride, [
+    int height, [
+    int? stride,
     dynamic options,
   ]) {
-    final ocrOpts = _resolveOptions(options, spatial: false);
-    final res = _inner.detectTextRgb(pixels, width, height, stride, ocrOpts);
-    if (res is generated.DetectTextResultStructured) {
-      return res.results;
+    final effectiveStride = stride ?? (width * 3);
+    final ocrOpts = _resolveOptions(options);
+    return _inner.detectTextRgb(pixels, width, height, effectiveStride, ocrOpts);
+  }
+
+  /// Unified UniFFI image detection method or fluent builder.
+  dynamic detectText([dynamic source, generated.OcrRunOptions? options]) {
+    if (source != null && options != null && source is generated.ImageSource) {
+      return _inner.detectText(source, options);
     }
-    return const [];
-  }
-
-  /// Detect text from raw RGB pixel buffer formatted as spatial string.
-  String detectTextRgbSpatial(
-    Uint8List pixels,
-    int width,
-    int height,
-    int stride, [
-    dynamic options,
-  ]) {
-    final ocrOpts = _resolveOptions(options, spatial: true);
-    final res = _inner.detectTextRgb(pixels, width, height, stride, ocrOpts);
-    if (res is generated.DetectTextResultSpatial) {
-      return res.text;
+    if (source == null) {
+      return DetectTextBuilder(this);
     }
-    return '';
+    if (source is String) {
+      final b = DetectTextBuilder(this).image(source);
+      if (options != null) b.withOptions(options);
+      return b;
+    }
+    if (source is Uint8List) {
+      final b = DetectTextBuilder(this).data(source);
+      if (options != null) b.withOptions(options);
+      return b;
+    }
+    if (source is generated.ImageSource) {
+      if (options != null) {
+        return _inner.detectText(source, options);
+      }
+      return DetectTextBuilder(this, source);
+    }
+    throw ArgumentError(
+        'Expected String, Uint8List, or ImageSource, got ${source.runtimeType}');
   }
 
-  /// Unified UniFFI image detection method.
-  generated.DetectTextResult detectText(
-      generated.ImageSource source, generated.OcrRunOptions options) {
-    return _inner.detectText(source, options);
-  }
-
-  /// Engine version string.
-  String version() => _inner.version();
+  /// Creates a fluent DetectTextBuilder for text detection and recognition.
+  DetectTextBuilder detectTextBuilder() => DetectTextBuilder(this);
 
   /// Release native resources.
   void close() => _inner.close();
 
-  /// Alias for close() for backward compatibility.
-  void dispose() => close();
-
-  static generated.OcrRunOptions _resolveOptions(dynamic options,
-      {required bool spatial}) {
-    generated.OcrRunOptions opts;
+  static generated.OcrRunOptions _resolveOptions(dynamic options) {
     if (options is generated.OcrRunOptions) {
-      opts = options;
-    } else if (options is String && options.isNotEmpty && options != '{}') {
+      return options;
+    }
+    if (options is String && options.isNotEmpty && options != '{}') {
       try {
         final decoded = json.decode(options) as Map<String, dynamic>;
-        opts = generated.OcrRunOptions.fromJson(decoded);
+        return generated.OcrRunOptions.fromJson(decoded);
       } catch (_) {
-        opts = generated.defaultOcrRunOptions();
+        return generated.defaultOcrRunOptions();
       }
-    } else {
-      opts = generated.defaultOcrRunOptions();
     }
+    return generated.defaultOcrRunOptions();
+  }
+}
 
-    if (spatial && opts.output != generated.OutputGranularity.spatial) {
-      return generated.OcrRunOptions(
-        output: generated.OutputGranularity.spatial,
-        lineYThreshold: opts.lineYThreshold,
-        wordXThreshold: opts.wordXThreshold,
-        textScore: opts.textScore,
-        classification: opts.classification,
-        orientation: opts.orientation,
-        unwarp: opts.unwarp,
-        layout: opts.layout,
-        minHeight: opts.minHeight,
-        maxSideLen: opts.maxSideLen,
-        minSideLen: opts.minSideLen,
-        widthHeightRatio: opts.widthHeightRatio,
-        detection: opts.detection,
-        postprocess: opts.postprocess,
-        calibration: opts.calibration,
-        optimization: opts.optimization,
-        recBatchNum: opts.recBatchNum,
+/// Fluent builder for chained text detection configuration and execution.
+class DetectTextBuilder {
+  final RustO _engine;
+  generated.ImageSource? _source;
+  Uint8List? _rgbPixels;
+  int _rgbWidth = 0;
+  int _rgbHeight = 0;
+  int _rgbStride = 0;
+  generated.OutputGranularity _output = generated.OutputGranularity.lines;
+  bool? _autoUnwarp;
+  bool? _layoutReading;
+  bool? _orientationDetection;
+  bool? _lineClassification;
+  generated.PreDetectionOptions? _preDetection;
+  generated.DetectionRunOptions? _detection;
+  generated.PostDetectionOptions? _postDetection;
+  generated.PreRecognitionOptions? _preRecognition;
+  generated.RecognitionRunOptions? _recognition;
+  generated.PostRecognitionOptions? _postRecognition;
+
+  DetectTextBuilder(this._engine, [this._source]);
+
+  DetectTextBuilder image(String imagePath) {
+    _source = generated.ImageSourcePath(path: imagePath);
+    _rgbPixels = null;
+    return this;
+  }
+
+  DetectTextBuilder data(Uint8List bytes) {
+    _source = generated.ImageSourceBytes(data: bytes);
+    _rgbPixels = null;
+    return this;
+  }
+
+  DetectTextBuilder rgb(Uint8List pixels, int width, int height, [int? stride]) {
+    _rgbPixels = pixels;
+    _rgbWidth = width;
+    _rgbHeight = height;
+    _rgbStride = stride ?? (width * 3);
+    _source = null;
+    return this;
+  }
+
+  DetectTextBuilder source(generated.ImageSource source) {
+    _source = source;
+    _rgbPixels = null;
+    return this;
+  }
+
+  DetectTextBuilder withOptions(generated.OcrRunOptions options) {
+    _output = options.output;
+    _autoUnwarp = options.autoUnwarp;
+    _layoutReading = options.layoutReading;
+    _orientationDetection = options.orientationDetection;
+    _lineClassification = options.lineClassification;
+    _preDetection = options.preDetection;
+    _detection = options.detection;
+    _postDetection = options.postDetection;
+    _preRecognition = options.preRecognition;
+    _recognition = options.recognition;
+    _postRecognition = options.postRecognition;
+    return this;
+  }
+
+  DetectTextBuilder withAutoUnwarp([bool enabled = true]) {
+    _autoUnwarp = enabled;
+    return this;
+  }
+
+  DetectTextBuilder withLayoutReading([bool enabled = true]) {
+    _layoutReading = enabled;
+    return this;
+  }
+
+  DetectTextBuilder withOrientationDetection([bool enabled = true]) {
+    _orientationDetection = enabled;
+    return this;
+  }
+
+  DetectTextBuilder withLineClassification([bool enabled = true]) {
+    _lineClassification = enabled;
+    return this;
+  }
+
+  DetectTextBuilder withPreDetection({
+    double? descreenStrength,
+    int? targetMaxSide,
+    double? cropPaddingX,
+    double? cropPaddingY,
+    generated.PreDetectionOptions? options,
+  }) {
+    _preDetection = options ??
+        generated.PreDetectionOptions(
+          descreenStrength: descreenStrength,
+          targetMaxSide: targetMaxSide,
+          cropPaddingX: cropPaddingX,
+          cropPaddingY: cropPaddingY,
+        );
+    return this;
+  }
+
+  DetectTextBuilder withDetection({
+    int? limitSideLen,
+    String? limitType,
+    Float32List? mean,
+    Float32List? std,
+    generated.DetectionRunOptions? options,
+  }) {
+    _detection = options ??
+        generated.DetectionRunOptions(
+          limitSideLen: limitSideLen,
+          limitType: limitType,
+          mean: mean,
+          std: std,
+        );
+    return this;
+  }
+
+  DetectTextBuilder withPostDetection({
+    double? threshold,
+    double? boxThreshold,
+    double? unclipRatio,
+    bool? useDilation,
+    String? scoreMode,
+    int? maxCandidates,
+    double? minHeight,
+    double? minSideLen,
+    double? maxSideLen,
+    double? widthHeightRatio,
+    generated.PostDetectionOptions? options,
+  }) {
+    _postDetection = options ??
+        generated.PostDetectionOptions(
+          threshold: threshold,
+          boxThreshold: boxThreshold,
+          unclipRatio: unclipRatio,
+          useDilation: useDilation,
+          scoreMode: scoreMode,
+          maxCandidates: maxCandidates,
+          minHeight: minHeight,
+          minSideLen: minSideLen,
+          maxSideLen: maxSideLen,
+          widthHeightRatio: widthHeightRatio,
+        );
+    return this;
+  }
+
+  DetectTextBuilder withPreRecognition({
+    double? lineYThreshold,
+    double? wordXThreshold,
+    generated.PreRecognitionOptions? options,
+  }) {
+    _preRecognition = options ??
+        generated.PreRecognitionOptions(
+          lineYThreshold: lineYThreshold,
+          wordXThreshold: wordXThreshold,
+        );
+    return this;
+  }
+
+  DetectTextBuilder withRecognition({
+    int? batchSize,
+    generated.RecognitionRunOptions? options,
+  }) {
+    _recognition = options ??
+        generated.RecognitionRunOptions(
+          batchSize: batchSize,
+        );
+    return this;
+  }
+
+  DetectTextBuilder withPostRecognition({
+    double? scoreThreshold,
+    generated.PostRecognitionOptions? options,
+  }) {
+    _postRecognition = options ??
+        generated.PostRecognitionOptions(
+          scoreThreshold: scoreThreshold,
+        );
+    return this;
+  }
+
+  DetectTextBuilder withOutput(generated.OutputGranularity granularity) {
+    _output = granularity;
+    return this;
+  }
+
+  DetectTextBuilder asLines() => withOutput(generated.OutputGranularity.lines);
+  DetectTextBuilder asWords() => withOutput(generated.OutputGranularity.words);
+  DetectTextBuilder asSpatial() => withOutput(generated.OutputGranularity.spatial);
+  DetectTextBuilder asTsv() => withOutput(generated.OutputGranularity.tsv);
+
+  generated.OcrRunOptions buildOptions() {
+    return generated.OcrRunOptions(
+      output: _output,
+      autoUnwarp: _autoUnwarp,
+      layoutReading: _layoutReading,
+      orientationDetection: _orientationDetection,
+      lineClassification: _lineClassification,
+      preDetection: _preDetection,
+      detection: _detection,
+      postDetection: _postDetection,
+      preRecognition: _preRecognition,
+      recognition: _recognition,
+      postRecognition: _postRecognition,
+    );
+  }
+
+  generated.DetectTextResult run() {
+    final pixels = _rgbPixels;
+    if (pixels != null) {
+      return _engine.detectTextRgb(
+        pixels,
+        _rgbWidth,
+        _rgbHeight,
+        _rgbStride,
+        buildOptions(),
       );
     }
-    return opts;
+    final src = _source;
+    if (src == null) {
+      throw StateError('Image source must be specified before calling run().');
+    }
+    return _engine.detectText(src, buildOptions()) as generated.DetectTextResult;
   }
 }

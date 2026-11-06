@@ -1,16 +1,24 @@
 import type {
-  DetectTextOptions,
+  OcrRunOptions,
   InitializeConfig,
   TextResult,
 } from '../types/index.js';
 import type { RawImageData } from '../utils/imageUtils.js';
 
+export interface RgbImagePayload {
+  pixels: Uint8Array | ArrayBuffer;
+  width: number;
+  height: number;
+  stride?: number | null;
+}
+
 export interface WorkerMessageRequest {
   id: number;
-  type: 'INIT' | 'DETECT' | 'TERMINATE';
+  type: 'INIT' | 'DETECT' | 'DETECT_RGB' | 'TERMINATE';
   config?: InitializeConfig;
   image?: RawImageData;
-  options?: DetectTextOptions;
+  rgb?: RgbImagePayload;
+  options?: OcrRunOptions;
 }
 
 export interface WorkerMessageResponse {
@@ -32,6 +40,10 @@ export class OcrWorkerBridge {
     if (workerInstance) {
       this.attachWorker(workerInstance);
     }
+  }
+
+  public isAvailable(): boolean {
+    return this.worker !== null;
   }
 
   public attachWorker(worker: Worker): void {
@@ -81,7 +93,7 @@ export class OcrWorkerBridge {
 
   public async detect(
     image: RawImageData,
-    options: DetectTextOptions
+    options?: OcrRunOptions
   ): Promise<TextResult[] | string> {
     if (!this.worker) {
       throw new Error('Worker is not running.');
@@ -93,18 +105,32 @@ export class OcrWorkerBridge {
     });
   }
 
+  public async detectRgb(
+    pixels: Uint8Array | ArrayBuffer,
+    width: number,
+    height: number,
+    stride?: number | null,
+    options?: OcrRunOptions
+  ): Promise<TextResult[] | string> {
+    if (!this.worker) {
+      throw new Error('Worker is not running.');
+    }
+    const id = ++this.messageCounter;
+    const rgb: RgbImagePayload = { pixels, width, height, stride };
+    return new Promise((resolve, reject) => {
+      this.pendingRequests.set(id, { resolve, reject });
+      this.worker!.postMessage({ id, type: 'DETECT_RGB', rgb, options });
+    });
+  }
+
   public terminate(): void {
     if (this.worker) {
       this.worker.terminate();
       this.worker = null;
     }
     for (const [, { reject }] of this.pendingRequests) {
-      reject(new Error('Worker terminated.'));
+      reject(new Error('Worker was terminated.'));
     }
     this.pendingRequests.clear();
-  }
-
-  public isAvailable(): boolean {
-    return this.worker !== null;
   }
 }

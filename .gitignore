@@ -57,11 +57,6 @@ packages/dotnet/models/*.mnn
 packages/dotnet/models/*.onnx
 packages/dotnet/models/*.rten
 packages/dotnet/models/*.txt
-packages/models/**/*.mnn
-packages/models/**/*.onnx
-packages/models/**/*.rten
-packages/models/**/models/
-packages/models/**/dist
 packages/web/dist
 packages/web/src/wasm/
 packages/react/dist

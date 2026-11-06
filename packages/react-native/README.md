@@ -1,190 +1,169 @@
-# React Native RustO
+# @rustors/react-native
 
 [![npm](https://img.shields.io/npm/v/@rustors/react-native.svg?logo=npm&logoColor=white&color=CB3837)](https://www.npmjs.com/package/@rustors/react-native)
 [![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
+> **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
 
-React Native OCR binding for RustO. Public API intentionally small:
+Official React Native SDK (iOS & Android, Legacy & New Architecture) for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
+
+## Quick Overview
 
 ```ts
-await initialize();
-const result = await detectText(source, options);
+import { close, detectText, initialize } from '@rustors/react-native';
+
+await initialize(); // Zero-config: auto-downloads Indra OCR .rten models on first run
+
+const lines = await detectText({ uri })
+  .withAutoUnwarp()
+  .withLayoutReading()
+  .asLines()
+  .run();
+
+const spatial = await detectText({ uri })
+  .asSpatial()
+  .run();
+
+await close();
 ```
 
-Initialize model resources once. Run `detectText` many times with request-local options.
-
-## Install
+## Installation
 
 ```bash
+npm install @rustors/react-native
+# or
 yarn add @rustors/react-native
-# or npm install @rustors/react-native
 ```
 
-### Models Setup
+### Android Repository Setup
 
-RustO automatically downloads required models (e.g. `indraocr` default) on demand into the app's cache directory on first run. No separate model pods or Gradle packages are needed.
+`@rustors/react-native` resolves the native `com.github.byrizki.rusto-rs:rusto-android:v0.4.0` AAR from JitPack. Ensure JitPack is registered in your app's `android/build.gradle` (or `android/settings.gradle`):
 
-To bundle models directly within your application, pass local file paths to `initialize({ model: 'indraocr' })` or place models in the application storage directory.
+```groovy
+allprojects {
+    repositories {
+        mavenCentral()
+        google()
+        maven { url 'https://jitpack.io' }
+    }
+}
+```
 
-## Complete example
+### iOS Setup
+
+```bash
+cd ios && pod install
+```
+
+> **Expo Note**: Native Rust binaries cannot run inside Expo Go. Use an Expo Development Build (`npx expo prebuild` + `npx expo run:ios` / `npx expo run:android`).
+
+## Model Provisioning: Zero-Config vs. Offline Bundling
+
+1. **Zero-Config Auto-Download (Default)**: Calling `await initialize()` with no arguments (or `await initialize({ model: 'ppocrv6-tiny', lang: 'latin' })`) automatically downloads the required `.rten` models and dictionary on first launch and caches them in the app's local cache directory (`cacheDir/rusto/models` on Android, `Caches/rusto/models` on iOS). No separate npm model packages, CocoaPods model specs, or Gradle model artifacts are required.
+2. **Offline Bundled `.rten` Assets**: For 100% air-gapped mobile apps, bundle `.rten` and `dict.txt` (or `indra_meta.json`) files inside Android `assets/models/` and iOS Xcode Bundle Resources, then reference them via `initialize({ models: { ... } })`. See [**BUNDLING.md**](./BUNDLING.md) for step-by-step instructions.
+
+## Complete Example
 
 ```tsx
-import { detectText, initialize, type TextResult } from '@rustors/react-native';
+import {
+  close,
+  detectText,
+  initialize,
+  type TextResult,
+} from '@rustors/react-native';
 
-export async function readReceipt(uri: string): Promise<TextResult[]> {
-  await initialize({ preset: 'ppv6' });
+export async function scanInvoice(uri: string): Promise<{
+  lines: TextResult[];
+  spatial: string;
+}> {
+  await initialize({
+    preset: 'indra',
+    enableReadingOrder: true,
+  });
 
-  return detectText(
-    { uri },
-    {
-      output: 'words',
-      textScore: 0.55,
-      maxSideLen: 1600,
-      detection: { limitSideLen: 960, limitType: 'max' },
-      postprocess: { useDilation: true },
-    }
-  );
-}
+  try {
+    // 1. Structured line-level recognition with UVDoc unwarping & layout reading order
+    const lines = await detectText({ uri })
+      .withAutoUnwarp()
+      .withLayoutReading()
+      .withPreDetection({ targetMaxSide: 1600 })
+      .withDetection({ limitSideLen: 960, limitType: 'max' })
+      .withPostDetection({ useDilation: true, unclipRatio: 1.8 })
+      .asLines()
+      .run();
 
-const words = await readReceipt('file:///absolute/path/receipt.jpg');
-console.log(words);
-```
+    // 2. Reconstructed 2D spatial plain-text layout
+    const spatial = await detectText({ uri })
+      .withPreRecognition({ lineYThreshold: 0.5, wordXThreshold: 0.4 })
+      .asSpatial()
+      .run();
 
-Example result:
-
-```json
-[
-  {
-    "text": "Total",
-    "score": 0.98,
-    "box_points": [
-      [40, 120],
-      [124, 120],
-      [124, 148],
-      [40, 148]
-    ],
-    "frame": { "width": 84, "height": 28, "top": 120, "left": 40 }
+    return { lines, spatial };
+  } finally {
+    await close();
   }
-]
-```
-
-For approximate columns and rows:
-
-```ts
-const text = await detectText(
-  { uri: 'file:///absolute/path/receipt.jpg' },
-  { output: 'spatial', lineYThreshold: 0.5, wordXThreshold: 0.4 }
-);
-
-console.log(text);
-// Item                 Amount
-// Coffee                $3.50
-// Total                $12.50
+}
 ```
 
 ## Public API
 
 ### `initialize(config?: InitializeConfig): Promise<void>`
 
-Creates or replaces native OCR engine. Defaults to PP-OCRv6 bundled model filenames.
+Initializes or replaces the native OCR session.
 
 ```ts
+// Zero-config Indra OCR default (auto-downloads .rten assets on first run)
+await initialize();
+
+// Offline bundled .rten assets (Android assets/models/* & iOS bundle resources)
 await initialize({
   preset: 'ppv6',
   models: {
-    detection: 'det.onnx',
-    recognition: 'rec.onnx',
-    dictionary: 'dict.txt',
-    // classification: 'cls.onnx',
-    // orientation: 'orient.onnx',
+    detection: 'models/ppocrv6_tiny_det.rten',
+    recognition: 'models/ppocrv6_tiny_rec.rten',
+    dictionary: 'models/ppocrv6_dict.txt',
+    unwarp: 'models/uvdoc.rten',
+    orientation: 'models/ppocr_orient.rten',
+    layout: 'models/layout_cdla.rten',
   },
 });
 ```
 
-| Config field            | Values                                 | Purpose                                                                 |
-| ----------------------- | -------------------------------------- | ----------------------------------------------------------------------- |
-| `preset`                | `'ppv6'`, `'ppv5'`, `'ppv4'`, `'ppv3'` | Model-family defaults. Default: `'ppv6'`.                               |
-| `models.detection`      | non-empty string                       | Detection-model path.                                                   |
-| `models.recognition`    | non-empty string                       | Recognition-model path.                                                 |
-| `models.dictionary`     | non-empty string                       | Recognition-dictionary path.                                            |
-| `models.classification` | non-empty string                       | Optional classifier resource. Pair with request `classification: true`. |
-| `models.orientation`    | non-empty string                       | Optional orientation resource. Pair with request `orientation: true`.   |
+| Field | Values | Description |
+| :--- | :--- | :--- |
+| `preset` | `'indra'`, `'ppv6'`, `'ppv5'`, `'ppv4'`, `'ppv3'` | Architecture preset |
+| `model` | `'indraocr'`, `'ppocrv6-tiny'`, `'ppocrv6-small'`, `'ppocrv5-mobile'`, etc. | Canonical pipeline name for auto-download |
+| `lang` | `'latin'`, `'cjk'`, `'ja'`, `'korean'`, `'ar'`, `'cyrillic'`, etc. | Target recognition script/language |
+| `modelPath` / `cacheDir` | `string` | Custom model directory or writable download cache directory |
+| `enableReadingOrder` | `boolean` | Load neural reading-order transformer |
+| `layoutVariant` | `'cdla'` \| `'publaynet'` | Document layout model taxonomy |
+| `recBatchNum` | integer `>= 1` | Recognition batch size override |
+| `models` | `{ detection, recognition, dictionary, classification, orientation, unwarp, layout }` | Explicit bundled or local `.rten` / `.txt` asset paths |
 
-Initialization is model setup only. Resize, detection, and postprocess tuning belong to `detectText`.
-
-### `detectText(source, options?)`
-
-Runs one request. Native engine must already be initialized.
-
-```ts
-const lines = await detectText({ uri: '/absolute/path/invoice.jpg' });
-const bytes = await detectText({ bytes: new Uint8Array(imageBytes) });
-const base64 = await detectText({ base64: encodedJpeg });
-```
+### `detectText(source)` -> `DetectTextBuilder`
 
 `source` must contain **exactly one** of:
 
-| Source       | Value                                   | Notes                                                                        |
-| ------------ | --------------------------------------- | ---------------------------------------------------------------------------- |
-| `{ uri }`    | non-empty string                        | Absolute path, `file:` URI, or Android `content://` URI. Whitespace trimmed. |
-| `{ base64 }` | non-empty string                        | Encoded image payload. Whitespace trimmed.                                   |
-| `{ bytes }`  | non-empty `Uint8Array` or `ArrayBuffer` | Encoded image bytes; bridge converts to base64.                              |
+| Source | Type | Notes |
+| :--- | :--- | :--- |
+| `{ uri }` | `string` | Local path, `file://` URI, or Android `content://` URI |
+| `{ base64 }` | `string` | Base64-encoded PNG/JPEG/WebP payload |
+| `{ bytes }` | `Uint8Array \| ArrayBuffer` | Encoded image bytes |
 
-Unknown keys, multiple source keys, empty values, `null`, arrays, and primitive sources throw `TypeError` before native dispatch.
+Chain pipeline stages and output granularity before calling `.run()`:
+- **Output Granularity**: `.asLines()`, `.asWords()`, `.asSpatial()`, or `.withOutput('lines' | 'words' | 'spatial')`
+- **Pipeline Toggles**: `.withAutoUnwarp()`, `.withLayoutReading()`, `.withOrientationDetection()`, `.withLineClassification()`
+- **6-Phase Tuning**: `.withPreDetection(...)`, `.withDetection(...)`, `.withPostDetection(...)`, `.withPreRecognition(...)`, `.withRecognition(...)`, `.withPostRecognition(...)`
+- **Terminal Execution**: `.run()`
 
-### `DetectTextOptions`
+### `close(): Promise<void>`
 
-All fields optional. Omitted values merge with engine defaults and never alter later calls.
+Releases the active native OCR engine instance and frees model memory.
 
-```ts
-const options = {
-  output: 'words' as const,
-  lineYThreshold: 0.5,
-  wordXThreshold: 0.4,
-  textScore: 0.55,
-  classification: false,
-  orientation: false,
-  minHeight: 32,
-  maxSideLen: 1600,
-  minSideLen: 64,
-  widthHeightRatio: -1,
-  detection: {
-    limitSideLen: 960,
-    limitType: 'max' as const,
-    mean: [0.485, 0.456, 0.406] as [number, number, number],
-    std: [0.229, 0.224, 0.225] as [number, number, number],
-  },
-  postprocess: {
-    threshold: 0.3,
-    boxThreshold: 0.6,
-    maxCandidates: 1000,
-    unclipRatio: 2.0,
-    useDilation: true,
-  },
-};
-```
+## Result Types
 
-| Field                                   | Valid value                       | Default / behavior                                                          |
-| --------------------------------------- | --------------------------------- | --------------------------------------------------------------------------- |
-| `output`                                | `'lines' \| 'words' \| 'spatial'` | `'lines'`; structured list for lines/words, string for spatial.             |
-| `lineYThreshold`, `wordXThreshold`      | finite `>= 0`                     | `0.5`, `0.4`; line/word grouping tolerance.                                 |
-| `textScore`                             | finite `[0, 1]`                   | Engine default confidence cutoff.                                           |
-| `classification`, `orientation`         | boolean                           | `false`; only useful with configured optional models.                       |
-| `minHeight`, `maxSideLen`, `minSideLen` | finite `> 0`                      | Request-local resize bounds; `minSideLen <= maxSideLen` when both supplied. |
-| `widthHeightRatio`                      | finite `> 0` or `-1`              | `-1` retains native aspect-ratio behavior.                                  |
-| `detection.limitSideLen`                | integer `1..32767`                | Detector resize bound.                                                      |
-| `detection.limitType`                   | `'min' \| 'max'`                  | Short-side minimum / long-side maximum mode.                                |
-| `detection.mean`, `detection.std`       | exactly three finite numbers      | Input normalization; `std` entries cannot be zero.                          |
-| `postprocess.threshold`, `boxThreshold` | finite `[0, 1]`                   | Detector pixel and polygon confidence thresholds.                           |
-| `postprocess.maxCandidates`             | integer `>= 1`                    | Candidate cap.                                                              |
-| `postprocess.unclipRatio`               | finite `> 0`                      | Polygon expansion ratio.                                                    |
-| `postprocess.useDilation`               | boolean                           | Enables dilation for faint/broken strokes.                                  |
-
-`preprocessing` is not a valid nested option. `detection` and `postprocess` are root-level siblings.
-
-## Result types
+### `TextResult` (from `.asLines().run()` and `.asWords().run()`)
 
 ```ts
 interface TextResult {
@@ -192,29 +171,21 @@ interface TextResult {
   score: number;
   box_points: [[number, number], [number, number], [number, number], [number, number]];
   frame: { width: number; height: number; top: number; left: number };
+  region_id?: number;
+  layout_type?: string;
 }
 ```
 
-`box_points` order is top-left, top-right, bottom-right, bottom-left. Values are image pixels with origin at top-left. `frame` is axis-aligned, including for rotated polygons.
+### Spatial String (from `.asSpatial().run()`)
 
-## Errors and platform support
+Returns a `string` preserving approximate columns and line spacing.
 
-- Call `initialize` before `detectText`; native bridge reports not-initialized failure otherwise.
-- Invalid config/options/source fail before native OCR. Correct value and retry; initialized engine remains usable.
-- Native image/model errors depend on platform: missing file, missing model resources, decode failure, or OCR runtime failure.
-- Requires iOS 13+ or Android API 21+. Expo Go cannot load native Rust module; use development build.
+## Platform Support
 
-## Model bundling
-
-See [BUNDLING.md](./BUNDLING.md) for custom model packaging, on-demand resources, and app-size tradeoffs.
-
-## 📖 Documentation
-
-For full documentation, guides, and API reference:
-- [React Native Guide](https://byrizki.com/rusto-rs/how-to/use-react-native)
-- [Full Documentation](https://byrizki.com/rusto-rs/)
+- **iOS**: 13.0+ (arm64 device & arm64/x86_64 simulator)
+- **Android**: API 21+ (`arm64-v8a`, `armeabi-v7a`, `x86_64`)
+- **React Native**: Both Legacy Bridge and New Architecture (TurboModules)
 
 ## License
 
 MIT
-

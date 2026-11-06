@@ -18,7 +18,7 @@ export { DropzonePreview } from './components/DropzonePreview.js';
 
 // Geometry & Formatters
 export { scaleFrame, scaleQuad, calculateScale } from './utils/geometry.js';
-export { resultsToText, resultsToCsv, resultsToJson } from './utils/formatters.js';
+export { resultsToText, resultsToTsv, resultsToJson } from './utils/formatters.js';
 
 // Types
 export * from './types/index.js';

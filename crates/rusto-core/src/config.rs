@@ -106,7 +106,7 @@ pub struct InitializeConfig {
 
 impl Default for InitializeConfig {
     fn default() -> Self {
-        Self::from_preset(PPV6_MODEL_CONFIG, "det.mnn", "rec.mnn", "dict.txt")
+        Self::from_preset(INDRA_MODEL_CONFIG, "det.rten", "rec.rten", "meta.json")
     }
 }
 
@@ -428,7 +428,7 @@ impl InitializeConfig {
             };
 
             let (default_rec, default_dict) = if let Some(l) = flat.lang.as_deref() {
-                if let Some((rec_file, dict_file)) = models::resolve_language_assets(l) {
+                if let Some((rec_file, dict_file)) = models::resolve_model_language_assets(canonical_model, l) {
                     (rec_file, dict_file)
                 } else {
                     (base_assets.rec_filename, base_assets.dict_filename)
@@ -499,9 +499,9 @@ impl InitializeConfig {
             } else {
                 let canonical = models::normalize_model_name(effective_model);
                 let orient_file = if canonical == "indraocr" {
-                    "indra_orient.mnn"
+                    "indra_orient.rten"
                 } else {
-                    "ppocr_orient.mnn"
+                    "ppocr_orient.rten"
                 };
                 models::resolve_asset_local(None, effective_dir, "orient", orient_file, &cache_dir)
                     .map_err(|e| serde::de::Error::custom(e.to_string()))?
@@ -525,7 +525,7 @@ impl InitializeConfig {
             let cls_path = if let Some(p) = cls_override {
                 PathBuf::from(p)
             } else {
-                models::resolve_asset_local(None, effective_dir, "cls", "ppocr_cls.mnn", &cache_dir)
+                models::resolve_asset_local(None, effective_dir, "cls", "ppocr_cls.rten", &cache_dir)
                     .map_err(|e| serde::de::Error::custom(e.to_string()))?
             };
             if let Some(thresh) = flat.classification.as_ref().and_then(|c| c.threshold) {
@@ -547,7 +547,7 @@ impl InitializeConfig {
             let unwarp_path = if let Some(p) = unwarp_override {
                 PathBuf::from(p)
             } else {
-                models::resolve_asset_local(None, effective_dir, "unwarp", "uvdoc.mnn", &cache_dir)
+                models::resolve_asset_local(None, effective_dir, "unwarp", "uvdoc.rten", &cache_dir)
                     .map_err(|e| serde::de::Error::custom(e.to_string()))?
             };
             config = config.with_unwarp(unwarp_path);
@@ -565,7 +565,7 @@ impl InitializeConfig {
             let layout_path = if let Some(p) = layout_override {
                 PathBuf::from(p)
             } else {
-                let layout_file = if flat.layout_variant.as_deref() == Some("publaynet") { "layout_publaynet.mnn" } else { "layout_cdla.mnn" };
+                let layout_file = if flat.layout_variant.as_deref() == Some("publaynet") { "layout_publaynet.rten" } else { "layout_cdla.rten" };
                 models::resolve_asset_local(None, effective_dir, "layout", layout_file, &cache_dir)
                     .map_err(|e| serde::de::Error::custom(e.to_string()))?
             };
@@ -586,7 +586,7 @@ impl InitializeConfig {
         }
 
         if flat.enable_reading_order.unwrap_or(false) {
-            let order_path = models::resolve_asset_local(None, effective_dir, "order", "indra_order.mnn", &cache_dir)
+            let order_path = models::resolve_asset_local(None, effective_dir, "order", "indra_order.rten", &cache_dir)
                 .map_err(|e| serde::de::Error::custom(e.to_string()))?;
             config.global.reading_order = true;
             config.global.reading_order_model = Some(order_path);

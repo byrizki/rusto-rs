@@ -1,55 +1,175 @@
 # @rustors/node
 
-[![npm](https://img.shields.io/npm/v/@rustors/node.svg?logo=node.js&logoColor=white&color=339933)](https://www.npmjs.com/package/@rustors/node)
-[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-Pure Rust Optical Character Recognition (OCR) engine for Node.js via native N-API addons.
-
-> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
+Official Node.js N-API native bindings for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
 
 ## Features
 
-- **Blazing Fast N-API**: Zero IPC overhead, directly invoking RustO's pure-Rust engine.
-- **RTen & ONNX Support**: High performance text detection and recognition.
-- **Structured & Spatial Outputs**: Extracts bounding boxes, confidence scores, and physical 2D layouts.
-- **Zero C++ Dependencies**: Compiles cleanly with standard Node.js toolchains.
+- **Zero-Config Indra OCR Default**: Initialize with `RustO.initialize()` — automatically downloads and caches the default `indraocr` `.rten` pipeline on first run.
+- **Pure-Rust Native Addon**: Zero C++ or Python runtime dependencies; prebuilt N-API binaries for Linux, macOS, and Windows (`x64` & `arm64`).
+- **Document Intelligence Pipeline**: Built-in UVDoc document unwarping (`withAutoUnwarp()`), 4-way page orientation correction (`withOrientationDetection()`), layout analysis, and neural reading-order recovery (`withLayoutReading()`).
+- **Fluent Builder API**: Configure the 6-phase OCR pipeline and select `.asLines()`, `.asWords()`, or `.asSpatial()` before calling `.run()`.
+- **Flexible Image Inputs**: Pass file paths, `Buffer` / `Uint8Array`, `{ path }`, `{ uri }`, `{ bytes }`, or raw interleaved RGB8 buffers via `.rgb(...)`.
 
 ## Installation
 
 ```bash
 npm install @rustors/node
+# or
+pnpm add @rustors/node
 ```
 
-## Quick Start
+## Quick Start (Zero-Config)
 
-```javascript
-const { RustO } = require('@rustors/node');
+Calling `RustO.initialize()` with no arguments initializes the default **Indra OCR** pipeline and automatically downloads missing `.rten` model assets into your user cache directory (`~/.cache/rusto/models` or `$RUSTO_CACHE_DIR`).
 
-// Initialize with model weights or JSON config
-const engine = new RustO(JSON.stringify({
-  detection: { model_path: 'path/to/det.rten' },
-  recognition: { model_path: 'path/to/rec.rten', dict_path: 'path/to/dict.txt' }
-}));
+```ts
+import { RustO } from '@rustors/node';
 
-// Run OCR on an image file
-const results = engine.detectTextFile('invoice.png', JSON.stringify({}));
-results.forEach(res => {
-  console.log(`${res.text} (${(res.score * 100).toFixed(1)}%)`);
+const engine = RustO.initialize();
+
+try {
+  // Structured line-level recognition with unwarping & layout reading order
+  const lines = engine
+    .detectText('invoice.png')
+    .withAutoUnwarp()
+    .withLayoutReading()
+    .asLines()
+    .run();
+
+  for (const item of lines) {
+    console.log(
+      `[${item.score.toFixed(2)}] (${item.layout_type ?? 'line'} #${item.region_id ?? '-'}) ${item.text}`
+    );
+  }
+
+  // Reconstructed 2D spatial text layout
+  const spatialLayout = engine
+    .detectText('invoice.png')
+    .asSpatial()
+    .run();
+
+  console.log(spatialLayout);
+} finally {
+  engine.close();
+}
+```
+
+## Custom Initialization & Presets
+
+You can pass an `InitializeConfig` object (or JSON string) to `RustO.initialize(config)` or `new RustO(config)` to select a model family, target language, or local `.rten` files:
+
+```ts
+import { RustO, type InitializeConfig } from '@rustors/node';
+
+// Option A: Select a canonical model & language (auto-downloaded if not cached)
+const fastEngine = RustO.initialize({
+  model: 'ppocrv6-tiny',
+  lang: 'latin',
+  enableReadingOrder: true,
 });
 
-// Run spatial OCR (reconstruct 2D layout)
-const spatialText = engine.detectTextFileSpatial('invoice.png', JSON.stringify({}));
-console.log(spatialText);
+// Option B: Explicit offline .rten model paths via constructor or initialize()
+const offlineConfig: InitializeConfig = {
+  preset: 'indra',
+  enableReadingOrder: true,
+  detection: {
+    modelPath: './models/indra_det.rten',
+  },
+  recognition: {
+    modelPath: './models/indra_rec.rten',
+    dictPath: './models/indra_meta.json',
+  },
+  unwarp: {
+    enabled: true,
+    modelPath: './models/uvdoc.rten',
+  },
+  layout: {
+    enabled: true,
+    modelPath: './models/layout_cdla.rten',
+  },
+};
+
+const offlineEngine = new RustO(offlineConfig);
 ```
 
-## 📖 Documentation
+### Pre-Downloading Models Ahead of Time
 
-For full documentation, guides, and API reference:
-- [Node.js Guide](https://byrizki.com/rusto-rs/how-to/use-node)
-- [Full Documentation](https://byrizki.com/rusto-rs/)
+For containerized deployments or air-gapped builds, pre-warm the model cache during build time:
+
+```ts
+import { RustO } from '@rustors/node';
+
+// Download default Indra OCR assets (or pass 'ppocrv6-tiny', 'ppocrv5-mobile', etc.)
+const cachedPaths = RustO.downloadModel('indraocr', 'latin', './models-cache');
+console.log('Downloaded assets:', cachedPaths);
+```
+
+## Input Sources & Raw RGB Buffers
+
+`engine.detectText(source)` accepts file paths, encoded image `Buffer` / `Uint8Array` payloads, or raw 24-bit interleaved RGB pixel buffers:
+
+```ts
+import { readFileSync } from 'node:fs';
+import { RustO } from '@rustors/node';
+
+const engine = RustO.initialize();
+
+// 1. Encoded PNG/JPEG/WebP buffer
+const pngBytes = readFileSync('receipt.png');
+const wordItems = engine.detectText(pngBytes).asWords().run();
+
+// 2. Raw interleaved RGB8 buffer (e.g. from sharp or video frames)
+const width = 1280;
+const height = 720;
+const stride = width * 3; // optional; defaults to width * 3
+const rgbBuf = Buffer.alloc(stride * height);
+
+const rgbResults = engine
+  .detectText()
+  .rgb(rgbBuf, width, height, stride)
+  .asLines()
+  .run();
+
+engine.close();
+```
+
+## 6-Phase Pipeline Tuning
+
+Fine-tune individual stages per request on `DetectTextBuilder`:
+
+```ts
+const results = engine
+  .detectText('scan.jpg')
+  .withOrientationDetection()
+  .withAutoUnwarp()
+  .withLayoutReading()
+  .withPreDetection({ descreenStrength: 0.4, targetMaxSide: 1280 })
+  .withDetection({ limitSideLen: 960, limitType: 'max' })
+  .withPostDetection({ threshold: 0.3, boxThreshold: 0.6, unclipRatio: 1.6 })
+  .withPreRecognition({ lineYThreshold: 0.5, wordXThreshold: 0.4 })
+  .withRecognition({ batchSize: 8 })
+  .withPostRecognition({ scoreThreshold: 0.5 })
+  .withOutput('lines') // 'lines' | 'words' | 'spatial'
+  .run();
+```
+
+## Output Types
+
+### `TextResult` (returned by `.asLines().run()` and `.asWords().run()`)
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `text` | `string` | Recognized UTF-8 text string |
+| `score` | `number` | Recognition confidence score (`0.0` – `1.0`) |
+| `box_points` | `[[number, number], ...]` | 4-point bounding polygon `[[x1, y1], [x2, y2], [x3, y3], [x4, y4]]` |
+| `frame` | `{ width, height, top, left }` | Axis-aligned bounding box in image pixels |
+| `region_id` | `number \| null \| undefined` | Document layout region index (`regionId` metadata when `withLayoutReading()` is enabled) |
+| `layout_type` | `LayoutType \| string \| null \| undefined` | Semantic layout label (`layoutType`: `'text'`, `'title'`, `'table'`, `'header'`, `'footer'`, `'figure'`, etc.) |
+
+### Spatial String (returned by `.asSpatial().run()`)
+
+Returns a `string` preserving the 2D visual column and line spacing of the source document.
 
 ## License
 
-MIT License
-
+Apache-2.0 OR MIT

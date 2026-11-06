@@ -34,7 +34,9 @@ data class TextResult(
         val minY = boxPoints.minOfOrNull { it.y } ?: 0f
         val maxY = boxPoints.maxOfOrNull { it.y } ?: 0f
         Frame(width = maxX - minX, height = maxY - minY, top = minY, left = minX)
-    }
+    },
+    val regionId: Int? = null,
+    val layoutType: String? = null
 )
 
 /**
@@ -127,14 +129,17 @@ data class InitializeConfig(
         model?.let { json.put("model", it) }
         modelPath?.let { json.put("modelPath", it) }
         lang?.let { json.put("lang", it) }
-        cacheDir?.let { json.put("cacheDir", it) }
+        val resolvedCacheDir = cacheDir ?: File(context.cacheDir, "rusto/models").absolutePath
+        json.put("cacheDir", resolvedCacheDir)
         enableReadingOrder?.let { json.put("enableReadingOrder", it) }
         layoutVariant?.let { json.put("layoutVariant", it) }
         template?.let { json.put("template", it) }
 
         val hasModelDir = model != null || modelPath != null
+        val hasBundledDefaults = !hasModelDir && detection == null && recognition == null &&
+            (hasAsset(context, "det.rten") || hasAsset(context, "det.onnx"))
 
-        if (detection != null || !hasModelDir) {
+        if (detection != null || hasBundledDefaults) {
             val detObj = JSONObject()
             val detPath = detection?.modelPath ?: "det.rten"
             detObj.put("modelPath", resolveModel(context, detPath))
@@ -145,10 +150,11 @@ data class InitializeConfig(
             detection?.limitSideLen?.let { detObj.put("limitSideLen", it) }
             detection?.limitType?.let { detObj.put("limitType", it) }
             detection?.useDilation?.let { detObj.put("useDilation", it) }
+            detection?.scoreMode?.let { detObj.put("scoreMode", it) }
             json.put("detection", detObj)
         }
 
-        if (recognition != null || !hasModelDir) {
+        if (recognition != null || hasBundledDefaults) {
             val recObj = JSONObject()
             val recPath = recognition?.modelPath ?: "rec.rten"
             val dictPath = recognition?.dictPath ?: "dict.txt"
@@ -199,10 +205,58 @@ data class InitializeConfig(
         return json.toString()
     }
 
+    private fun hasAsset(context: Context, assetName: String): Boolean {
+        return try {
+            context.assets.open(assetName).close()
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun resolveModel(context: Context, pathOrAsset: String): String {
         val file = File(pathOrAsset)
         if (file.exists()) return file.absolutePath
         return RustO.copyAssetToCache(context, pathOrAsset)
+    }
+
+    companion object {
+        fun forModel(model: String = "indraocr", lang: String? = null, modelPath: String? = null): InitializeConfig =
+            InitializeConfig(model = model, lang = lang, modelPath = modelPath)
+
+        fun indra(detModelPath: String? = null, recModelPath: String? = null, dictPath: String? = null): InitializeConfig =
+            preset("indra", detModelPath, recModelPath, dictPath, recBatchNum = 1)
+
+        fun ppv6(detModelPath: String? = null, recModelPath: String? = null, dictPath: String? = null): InitializeConfig =
+            preset("ppv6", detModelPath, recModelPath, dictPath)
+
+        fun ppv5(detModelPath: String? = null, recModelPath: String? = null, dictPath: String? = null): InitializeConfig =
+            preset("ppv5", detModelPath, recModelPath, dictPath)
+
+        fun ppv4(detModelPath: String? = null, recModelPath: String? = null, dictPath: String? = null): InitializeConfig =
+            preset("ppv4", detModelPath, recModelPath, dictPath)
+
+        fun ppv3(detModelPath: String? = null, recModelPath: String? = null, dictPath: String? = null): InitializeConfig =
+            preset("ppv3", detModelPath, recModelPath, dictPath)
+
+        private fun preset(
+            template: String,
+            detModelPath: String?,
+            recModelPath: String?,
+            dictPath: String?,
+            recBatchNum: Int? = null,
+        ): InitializeConfig {
+            if (detModelPath == null && recModelPath == null && dictPath == null) {
+                return InitializeConfig(template = template)
+            }
+            return InitializeConfig(
+                template = template,
+                detection = detModelPath?.let { DetectionConfig(enabled = true, modelPath = it) },
+                recognition = if (recModelPath != null || dictPath != null) {
+                    RecognitionConfig(enabled = true, modelPath = recModelPath, dictPath = dictPath, recBatchNum = recBatchNum)
+                } else null,
+            )
+        }
     }
 }
 
@@ -219,43 +273,61 @@ enum class OutputGranularity(val wireValue: String) {
 }
 
 /**
- * Post-processing options for DBNet polygon detection and binarization.
+ * Phase 1: Pre-detection options (descreen, downscale, padding).
  */
-data class PostprocessRunOptions(
-    val threshold: Float? = null,
-    val boxThreshold: Float? = null,
-    val maxCandidates: Int? = null,
-    val unclipRatio: Float? = null,
-    val useDilation: Boolean? = null,
-    val scoreMode: String? = null,
+data class PreDetectionOptions(
+    val descreenStrength: Float? = null,
+    val targetMaxSide: UInt? = null,
+    val cropPaddingX: Float? = null,
+    val cropPaddingY: Float? = null,
 )
 
 /**
- * Image detection stage options.
+ * Phase 2: Detection inference options (limits, normalization).
  */
 data class DetectionRunOptions(
     val limitSideLen: Int? = null,
     val limitType: String? = null,
     val mean: FloatArray? = null,
     val std: FloatArray? = null,
-    val postprocess: PostprocessRunOptions? = null,
 )
 
 /**
- * Pre-OCR image calibration options for descreening patterned backgrounds.
+ * Phase 3: Post-detection options (thresholds, unclip, dilation, box geometry).
  */
-data class CalibrationOptions(
-    val descreenStrength: Float? = null,
+data class PostDetectionOptions(
+    val threshold: Float? = null,
+    val boxThreshold: Float? = null,
+    val unclipRatio: Float? = null,
+    val useDilation: Boolean? = null,
+    val scoreMode: String? = null,
+    val maxCandidates: Int? = null,
+    val minHeight: Float? = null,
+    val minSideLen: Float? = null,
+    val maxSideLen: Float? = null,
+    val widthHeightRatio: Float? = null,
 )
 
 /**
- * Runtime crop and resolution optimization options.
+ * Phase 4: Pre-recognition grouping options (line_y, word_x tolerances).
  */
-data class OptimizationOptions(
-    val enabled: Boolean? = null,
-    val targetMaxSide: Int? = null,
-    val cropPaddingX: Float? = null,
-    val cropPaddingY: Float? = null,
+data class PreRecognitionOptions(
+    val lineYThreshold: Float? = null,
+    val wordXThreshold: Float? = null,
+)
+
+/**
+ * Phase 5: Recognition inference options (batch size).
+ */
+data class RecognitionRunOptions(
+    val batchSize: Int? = null,
+)
+
+/**
+ * Phase 6: Post-recognition filtering options (score threshold).
+ */
+data class PostRecognitionOptions(
+    val scoreThreshold: Float? = null,
 )
 
 /**
@@ -263,105 +335,71 @@ data class OptimizationOptions(
  */
 data class OcrRunOptions(
     val output: OutputGranularity = OutputGranularity.LINES,
-    val lineYThreshold: Float? = null,
-    val wordXThreshold: Float? = null,
-    val textScore: Float? = null,
-    val classification: Boolean? = null,
-    val orientation: Boolean? = null,
-    val minHeight: Float? = null,
-    val maxSideLen: Float? = null,
-    val minSideLen: Float? = null,
-    val widthHeightRatio: Float? = null,
+    val autoUnwarp: Boolean? = null,
+    val layoutReading: Boolean? = null,
+    val orientationDetection: Boolean? = null,
+    val lineClassification: Boolean? = null,
+    val preDetection: PreDetectionOptions? = null,
     val detection: DetectionRunOptions? = null,
-    val postprocess: PostprocessRunOptions? = null,
-    val unwarp: Boolean? = null,
-    val layout: Boolean? = null,
-    val recBatchNum: Int? = null,
-    val calibration: CalibrationOptions? = null,
-    val optimization: OptimizationOptions? = null,
+    val postDetection: PostDetectionOptions? = null,
+    val preRecognition: PreRecognitionOptions? = null,
+    val recognition: RecognitionRunOptions? = null,
+    val postRecognition: PostRecognitionOptions? = null,
 ) {
     internal fun toJson(): String {
-        require(lineYThreshold == null || lineYThreshold.isFinite() && lineYThreshold >= 0f) {
-            "lineYThreshold must be finite and non-negative."
-        }
-        require(wordXThreshold == null || wordXThreshold.isFinite() && wordXThreshold >= 0f) {
-            "wordXThreshold must be finite and non-negative."
-        }
-        require(textScore == null || textScore.isFinite() && textScore in 0f..1f) {
-            "textScore must be finite and between 0 and 1."
-        }
-        validateRuntimeOverrides()
         return JSONObject().apply {
             put("output", output.wireValue)
-            lineYThreshold?.let { put("lineYThreshold", it.toDouble()) }
-            wordXThreshold?.let { put("wordXThreshold", it.toDouble()) }
-            textScore?.let { put("textScore", it.toDouble()) }
-            classification?.let { put("classification", it) }
-            orientation?.let { put("orientation", it) }
-            unwarp?.let { put("unwarp", it) }
-            layout?.let { put("layout", it) }
-            minHeight?.let { put("minHeight", it.toDouble()) }
-            maxSideLen?.let { put("maxSideLen", it.toDouble()) }
-            minSideLen?.let { put("minSideLen", it.toDouble()) }
-            widthHeightRatio?.let { put("widthHeightRatio", it.toDouble()) }
-            detection?.let { detection ->
+            autoUnwarp?.let { put("autoUnwarp", it) }
+            layoutReading?.let { put("layoutReading", it) }
+            orientationDetection?.let { put("orientationDetection", it) }
+            lineClassification?.let { put("lineClassification", it) }
+            preDetection?.let { p ->
+                put("preDetection", JSONObject().apply {
+                    p.descreenStrength?.let { put("descreenStrength", it.toDouble()) }
+                    p.targetMaxSide?.let { put("targetMaxSide", it.toLong()) }
+                    p.cropPaddingX?.let { put("cropPaddingX", it.toDouble()) }
+                    p.cropPaddingY?.let { put("cropPaddingY", it.toDouble()) }
+                })
+            }
+            detection?.let { d ->
                 put("detection", JSONObject().apply {
-                    detection.limitSideLen?.let { put("limitSideLen", it) }
-                    detection.limitType?.let { put("limitType", it) }
-                    detection.mean?.let { put("mean", it.toList()) }
-                    detection.std?.let { put("std", it.toList()) }
+                    d.limitSideLen?.let { put("limitSideLen", it) }
+                    d.limitType?.let { put("limitType", it) }
+                    d.mean?.let { put("mean", it.toList()) }
+                    d.std?.let { put("std", it.toList()) }
                 })
             }
-            postprocess?.let { postprocess ->
-                put("postprocess", JSONObject().apply {
-                    postprocess.threshold?.let { put("threshold", it.toDouble()) }
-                    postprocess.boxThreshold?.let { put("boxThreshold", it.toDouble()) }
-                    postprocess.maxCandidates?.let { put("maxCandidates", it) }
-                    postprocess.unclipRatio?.let { put("unclipRatio", it.toDouble()) }
-                    postprocess.useDilation?.let { put("useDilation", it) }
+            postDetection?.let { pd ->
+                put("postDetection", JSONObject().apply {
+                    pd.threshold?.let { put("threshold", it.toDouble()) }
+                    pd.boxThreshold?.let { put("boxThreshold", it.toDouble()) }
+                    pd.maxCandidates?.let { put("maxCandidates", it) }
+                    pd.unclipRatio?.let { put("unclipRatio", it.toDouble()) }
+                    pd.useDilation?.let { put("useDilation", it) }
+                    pd.scoreMode?.let { put("scoreMode", it) }
+                    pd.minHeight?.let { put("minHeight", it.toDouble()) }
+                    pd.minSideLen?.let { put("minSideLen", it.toDouble()) }
+                    pd.maxSideLen?.let { put("maxSideLen", it.toDouble()) }
+                    pd.widthHeightRatio?.let { put("widthHeightRatio", it.toDouble()) }
                 })
             }
-            recBatchNum?.let { put("recBatchNum", it) }
-            calibration?.let { calib ->
-                put("calibration", JSONObject().apply {
-                    calib.descreenStrength?.let { put("descreenStrength", it.toDouble()) }
+            preRecognition?.let { pr ->
+                put("preRecognition", JSONObject().apply {
+                    pr.lineYThreshold?.let { put("lineYThreshold", it.toDouble()) }
+                    pr.wordXThreshold?.let { put("wordXThreshold", it.toDouble()) }
                 })
             }
-            optimization?.let { opt ->
-                put("optimization", JSONObject().apply {
-                    opt.enabled?.let { put("enabled", it) }
-                    opt.targetMaxSide?.let { put("targetMaxSide", it) }
-                    opt.cropPaddingX?.let { put("cropPaddingX", it.toDouble()) }
-                    opt.cropPaddingY?.let { put("cropPaddingY", it.toDouble()) }
+            recognition?.let { r ->
+                put("recognition", JSONObject().apply {
+                    r.batchSize?.let { put("batchSize", it) }
+                })
+            }
+            postRecognition?.let { pr ->
+                put("postRecognition", JSONObject().apply {
+                    pr.scoreThreshold?.let { put("scoreThreshold", it.toDouble()) }
                 })
             }
         }.toString()
-    }
-
-    private fun validateRuntimeOverrides() {
-        fun positive(name: String, number: Float?) = require(number == null || number.isFinite() && number > 0f) { "$name must be finite and greater than zero." }
-        positive("minHeight", minHeight); positive("maxSideLen", maxSideLen); positive("minSideLen", minSideLen)
-        require(widthHeightRatio == null || widthHeightRatio.isFinite() && (widthHeightRatio > 0f || widthHeightRatio == -1f)) { "widthHeightRatio must be positive or -1." }
-        require(minSideLen == null || maxSideLen == null || minSideLen <= maxSideLen) { "minSideLen must not exceed maxSideLen." }
-        require(recBatchNum == null || recBatchNum >= 1) { "recBatchNum must be at least one." }
-        optimization?.let { opt ->
-            require(opt.targetMaxSide == null || opt.targetMaxSide >= 1) { "targetMaxSide must be at least one." }
-            require(opt.cropPaddingX == null || opt.cropPaddingX.isFinite() && opt.cropPaddingX in 0f..1f) { "cropPaddingX must be between zero and one." }
-            require(opt.cropPaddingY == null || opt.cropPaddingY.isFinite() && opt.cropPaddingY in 0f..1f) { "cropPaddingY must be between zero and one." }
-        }
-        detection?.let { detection ->
-            require(detection.limitSideLen == null || detection.limitSideLen in 1..32767) { "limitSideLen must be between 1 and 32767." }
-            require(detection.limitType == null || detection.limitType == "min" || detection.limitType == "max") { "limitType must be min or max." }
-            for ((name, values, rejectZero) in listOf(Triple("mean", detection.mean, false), Triple("std", detection.std, true))) {
-                require(values == null || values.size == 3 && values.all { it.isFinite() && (!rejectZero || it != 0f) }) { "$name must contain three valid numbers." }
-            }
-        }
-        postprocess?.let { postprocess ->
-            require(postprocess.threshold == null || postprocess.threshold.isFinite() && postprocess.threshold in 0f..1f) { "threshold must be between zero and one." }
-            require(postprocess.boxThreshold == null || postprocess.boxThreshold.isFinite() && postprocess.boxThreshold in 0f..1f) { "boxThreshold must be between zero and one." }
-            require(postprocess.maxCandidates == null || postprocess.maxCandidates >= 1) { "maxCandidates must be at least one." }
-            require(postprocess.unclipRatio == null || postprocess.unclipRatio.isFinite() && postprocess.unclipRatio > 0f) { "unclipRatio must be finite and greater than zero." }
-        }
     }
 }
 
@@ -401,10 +439,10 @@ class RustO private constructor(
             uniffi.rusto.downloadModel(model, lang, cacheDir)
 
         /**
-         * Downloads all available canonical models to the cache directory ahead of time.
+         * Returns the engine library version string.
          */
-        fun downloadAllModels(cacheDir: String? = null): List<String> =
-            uniffi.rusto.downloadAllModels(cacheDir)
+        fun version(): String = uniffi.rusto.rustoVersion()
+
 
         /**
          * Initializes the RustO OCR engine with Android context and optional model configuration.
@@ -450,13 +488,38 @@ class RustO private constructor(
     }
 
     /**
-     * Runs text detection and recognition on the specified image source.
+     * Creates a fluent DetectTextBuilder for text detection and recognition.
+     */
+    fun detectText(): DetectTextBuilder = DetectTextBuilder(this)
+
+    /**
+     * Creates a fluent DetectTextBuilder with the given image source.
+     */
+    fun detectText(source: ImageSource): DetectTextBuilder = DetectTextBuilder(this, source)
+
+    /**
+     * Creates a fluent DetectTextBuilder with the given URI string.
+     */
+    fun detectText(uri: String): DetectTextBuilder = DetectTextBuilder(this, ImageSource.Uri(uri))
+
+    /**
+     * Creates a fluent DetectTextBuilder with the given byte array.
+     */
+    fun detectText(bytes: ByteArray): DetectTextBuilder = DetectTextBuilder(this, ImageSource.Bytes(bytes))
+
+    /**
+     * Creates a fluent DetectTextBuilder for text detection and recognition.
+     */
+    fun detectTextBuilder(): DetectTextBuilder = DetectTextBuilder(this)
+
+    /**
+     * Runs text detection and recognition directly with the specified options.
      *
      * @param source ImageSource (Uri or Bytes).
      * @param options Per-request OCR execution options.
      * @return DetectTextResult (Structured or Spatial).
      */
-    fun detectText(source: ImageSource, options: OcrRunOptions = OcrRunOptions()): DetectTextResult {
+    fun detectText(source: ImageSource, options: OcrRunOptions): DetectTextResult {
         val activeEngine = engine ?: throw IllegalStateException("RustO is closed.")
         val uniffiSource = when (source) {
             is ImageSource.Bytes -> uniffi.rusto.ImageSource.Bytes(source.value)
@@ -468,28 +531,75 @@ class RustO private constructor(
         val uniffiOptions = toUniffiOptions(options)
 
         return try {
-            when (val res = activeEngine.detectText(uniffiSource, uniffiOptions)) {
-                is uniffi.rusto.DetectTextResult.Spatial -> DetectTextResult.Spatial(res.text)
-                is uniffi.rusto.DetectTextResult.Structured -> DetectTextResult.Structured(
-                    res.results.map { item ->
-                        TextResult(
-                            text = item.text,
-                            score = item.score,
-                            boxPoints = item.boxPoints.map { Point2D(it.x, it.y) },
-                            frame = Frame(
-                                width = item.frame.width,
-                                height = item.frame.height,
-                                top = item.frame.top,
-                                left = item.frame.left,
-                            )
-                        )
-                    }
-                )
-            }
+            mapDetectTextResult(activeEngine.detectText(uniffiSource, uniffiOptions))
         } catch (e: Exception) {
             throw RustOException("OCR detection failed: ${e.message}")
         }
     }
+
+    /**
+     * Runs text detection and recognition directly on a raw interleaved RGB8 pixel buffer.
+     */
+    fun detectTextRgb(
+        pixels: ByteArray,
+        width: Int,
+        height: Int,
+        stride: Long = width.toLong() * 3L,
+        options: OcrRunOptions = OcrRunOptions(),
+    ): DetectTextResult {
+        val activeEngine = engine ?: throw IllegalStateException("RustO is closed.")
+        val uniffiOptions = toUniffiOptions(options)
+        return try {
+            mapDetectTextResult(
+                activeEngine.detectTextRgb(
+                    pixels,
+                    width.toUInt(),
+                    height.toUInt(),
+                    stride.toULong(),
+                    uniffiOptions,
+                )
+            )
+        } catch (e: Exception) {
+            throw RustOException("OCR RGB detection failed: ${e.message}")
+        }
+    }
+
+    private fun mapDetectTextResult(res: uniffi.rusto.DetectTextResult): DetectTextResult =
+        when (res) {
+            is uniffi.rusto.DetectTextResult.Spatial -> DetectTextResult.Spatial(res.text)
+            is uniffi.rusto.DetectTextResult.Structured -> DetectTextResult.Structured(
+                res.results.map { item ->
+                    TextResult(
+                        text = item.text,
+                        score = item.score,
+                        boxPoints = item.boxPoints.map { Point2D(it.x, it.y) },
+                        frame = Frame(
+                            width = item.frame.width,
+                            height = item.frame.height,
+                            top = item.frame.top,
+                            left = item.frame.left,
+                        ),
+                        regionId = item.regionId,
+                        layoutType = formatLayoutType(item.layoutType),
+                    )
+                }
+            )
+        }
+
+    private fun formatLayoutType(layoutType: uniffi.rusto.LayoutType?): String? =
+        when (layoutType) {
+            null -> null
+            uniffi.rusto.LayoutType.TEXT -> "text"
+            uniffi.rusto.LayoutType.TITLE -> "title"
+            uniffi.rusto.LayoutType.FIGURE -> "figure"
+            uniffi.rusto.LayoutType.FIGURE_CAPTION -> "figureCaption"
+            uniffi.rusto.LayoutType.TABLE -> "table"
+            uniffi.rusto.LayoutType.TABLE_CAPTION -> "tableCaption"
+            uniffi.rusto.LayoutType.HEADER -> "header"
+            uniffi.rusto.LayoutType.FOOTER -> "footer"
+            uniffi.rusto.LayoutType.REFERENCE -> "reference"
+            uniffi.rusto.LayoutType.EQUATION -> "equation"
+        }
 
     private fun toUniffiOptions(options: OcrRunOptions): uniffi.rusto.OcrRunOptions =
         uniffi.rusto.OcrRunOptions(
@@ -498,59 +608,56 @@ class RustO private constructor(
                 OutputGranularity.WORDS -> uniffi.rusto.OutputGranularity.WORDS
                 OutputGranularity.SPATIAL -> uniffi.rusto.OutputGranularity.SPATIAL
             },
-            lineYThreshold = options.lineYThreshold,
-            wordXThreshold = options.wordXThreshold,
-            textScore = options.textScore,
-            classification = options.classification,
-            orientation = options.orientation,
-            unwarp = options.unwarp,
-            layout = options.layout,
-            minHeight = options.minHeight,
-            maxSideLen = options.maxSideLen,
-            minSideLen = options.minSideLen,
-            widthHeightRatio = options.widthHeightRatio,
+            autoUnwarp = options.autoUnwarp,
+            layoutReading = options.layoutReading,
+            orientationDetection = options.orientationDetection,
+            lineClassification = options.lineClassification,
+            preDetection = options.preDetection?.let { p ->
+                uniffi.rusto.PreDetectionOptions(
+                    descreenStrength = p.descreenStrength,
+                    targetMaxSide = p.targetMaxSide,
+                    cropPaddingX = p.cropPaddingX,
+                    cropPaddingY = p.cropPaddingY,
+                )
+            },
             detection = options.detection?.let { d ->
                 uniffi.rusto.DetectionRunOptions(
                     limitSideLen = d.limitSideLen,
                     limitType = d.limitType,
                     mean = d.mean?.toList(),
                     std = d.std?.toList(),
-                    postprocess = d.postprocess?.let { p ->
-                        uniffi.rusto.PostprocessRunOptions(
-                            threshold = p.threshold,
-                            boxThreshold = p.boxThreshold,
-                            maxCandidates = p.maxCandidates,
-                            unclipRatio = p.unclipRatio,
-                            useDilation = p.useDilation,
-                            scoreMode = p.scoreMode,
-                        )
-                    }
                 )
             },
-            postprocess = options.postprocess?.let { p ->
-                uniffi.rusto.PostprocessRunOptions(
-                    threshold = p.threshold,
-                    boxThreshold = p.boxThreshold,
-                    maxCandidates = p.maxCandidates,
-                    unclipRatio = p.unclipRatio,
-                    useDilation = p.useDilation,
-                    scoreMode = p.scoreMode,
+            postDetection = options.postDetection?.let { pd ->
+                uniffi.rusto.PostDetectionOptions(
+                    threshold = pd.threshold,
+                    boxThreshold = pd.boxThreshold,
+                    unclipRatio = pd.unclipRatio,
+                    useDilation = pd.useDilation,
+                    scoreMode = pd.scoreMode,
+                    maxCandidates = pd.maxCandidates,
+                    minHeight = pd.minHeight,
+                    minSideLen = pd.minSideLen,
+                    maxSideLen = pd.maxSideLen,
+                    widthHeightRatio = pd.widthHeightRatio,
                 )
             },
-            calibration = options.calibration?.let { c ->
-                uniffi.rusto.CalibrationOptions(
-                    descreenStrength = c.descreenStrength,
+            preRecognition = options.preRecognition?.let { pr ->
+                uniffi.rusto.PreRecognitionOptions(
+                    lineYThreshold = pr.lineYThreshold,
+                    wordXThreshold = pr.wordXThreshold,
                 )
             },
-            optimization = options.optimization?.let { o ->
-                uniffi.rusto.OptimizationOptions(
-                    enabled = o.enabled,
-                    targetMaxSide = o.targetMaxSide?.toUInt(),
-                    cropPaddingX = o.cropPaddingX,
-                    cropPaddingY = o.cropPaddingY,
+            recognition = options.recognition?.let { r ->
+                uniffi.rusto.RecognitionRunOptions(
+                    batchSize = r.batchSize,
                 )
             },
-            recBatchNum = options.recBatchNum,
+            postRecognition = options.postRecognition?.let { pr ->
+                uniffi.rusto.PostRecognitionOptions(
+                    scoreThreshold = pr.scoreThreshold,
+                )
+            },
         )
 
     private inline fun <T> withUriInput(value: String, action: (String?, ByteArray?) -> T): T {
@@ -569,6 +676,16 @@ class RustO private constructor(
     }
 
     /**
+     * Checks if the engine instance is initialized and ready for inference.
+     */
+    fun isReady(): Boolean = engine != null
+
+    /**
+     * Returns the engine library version string.
+     */
+    fun version(): String = uniffi.rusto.rustoVersion()
+
+    /**
      * Releases the native RustO engine handle and frees memory.
      */
     override fun close() {
@@ -576,4 +693,226 @@ class RustO private constructor(
         engine = null
     }
 }
+
+/**
+ * Fluent builder for chained text detection configuration and execution.
+ */
+class DetectTextBuilder(
+    private val engine: RustO,
+    private var source: ImageSource? = null,
+) {
+    private var rgbPixels: ByteArray? = null
+    private var rgbWidth: Int = 0
+    private var rgbHeight: Int = 0
+    private var rgbStride: Long = 0L
+    private var options = OcrRunOptions()
+
+    /**
+     * Sets the input image path or URI.
+     */
+    fun image(uri: String): DetectTextBuilder = apply {
+        this.source = ImageSource.Uri(uri)
+        this.rgbPixels = null
+    }
+
+    /**
+     * Sets the input image URI.
+     */
+    fun image(uri: android.net.Uri): DetectTextBuilder = apply {
+        this.source = ImageSource.Uri(uri.toString())
+        this.rgbPixels = null
+    }
+
+    /**
+     * Sets the raw image byte buffer.
+     */
+    fun data(bytes: ByteArray): DetectTextBuilder = apply {
+        this.source = ImageSource.Bytes(bytes)
+        this.rgbPixels = null
+    }
+
+    /**
+     * Sets a raw interleaved RGB8 pixel buffer.
+     */
+    fun rgb(pixels: ByteArray, width: Int, height: Int, stride: Long = width.toLong() * 3L): DetectTextBuilder = apply {
+        this.rgbPixels = pixels
+        this.rgbWidth = width
+        this.rgbHeight = height
+        this.rgbStride = stride
+        this.source = null
+    }
+
+    /**
+     * Sets the image source directly.
+     */
+    fun source(source: ImageSource): DetectTextBuilder = apply {
+        this.source = source
+        this.rgbPixels = null
+    }
+
+    /**
+     * Sets the full OCR execution options.
+     */
+    fun withOptions(options: OcrRunOptions): DetectTextBuilder = apply {
+        this.options = options
+    }
+
+    /**
+     * Enables or disables automatic document unwarping.
+     */
+    fun withAutoUnwarp(enabled: Boolean = true): DetectTextBuilder = apply {
+        options = options.copy(autoUnwarp = enabled)
+    }
+
+    /**
+     * Enables or disables document layout reading order analysis.
+     */
+    fun withLayoutReading(enabled: Boolean = true): DetectTextBuilder = apply {
+        options = options.copy(layoutReading = enabled)
+    }
+
+    /**
+     * Enables or disables 0/90/180/270 orientation angle detection.
+     */
+    fun withOrientationDetection(enabled: Boolean = true): DetectTextBuilder = apply {
+        options = options.copy(orientationDetection = enabled)
+    }
+
+    /**
+     * Enables or disables text line classification (e.g. 180-degree flip).
+     */
+    fun withLineClassification(enabled: Boolean = true): DetectTextBuilder = apply {
+        options = options.copy(lineClassification = enabled)
+    }
+
+    /**
+     * Configures pre-detection options.
+     */
+    fun withPreDetection(preDetection: PreDetectionOptions): DetectTextBuilder = apply {
+        options = options.copy(preDetection = preDetection)
+    }
+
+    /**
+     * Configures pre-detection options via trailing lambda.
+     */
+    fun withPreDetection(configure: PreDetectionOptions.() -> PreDetectionOptions): DetectTextBuilder = apply {
+        val current = options.preDetection ?: PreDetectionOptions()
+        options = options.copy(preDetection = current.configure())
+    }
+
+    /**
+     * Configures detection inference options.
+     */
+    fun withDetection(detection: DetectionRunOptions): DetectTextBuilder = apply {
+        options = options.copy(detection = detection)
+    }
+
+    /**
+     * Configures detection inference options via trailing lambda.
+     */
+    fun withDetection(configure: DetectionRunOptions.() -> DetectionRunOptions): DetectTextBuilder = apply {
+        val current = options.detection ?: DetectionRunOptions()
+        options = options.copy(detection = current.configure())
+    }
+
+    /**
+     * Configures post-detection threshold and filtering options.
+     */
+    fun withPostDetection(postDetection: PostDetectionOptions): DetectTextBuilder = apply {
+        options = options.copy(postDetection = postDetection)
+    }
+
+    /**
+     * Configures post-detection options via trailing lambda.
+     */
+    fun withPostDetection(configure: PostDetectionOptions.() -> PostDetectionOptions): DetectTextBuilder = apply {
+        val current = options.postDetection ?: PostDetectionOptions()
+        options = options.copy(postDetection = current.configure())
+    }
+
+    /**
+     * Configures pre-recognition line/word grouping tolerances.
+     */
+    fun withPreRecognition(preRecognition: PreRecognitionOptions): DetectTextBuilder = apply {
+        options = options.copy(preRecognition = preRecognition)
+    }
+
+    /**
+     * Configures pre-recognition options via trailing lambda.
+     */
+    fun withPreRecognition(configure: PreRecognitionOptions.() -> PreRecognitionOptions): DetectTextBuilder = apply {
+        val current = options.preRecognition ?: PreRecognitionOptions()
+        options = options.copy(preRecognition = current.configure())
+    }
+
+    /**
+     * Configures recognition execution options.
+     */
+    fun withRecognition(recognition: RecognitionRunOptions): DetectTextBuilder = apply {
+        options = options.copy(recognition = recognition)
+    }
+
+    /**
+     * Configures recognition execution options via trailing lambda.
+     */
+    fun withRecognition(configure: RecognitionRunOptions.() -> RecognitionRunOptions): DetectTextBuilder = apply {
+        val current = options.recognition ?: RecognitionRunOptions()
+        options = options.copy(recognition = current.configure())
+    }
+
+    /**
+     * Configures post-recognition confidence filtering options.
+     */
+    fun withPostRecognition(postRecognition: PostRecognitionOptions): DetectTextBuilder = apply {
+        options = options.copy(postRecognition = postRecognition)
+    }
+
+    /**
+     * Configures post-recognition options via trailing lambda.
+     */
+    fun withPostRecognition(configure: PostRecognitionOptions.() -> PostRecognitionOptions): DetectTextBuilder = apply {
+        val current = options.postRecognition ?: PostRecognitionOptions()
+        options = options.copy(postRecognition = current.configure())
+    }
+
+    /**
+     * Sets output format granularity.
+     */
+    fun withOutput(granularity: OutputGranularity): DetectTextBuilder = apply {
+        options = options.copy(output = granularity)
+    }
+
+    /**
+     * Sets output granularity to lines.
+     */
+    fun asLines(): DetectTextBuilder = withOutput(OutputGranularity.LINES)
+
+    /**
+     * Sets output granularity to individual words.
+     */
+    fun asWords(): DetectTextBuilder = withOutput(OutputGranularity.WORDS)
+
+    /**
+     * Sets output granularity to 2D formatted spatial text.
+     */
+    fun asSpatial(): DetectTextBuilder = withOutput(OutputGranularity.SPATIAL)
+
+    /**
+     * Sets output granularity to TSV (tab-separated values).
+     */
+    fun asTsv(): DetectTextBuilder = withOutput(OutputGranularity.TSV)
+
+    /**
+     * Terminal execution: runs text detection and returns the result.
+     */
+    fun run(): DetectTextResult {
+        val pixels = rgbPixels
+        if (pixels != null) {
+            return engine.detectTextRgb(pixels, rgbWidth, rgbHeight, rgbStride, options)
+        }
+        val src = source ?: throw IllegalStateException("Image source must be specified before calling run().")
+        return engine.detectText(src, options)
+    }
+}
+
 

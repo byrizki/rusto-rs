@@ -1,178 +1,157 @@
-# RustODotnet
+# RustODotnet (.NET SDK)
 
-[![NuGet](https://img.shields.io/nuget/v/RustODotnet.svg?logo=nuget&logoColor=white&color=004880)](https://www.nuget.org/packages/RustODotnet)
-[![Documentation](https://img.shields.io/badge/docs-byrizki.com%2Frusto--rs-blue.svg)](https://byrizki.com/rusto-rs/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Official C# / .NET bindings for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
 
-`RustODotnet` exposes canonical RustO OCR API for .NET. Initialize model session once, run many request-local detections, then dispose engine.
+## Features
 
-> 📖 **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
+- **Zero-Config Indra OCR**: `using var ocr = RustO.Initialize();` automatically downloads and caches the default `indraocr` `.rten` models on first run — no separate NuGet model packages required.
+- **Standalone `.rten` Model Support**: Load local `.rten` models directly for offline or air-gapped deployments, or pre-warm caches via `RustO.DownloadModel(...)`.
+- **Document Intelligence**: Built-in UVDoc document unwarping (`WithAutoUnwarp()`), 4-way page orientation detection (`WithOrientationDetection()`), and neural reading-order recovery (`WithLayoutReading()`).
+- **Fluent Builder API**: Chain `.AsLines()`, `.AsWords()`, `.AsSpatial()`, or `.WithOutput(...)` into a single `.Run()` terminal method.
+- **Universal Image Inputs**: File paths, `byte[]` encoded images, `ImageSource`, or raw 24-bit interleaved RGB buffers via `.Rgb(...)`.
+
+## Installation
 
 ```bash
 dotnet add package RustODotnet
 ```
 
-Models (e.g. PP-OCRv6 Tiny by default) are automatically downloaded into local cache on first use, or can be supplied locally via `InitializeConfig`.
+## Quick Start (Zero-Config)
 
-## Complete example
+`RustO.Initialize()` uses the **Indra OCR** pipeline by default and automatically downloads `.rten` assets into your user cache (`~/.cache/rusto/models` or `RUSTO_CACHE_DIR`) on first use:
 
 ```csharp
 using System;
-using System.IO;
 using RustODotnet;
 
-var config = InitializeConfig.Ppv6();
-using var ocr = RustO.Initialize(config);
+using var ocr = RustO.Initialize();
 
-var result = ocr.DetectText(
-    new UriImageSource("invoice.jpg"),
-    new OcrRunOptions
-    {
-        Output = OutputGranularity.Words,
-        TextScore = 0.55f,
-        MaxSideLen = 1600f,
-        Detection = new DetectionRunOptions
-        {
-            LimitSideLen = 960,
-            LimitType = "max",
-        },
-        Postprocess = new PostprocessRunOptions
-        {
-            UseDilation = true,
-        },
-    });
+// Structured line-level recognition with unwarping & layout reading order
+var result = ocr.DetectText("invoice.png")
+    .WithAutoUnwarp()
+    .WithLayoutReading()
+    .AsLines()
+    .Run();
 
-switch (result)
+if (result is StructuredDetectTextResult structured)
 {
-    case StructuredDetectTextResult structured:
-        foreach (var item in structured.Items)
-            Console.WriteLine($"{item.Text} ({item.Score:F2}) at {item.Frame.Left}, {item.Frame.Top}");
-        break;
-    case SpatialDetectTextResult spatial:
-        Console.WriteLine(spatial.Text);
-        break;
+    foreach (var item in structured.Items)
+    {
+        Console.WriteLine(
+            $"[{item.Score:F2}] ({item.LayoutType ?? "line"} #{item.RegionId?.ToString() ?? "-"}) {item.Text}"
+        );
+    }
+}
+
+// Reconstructed 2D spatial layout
+var spatialResult = ocr.DetectText("invoice.png")
+    .AsSpatial()
+    .Run();
+
+if (spatialResult is SpatialDetectTextResult spatial)
+{
+    Console.WriteLine(spatial.Text);
 }
 ```
 
-Example structured output:
+## Presets & Standalone `.rten` Models
 
-```text
-Total (0.98) at 40, 120
-$12.50 (0.96) at 140, 120
-```
-
-## Public API
-
-| API | Purpose |
-|---|---|
-| `RustO.Initialize(InitializeConfig? config)` | Creates engine and loads model resources. |
-| `ocr.DetectText(ImageSource, OcrRunOptions? options)` | Runs lines, words, or spatial OCR. |
-| `UriImageSource(string)` | Path or `file:` URI input. |
-| `BytesImageSource(byte[])` | Encoded image bytes input. |
-| `StructuredDetectTextResult` | `Items: IReadOnlyList<TextResult>` for `Lines` and `Words`. |
-| `SpatialDetectTextResult` | `Text: string` for `Spatial`. |
-| `RustO.Dispose()` | Releases native engine. Prefer `using var`. |
-
-## Initialization config
-
-Initialization selects model preset/resources. It does not control per-image preprocessing.
+Configure model presets (`InitializeConfig.Indra()`, `InitializeConfig.Ppv6()`, `InitializeConfig.ForModel(...)`) or point to local `.rten` model files for offline environments:
 
 ```csharp
-using var ocr = RustO.Initialize(InitializeConfig.Ppv6(
-    detection: new DetectionConfig { ModelPath = "models/det.onnx" },
-    recognition: new RecognitionConfig
-    {
-        ModelPath = "models/rec.onnx",
-        DictPath = "models/dict.txt",
-    }));
-```
+using RustODotnet;
 
-| Field | Type | Meaning |
-|---|---|---|
-| `Template` | `"ppv6"`, `"ppv5"`, `"ppv4"`, `"ppv3"` | Preset defaults. Use `InitializeConfig.Ppv6()` etc. when possible. |
-| `Detection.ModelPath` | `string` | Detection model; default logical name `det.onnx` (or `det.rten`). |
-| `Recognition.ModelPath` | `string` | Recognition model; default logical name `rec.onnx` (or `rec.rten`). |
-| `Recognition.DictPath` | `string` | Dictionary; default logical name `dict.txt`. |
-| `Classification` / `Orientation` | optional config | Optional auxiliary model paths. Enable respective request option to use. |
+// 1. Canonical model & language preset (auto-downloads .rten files if missing)
+using var indraOcr = RustO.Initialize(InitializeConfig.Indra());
+using var tinyOcr = RustO.Initialize(InitializeConfig.ForModel("ppocrv6-tiny", lang: "latin"));
 
-Model resolution checks common application/model paths and automatically downloads missing models if enabled in native runtime options. For custom resources or offline environments, pass explicit paths.
-
-## Request-local options
-
-`OcrRunOptions` applies only to one `DetectText` call. Unset properties merge with initialized defaults and do not mutate next call.
-
-```csharp
-var options = new OcrRunOptions
+// 2. Offline standalone .rten models (e.g. placed in ./models/ next to your executable)
+var offlineConfig = new InitializeConfig
 {
-    Output = OutputGranularity.Words,
-    LineYThreshold = 0.5f,
-    WordXThreshold = 0.4f,
-    TextScore = 0.55f,
-    MaxSideLen = 1600f,
-    Detection = new DetectionRunOptions
+    Template = "indra",
+    EnableReadingOrder = true,
+    Detection = new DetectionConfig { ModelPath = "models/indra_det.rten" },
+    Recognition = new RecognitionConfig
     {
-        LimitSideLen = 960,
-        LimitType = "max",
-        Mean = new[] { 0.485f, 0.456f, 0.406f },
-        Std = new[] { 0.229f, 0.224f, 0.225f },
+        ModelPath = "models/indra_rec.rten",
+        DictPath = "models/indra_meta.json"
     },
-    Postprocess = new PostprocessRunOptions
-    {
-        Threshold = 0.3f,
-        BoxThreshold = 0.6f,
-        MaxCandidates = 1000,
-        UnclipRatio = 2.0f,
-        UseDilation = true,
-    },
+    Unwarp = new UnwarpConfig { ModelPath = "models/uvdoc.rten" },
+    Layout = new LayoutConfig { ModelPath = "models/layout_cdla.rten" }
 };
+
+using var offlineOcr = RustO.Initialize(offlineConfig);
 ```
 
-| Property | Valid values | Meaning |
-|---|---|---|
-| `Output` | `Lines`, `Words`, `Spatial` | Default `Lines`; structured collection for first two, string for spatial. |
-| `LineYThreshold`, `WordXThreshold` | finite `>= 0` | Line and word/spatial grouping tolerance. |
-| `TextScore` | finite `[0, 1]` | Recognition-confidence cutoff. |
-| `Classification`, `Orientation` | `bool` | Per-request optional stages; models must be configured first. |
-| `MinHeight`, `MaxSideLen`, `MinSideLen` | finite `> 0` | Request-local resize bounds. `MinSideLen` cannot exceed `MaxSideLen` when both set. |
-| `WidthHeightRatio` | finite `> 0` or `-1` | Recognition padding ratio. |
-| `Detection.LimitSideLen` | integer `1..32767` | Detector resize target/bound. |
-| `Detection.LimitType` | `"min"` / `"max"` | Short-side minimum / long-side cap. |
-| `Detection.Mean`, `Std` | three finite values | RGB normalization; `Std` values non-zero. |
-| `Postprocess.Threshold`, `BoxThreshold` | finite `[0, 1]` | Binarization and polygon confidence. |
-| `Postprocess.MaxCandidates` | integer `>= 1` | Candidate limit. |
-| `Postprocess.UnclipRatio` | finite `> 0` | Polygon expansion. |
-| `Postprocess.UseDilation` | `bool` | Helps faint or broken strokes. |
+> If `det.rten`, `rec.rten`, and `dict.txt` exist in your application base directory (or `models/` subdirectory), `RustO.Initialize()` automatically resolves and uses those bundled files offline.
 
-`Detection` and `Postprocess` are root-level `OcrRunOptions` properties. No nested `Preprocessing` API exists.
+### Pre-Downloading Models
 
-## Sources and output
+For container builds or CI environments, download `.rten` assets ahead of time:
 
 ```csharp
-var fromPath = ocr.DetectText(new UriImageSource("/tmp/receipt.png"));
-var fromBytes = ocr.DetectText(new BytesImageSource(File.ReadAllBytes("receipt.png")));
-
-var spatial = ocr.DetectText(
-    new UriImageSource("table.png"),
-    new OcrRunOptions { Output = OutputGranularity.Spatial });
-
-if (spatial is SpatialDetectTextResult layout)
-    Console.WriteLine(layout.Text);
-// Item                 Amount
-// Coffee                $3.50
-// Total                $12.50
+string[] cachedFiles = RustO.DownloadModel(model: "indraocr", lang: "latin", cacheDir: "./models-cache");
 ```
 
-`TextResult` has `Text`, `Score`, `BoxPoints`, and `Frame`. `BoxPoints` contains top-left, top-right, bottom-right, bottom-left image-pixel coordinates. `Frame` is axis-aligned with `Left`, `Top`, `Width`, `Height`.
+## Byte Buffers & Raw RGB Pixels
 
-## Errors and lifecycle
+```csharp
+using System.IO;
+using RustODotnet;
 
-- `RustOException` indicates native initialization, model, image decode, option, or OCR failure.
-- Constructors reject null source payloads. Validate input file/resource availability before detection.
-- Always dispose `RustO`; `using var` handles success and failure paths.
-- Invalid request options do not require reinitialization. Correct options and call `DetectText` again.
+using var ocr = RustO.Initialize();
 
-## 📖 Documentation
+// 1. Encoded PNG/JPEG byte array
+byte[] imageBytes = File.ReadAllBytes("receipt.png");
+var wordsResult = ocr.DetectText(imageBytes).AsWords().Run();
 
-For full documentation, guides, and API reference:
-- [C# / .NET Guide](https://byrizki.com/rusto-rs/how-to/use-csharp)
-- [Full Documentation](https://byrizki.com/rusto-rs/)
+// 2. Raw interleaved 24-bit RGB pixel buffer
+uint width = 1280;
+uint height = 720;
+ulong stride = width * 3;
+byte[] rgbPixels = new byte[stride * height];
+
+var rgbResult = ocr.DetectText()
+    .Rgb(rgbPixels, width, height, stride)
+    .AsLines()
+    .Run();
+```
+
+## 6-Phase Pipeline Tuning
+
+Customize any stage of the pipeline per call on `DetectTextBuilder`:
+
+```csharp
+var tuned = ocr.DetectText("scan.jpg")
+    .WithOrientationDetection()
+    .WithAutoUnwarp()
+    .WithLayoutReading()
+    .WithPreDetection(p => p.TargetMaxSide = 1280)
+    .WithDetection(d =>
+    {
+        d.LimitSideLen = 960;
+        d.LimitType = "max";
+    })
+    .WithPostDetection(pd =>
+    {
+        pd.Threshold = 0.3f;
+        pd.BoxThreshold = 0.6f;
+        pd.UnclipRatio = 1.6f;
+    })
+    .WithRecognition(r => r.BatchSize = 8)
+    .WithPostRecognition(pr => pr.ScoreThreshold = 0.5f)
+    .WithOutput(OutputGranularity.Lines)
+    .Run();
+```
+
+## Result Types & Lifecycle
+
+- `StructuredDetectTextResult`: Returned for `.AsLines()` and `.AsWords()`. Inspect `structured.Items` (`IReadOnlyList<TextResult>`):
+  - `Text` (`string`), `Score` (`float`), `BoxPoints` (`Point2D[]`), `Frame` (`Frame`)
+  - `RegionId` (`int?`) and `LayoutType` (`string`: `"text"`, `"title"`, `"table"`, `"header"`, `"footer"`, `"figure"`, etc.) when `WithLayoutReading()` is enabled.
+- `SpatialDetectTextResult`: Returned for `.AsSpatial()`. Inspect `spatial.Text` (`string`).
+- **Resource Cleanup**: `RustO` implements `IDisposable` — prefer `using var ocr = RustO.Initialize();` or call `ocr.Close()` when finished.
+
+## License
+
+Apache-2.0 OR MIT

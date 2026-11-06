@@ -1,6 +1,6 @@
 [package]
 name = "rusto-core"
-version = "0.3.2"
+version = "0.4.0"
 edition = "2021"
 description = "Core pure-Rust computer vision algorithms, postprocessing, and types for RustO!"
 license = "MIT"
@@ -15,7 +15,7 @@ serde_json = "1.0"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 nalgebra = "0.33"
 dirs = "5.0"
-rusto-nn = { path = "../rusto-nn", version = "0.3.2" }
+rusto-nn = { path = "../rusto-nn", version = "0.4.0" }
 
 [features]
 default = []
