@@ -1,12 +1,19 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { ProgressState } from '../types/ocrConfig';
 
-defineProps<{
+const props = defineProps<{
   progress: ProgressState;
 }>();
 
 const radius = 26;
 const circumference = 2 * Math.PI * radius;
+
+const shouldDisplay = computed(
+  () =>
+    props.progress.active &&
+    (props.progress.phase === 'download' || props.progress.phase === 'init')
+);
 </script>
 
 <template>
@@ -19,19 +26,17 @@ const circumference = 2 * Math.PI * radius;
     leave-to-class="opacity-0 scale-98"
   >
     <div
-      v-if="progress.active"
-      class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/75 dark:bg-neutral-950/80 backdrop-blur-md select-none p-4 cursor-wait"
+      v-if="shouldDisplay"
+      class="absolute inset-0 z-40 flex flex-col items-center justify-center bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm select-none p-4 cursor-wait"
       role="status"
       aria-live="polite"
       @click.stop
     >
       <div
-        class="flex flex-col items-center justify-center p-6 rounded-2xl bg-white/95 dark:bg-neutral-900/95 border border-neutral-200 dark:border-neutral-800 shadow-2xl max-w-sm w-full mx-4 text-center ring-1 ring-black/5 dark:ring-white/5"
+        class="flex flex-col items-center justify-center p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl max-w-xs w-full mx-4 text-center"
       >
-        <!-- Circular Progress Ring -->
-        <div class="relative w-18 h-18 flex items-center justify-center my-2">
-          <svg class="w-full h-full -rotate-90" viewBox="0 0 64 64">
-            <!-- Background circle track -->
+        <div class="relative w-16 h-16 flex items-center justify-center my-1.5">
+          <svg class="w-full h-full -rotate-90" viewBox="0 0 64 64" aria-hidden="true">
             <circle
               cx="32"
               cy="32"
@@ -39,9 +44,8 @@ const circumference = 2 * Math.PI * radius;
               fill="none"
               stroke="currentColor"
               stroke-width="4.5"
-              class="text-neutral-200 dark:text-neutral-800"
+              class="text-zinc-200 dark:text-zinc-800"
             />
-            <!-- Progress circle fill -->
             <circle
               cx="32"
               cy="32"
@@ -58,11 +62,10 @@ const circumference = 2 * Math.PI * radius;
             />
           </svg>
 
-          <!-- Center Percentage or Spinner -->
           <div class="absolute inset-0 flex items-center justify-center">
             <span
               v-if="progress.percent > 0"
-              class="text-xs font-bold font-mono text-neutral-800 dark:text-neutral-100"
+              class="text-xs font-bold font-mono text-zinc-800 dark:text-zinc-100 tabular-nums"
             >
               {{ progress.percent }}%
             </span>
@@ -73,48 +76,30 @@ const circumference = 2 * Math.PI * radius;
           </div>
         </div>
 
-        <!-- Phase & Pipeline Step Badges -->
         <div class="mt-2 flex items-center justify-center gap-1.5 flex-wrap">
           <span
-            v-if="progress.step"
-            class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 font-mono"
-          >
-            Step {{ progress.step.current }}/{{ progress.step.total }}
-          </span>
-          <span
             v-if="progress.phase === 'download'"
-            class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200/80 dark:border-sky-900/70"
           >
-            <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-            Downloading Model
-          </span>
-          <span
-            v-else-if="progress.phase === 'init'"
-            class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900"
-          >
-            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            Initializing Pipeline
+            <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
+            Downloading Weights
           </span>
           <span
             v-else
-            class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-primary/10 text-primary border border-primary/20"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-900/70"
           >
-            <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            Running Inference
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Initializing WASM
           </span>
         </div>
 
-        <!-- Stage Text -->
-        <h4
-          class="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mt-2.5 tracking-tight"
-        >
-          {{ progress.stageText || 'Processing...' }}
+        <h4 class="text-xs font-semibold text-zinc-900 dark:text-zinc-100 mt-2.5">
+          {{ progress.stageText || 'Preparing engine...' }}
         </h4>
 
-        <!-- Detail Text -->
         <p
           v-if="progress.detailText"
-          class="text-xs text-neutral-500 dark:text-neutral-400 font-mono mt-1 break-all"
+          class="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono mt-1 tabular-nums"
         >
           {{ progress.detailText }}
         </p>

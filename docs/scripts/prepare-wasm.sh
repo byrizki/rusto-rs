@@ -10,20 +10,35 @@ mkdir -p "$WASM_DIR" "$DOCS_DIR/public/wasm"
 
 # 1. If wasm-pack is installed, compile from source to ensure latest build
 if command -v wasm-pack >/dev/null 2>&1; then
-  echo "Building rten-wasm from source using wasm-pack..."
-  (cd "$REPO_ROOT" && wasm-pack build crates/rten-wasm --target web --release --out-dir "$WASM_DIR")
+  echo "Building pluggable WASM inference runtimes from source using wasm-pack..."
+
+  echo "  1/3 Building rusto-nn (default pure-Rust inference engine)..."
+  (cd "$REPO_ROOT" && wasm-pack build crates/rten-wasm --target web --release --out-name rusto_nn --out-dir "$WASM_DIR")
+
+  echo "  2/3 Building rusto-rten (RTen inference engine)..."
+  (cd "$REPO_ROOT" && wasm-pack build crates/rten-wasm --target web --release --out-name rusto_rten --out-dir "$WASM_DIR" -- --no-default-features --features rusto-rten)
+
+  echo "  3/3 Building rusto-webgpu (WebGPU hardware accelerator engine)..."
+  (cd "$REPO_ROOT" && wasm-pack build crates/rten-wasm --target web --release --out-name rusto_webgpu --out-dir "$WASM_DIR" -- --no-default-features --features rusto-webgpu)
+
   rm -f "$WASM_DIR/.gitignore"
-  if [ -f "$WASM_DIR/rusto_rten_wasm_bg.wasm" ]; then
-    cp -f "$WASM_DIR/rusto_rten_wasm_bg.wasm" "$DOCS_DIR/public/wasm/"
-  fi
-  echo "✓ WASM runtime successfully built from source in $WASM_DIR and $DOCS_DIR/public/wasm"
+
+  # Sync default rusto_nn to rusto_rten_wasm for backwards compatibility
+  cp -f "$WASM_DIR/rusto_nn.js" "$WASM_DIR/rusto_rten_wasm.js"
+  cp -f "$WASM_DIR/rusto_nn.d.ts" "$WASM_DIR/rusto_rten_wasm.d.ts"
+  cp -f "$WASM_DIR/rusto_nn_bg.wasm" "$WASM_DIR/rusto_rten_wasm_bg.wasm"
+  cp -f "$WASM_DIR/rusto_nn_bg.wasm.d.ts" "$WASM_DIR/rusto_rten_wasm_bg.wasm.d.ts"
+
+  # Copy all WASM binaries to docs/public/wasm
+  cp -f "$WASM_DIR"/*.wasm "$DOCS_DIR/public/wasm/"
+  echo "✓ WASM runtimes (rusto-nn, rusto-rten, rusto-webgpu) successfully built in $WASM_DIR and $DOCS_DIR/public/wasm"
   exit 0
 fi
 
-# 2. Fallback: if local WASM runtime already present, copy to public
-if [ -f "$WASM_DIR/rusto_rten_wasm.js" ] && [ -f "$WASM_DIR/rusto_rten_wasm_bg.wasm" ]; then
-  echo "✓ Local WASM runtime already present in $WASM_DIR"
-  cp -f "$WASM_DIR/rusto_rten_wasm_bg.wasm" "$DOCS_DIR/public/wasm/" || true
+# 2. Fallback: if local WASM runtimes already present, copy to public
+if [ -f "$WASM_DIR/rusto_nn_bg.wasm" ] || [ -f "$WASM_DIR/rusto_rten_wasm_bg.wasm" ]; then
+  echo "✓ Local WASM runtimes already present in $WASM_DIR"
+  cp -f "$WASM_DIR"/*.wasm "$DOCS_DIR/public/wasm/" || true
   exit 0
 fi
 

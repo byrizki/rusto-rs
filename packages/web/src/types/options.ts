@@ -152,8 +152,6 @@ export interface OcrRunOptions {
   recognition?: RecognitionRunOptions;
   /** Phase 6: Post-recognition filtering options (score threshold). */
   postRecognition?: PostRecognitionOptions;
-  /** Enable WebGPU hardware acceleration if supported by browser/runtime. Default: false. */
-  webgpu?: boolean;
 }
 
 export type DetectTextOptions = OcrRunOptions;

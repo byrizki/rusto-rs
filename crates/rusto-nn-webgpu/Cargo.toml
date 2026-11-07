@@ -10,7 +10,11 @@ categories = ["science", "computer-vision"]
 
 [dependencies]
 rusto-nn = { path = "../rusto-nn", version = "0.4.0" }
-wgpu = { version = "24", default-features = false, features = ["wgsl"] }
+wgpu = { version = "24", default-features = false, features = ["wgsl", "webgpu", "fragile-send-sync-non-atomic-wasm"] }
 pollster = "0.4"
 thiserror = "1.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3"
+wasm-bindgen = "0.2"
 

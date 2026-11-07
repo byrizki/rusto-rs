@@ -65,11 +65,13 @@ export interface OcrConfig {
   optimizationTargetMaxSide: number;
   cropPaddingX: number;
   cropPaddingY: number;
-  // Hardware Acceleration
+  // Inference Engine Backend
+  inferenceBackend: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu';
   useWebGpu: boolean;
 }
 
 export const defaultOcrConfig: OcrConfig = {
+  inferenceBackend: 'rusto-nn',
   textScore: 0.5,
   lineYThreshold: 0.5,
   wordXThreshold: 0.4,
@@ -183,6 +185,5 @@ export function buildDetectTextOptions(
     postRecognition: {
       scoreThreshold: config.textScore,
     },
-    webgpu: Boolean(config.useWebGpu),
   };
 }

@@ -77,8 +77,34 @@ pub struct WebGpuBackend {
 }
 
 impl WebGpuBackend {
+    /// Check whether WebGPU is supported by the current runtime environment.
+    pub fn is_webgpu_supported() -> bool {
+        #[cfg(target_arch = "wasm32")]
+        {
+            let global = js_sys::global();
+            if let Ok(nav) = js_sys::Reflect::get(&global, &wasm_bindgen::JsValue::from_str("navigator")) {
+                if !nav.is_undefined() && !nav.is_null() {
+                    if let Ok(gpu) = js_sys::Reflect::get(&nav, &wasm_bindgen::JsValue::from_str("gpu")) {
+                        return !gpu.is_undefined() && !gpu.is_null();
+                    }
+                }
+            }
+            false
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            true
+        }
+    }
+
     /// Initialize WebGPU backend with auto-detected high-performance GPU adapter
     pub fn init() -> Result<Self, MnnError> {
+        if !Self::is_webgpu_supported() {
+            return Err(MnnError::BackendError(
+                "WebGPU is not supported or not available in the current runtime environment".into(),
+            ));
+        }
+
         let instance = wgpu::Instance::default();
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
@@ -97,6 +123,40 @@ impl WebGpuBackend {
             None,
         ))
         .map_err(|e| MnnError::BackendError(format!("Failed to request WebGPU device: {}", e)))?;
+
+        Self::from_device(device, queue)
+    }
+
+    /// Async WebGPU initialization for WebAssembly browser runtimes
+    pub async fn init_async() -> Result<Self, MnnError> {
+        if !Self::is_webgpu_supported() {
+            return Err(MnnError::BackendError(
+                "WebGPU is not supported or not available in the current runtime environment".into(),
+            ));
+        }
+
+        let instance = wgpu::Instance::default();
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: None,
+                force_fallback_adapter: false,
+            })
+            .await
+            .ok_or_else(|| MnnError::BackendError("No suitable WebGPU adapter found".into()))?;
+
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: Some("rusto_nn_webgpu_device"),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
+                    memory_hints: wgpu::MemoryHints::Performance,
+                },
+                None,
+            )
+            .await
+            .map_err(|e| MnnError::BackendError(format!("Failed to request WebGPU device: {}", e)))?;
 
         Self::from_device(device, queue)
     }
@@ -242,7 +302,16 @@ impl DeviceBackend for WebGpuBackend {
     }
 
     fn is_available(&self) -> bool {
-        true
+        #[cfg(target_arch = "wasm32")]
+        {
+            // On single-threaded browser WASM, blocking rx.recv() inside synchronous gemm
+            // deadlocks because the browser event loop cannot process map_async callbacks.
+            false
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            true
+        }
     }
 
     fn gemm(

@@ -196,12 +196,20 @@ export async function loadAndInitModel(
   model: OcrModelOption,
   progressRange: [number, number] = [0, 100],
   onProgress?: (progress: ModelDownloadProgress) => void,
-  layoutModelId?: LayoutModelId
+  layoutModelId?: LayoutModelId,
+  backend: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu' = 'rusto-nn'
 ): Promise<void> {
   const assets = await fetchModelAssets(model, onProgress, progressRange, baseURL, layoutModelId);
+  const wasmFileName =
+    backend === 'rusto-rten'
+      ? 'rusto_rten_bg.wasm'
+      : backend === 'rusto-webgpu'
+        ? 'rusto_webgpu_bg.wasm'
+        : 'rusto_nn_bg.wasm';
   await initialize({
+    backend,
     preset: model.preset,
-    wasmUrl: `${baseURL}wasm/rusto_rten_wasm_bg.wasm?v=0.4.0`,
+    wasmUrl: `${baseURL}wasm/${wasmFileName}?v=0.4.0`,
     models: assets,
     enableReadingOrder: layoutModelId !== undefined && layoutModelId !== 'none',
     layoutModel: layoutModelId,

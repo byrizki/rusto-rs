@@ -18,9 +18,20 @@ export interface ModelSourceConfig {
 }
 
 /**
+ * Supported pluggable WebAssembly inference engine backends:
+ * - 'rusto-nn': 100% pure-Rust Alibaba MNN/ONNX neural network engine (default, recommended).
+ * - 'rusto-rten': RTen pure-Rust neural network inference engine.
+ * - 'rusto-webgpu': WebGPU hardware accelerated compute shader engine (rusto-nn-webgpu).
+ */
+export type InferenceBackend = 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu';
+
+/**
  * Configuration options for initializing the RustO Web OCR engine.
  */
 export interface InitializeConfig {
+  /** Inference engine backend switch ('rusto-nn' | 'rusto-rten' | 'rusto-webgpu'). Defaults to 'rusto-nn'. */
+  backend?: InferenceBackend;
+
   /** Model preset identifier. Defaults to 'ppv6'. */
   preset?: ModelPreset;
 

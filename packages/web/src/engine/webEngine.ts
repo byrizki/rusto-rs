@@ -1,6 +1,7 @@
 import type {
   OcrRunOptions,
   InitializeConfig,
+  InferenceBackend,
   ImageSource,
   TextResult,
   PreDetectionOptions,
@@ -196,8 +197,10 @@ export class WebOcrEngine {
   public async initialize(config: InitializeConfig = {}): Promise<void> {
     this.currentConfig = { ...config };
 
-    // 1. Initialize WebAssembly RTen runtime
-    await initWasmRuntime(config.wasmUrl);
+    const backend = config.backend || (config.webgpu ? 'rusto-webgpu' : 'rusto-nn');
+
+    // 1. Initialize WebAssembly runtime for the requested pluggable engine
+    await initWasmRuntime(config.wasmUrl, backend);
 
     // 2. Load model buffers if provided
     if (config.models) {
@@ -248,6 +251,14 @@ export class WebOcrEngine {
    */
   public version(): string {
     return '0.4.0';
+  }
+
+  /**
+   * Returns the active inference engine backend identifier ('rusto-nn' | 'rusto-rten' | 'rusto-webgpu').
+   */
+  public backend(): InferenceBackend {
+    return (this.currentConfig.backend ||
+      (this.currentConfig.webgpu ? 'rusto-webgpu' : 'rusto-nn')) as InferenceBackend;
   }
 
   /**

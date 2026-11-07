@@ -46,6 +46,7 @@ function createOcrExecutionState(defaultModelName: string) {
     progress: ref<ProgressState>({ ...defaultProgressState }),
     activeLoadedModel: ref<string | null>(null),
     activeLoadedLayoutModel: ref<LayoutModelId | null>(null),
+    activeLoadedBackend: ref<'rusto-nn' | 'rusto-rten' | 'rusto-webgpu' | null>(null),
     status: ref<'idle' | 'initializing' | 'ready' | 'error'>('idle'),
     statusMessage: ref<string>(`${defaultModelName} selected (click Run OCR to load)`),
     isScanning: ref<boolean>(false),
@@ -74,12 +75,13 @@ async function runInitSequence(
   modelMeta: OcrModelOption,
   state: OcrState,
   setProgress: ProgressCallback,
-  opts?: EngineInitOptions
+  opts?: EngineInitOptions,
+  backend: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu' = 'rusto-nn'
 ): Promise<void> {
   const isPipeline = opts?.keepProgress ?? false;
   const range: [number, number] = opts?.progressRange ?? (isPipeline ? [0, 60] : [0, 100]);
   state.status.value = 'initializing';
-  state.statusMessage.value = `Loading ${modelMeta.name}...`;
+  state.statusMessage.value = `Loading ${modelMeta.name} (${backend})...`;
   setProgress(
     'download',
     `Downloading ${modelMeta.name}...`,
@@ -92,7 +94,8 @@ async function runInitSequence(
     modelMeta,
     range,
     (prog) => setProgress('download', prog.stageText, prog.percent, prog.detailText, opts?.step),
-    opts?.layoutModelId
+    opts?.layoutModelId,
+    backend
   );
   setProgress(
     'init',
@@ -108,22 +111,25 @@ async function performEngineInit(
   modelId: string,
   state: OcrState,
   setProgress: ProgressCallback,
-  opts?: EngineInitOptions
+  opts?: EngineInitOptions,
+  backend: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu' = 'rusto-nn'
 ): Promise<boolean> {
   const layoutId = opts?.layoutModelId ?? null;
   if (
     isInitialized() &&
     state.activeLoadedModel.value === modelId &&
-    state.activeLoadedLayoutModel.value === layoutId
+    state.activeLoadedLayoutModel.value === layoutId &&
+    state.activeLoadedBackend.value === backend
   ) {
     state.status.value = 'ready';
     return true;
   }
   const modelMeta = availableModels.find((m) => m.id === modelId) ?? defaultModel;
   try {
-    await runInitSequence(baseURL, modelMeta, state, setProgress, opts);
+    await runInitSequence(baseURL, modelMeta, state, setProgress, opts, backend);
     state.activeLoadedModel.value = modelId;
     state.activeLoadedLayoutModel.value = layoutId;
+    state.activeLoadedBackend.value = backend;
     state.status.value = 'ready';
     state.statusMessage.value = 'Engine Ready';
     return true;
@@ -163,15 +169,10 @@ async function executeModelInference(
   return { output, durationMs, opts };
 }
 
-interface PipelineContext {
+interface PipelineContext extends WebOcrExecutionOptions {
   state: OcrState;
-  selectedModel: Ref<string>;
   initEngine: (modelId?: string, opts?: EngineInitOptions) => Promise<boolean>;
-  imageSrc: Ref<string>;
-  ocrConfig: Ref<OcrConfig>;
-  outputMode: Ref<'lines' | 'words'>;
   setProgress: ProgressCallback;
-  currentModel: ComputedRef<OcrModelOption>;
 }
 
 function applyProcessedPipelineOutput(
@@ -213,11 +214,15 @@ async function performOcrPipeline(ctx: PipelineContext) {
   state.isScanning.value = true;
   const currentLayout = ocrConfig.value.layoutModel;
   const isLayoutSynced =
-    !currentLayout || currentLayout === 'none' || currentLayout === 'heuristic'
-      ? true
-      : state.activeLoadedLayoutModel.value === currentLayout;
+    !currentLayout ||
+    currentLayout === 'none' ||
+    currentLayout === 'heuristic' ||
+    state.activeLoadedLayoutModel.value === currentLayout;
   const needsInit =
-    !isInitialized() || state.activeLoadedModel.value !== selectedModel.value || !isLayoutSynced;
+    !isInitialized() ||
+    state.activeLoadedModel.value !== selectedModel.value ||
+    !isLayoutSynced ||
+    state.activeLoadedBackend.value !== ocrConfig.value.inferenceBackend;
   try {
     if (needsInit) {
       const ok = await initEngine(selectedModel.value, {
@@ -249,7 +254,7 @@ async function performOcrPipeline(ctx: PipelineContext) {
 }
 
 export function useWebOcrExecution(options: WebOcrExecutionOptions) {
-  const { baseURL, imageSrc, ocrConfig, selectedModel, currentModel, outputMode } = options;
+  const { baseURL, ocrConfig, selectedModel, currentModel } = options;
   const state = createOcrExecutionState(currentModel.value.name);
 
   const setProgress: ProgressCallback = (phase, stageText, percent, detailText, step) => {
@@ -259,7 +264,7 @@ export function useWebOcrExecution(options: WebOcrExecutionOptions) {
   const resetResults = () => resetOcrResultsState(state);
 
   const initEngine = (modelId = selectedModel.value, opts?: EngineInitOptions) =>
-    performEngineInit(baseURL, modelId, state, setProgress, opts);
+    performEngineInit(baseURL, modelId, state, setProgress, opts, ocrConfig.value.inferenceBackend);
 
   const switchModel = (modelId: string) => {
     selectedModel.value = modelId;
@@ -268,7 +273,8 @@ export function useWebOcrExecution(options: WebOcrExecutionOptions) {
     resetResults();
     const isLoaded =
       state.activeLoadedModel.value === modelId &&
-      state.activeLoadedLayoutModel.value === (ocrConfig.value.layoutModel ?? null);
+      state.activeLoadedLayoutModel.value === (ocrConfig.value.layoutModel ?? null) &&
+      state.activeLoadedBackend.value === ocrConfig.value.inferenceBackend;
     state.status.value = isLoaded ? 'ready' : 'idle';
     state.statusMessage.value = isLoaded
       ? 'Engine Ready'
@@ -277,14 +283,10 @@ export function useWebOcrExecution(options: WebOcrExecutionOptions) {
 
   const runOcr = () =>
     performOcrPipeline({
+      ...options,
       state,
-      selectedModel,
       initEngine,
-      imageSrc,
-      ocrConfig,
-      outputMode,
       setProgress,
-      currentModel,
     });
 
   return { ...state, initEngine, switchModel, resetResults, runOcr };

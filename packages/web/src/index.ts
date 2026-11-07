@@ -38,6 +38,13 @@ export function version(): string {
 }
 
 /**
+ * Returns the active inference engine backend identifier ('rusto-nn' | 'rusto-rten' | 'rusto-webgpu').
+ */
+export function engineBackend(): string {
+  return defaultEngine.backend();
+}
+
+/**
  * Downloads or pre-fetches model asset URLs for a specific pipeline ahead of time.
  */
 export function downloadModel(

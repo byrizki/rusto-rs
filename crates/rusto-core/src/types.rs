@@ -831,3 +831,36 @@ impl OcrRunOptions {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ocr_run_options_deserialization_and_unknown_fields_rejection() {
+        let valid_json = r#"{
+            "output": "lines",
+            "autoUnwarp": true,
+            "layoutReading": true,
+            "detection": {
+                "limitSideLen": 960,
+                "limitType": "max"
+            }
+        }"#;
+
+        let options: Result<OcrRunOptions, _> = serde_json::from_str(valid_json);
+        assert!(options.is_ok(), "Failed to deserialize valid OcrRunOptions: {:?}", options.err());
+        let opts = options.unwrap();
+        assert_eq!(opts.output, OutputGranularity::Lines);
+        assert_eq!(opts.auto_unwarp, Some(true));
+        assert!(opts.validate().is_ok());
+
+        // Unknown fields (such as engine backend parameters) must be denied on OcrRunOptions
+        let invalid_json = r#"{
+            "output": "lines",
+            "webgpu": false
+        }"#;
+        let rejected: Result<OcrRunOptions, _> = serde_json::from_str(invalid_json);
+        assert!(rejected.is_err(), "Expected unknown field 'webgpu' to be denied on OcrRunOptions");
+    }
+}

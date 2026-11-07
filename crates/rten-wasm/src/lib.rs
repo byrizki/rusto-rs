@@ -24,7 +24,48 @@ pub fn wasm_version() -> String {
 /// Returns whether WebAssembly inference engine is ready.
 #[wasm_bindgen(js_name = isReady)]
 pub fn wasm_is_ready() -> bool {
+    console_error_panic_hook::set_once();
     true
+}
+
+/// Returns the active inference engine backend identifier ('rusto-nn' | 'rusto-rten' | 'rusto-webgpu').
+#[wasm_bindgen(js_name = engineBackend)]
+pub fn wasm_engine_backend() -> String {
+    #[cfg(feature = "rusto-webgpu")]
+    {
+        "rusto-webgpu".to_string()
+    }
+    #[cfg(feature = "rusto-rten")]
+    {
+        "rusto-rten".to_string()
+    }
+    #[cfg(not(any(feature = "rusto-webgpu", feature = "rusto-rten")))]
+    {
+        "rusto-nn".to_string()
+    }
+}
+
+/// Initializes WebGPU compute acceleration if supported by this WASM build.
+#[wasm_bindgen(js_name = initWebGpu)]
+pub async fn wasm_init_webgpu() -> Result<bool, String> {
+    console_error_panic_hook::set_once();
+    #[cfg(feature = "rusto-webgpu")]
+    {
+        if !rusto_nn_webgpu::WebGpuBackend::is_webgpu_supported() {
+            return Ok(false);
+        }
+        match rusto_nn_webgpu::WebGpuBackend::init_async().await {
+            Ok(backend) => {
+                backend.register();
+                Ok(true)
+            }
+            Err(_) => Ok(false),
+        }
+    }
+    #[cfg(not(feature = "rusto-webgpu"))]
+    {
+        Ok(false)
+    }
 }
 
 #[wasm_bindgen]
@@ -58,6 +99,7 @@ pub type RustoModel = RtenModel;
 impl RtenModel {
     #[wasm_bindgen(constructor)]
     pub fn new(model_data: Vec<u8>) -> Result<RtenModel, String> {
+        console_error_panic_hook::set_once();
         let model = Arc::new(Model::from_bytes(model_data).map_err(|e| e.to_string())?);
         let session = Session::from_arc(Arc::clone(&model)).map_err(|e| e.to_string())?;
         Ok(RtenModel { model, session })
@@ -184,6 +226,7 @@ impl RtenOcrPipeline {
         rec_data: Vec<u8>,
         dict_text: &str,
     ) -> Result<RtenOcrPipeline, String> {
+        console_error_panic_hook::set_once();
         let det_model = Arc::new(Model::from_bytes(det_data).map_err(|e| format!("Det model load error: {:?}", e))?);
         let det_session = Session::from_arc(Arc::clone(&det_model)).map_err(|e| format!("Det session error: {:?}", e))?;
 

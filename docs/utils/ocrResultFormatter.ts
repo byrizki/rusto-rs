@@ -1,25 +1,127 @@
-import type {
-  DetectTextOptions,
-  TextResult,
-} from '@rustors/web';
+import type { DetectTextOptions, TextResult } from '@rustors/web';
 import type { OcrModelOption } from '../types/ocrModels';
 import { type ActiveRunConfig, type OcrConfig, buildDetectTextOptions } from '../types/ocrConfig';
 
+interface SpatialToken {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text: string;
+}
+
+function groupSpatialLines(tokens: SpatialToken[], yTolerance: number): SpatialToken[][] {
+  const sorted = tokens.toSorted((a, b) => (a.y === b.y ? a.x - b.x : a.y - b.y));
+  const lines: SpatialToken[][] = [];
+  let currentLine: SpatialToken[] = [];
+  let currentLineYSum = 0;
+
+  for (const token of sorted) {
+    if (currentLine.length > 0) {
+      const avgY = currentLineYSum / currentLine.length;
+      if (Math.abs(token.y - avgY) <= yTolerance) {
+        currentLine.push(token);
+        currentLineYSum += token.y;
+      } else {
+        lines.push(currentLine);
+        currentLine = [token];
+        currentLineYSum = token.y;
+      }
+    } else {
+      currentLine = [token];
+      currentLineYSum = token.y;
+    }
+  }
+  if (currentLine.length > 0) lines.push(currentLine);
+  return lines;
+}
+
+function formatSpatialLine(
+  line: SpatialToken[],
+  minX: number,
+  avgCharWidth: number,
+  xGapThreshold: number
+): string {
+  const sortedLine = line.toSorted((a, b) => a.x - b.x);
+  let lineStr = '';
+  let currentCharPos = 0;
+  let prevTokenEndX = minX;
+
+  for (let i = 0; i < sortedLine.length; i++) {
+    const token = sortedLine[i]!;
+    const targetCharPos = (token.x - minX) / avgCharWidth;
+    const spacesNeeded =
+      i === 0
+        ? Math.max(0, Math.round(targetCharPos))
+        : token.x - prevTokenEndX < xGapThreshold
+          ? 1
+          : Math.max(1, Math.round(targetCharPos - currentCharPos));
+
+    const cappedSpaces = Math.min(spacesNeeded, 80);
+    lineStr += ' '.repeat(cappedSpaces) + token.text;
+    currentCharPos += cappedSpaces + token.text.length;
+    prevTokenEndX = token.x + token.width;
+  }
+  return lineStr;
+}
+
+export function reconstructSpatialText(
+  items: TextResult[],
+  lineYThreshold: number = 0.5,
+  wordXThreshold: number = 0.4
+): string {
+  if (items.length === 0) return '';
+
+  const tokens: SpatialToken[] = items.map((item) => ({
+    x: item.frame.left,
+    y: item.frame.top,
+    width: Math.max(item.frame.width, 1),
+    height: Math.max(item.frame.height, 1),
+    text: item.text,
+  }));
+
+  const sortedHeights = tokens.map((t) => t.height).toSorted((a, b) => a - b);
+  const medianHeight = sortedHeights[Math.floor(sortedHeights.length / 2)] ?? 12;
+  const totalChars = tokens.reduce((acc, t) => acc + t.text.length, 0);
+  const totalWidth = tokens.reduce((acc, t) => acc + t.width, 0);
+  const avgCharWidth =
+    totalChars > 0 ? Math.max(totalWidth / totalChars, 1) : Math.max(medianHeight * 0.5, 4);
+
+  const lines = groupSpatialLines(tokens, medianHeight * lineYThreshold);
+  const minX = Math.min(...tokens.map((t) => t.x));
+  const outputLines: string[] = [];
+  let prevLineAvgY: number | null = null;
+
+  for (const line of lines) {
+    const lineAvgY = line.reduce((acc, t) => acc + t.y, 0) / line.length;
+    if (prevLineAvgY !== null && lineAvgY - prevLineAvgY > medianHeight * 1.5) {
+      const blankCount = Math.min(
+        Math.max(Math.round((lineAvgY - prevLineAvgY - medianHeight) / medianHeight) - 1, 0),
+        4
+      );
+      for (let b = 0; b < blankCount; b++) outputLines.push('');
+    }
+    prevLineAvgY = lineAvgY;
+    outputLines.push(formatSpatialLine(line, minX, avgCharWidth, avgCharWidth * wordXThreshold));
+  }
+
+  return outputLines.join('\n');
+}
+
 export function processOcrOutput(
   output: TextResult[] | string,
-  _lineYThreshold?: number,
-  _wordXThreshold?: number,
+  lineYThreshold: number = 0.5,
+  wordXThreshold: number = 0.4,
   _enableReadingOrder: boolean = false
 ): { results: TextResult[]; spatialText: string } {
   if (Array.isArray(output)) {
     return {
       results: output,
-      spatialText: output.map((r) => r.text).join('\n'),
+      spatialText: reconstructSpatialText(output, lineYThreshold, wordXThreshold),
     };
   }
   return { results: [], spatialText: output };
 }
-
 
 export function formatResultsTsv(
   results: Array<{
@@ -31,9 +133,22 @@ export function formatResultsTsv(
   const header = ['text', 'score', 'left', 'top', 'width', 'height'].join('\t');
   const rows = results.map(
     (r) =>
-      `${r.text.replace(/[\t\n\r]/g, ' ')}\t${r.score.toFixed(4)}\t${r.frame.left}\t${r.frame.top}\t${r.frame.width}\t${r.frame.height}`
+      `${r.text.replaceAll(/[\t\n\r]/gu, ' ')}\t${r.score.toFixed(4)}\t${Math.round(r.frame.left)}\t${Math.round(r.frame.top)}\t${Math.round(r.frame.width)}\t${Math.round(r.frame.height)}`
   );
   return [header, ...rows].join('\n');
+}
+
+export function downloadTextFile(content: string, filename: string, mimeType: string): void {
+  if (typeof document === 'undefined') return;
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 export function formatActiveConfigJson(
@@ -69,7 +184,6 @@ export function formatFluentBuilderSnippet(
   const lines: string[] = [
     `import { detectText } from '@rustors/web';`,
     ``,
-    `// Execute OCR with fluent builder chaining`,
     `const results = await detectText()`,
     `  .image(imageSource)`,
   ];
@@ -94,7 +208,6 @@ export function formatOptionsSnippet(options: DetectTextOptions): string {
   return [
     `import { detectText } from '@rustors/web';`,
     ``,
-    `// Execute OCR with structured OcrRunOptions`,
     `const results = await detectText(imageSource, ${JSON.stringify(options, null, 2)});`,
   ].join('\n');
 }

@@ -1,16 +1,25 @@
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { defaultOcrConfig, type OcrConfig } from '../types/ocrConfig';
 import type { OcrProfilePreset } from '../types/ocrPresets';
+
+export type OcrSettingsTab = 'preDetection' | 'detection' | 'recognition' | 'runtime';
 
 export function useWebOcrSettings() {
   const ocrConfig = ref<OcrConfig>({ ...defaultOcrConfig });
   const isConfigOpen = ref<boolean>(false);
-  const configTab = ref<
-    'detection' | 'recognition' | 'layout' | 'resizing' | 'preprocess' | 'hardware' | 'models'
-  >('detection');
+  const configTab = ref<OcrSettingsTab>('preDetection');
+
+  const isCustomConfig = computed<boolean>(
+    () => JSON.stringify(ocrConfig.value) !== JSON.stringify(defaultOcrConfig)
+  );
 
   function toggleConfigPopover() {
     isConfigOpen.value = !isConfigOpen.value;
+  }
+
+  function openConfigTab(tab: OcrSettingsTab) {
+    configTab.value = tab;
+    isConfigOpen.value = true;
   }
 
   function resetConfigDefaults() {
@@ -18,12 +27,16 @@ export function useWebOcrSettings() {
   }
 
   function applyPreset(preset: OcrProfilePreset) {
-    ocrConfig.value = { ...ocrConfig.value, ...preset.config };
+    ocrConfig.value = {
+      ...defaultOcrConfig,
+      ...preset.config,
+      useWebGpu: ocrConfig.value.useWebGpu,
+    };
   }
 
   function isPresetActive(preset: OcrProfilePreset): boolean {
     return Object.entries(preset.config).every(
-      ([k, v]) => (ocrConfig.value as Record<string, unknown>)[k] === v
+      ([k, v]) => (ocrConfig.value as unknown as Record<string, unknown>)[k] === v
     );
   }
 
@@ -31,7 +44,9 @@ export function useWebOcrSettings() {
     ocrConfig,
     isConfigOpen,
     configTab,
+    isCustomConfig,
     toggleConfigPopover,
+    openConfigTab,
     resetConfigDefaults,
     applyPreset,
     isPresetActive,
