@@ -79,14 +79,14 @@ fn test_mnn_ocr_on_example1_image() {
 }
 
 #[test]
-fn test_mnn_ocr_on_ktp_image() {
+fn test_mnn_ocr_on_idcard_image() {
     let repo_root = get_repo_root();
     let det_path = repo_root.join("models/PPOCR_v6_tiny/det.mnn");
     let rec_path = repo_root.join("models/PPOCR_v6_tiny/rec.mnn");
     let dict_path = repo_root.join("models/PPOCR_v6_tiny/dict.txt");
-    let img_path = repo_root.join("ktp.jpeg");
+    let img_path = repo_root.join("models/test_images/idcard.jpg");
 
-    assert!(img_path.exists(), "ktp.jpeg exists: {}", img_path.display());
+    assert!(img_path.exists(), "idcard.jpg exists: {}", img_path.display());
     assert!(det_path.exists(), "det.mnn exists: {}", det_path.display());
     assert!(rec_path.exists(), "rec.mnn exists: {}", rec_path.display());
     assert!(dict_path.exists(), "dict.txt exists: {}", dict_path.display());
@@ -103,24 +103,24 @@ fn test_mnn_ocr_on_ktp_image() {
     let mut ocr = RustO::initialize(config)
         .expect("Initialize RustO with pure-Rust MNN engines");
 
-    println!("Running pure-Rust MNN OCR on ktp.jpeg...");
+    println!("Running pure-Rust MNN OCR on idcard.jpg...");
     let t0 = std::time::Instant::now();
     let result = ocr
         .detect_text(
             &ImageSource::Path(img_path),
             &OcrRunOptions::default(),
         )
-        .expect("Run MNN OCR pipeline on ktp");
+        .expect("Run MNN OCR pipeline on idcard");
     let elapsed = t0.elapsed();
 
     match result {
         DetectTextResult::Structured(lines) => {
             println!(
-                "KTP: Successfully recognized {} text lines in {:.2}s:",
+                "ID Card: Successfully recognized {} text lines in {:.2}s:",
                 lines.len(),
                 elapsed.as_secs_f64()
             );
-            assert!(!lines.is_empty(), "Should detect text regions on ktp.jpeg");
+            assert!(!lines.is_empty(), "Should detect text regions on idcard.jpg");
 
             for (i, line) in lines.iter().enumerate().take(15) {
                 println!(

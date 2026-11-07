@@ -144,8 +144,8 @@ function downloadLayoutAsset(
   if (layoutUrls.length === 0) return undefined;
   const label =
     layoutModelId === 'indra'
-      ? 'Indra Neural Reading Order (order.rten)'
-      : `${layoutModelId} (layout.rten)`;
+      ? 'Indra Neural Reading Order (order.onnx)'
+      : `${layoutModelId} (layout.mnn)`;
   return downloadBinaryWithProgress(layoutUrls, label, 3, totalSteps, onProgress, progressRange);
 }
 
@@ -163,7 +163,7 @@ export async function fetchModelAssets(
 
   const detBuffer = await downloadBinaryWithProgress(
     candidates.detection,
-    `${model.name} (det.rten)`,
+    `${model.name} (det.mnn)`,
     1,
     totalSteps,
     onProgress,
@@ -171,7 +171,7 @@ export async function fetchModelAssets(
   );
   const recBuffer = await downloadBinaryWithProgress(
     candidates.recognition,
-    `${model.name} (rec.rten)`,
+    `${model.name} (rec.mnn)`,
     2,
     totalSteps,
     onProgress,

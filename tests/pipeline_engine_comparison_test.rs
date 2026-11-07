@@ -42,7 +42,7 @@ fn test_ppocr_v6_tiny_rten_vs_mnn_comparison() {
 
     let test_images = [
         ("example1.png", root.join("models/test_images/example1.png")),
-        ("ktp.jpeg", root.join("ktp.jpeg")),
+        ("idcard.jpg", root.join("models/test_images/idcard.jpg")),
         ("chronam-ad-page.png", root.join("tests/fixtures/chronam-ad-page.png")),
     ];
 

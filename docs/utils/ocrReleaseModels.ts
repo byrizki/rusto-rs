@@ -43,15 +43,23 @@ export function getModelCandidateUrls(
   return {
     detection: dedupeStrings([
       `${HUGGINGFACE_BASE}/${assetItem.detection}`,
+      `${HUGGINGFACE_BASE}/${modelId}/det.mnn`,
+      `${HUGGINGFACE_BASE}/${modelId}/det.onnx`,
       `${HUGGINGFACE_BASE}/${modelId}/det.rten`,
       `${cleanBase}/models/${assetItem.detection}`,
+      `${cleanBase}/models/${modelId}/det.mnn`,
+      `${cleanBase}/models/${modelId}/det.onnx`,
       `${cleanBase}/models/${modelId}/det.rten`,
       assetItem.legacyDetection ? `${cleanBase}/models/${assetItem.legacyDetection}` : undefined,
     ]),
     recognition: dedupeStrings([
       `${HUGGINGFACE_BASE}/${assetItem.recognition}`,
+      `${HUGGINGFACE_BASE}/${modelId}/rec.mnn`,
+      `${HUGGINGFACE_BASE}/${modelId}/rec.onnx`,
       `${HUGGINGFACE_BASE}/${modelId}/rec.rten`,
       `${cleanBase}/models/${assetItem.recognition}`,
+      `${cleanBase}/models/${modelId}/rec.mnn`,
+      `${cleanBase}/models/${modelId}/rec.onnx`,
       `${cleanBase}/models/${modelId}/rec.rten`,
       assetItem.legacyRecognition
         ? `${cleanBase}/models/${assetItem.legacyRecognition}`
@@ -87,22 +95,35 @@ export function getLayoutModelCandidateUrls(
   const cleanBase = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
   if (layoutModelId === 'indra') {
     return dedupeStrings([
+      `${HUGGINGFACE_BASE}/indraocr/order.onnx`,
       `${HUGGINGFACE_BASE}/indraocr/order.rten`,
+      `${HUGGINGFACE_BASE}/indraocr/indra_order.onnx`,
       `${HUGGINGFACE_BASE}/indraocr/indra_order.rten`,
+      `${cleanBase}/models/indraocr/order.onnx`,
       `${cleanBase}/models/indraocr/order.rten`,
+      `${cleanBase}/models/indraocr/indra_order.onnx`,
       `${cleanBase}/models/indraocr/indra_order.rten`,
+      `${cleanBase}/models/indra/indra_order.onnx`,
       `${cleanBase}/models/indra/indra_order.rten`,
     ]);
   }
   if (layoutModelId === 'cdla') {
     return dedupeStrings([
+      `${HUGGINGFACE_BASE}/modules/layout_cdla.mnn`,
+      `${HUGGINGFACE_BASE}/modules/layout_cdla.onnx`,
       `${HUGGINGFACE_BASE}/modules/layout_cdla.rten`,
+      `${cleanBase}/models/modules/layout_cdla.mnn`,
+      `${cleanBase}/models/modules/layout_cdla.onnx`,
       `${cleanBase}/models/modules/layout_cdla.rten`,
     ]);
   }
   if (layoutModelId === 'publaynet') {
     return dedupeStrings([
+      `${HUGGINGFACE_BASE}/modules/layout_publaynet.mnn`,
+      `${HUGGINGFACE_BASE}/modules/layout_publaynet.onnx`,
       `${HUGGINGFACE_BASE}/modules/layout_publaynet.rten`,
+      `${cleanBase}/models/modules/layout_publaynet.mnn`,
+      `${cleanBase}/models/modules/layout_publaynet.onnx`,
       `${cleanBase}/models/modules/layout_publaynet.rten`,
     ]);
   }

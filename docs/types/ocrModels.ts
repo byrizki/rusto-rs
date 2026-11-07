@@ -78,9 +78,9 @@ export const availableLayoutModels: LayoutModelOption[] = [
     description:
       'Sequences multi-column text lines into natural human reading flow using coordinate transformer.',
     size: '2.9 MB',
-    assetFile: 'indraocr/indra_order.rten',
+    assetFile: 'indraocr/indra_order.onnx',
     downloadUrl:
-      'https://huggingface.co/byrizki/rusto-models/resolve/main/indraocr/indra_order.rten',
+      'https://huggingface.co/byrizki/rusto-models/resolve/main/indraocr/indra_order.onnx',
   },
   {
     id: 'cdla',
@@ -89,8 +89,8 @@ export const availableLayoutModels: LayoutModelOption[] = [
     description:
       'General document layout analysis detecting text, titles, figures, captions, tables, and headers.',
     size: '8.4 MB',
-    assetFile: 'modules/layout_cdla.rten',
-    downloadUrl: 'https://huggingface.co/byrizki/rusto-models/resolve/main/modules/layout_cdla.rten',
+    assetFile: 'modules/layout_cdla.mnn',
+    downloadUrl: 'https://huggingface.co/byrizki/rusto-models/resolve/main/modules/layout_cdla.mnn',
   },
   {
     id: 'publaynet',
@@ -99,9 +99,9 @@ export const availableLayoutModels: LayoutModelOption[] = [
     description:
       'Academic paper and publication layout model detecting text, titles, lists, tables, and figures.',
     size: '8.4 MB',
-    assetFile: 'modules/layout_publaynet.rten',
+    assetFile: 'modules/layout_publaynet.mnn',
     downloadUrl:
-      'https://huggingface.co/byrizki/rusto-models/resolve/main/modules/layout_publaynet.rten',
+      'https://huggingface.co/byrizki/rusto-models/resolve/main/modules/layout_publaynet.mnn',
   },
   {
     id: 'none',

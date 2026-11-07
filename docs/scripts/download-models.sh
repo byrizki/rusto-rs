@@ -12,13 +12,13 @@ mkdir -p "$TARGET_DIR"
 
 # Only bundle client/web-appropriate models for live demo (<25 MB each, avoids GitHub Pages 100 MB limit)
 declare -A MODEL_FILES=(
-  ["indraocr"]="indra_det.rten indra_rec.rten indra_meta.json"
-  ["ppocrv6-tiny"]="ppocrv6_tiny_det.rten ppocrv6_tiny_rec.rten ppocrv6_dict.txt"
-  ["ppocrv6-tiny-int8"]="ppocrv6_tiny_int8_det.rten ppocrv6_tiny_int8_rec.rten ppocrv6_dict.txt"
-  ["ppocrv6-small"]="ppocrv6_small_det.rten ppocrv6_small_rec.rten ppocrv6_dict.txt"
-  ["ppocrv6-small-int8"]="ppocrv6_small_int8_det.rten ppocrv6_small_int8_rec.rten ppocrv6_dict.txt"
-  ["ppocrv5-mobile"]="ppocrv5_mobile_det.rten ppocrv5_mobile_rec.rten ppocrv5_dict.txt"
-  ["ppocrv4-mobile"]="ppocrv4_mobile_det.rten ppocrv4_mobile_rec.rten ppocrv4_dict.txt"
+  ["indraocr"]="indra_det.mnn indra_rec.mnn indra_meta.json"
+  ["ppocrv6-tiny"]="ppocrv6_tiny_det.mnn ppocrv6_tiny_rec.mnn ppocrv6_dict.txt"
+  ["ppocrv6-tiny-int8"]="ppocrv6_tiny_int8_det.onnx ppocrv6_tiny_int8_rec.onnx ppocrv6_dict.txt"
+  ["ppocrv6-small"]="ppocrv6_small_det.onnx ppocrv6_small_rec.onnx ppocrv6_dict.txt"
+  ["ppocrv6-small-int8"]="ppocrv6_small_int8_det.onnx ppocrv6_small_int8_rec.onnx ppocrv6_dict.txt"
+  ["ppocrv5-mobile"]="ppocrv5_mobile_det.onnx ppocrv5_mobile_rec.onnx ppocrv5_dict.txt"
+  ["ppocrv4-mobile"]="ppocrv4_mobile_det.onnx ppocrv4_mobile_rec.onnx ppocrv4_dict.txt"
 )
 
 echo "=== Indexing and Downloading Models from Hugging Face Hub ($HF_BASE) ==="
@@ -62,22 +62,37 @@ for model in "${!MODEL_FILES[@]}"; do
     fi
   }
 
+  det_ext="${det_file##*.}"
+  rec_ext="${rec_file##*.}"
+
   if [ "$model" = "indraocr" ]; then
-    download_file "$TARGET_DIR/$model/det.rten" "$model" "det.rten" "$det_file" "$REPO_ROOT/models/indra/det.rten"
-    download_file "$TARGET_DIR/$model/rec.rten" "$model" "rec.rten" "$rec_file" "$REPO_ROOT/models/indra/rec.rten"
+    download_file "$TARGET_DIR/$model/det.$det_ext" "$model" "det.$det_ext" "$det_file" "$REPO_ROOT/models/indra/det.$det_ext"
+    download_file "$TARGET_DIR/$model/rec.$rec_ext" "$model" "rec.$rec_ext" "$rec_file" "$REPO_ROOT/models/indra/rec.$rec_ext"
     download_file "$TARGET_DIR/$model/meta.json" "$model" "meta.json" "$dict_file" "$REPO_ROOT/models/indra/meta.json"
-    link_flat "$TARGET_DIR/$model/det.rten" "$det_file"
-    link_flat "$TARGET_DIR/$model/rec.rten" "$rec_file"
+    link_flat "$TARGET_DIR/$model/det.$det_ext" "$det_file"
+    link_flat "$TARGET_DIR/$model/rec.$rec_ext" "$rec_file"
     link_flat "$TARGET_DIR/$model/meta.json" "$dict_file"
   else
-    download_file "$TARGET_DIR/$model/det.rten" "$model" "det.rten" "$det_file" "$REPO_ROOT/models/PPOCR_${model//-/_}/det.rten"
-    download_file "$TARGET_DIR/$model/rec.rten" "$model" "rec.rten" "$rec_file" "$REPO_ROOT/models/PPOCR_${model//-/_}/rec.rten"
+    download_file "$TARGET_DIR/$model/det.$det_ext" "$model" "det.$det_ext" "$det_file" "$REPO_ROOT/models/PPOCR_${model//-/_}/det.$det_ext"
+    download_file "$TARGET_DIR/$model/rec.$rec_ext" "$model" "rec.$rec_ext" "$rec_file" "$REPO_ROOT/models/PPOCR_${model//-/_}/rec.$rec_ext"
     download_file "$TARGET_DIR/$model/dict.txt" "$model" "dict.txt" "$dict_file" "$REPO_ROOT/models/PPOCR_${model//-/_}/dict.txt"
-    link_flat "$TARGET_DIR/$model/det.rten" "$det_file"
-    link_flat "$TARGET_DIR/$model/rec.rten" "$rec_file"
+    link_flat "$TARGET_DIR/$model/det.$det_ext" "$det_file"
+    link_flat "$TARGET_DIR/$model/rec.$rec_ext" "$rec_file"
     link_flat "$TARGET_DIR/$model/dict.txt" "$dict_file"
   fi
 done
+
+# Also download layout and auxiliary modules for live demo
+mkdir -p "$TARGET_DIR/modules"
+download_file "$TARGET_DIR/modules/layout_cdla.mnn" "modules" "layout_cdla.mnn" "layout_cdla.mnn" "$REPO_ROOT/models/layout_cdla.mnn"
+download_file "$TARGET_DIR/modules/layout_publaynet.mnn" "modules" "layout_publaynet.mnn" "layout_publaynet.mnn" "$REPO_ROOT/models/layout_publaynet.mnn"
+download_file "$TARGET_DIR/modules/orient.mnn" "modules" "orient.mnn" "orient.mnn" "$REPO_ROOT/models/orient.mnn"
+download_file "$TARGET_DIR/modules/cls.mnn" "modules" "cls.mnn" "cls.mnn" "$REPO_ROOT/models/cls.mnn"
+download_file "$TARGET_DIR/modules/uvdoc.mnn" "modules" "uvdoc.mnn" "uvdoc.mnn" "$REPO_ROOT/models/uvdoc.mnn"
+
+# Order model for Indra OCR
+download_file "$TARGET_DIR/indraocr/order.onnx" "indraocr" "order.onnx" "indra_order.onnx" "$REPO_ROOT/models/indra/order.onnx"
+link_flat "$TARGET_DIR/indraocr/order.onnx" "indra_order.onnx"
 
 echo "=== Syncing WebAssembly runtime binary ==="
 mkdir -p "$DOCS_DIR/public/wasm"
