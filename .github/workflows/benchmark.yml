@@ -3,8 +3,17 @@ name: OmniDocBench Comprehensive Benchmark
 on:
   workflow_dispatch:
     inputs:
+      dataset_mode:
+        description: 'OmniDocBench dataset mode ("english-only" for 755 pages, "all" for 1651 pages, or "sample-only" for 101 pages)'
+        required: false
+        default: 'english-only'
+        type: choice
+        options:
+          - english-only
+          - all
+          - sample-only
       sample_size:
-        description: 'Number of stratified OmniDocBench pages to evaluate'
+        description: 'Number of pages to evaluate (default "30" for stratified sample, or "0" / "-1" for all available pages)'
         required: false
         default: '30'
         type: string
@@ -63,6 +72,22 @@ jobs:
             target/release/mnn-direct
             benchmarks/omnidocbench/ocrs_bin/bin/ocrs
           retention-days: 7
+
+      - name: Cache OmniDocBench Dataset
+        uses: actions/cache@v4
+        id: dataset-cache
+        with:
+          path: benchmarks/omnidocbench/dataset
+          key: omnidocbench-${{ inputs.dataset_mode || 'english-only' }}-${{ hashFiles('scripts/download_omnidocbench.sh') }}
+          restore-keys: |
+            omnidocbench-${{ inputs.dataset_mode || 'english-only' }}-
+            omnidocbench-
+
+      - name: Prepare OmniDocBench Dataset (Warm Up Cache)
+        if: steps.dataset-cache.outputs.cache-hit != 'true'
+        run: |
+          chmod +x scripts/download_omnidocbench.sh
+          bash scripts/download_omnidocbench.sh --${{ inputs.dataset_mode || 'english-only' }}
 
       - name: Resolve Benchmark Target Matrix
         id: resolve-matrix
@@ -151,15 +176,32 @@ jobs:
             pip install -e vendor/indra-ocr
           fi
 
+      - name: Cache OCR Models
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: rusto-ocr-models-${{ hashFiles('scripts/download_models.sh') }}
+          restore-keys: |
+            rusto-ocr-models-
+
       - name: Prepare Test Models
         run: |
           chmod +x scripts/download_models.sh
           bash scripts/download_models.sh --ci
 
-      - name: Prepare OmniDocBench Sample Dataset
+      - name: Cache OmniDocBench Dataset
+        uses: actions/cache@v4
+        with:
+          path: benchmarks/omnidocbench/dataset
+          key: omnidocbench-${{ inputs.dataset_mode || 'english-only' }}-${{ hashFiles('scripts/download_omnidocbench.sh') }}
+          restore-keys: |
+            omnidocbench-${{ inputs.dataset_mode || 'english-only' }}-
+            omnidocbench-
+
+      - name: Ensure OmniDocBench Dataset Available
         run: |
           chmod +x scripts/download_omnidocbench.sh
-          bash scripts/download_omnidocbench.sh --sample-only
+          bash scripts/download_omnidocbench.sh --${{ inputs.dataset_mode || 'english-only' }}
 
       - name: Run Benchmark (${{ matrix.target }})
         run: |
@@ -167,6 +209,7 @@ jobs:
           python3 benchmarks/omnidocbench/run_full_benchmark.py \
             --targets ${{ matrix.target }} \
             --sample-size ${{ inputs.sample_size || 30 }} \
+            --language ${{ inputs.dataset_mode == 'all' && 'all' || 'english' }} \
             --output-file benchmarks/omnidocbench/results/metric_${{ matrix.target }}.json
 
       - name: Upload Single Target Metric

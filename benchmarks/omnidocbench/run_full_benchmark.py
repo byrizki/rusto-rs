@@ -78,39 +78,56 @@ def load_ground_truth():
         return json.load(f)
 
 
-def select_stratified_sample(gt_data, sample_size=30):
-    english = [
-        s for s in gt_data
-        if s.get("page_info", {}).get("page_attribute", {}).get("language") == "english"
+def select_stratified_sample(gt_data, sample_size=30, language="english"):
+    if language == "all":
+        candidates = gt_data
+    else:
+        candidates = [
+            s for s in gt_data
+            if s.get("page_info", {}).get("page_attribute", {}).get("language") == language
+        ]
+
+    available = [
+        s for s in candidates
+        if (IMAGES_DIR / s.get("page_info", {}).get("image_path", "")).is_file()
+        and (IMAGES_DIR / s.get("page_info", {}).get("image_path", "")).stat().st_size > 1000
     ]
-    by_type = defaultdict(list)
-    for s in english:
-        src = s.get("page_info", {}).get("page_attribute", {}).get("data_source", "unknown")
-        img_name = s.get("page_info", {}).get("image_path")
-        if (IMAGES_DIR / img_name).exists():
+
+    if not available:
+        return []
+
+    if sample_size <= 0 or sample_size >= len(available):
+        return available
+
+    if sample_size == 30 and language == "english":
+        by_type = defaultdict(list)
+        for s in available:
+            src = s.get("page_info", {}).get("page_attribute", {}).get("data_source", "unknown")
             by_type[src].append(s)
 
-    usatoday_target = "newspaper_USAToday-2025-01-08@magazinesclubnew_page_012.png"
-    usatoday = [s for s in english if s.get("page_info", {}).get("image_path") == usatoday_target][0]
+        usatoday_target = "newspaper_USAToday-2025-01-08@magazinesclubnew_page_012.png"
+        usatoday = [s for s in available if s.get("page_info", {}).get("image_path") == usatoday_target]
 
-    rng = random.Random(42)
-    sampled = [usatoday]
+        rng = random.Random(42)
+        sampled = list(usatoday)
 
-    proportions = {
-        "academic_literature": 7,
-        "book": 5,
-        "PPT2PDF": 4,
-        "magazine": 4,
-        "exam_paper": 4,
-        "newspaper": 3,
-        "colorful_textbook": 2,
-    }
+        proportions = {
+            "academic_literature": 7,
+            "book": 5,
+            "PPT2PDF": 4,
+            "magazine": 4,
+            "exam_paper": 4,
+            "newspaper": 3,
+            "colorful_textbook": 2,
+        }
 
-    for src, count in proportions.items():
-        pool = [s for s in by_type[src] if s.get("page_info", {}).get("image_path") != usatoday_target]
-        sampled.extend(rng.sample(pool, min(count, len(pool))))
-
-    return sampled[:sample_size]
+        for src, count in proportions.items():
+            pool = [s for s in by_type[src] if s.get("page_info", {}).get("image_path") != usatoday_target]
+            sampled.extend(rng.sample(pool, min(count, len(pool))))
+        return sampled[:sample_size]
+    else:
+        rng = random.Random(42)
+        return rng.sample(available, min(sample_size, len(available)))
 
 
 def get_ground_truth_text(sample):
@@ -751,7 +768,8 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="OmniDocBench Comprehensive Benchmark Runner")
     parser.add_argument("--targets", type=str, default="", help="Comma-separated target keys or letters (a-l) to run, or empty for all")
-    parser.add_argument("--sample-size", type=int, default=30, help="Number of stratified sample pages to evaluate (default: 30)")
+    parser.add_argument("--sample-size", type=int, default=30, help="Number of sample pages to evaluate (default: 30, set 0 or -1 for all available pages)")
+    parser.add_argument("--language", type=str, default="english", choices=["english", "all"], help="Language subset to evaluate ('english' or 'all', default: 'english')")
     parser.add_argument("--output-file", type=str, default="", help="Path to output results JSON file (default: results/benchmark_metrics.json)")
     parser.add_argument("--merge-dir", type=str, default="", help="Merge all *.json files in this directory into unified results")
     parser.add_argument("--generate-report", action="store_true", help="Generate OMNIDOCBENCH_EVALUATION_REPORT.md from metrics")
@@ -834,8 +852,8 @@ def main():
     print("=" * 70)
 
     gt_data = load_ground_truth()
-    samples = select_stratified_sample(gt_data, sample_size=args.sample_size)
-    print(f"Selected stratified sample of {len(samples)} representative documents.")
+    samples = select_stratified_sample(gt_data, sample_size=args.sample_size, language=args.language)
+    print(f"Selected sample of {len(samples)} representative documents (language: {args.language}).")
 
     warmup_img = "newspaper_USAToday-2025-01-08@magazinesclubnew_page_012.png"
     runner = BenchmarkRunner(samples)

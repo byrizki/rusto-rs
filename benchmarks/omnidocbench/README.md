@@ -42,17 +42,20 @@ benchmarks/omnidocbench/
 
 ## 3. Pulling Dataset and Evaluator
 
-Use the centralized script `scripts/download_omnidocbench.sh` to download or update the suite:
+Use the centralized script `scripts/download_omnidocbench.sh` to download or update the suite. The script automatically caches downloaded assets locally, verifies existing files, and skips redundant fetches on re-runs:
 
 ```bash
-# Pull the evaluator and the 755 English-tagged images (Issue #17 setup)
+# Pull the evaluator and the 755 English-tagged images (Issue #17 setup) [default]
 ./scripts/download_omnidocbench.sh --english-only
 
-# Or pull all 1651 pages across all languages
+# Or pull all 1651 pages across all languages (~1.35 GB)
 ./scripts/download_omnidocbench.sh --all
 
 # Or pull the 101 seeded sample pages
 ./scripts/download_omnidocbench.sh --sample-only
+
+# Or specify a persistent external cache directory
+./scripts/download_omnidocbench.sh --english-only --cache-dir ~/.cache/omnidocbench
 
 # Or only pull evaluator without images
 ./scripts/download_omnidocbench.sh --evaluator-only
