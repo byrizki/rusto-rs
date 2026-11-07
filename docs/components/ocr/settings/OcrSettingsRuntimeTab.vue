@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { OcrConfig } from '../../../types/ocrConfig';
 import type { OcrModelOption } from '../../../types/ocrModels';
 import { getModelCandidateUrls, HUGGINGFACE_REPO } from '../../../utils/ocrReleaseModels';
+import OcrInfoPopover from './OcrInfoPopover.vue';
+import OcrSettingsCollapsibleSection from './OcrSettingsCollapsibleSection.vue';
 
 const props = defineProps<{
   config: OcrConfig;
@@ -15,6 +17,17 @@ const props = defineProps<{
 const emit = defineEmits<{
   backendChanged: [backend: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu'];
 }>();
+
+type RuntimeSection = 'engines' | 'model' | 'weights';
+const activeSection = ref<RuntimeSection | null>('engines');
+
+function onToggle(section: RuntimeSection, nextValue: boolean) {
+  if (nextValue) {
+    activeSection.value = section;
+  } else if (activeSection.value === section) {
+    activeSection.value = null;
+  }
+}
 
 const candidateUrls = computed(() => getModelCandidateUrls(props.selectedModelId, props.baseURL));
 
@@ -70,23 +83,16 @@ function selectEngine(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu') {
 </script>
 
 <template>
-  <div class="space-y-3.5 text-xs">
-    <!-- Pluggable Inference Engines -->
-    <div
-      class="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/50 space-y-2.5"
+  <div class="space-y-3 text-xs">
+    <!-- Pluggable Inference Engines (Collapsible) -->
+    <OcrSettingsCollapsibleSection
+      :model-value="activeSection === 'engines'"
+      @update:model-value="(val) => onToggle('engines', val)"
+      title="Inference Engine Backend"
+      :badge="config.inferenceBackend"
+      description="Pluggable inference runtimes compiled to separate WebAssembly binaries"
     >
-      <div class="flex items-center justify-between">
-        <div>
-          <span class="font-semibold text-zinc-900 dark:text-zinc-100 block">
-            Inference Engine Backend
-          </span>
-          <span class="text-[11px] text-zinc-500 dark:text-zinc-400">
-            Pluggable inference runtimes compiled to separate WebAssembly binaries
-          </span>
-        </div>
-      </div>
-
-      <div class="space-y-2">
+      <div class="space-y-2 pt-1">
         <div
           v-for="engine in engines"
           :key="engine.id"
@@ -94,12 +100,12 @@ function selectEngine(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu') {
           class="p-2.5 rounded-lg border transition-all cursor-pointer relative"
           :class="[
             config.inferenceBackend === engine.id
-              ? 'border-primary/80 bg-primary/5 dark:bg-primary/10 shadow-2xs ring-1 ring-primary/40'
+              ? 'border-primary bg-primary/5 dark:bg-primary/10'
               : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700',
           ]"
         >
-          <div class="flex items-center justify-between gap-2 mb-1">
-            <div class="flex items-center gap-2">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5">
               <input
                 type="radio"
                 :name="'ocr-inference-engine'"
@@ -111,6 +117,7 @@ function selectEngine(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu') {
               <span class="font-mono font-semibold text-zinc-900 dark:text-zinc-100 text-xs">
                 {{ engine.name }}
               </span>
+              <OcrInfoPopover :text="engine.description" />
             </div>
             <span
               class="px-1.5 py-0.5 rounded text-[10px] font-medium border"
@@ -119,10 +126,6 @@ function selectEngine(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu') {
               {{ engine.badge }}
             </span>
           </div>
-
-          <p class="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug pl-5">
-            {{ engine.description }}
-          </p>
 
           <div
             class="flex items-center justify-between gap-2 mt-2 pt-1.5 border-t border-zinc-100 dark:border-zinc-800/80 text-[10px] font-mono text-zinc-400 pl-5"
@@ -141,76 +144,75 @@ function selectEngine(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu') {
             </span>
           </div>
         </div>
-      </div>
 
-      <div
-        v-if="config.inferenceBackend === 'rusto-webgpu' && !isWebGpuSupported"
-        class="p-2 rounded-lg border border-amber-200/80 dark:border-amber-900/60 bg-amber-50/60 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-[11px] flex items-start gap-2"
-      >
-        <span class="w-2 h-2 rounded-full mt-1 shrink-0 bg-amber-500" />
-        <span>
-          WebGPU unavailable in this browser. When executing, the engine will automatically fall
-          back to SIMD128 CPU compute.
-        </span>
-      </div>
-    </div>
-
-    <!-- Active Model Info -->
-    <div
-      class="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/50 space-y-2"
-    >
-      <div class="flex items-center justify-between gap-2">
-        <span class="font-semibold text-zinc-900 dark:text-zinc-100">
-          {{ currentModel.name }}
-        </span>
-        <span
-          class="px-2 py-0.5 rounded-md text-[10px] font-mono bg-primary/10 text-primary font-semibold tabular-nums"
+        <div
+          v-if="config.inferenceBackend === 'rusto-webgpu' && !isWebGpuSupported"
+          class="p-2 rounded-lg border border-amber-200/80 dark:border-amber-900/60 bg-amber-50/60 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-[11px] flex items-start gap-2"
         >
-          {{ currentModel.size }}
-        </span>
+          <span class="w-2 h-2 rounded-full mt-1 shrink-0 bg-amber-500" />
+          <span>
+            WebGPU unavailable in this browser. When executing, the engine will automatically fall
+            back to SIMD128 CPU compute.
+          </span>
+        </div>
       </div>
-      <p class="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">
-        {{ currentModel.description }}
-      </p>
-      <div class="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
-        <span class="px-2 py-0.5 rounded bg-zinc-200/70 dark:bg-zinc-800 font-mono text-[10px]">
-          preset: {{ currentModel.preset }}
-        </span>
-        <span class="px-2 py-0.5 rounded bg-zinc-200/70 dark:bg-zinc-800 font-mono text-[10px]">
-          {{ currentModel.trait }}
-        </span>
-      </div>
-    </div>
+    </OcrSettingsCollapsibleSection>
 
-    <!-- Weights Sources -->
-    <div
-      class="p-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/50 space-y-2"
+    <!-- Active Model Info (Collapsible) -->
+    <OcrSettingsCollapsibleSection
+      :model-value="activeSection === 'model'"
+      @update:model-value="(val) => onToggle('model', val)"
+      :title="`Model: ${currentModel.name}`"
+      :badge="currentModel.size"
+      :description="currentModel.description"
     >
-      <div class="flex items-center justify-between">
-        <span class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
-          Model Weights Source
-        </span>
-        <a
-          :href="`https://huggingface.co/${HUGGINGFACE_REPO}`"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-[11px] text-primary hover:underline font-mono inline-flex items-center gap-1"
-        >
-          <span>{{ HUGGINGFACE_REPO }}</span>
-          <span aria-hidden="true">↗</span>
-        </a>
-      </div>
-      <div class="space-y-1 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
-        <div class="truncate" :title="candidateUrls.detection[0]">
-          <span class="text-zinc-400">det:</span> {{ candidateUrls.detection[0] }}
-        </div>
-        <div class="truncate" :title="candidateUrls.recognition[0]">
-          <span class="text-zinc-400">rec:</span> {{ candidateUrls.recognition[0] }}
-        </div>
-        <div class="truncate" :title="candidateUrls.dictionary[0]">
-          <span class="text-zinc-400">dict:</span> {{ candidateUrls.dictionary[0] }}
+      <div class="pt-1">
+        <div class="flex flex-wrap items-center gap-2 text-[11px]">
+          <span class="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono text-[10px]">
+            preset: {{ currentModel.preset }}
+          </span>
+          <span class="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono text-[10px]">
+            {{ currentModel.trait }}
+          </span>
         </div>
       </div>
-    </div>
+    </OcrSettingsCollapsibleSection>
+
+    <!-- Weights Sources (Collapsible) -->
+    <OcrSettingsCollapsibleSection
+      :model-value="activeSection === 'weights'"
+      @update:model-value="(val) => onToggle('weights', val)"
+      title="Model Weights & Asset Endpoints"
+      badge="Hugging Face"
+      description="Remote CDN and local asset fallback URLs for weights & dictionaries"
+    >
+      <div class="space-y-2 pt-1">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+            Repository
+          </span>
+          <a
+            :href="`https://huggingface.co/${HUGGINGFACE_REPO}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-[11px] text-primary hover:underline font-mono inline-flex items-center gap-1"
+          >
+            <span>{{ HUGGINGFACE_REPO }}</span>
+            <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+        <div class="space-y-1 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+          <div class="truncate" :title="candidateUrls.detection[0]">
+            <span class="text-zinc-400">det:</span> {{ candidateUrls.detection[0] }}
+          </div>
+          <div class="truncate" :title="candidateUrls.recognition[0]">
+            <span class="text-zinc-400">rec:</span> {{ candidateUrls.recognition[0] }}
+          </div>
+          <div class="truncate" :title="candidateUrls.dictionary[0]">
+            <span class="text-zinc-400">dict:</span> {{ candidateUrls.dictionary[0] }}
+          </div>
+        </div>
+      </div>
+    </OcrSettingsCollapsibleSection>
   </div>
 </template>

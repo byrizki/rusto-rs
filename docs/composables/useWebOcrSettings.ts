@@ -2,12 +2,12 @@ import { computed, ref } from 'vue';
 import { defaultOcrConfig, type OcrConfig } from '../types/ocrConfig';
 import type { OcrProfilePreset } from '../types/ocrPresets';
 
-export type OcrSettingsTab = 'preDetection' | 'detection' | 'recognition' | 'runtime';
+export type OcrSettingsTab = 'detection' | 'recognition' | 'runtime';
 
 export function useWebOcrSettings() {
   const ocrConfig = ref<OcrConfig>({ ...defaultOcrConfig });
   const isConfigOpen = ref<boolean>(false);
-  const configTab = ref<OcrSettingsTab>('preDetection');
+  const configTab = ref<OcrSettingsTab>('detection');
 
   const isCustomConfig = computed<boolean>(
     () => JSON.stringify(ocrConfig.value) !== JSON.stringify(defaultOcrConfig)

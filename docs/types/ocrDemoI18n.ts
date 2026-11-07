@@ -66,7 +66,6 @@ export interface OcrDemoStrings {
     title: string;
     resetDefaults: string;
     presetsLabel: string;
-    tabPreDetection: string;
     tabDetection: string;
     tabRecognition: string;
     tabRuntime: string;

@@ -5,8 +5,8 @@ import type { OcrConfig } from '../../types/ocrConfig';
 import type { OcrDemoStrings } from '../../types/ocrDemoI18n';
 import type { OcrModelOption } from '../../types/ocrModels';
 import { ocrProfilePresets, type OcrProfilePreset } from '../../types/ocrPresets';
+import OcrPresetSelect from './settings/OcrPresetSelect.vue';
 import OcrSettingsDetectionTab from './settings/OcrSettingsDetectionTab.vue';
-import OcrSettingsPreDetectionTab from './settings/OcrSettingsPreDetectionTab.vue';
 import OcrSettingsRecognitionTab from './settings/OcrSettingsRecognitionTab.vue';
 import OcrSettingsRuntimeTab from './settings/OcrSettingsRuntimeTab.vue';
 
@@ -34,13 +34,11 @@ const emit = defineEmits<{
   applyAndRun: [];
 }>();
 
-const activePresetDescription = computed(() => {
-  const match = ocrProfilePresets.find((p) => props.isPresetActive(p));
-  return match?.description ?? null;
+const activePreset = computed<OcrProfilePreset | null>(() => {
+  return ocrProfilePresets.find((p) => props.isPresetActive(p)) ?? null;
 });
 
 const tabs = computed<Array<{ id: OcrSettingsTab; label: string }>>(() => [
-  { id: 'preDetection', label: props.strings.tabPreDetection },
   { id: 'detection', label: props.strings.tabDetection },
   { id: 'recognition', label: props.strings.tabRecognition },
   { id: 'runtime', label: props.strings.tabRuntime },
@@ -65,7 +63,7 @@ const tabs = computed<Array<{ id: OcrSettingsTab; label: string }>>(() => [
         role="dialog"
         aria-modal="true"
         :aria-label="strings.title"
-        class="w-full max-w-[520px] max-h-[85dvh] flex flex-col rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs overflow-hidden"
+        class="w-full max-w-[540px] max-h-[80vh] sm:max-h-[620px] flex flex-col rounded-2xl shadow-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs overflow-hidden"
       >
         <div
           class="flex items-center justify-between px-4 py-3 border-b border-zinc-200/80 dark:border-zinc-800 shrink-0"
@@ -93,40 +91,18 @@ const tabs = computed<Array<{ id: OcrSettingsTab; label: string }>>(() => [
         </div>
 
         <div
-          class="px-4 py-2.5 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-950/60 shrink-0 space-y-1.5"
+          class="px-4 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-950/60 shrink-0"
         >
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span
-              class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mr-0.5 shrink-0"
-            >
-              {{ strings.presetsLabel }}:
-            </span>
-            <button
-              v-for="preset in ocrProfilePresets"
-              :key="preset.id"
-              type="button"
-              @click="emit('applyPreset', preset)"
-              :title="preset.description"
-              class="px-2 py-0.5 text-[11px] rounded-md border transition-all cursor-pointer"
-              :class="
-                isPresetActive(preset)
-                  ? 'bg-primary text-white border-primary font-semibold shadow-2xs'
-                  : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:border-zinc-400 dark:hover:border-zinc-600'
-              "
-            >
-              {{ preset.name }}
-            </button>
-          </div>
-          <p
-            v-if="activePresetDescription"
-            class="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug"
-          >
-            {{ activePresetDescription }}
-          </p>
+          <OcrPresetSelect
+            :presets="ocrProfilePresets"
+            :active-preset="activePreset"
+            :is-config-modified="isConfigModified"
+            @select="(preset) => emit('applyPreset', preset)"
+          />
         </div>
 
         <div
-          class="grid grid-cols-4 gap-1 px-4 pt-2.5 pb-2 border-b border-zinc-200/70 dark:border-zinc-800 shrink-0 bg-white dark:bg-zinc-900"
+          class="grid grid-cols-3 gap-1 px-4 pt-2.5 pb-2 border-b border-zinc-200/70 dark:border-zinc-800 shrink-0 bg-white dark:bg-zinc-900"
           role="tablist"
         >
           <button
@@ -148,8 +124,7 @@ const tabs = computed<Array<{ id: OcrSettingsTab; label: string }>>(() => [
         </div>
 
         <div class="flex-1 min-h-0 p-4 overflow-y-auto">
-          <OcrSettingsPreDetectionTab v-if="activeTab === 'preDetection'" :config="config" />
-          <OcrSettingsDetectionTab v-else-if="activeTab === 'detection'" :config="config" />
+          <OcrSettingsDetectionTab v-if="activeTab === 'detection'" :config="config" />
           <OcrSettingsRecognitionTab
             v-else-if="activeTab === 'recognition'"
             :config="config"

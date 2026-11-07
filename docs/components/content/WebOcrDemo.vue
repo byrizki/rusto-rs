@@ -274,7 +274,7 @@ onUnmounted(() => {
           :strings="strings.results"
           @change-granularity="setGranularity"
           @dismiss-error="ocrError = null"
-          @open-settings="openConfigTab('preDetection')"
+          @open-settings="openConfigTab('detection')"
           @run-ocr="runOcr"
         />
       </div>
