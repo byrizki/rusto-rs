@@ -23,14 +23,14 @@ Evaluating across 30 diverse multi-column documents (academic literature, textbo
 | Engine / Runtime | Binary Size | Model Weights | Mean Latency ↓ | Peak RSS ↓ | Accuracy (1 - NED) ↑ |
 |:---|:---:|:---:|:---:|:---:|:---:|
 | **PaddleOCR + PP-OCRv6 Tiny** | 120.1 MB | 6.1 MB | **605.3 ms** | 659.3 MB | 45.33% |
-| **RustO + PP-OCRv6 Tiny (RTen)** | **8.2 MB** | 6.1 MB | **976.0 ms** | **178.0 MB** | **45.41%** |
+| **RustO + PP-OCRv6 Tiny (RTen)** | **8.3 MB** | 6.1 MB | **976.0 ms** | **178.0 MB** | **45.41%** |
 | **RapidOCR + PP-OCRv6 Tiny** | 22.7 MB | 6.1 MB | 1,011.5 ms | 392.5 MB | 44.84% |
-| **RustO + Indra Models (RTen Base)** | **8.2 MB** | **5.4 MB** | **1,054.7 ms** | **196.2 MB** | **45.97%** |
-| **RustO + Indra Models (Pure-Rust MNN Base)** | **8.2 MB** | **5.4 MB** | 1,141.3 ms | 285.9 MB | **45.97%** |
-| **RustO + PP-OCRv6 Tiny (Pure-Rust MNN)** | **8.2 MB** | 5.9 MB | 1,304.2 ms | 253.1 MB | 43.21% |
+| **RustO + Indra Models (RTen Base)** | **8.3 MB** | **5.4 MB** | **1,054.7 ms** | **196.2 MB** | **45.97%** |
+| **RustO + Indra Models (Pure-Rust MNN Base)** | **4.5 MB** | **5.4 MB** | 1,141.3 ms | 285.9 MB | **45.97%** |
+| **RustO + PP-OCRv6 Tiny (Pure-Rust MNN)** | **4.5 MB** | 5.9 MB | 1,304.2 ms | 253.1 MB | 43.21% |
 | **ocrs (RTen Original)** | 12.2 MB | 11.6 MB | 2,059.1 ms | 1,900.4 MB | 44.33% |
 | **PaddleOCR + PP-OCRv6 Small** | 120.1 MB | 29.8 MB | 2,390.5 ms | 928.7 MB | 44.68% |
-| **RustO + PP-OCRv6 Small (RTen)** | **8.2 MB** | 29.8 MB | 3,135.0 ms | **249.4 MB** | 44.64% |
+| **RustO + PP-OCRv6 Small (RTen)** | **8.3 MB** | 29.8 MB | 3,135.0 ms | **249.4 MB** | 44.64% |
 | **RapidOCR + PP-OCRv6 Small** | 22.7 MB | 29.8 MB | 3,522.0 ms | 508.3 MB | 44.55% |
 
 ### Full Pipeline (Native Document Understanding & Layout Recovery)

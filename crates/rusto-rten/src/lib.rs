@@ -382,5 +382,6 @@ pub fn loader(
 
 /// Register the RTen backend with `rusto-core`'s engine session loader.
 pub fn register() {
+    rusto_core::engine::set_active_backend(rusto_core::engine::EngineBackend::Rten);
     rusto_core::engine::register_session_loader(loader);
 }

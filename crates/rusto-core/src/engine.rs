@@ -290,6 +290,27 @@ pub fn resolve_model_path(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum EngineBackend {
+    MnnPure = 0,
+    Rten = 1,
+    MnnCpp = 2,
+}
+
+static CURRENT_BACKEND: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+pub fn set_active_backend(backend: EngineBackend) {
+    CURRENT_BACKEND.store(backend as u8, std::sync::atomic::Ordering::Release);
+}
+
+pub fn active_backend() -> EngineBackend {
+    match CURRENT_BACKEND.load(std::sync::atomic::Ordering::Acquire) {
+        1 => EngineBackend::Rten,
+        2 => EngineBackend::MnnCpp,
+        _ => EngineBackend::MnnPure,
+    }
+}
+
 pub type SessionLoader = fn(&Path, &EngineConfig) -> Result<Box<dyn InferenceSession>, CoreError>;
 static SESSION_LOADER: std::sync::atomic::AtomicPtr<()> = std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
 

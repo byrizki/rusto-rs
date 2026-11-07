@@ -129,31 +129,31 @@ The complete 21-pipeline benchmark on OmniDocBench evaluates engines across **Pa
 | Engine / Runtime | Pipeline Target | Binary Size | Model Weights | Mean Latency ↓ | P95 Latency ↓ | Peak RSS ↓ | Mean NED ↓ | Accuracy (1-NED) ↑ | USA Today NED ↓ |
 |:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | **PaddleOCR + PP-OCRv6 Tiny** | Target 4 (Base) | 120.1 MB | 6.1 MB | **605.3 ms** | **1,322.0 ms** | 659.3 MB | 0.5467 | 45.33% | **0.7331** |
-| **RustO + PP-OCRv6 Tiny (RTen)** | Target 1 (RTen) | **8.2 MB** | 6.1 MB | **976.0 ms** | **2,005.0 ms** | **178.0 MB** | **0.5459** | **45.41%** | **0.7319** |
+| **RustO + PP-OCRv6 Tiny (RTen)** | Target 1 (RTen) | **8.3 MB** | 6.1 MB | **976.0 ms** | **2,005.0 ms** | **178.0 MB** | **0.5459** | **45.41%** | **0.7319** |
 | **RapidOCR + PP-OCRv6 Tiny** | Target 3 (Base) | 22.7 MB | 6.1 MB | 1,011.5 ms | 2,233.1 ms | 392.5 MB | 0.5516 | 44.84% | 0.7831 |
-| **RustO + Indra Models (RTen Base)** | Target 7 (RTen) | **8.2 MB** | **5.4 MB** | **1,054.7 ms** | 2,823.1 ms | **196.2 MB** | **0.5403** | **45.97%** | 0.7839 |
-| **RustO + Indra Models (Pure MNN Base)** | Target 7 (MNN) | **8.2 MB** | **5.4 MB** | 1,141.3 ms | 3,255.9 ms | 285.9 MB | **0.5403** | **45.97%** | 0.7839 |
-| **RustO + PP-OCRv6 Tiny (Pure MNN)** | Target 1 (MNN) | **8.2 MB** | 5.9 MB | 1,304.2 ms | 2,772.0 ms | 253.1 MB | 0.5679 | 43.21% | 0.9643 |
+| **RustO + Indra Models (RTen Base)** | Target 7 (RTen) | **8.3 MB** | **5.4 MB** | **1,054.7 ms** | 2,823.1 ms | **196.2 MB** | **0.5403** | **45.97%** | 0.7839 |
+| **RustO + Indra Models (Pure MNN Base)** | Target 7 (MNN) | **4.5 MB** | **5.4 MB** | 1,141.3 ms | 3,255.9 ms | 285.9 MB | **0.5403** | **45.97%** | 0.7839 |
+| **RustO + PP-OCRv6 Tiny (Pure MNN)** | Target 1 (MNN) | **4.5 MB** | 5.9 MB | 1,304.2 ms | 2,772.0 ms | 253.1 MB | 0.5679 | 43.21% | 0.9643 |
 | **ocrs (RTen Original)** | Target 5 (Base) | 12.2 MB | 11.6 MB | 2,059.1 ms | 4,507.6 ms | 1,900.4 MB | 0.5567 | 44.33% | 0.7396 |
 | **PaddleOCR + PP-OCRv6 Small** | Target 4 (Base) | 120.1 MB | 29.8 MB | 2,390.5 ms | 5,271.0 ms | 928.7 MB | 0.5532 | 44.68% | 0.7474 |
-| **RustO + PP-OCRv6 Small (Base)** | Target 1 (Base) | **8.2 MB** | 29.8 MB | 2,971.0 ms | 7,854.3 ms | **243.6 MB** | 0.5536 | 44.64% | 0.7656 |
-| **RustO + PP-OCRv6 Small (RTen)** | Target 1 (RTen) | **8.2 MB** | 29.8 MB | 3,135.0 ms | 7,728.6 ms | **249.4 MB** | 0.5536 | 44.64% | 0.7656 |
+| **RustO + PP-OCRv6 Small (Base)** | Target 1 (Base) | **4.5 MB** | 29.8 MB | 2,971.0 ms | 7,854.3 ms | **243.6 MB** | 0.5536 | 44.64% | 0.7656 |
+| **RustO + PP-OCRv6 Small (RTen)** | Target 1 (RTen) | **8.3 MB** | 29.8 MB | 3,135.0 ms | 7,728.6 ms | **249.4 MB** | 0.5536 | 44.64% | 0.7656 |
 | **RapidOCR + PP-OCRv6 Small** | Target 3 (Base) | 22.7 MB | 29.8 MB | 3,522.0 ms | 6,863.2 ms | 508.3 MB | 0.5545 | 44.55% | 0.7839 |
 
 ### Part II: Full Pipeline Benchmark (Native Document Understanding)
 
 | Engine & Ecosystem | Native Pipeline Components | Binary Size | Model Weights | Mean Latency ↓ | P95 Latency ↓ | Peak RSS ↓ | Mean NED ↓ | Accuracy ↑ | USA Today NED ↓ |
 |:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **RustO Full + Indra Models (RTen)** | `det` + `orient` + `rec` + **`order`** | **8.2 MB** | 8.6 MB | **1,113.6 ms** | **2,766.3 ms** | **223.8 MB** | **0.5403** | **46.0%** | **0.7839** |
-| **RustO Full + Indra Models (Pure MNN)** | `det` + `orient` + `rec` + **`order`** | **8.2 MB** | 8.6 MB | **1,205.2 ms** | 2,853.5 ms | 316.1 MB | **0.5403** | **46.0%** | **0.7839** |
+| **RustO Full + Indra Models (RTen)** | `det` + `orient` + `rec` + **`order`** | **8.3 MB** | 8.6 MB | **1,113.6 ms** | **2,766.3 ms** | **223.8 MB** | **0.5403** | **46.0%** | **0.7839** |
+| **RustO Full + Indra Models (Pure MNN)** | `det` + `orient` + `rec` + **`order`** | **4.5 MB** | 8.6 MB | **1,205.2 ms** | 2,853.5 ms | 316.1 MB | **0.5403** | **46.0%** | **0.7839** |
 | **Indra OCR (Official)** | `det` + `orient` + `rec` + **`order`** | 22.7 MB | 8.6 MB | 1,415.4 ms | 2,454.6 ms | 492.0 MB | **0.3624** | **63.76%** | **0.0348** |
 | **PaddleOCR + PP-Structure** | `det` + `rec` + **`layout`** + **`sorted_boxes`** | 120.1 MB | 23.0 MB | 5,571.4 ms | 13,002.7 ms | 10,624.3 MB | 0.4282 | **57.18%** | 0.6638 |
 | **RapidOCR + RapidLayout Tiny** | `det` + `rec` + **`layout`** + **`sorted_boxes`** | 22.7 MB | 13.1 MB | 1,177.5 ms | 2,380.2 ms | 449.5 MB | 0.4615 | **53.85%** | 0.5735 |
 | **RapidOCR + RapidLayout Small** | `det` + `rec` + **`layout`** + **`sorted_boxes`** | 22.7 MB | 36.9 MB | 3,626.6 ms | 7,071.5 ms | 557.5 MB | 0.4649 | 53.51% | 0.5730 |
-| **RustO + PP-Structure Tiny** | `det` + `rec` + **`layout_cdla`** | **8.2 MB** | 12.8 MB | 1,509.3 ms | 3,100.2 ms | **296.9 MB** | 0.5404 | 46.0% | 0.9641 |
-| **RustO + PP-Structure Small** | `det` + `rec` + **`layout_cdla`** | **8.2 MB** | 36.9 MB | 3,153.4 ms | 7,413.9 ms | **314.7 MB** | 0.4999 | 50.0% | 0.7610 |
-| **RustO Full Pipeline Tiny (MNN)** | `det` + `rec` + `cls` + `orient` + **`layout_cdla`** | **8.2 MB** | 49.8 MB | 1,910.5 ms | 3,897.6 ms | **312.7 MB** | 0.5404 | 46.0% | 0.9641 |
-| **RustO Full Pipeline Small** | `det` + `rec` + `cls` + `orient` + **`layout_cdla`** | **8.2 MB** | 74.1 MB | 3,893.4 ms | 9,461.9 ms | **342.1 MB** | 0.4999 | 50.0% | 0.7610 |
+| **RustO + PP-Structure Tiny** | `det` + `rec` + **`layout_cdla`** | **4.5 MB** | 12.8 MB | 1,509.3 ms | 3,100.2 ms | **296.9 MB** | 0.5404 | 46.0% | 0.9641 |
+| **RustO + PP-Structure Small** | `det` + `rec` + **`layout_cdla`** | **4.5 MB** | 36.9 MB | 3,153.4 ms | 7,413.9 ms | **314.7 MB** | 0.4999 | 50.0% | 0.7610 |
+| **RustO Full Pipeline Tiny (MNN)** | `det` + `rec` + `cls` + `orient` + **`layout_cdla`** | **4.5 MB** | 49.8 MB | 1,910.5 ms | 3,897.6 ms | **312.7 MB** | 0.5404 | 46.0% | 0.9641 |
+| **RustO Full Pipeline Small** | `det` + `rec` + `cls` + `orient` + **`layout_cdla`** | **4.5 MB** | 74.1 MB | 3,893.4 ms | 9,461.9 ms | **342.1 MB** | 0.4999 | 50.0% | 0.7610 |
 | **PaddleOCR Full Tiny** | `det` + `rec` + `cls` | 120.1 MB | 6.6 MB | 747.1 ms | 1,640.8 ms | 669.7 MB | 0.5466 | 45.34% | 0.7335 |
 | **PaddleOCR Full Small** | `det` + `rec` + `cls` | 120.1 MB | 30.3 MB | 2,664.6 ms | 5,838.2 ms | 942.3 MB | 0.5539 | 44.61% | 0.7464 |
 | **RapidOCR Full Tiny** | `det` + `rec` + `cls` | 22.7 MB | 6.6 MB | 1,146.3 ms | 2,174.3 ms | 392.6 MB | 0.5516 | 44.84% | 0.7831 |

@@ -486,6 +486,7 @@ fn test_spatial_layout_mnn_verification() {
 }
 
 #[test]
+#[cfg(feature = "rten")]
 fn test_debug_compare_rten_vs_rusto_nn() {
     let root = get_repo_root();
     let rten_path = root.join("models/indra/rec.rten");
@@ -516,7 +517,9 @@ fn test_debug_compare_rten_vs_rusto_nn() {
 
     assert_eq!(off_ids[0], r_ids, "Token IDs between official RTen and rusto-nn must match identically");
     for (&oc, &rc) in off_confs[0].iter().zip(r_confs.iter()) {
-        assert!((oc - rc).abs() < 1e-4, "Confidence deviation too large: off={} vs rusto={}", oc, rc);
+        let oc_f: f32 = oc;
+        let rc_f: f32 = rc;
+        assert!((oc_f - rc_f).abs() < 1e-4, "Confidence deviation too large: off={} vs rusto={}", oc, rc);
     }
 }
 

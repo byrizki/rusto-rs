@@ -468,7 +468,7 @@ Empirically evaluated against official PaddleOCR and RapidOCR (C++ ONNX Runtime)
 
 | Capability / Metric | RustO! (Pure Rust Core) | OpenCV / C++ Stacks (RapidOCR / PaddleOCR) | Benchmark Reference |
 |---|:---:|:---:|---|
-| **CLI Binary Size (Self-Contained)** | ✅ **8.2 MB** | ❌ ~55 MB+ (libopencv + onnxruntime) | Production Linux x86-64 release |
+| **CLI Binary Size (Self-Contained)** | ✅ **4.5 MB** (`rusto`) / 8.3 MB (`rusto-rten`) | ❌ ~55 MB+ (libopencv + onnxruntime) | Production Linux x86-64 release |
 | **C FFI Shared Library (`librusto.so`)** | ✅ **304 KB** | ❌ ~15–30 MB | Stripped release `.so` |
 | **Android Native Size (Per-ABI)** | ✅ **~1.8 MB** | ❌ ~20 MB+ (`libopencv.so` + ONNX) | Android release AAR |
 | **WebAssembly (WASM) Bundle** | ✅ **238 KB** (gzipped `rusto-nn` WASM) | ❌ 3.78 MB (gzipped ONNX Runtime WASM) | Web client bundle size |

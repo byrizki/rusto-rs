@@ -247,6 +247,9 @@ pub use rusto_core::unwarp::UnwarpOutput;
 #[cfg(feature = "rten")]
 pub use rusto_rten::RtenSession;
 
+#[cfg(feature = "mnn-cpp")]
+pub use rusto_mnn::MnnCppSession;
+
 // Runtime initialization
 #[cfg(feature = "rten")]
 pub fn ensure_rten_registered() {
@@ -259,10 +262,24 @@ pub fn ensure_rten_registered() {
 #[cfg(not(feature = "rten"))]
 pub fn ensure_rten_registered() {}
 
+#[cfg(feature = "mnn-cpp")]
+pub fn ensure_mnn_cpp_registered() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        rusto_mnn::register();
+    });
+}
+
+#[cfg(not(feature = "mnn-cpp"))]
+pub fn ensure_mnn_cpp_registered() {}
+
 /// Initialize RustO runtime backends (registers RTen backend if enabled).
 pub fn init() {
     ensure_rten_registered();
+    ensure_mnn_cpp_registered();
 }
+
+pub mod cli;
 
 // C FFI module
 #[cfg(feature = "ffi")]

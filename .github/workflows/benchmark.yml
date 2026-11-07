@@ -1,0 +1,207 @@
+name: OmniDocBench Comprehensive Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      sample_size:
+        description: 'Number of stratified OmniDocBench pages to evaluate'
+        required: false
+        default: '30'
+        type: string
+      targets:
+        description: 'Target to evaluate (default "all" for all 12 targets in parallel, or comma-separated targets)'
+        required: false
+        default: 'all'
+        type: string
+
+concurrency:
+  group: omnidocbench-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-binaries:
+    name: Build Benchmark Binaries (Release)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build All Benchmark Binaries
+        run: |
+          cargo build --release \
+            --bin rusto \
+            --bin rusto-rten \
+            --bin rusto-mnn \
+            --bin rten-direct \
+            --bin mnn-direct \
+            --features rten,mnn-cpp
+
+      - name: Install Standalone ocrs Binary
+        run: |
+          mkdir -p benchmarks/omnidocbench/ocrs_bin
+          cargo install --root benchmarks/omnidocbench/ocrs_bin ocrs
+
+      - name: Upload Release Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-binaries
+          path: |
+            target/release/rusto
+            target/release/rusto-rten
+            target/release/rusto-mnn
+            target/release/rten-direct
+            target/release/mnn-direct
+            benchmarks/omnidocbench/ocrs_bin/bin/ocrs
+          retention-days: 7
+
+  benchmark:
+    name: ${{ matrix.name }}
+    needs: [build-binaries]
+    runs-on: ubuntu-22.04
+    if: ${{ inputs.targets == 'all' || inputs.targets == '' || contains(inputs.targets, matrix.target) }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: paddleocr_tiny
+            name: "(a) Python PaddleOCR + PP-OCRv6 Tiny"
+          - target: rapidocr_tiny
+            name: "(b) Python RapidOCR + PP-OCRv6 Tiny"
+          - target: indra_ocr
+            name: "(c) Python Indra OCR"
+          - target: mnn_ocr_tiny
+            name: "(d) MNN OCR Standalone (Direct) + PP-OCRv6"
+          - target: rten_ocr_direct
+            name: "(e) RTen OCR Direct + PP-OCRv6"
+          - target: ocrs
+            name: "(f) RTen + ocrs"
+          - target: rusto_rten_tiny
+            name: "(g) RTen OCR (Rusto Binding) + PP-OCRv6"
+          - target: rusto_mnn_tiny
+            name: "(h) MNN OCR (Rusto Binding) + PP-OCRv6"
+          - target: rusto_rten_indra
+            name: "(i) RTen OCR (Rusto Binding) + Indra OCR"
+          - target: rusto_mnn_indra
+            name: "(j) MNN OCR (Rusto Binding) + Indra OCR"
+          - target: rusto_nn_ppocr
+            name: "(k) Rusto NN OCR (Pure-Rust MNN) + PP-OCRv6"
+          - target: rusto_nn_indra
+            name: "(l) Rusto NN OCR (Pure-Rust MNN) + Indra OCR"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download Compiled Binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-binaries
+          path: target/release/
+
+      - name: Make Binaries Executable
+        run: |
+          chmod +x target/release/*
+          if [ -f target/release/ocrs ]; then
+            mkdir -p benchmarks/omnidocbench/ocrs_bin/bin
+            cp target/release/ocrs benchmarks/omnidocbench/ocrs_bin/bin/ocrs
+            chmod +x benchmarks/omnidocbench/ocrs_bin/bin/ocrs
+          fi
+
+      - name: Install Base Python Benchmark Tools
+        run: pip install Levenshtein numpy pillow
+
+      - name: Install Target-Specific Dependencies
+        run: |
+          if [ "${{ matrix.target }}" = "paddleocr_tiny" ]; then
+            pip install paddleocr paddlepaddle
+          elif [ "${{ matrix.target }}" = "rapidocr_tiny" ]; then
+            pip install rapidocr-onnxruntime
+          elif [ "${{ matrix.target }}" = "indra_ocr" ]; then
+            pip install onnxruntime
+            pip install -e vendor/indra-ocr
+          fi
+
+      - name: Prepare Test Models
+        run: |
+          chmod +x scripts/download_models.sh
+          bash scripts/download_models.sh --ci
+
+      - name: Prepare OmniDocBench Sample Dataset
+        run: |
+          chmod +x scripts/download_omnidocbench.sh
+          bash scripts/download_omnidocbench.sh --sample-only
+
+      - name: Run Benchmark (${{ matrix.target }})
+        run: |
+          mkdir -p benchmarks/omnidocbench/results
+          python3 benchmarks/omnidocbench/run_full_benchmark.py \
+            --targets ${{ matrix.target }} \
+            --sample-size ${{ inputs.sample_size || 30 }} \
+            --output-file benchmarks/omnidocbench/results/metric_${{ matrix.target }}.json
+
+      - name: Upload Single Target Metric
+        uses: actions/upload-artifact@v4
+        with:
+          name: metric-${{ matrix.target }}
+          path: benchmarks/omnidocbench/results/metric_${{ matrix.target }}.json
+          retention-days: 7
+
+  aggregate-results:
+    name: Merge Parallel Results & Generate Report
+    needs: [benchmark]
+    runs-on: ubuntu-22.04
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Reporting Dependencies
+        run: pip install Levenshtein numpy pillow
+
+      - name: Download All Target Metrics
+        uses: actions/download-artifact@v4
+        with:
+          pattern: metric-*
+          path: benchmarks/omnidocbench/results/
+          merge-multiple: true
+
+      - name: Merge Metrics & Generate Markdown Report
+        run: |
+          python3 benchmarks/omnidocbench/run_full_benchmark.py \
+            --merge-dir benchmarks/omnidocbench/results/ \
+            --generate-report
+
+      - name: Publish Summary to Job
+        run: |
+          if [ -f benchmarks/omnidocbench/OMNIDOCBENCH_EVALUATION_REPORT.md ]; then
+            cat benchmarks/omnidocbench/OMNIDOCBENCH_EVALUATION_REPORT.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Final Benchmark Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: omnidocbench-final-results
+          path: |
+            benchmarks/omnidocbench/results/benchmark_metrics.json
+            benchmarks/omnidocbench/OMNIDOCBENCH_EVALUATION_REPORT.md
+          retention-days: 30

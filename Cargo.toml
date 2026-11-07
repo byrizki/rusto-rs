@@ -58,7 +58,27 @@ cbindgen = { version = "0.28", default-features = false, optional = true }
 
 [[bin]]
 name = "rusto"
-path = "src/main.rs"
+path = "src/bin/rusto.rs"
+
+[[bin]]
+name = "rusto-rten"
+path = "src/bin/rusto_rten.rs"
+required-features = ["rten"]
+
+[[bin]]
+name = "rusto-mnn"
+path = "src/bin/rusto_mnn.rs"
+required-features = ["mnn-cpp"]
+
+[[bin]]
+name = "rten-direct"
+path = "src/bin/rten_direct.rs"
+required-features = ["rten"]
+
+[[bin]]
+name = "mnn-direct"
+path = "src/bin/mnn_direct.rs"
+required-features = ["mnn-cpp"]
 
 [[bin]]
 name = "uniffi-bindgen"
@@ -74,7 +94,7 @@ required-features = ["cbindgen-cli"]
 criterion = "0.5"
 
 [features]
-default = ["ffi", "rten"]
+default = ["ffi"]
 use-opencv = ["opencv", "dep:rusto-cpp", "rusto-cpp/opencv"]
 uniffi = ["dep:uniffi", "uniffi/scaffolding-ffi-buffer-fns"]
 uniffi-cli = ["uniffi", "uniffi/cli"]

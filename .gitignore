@@ -1,5 +1,6 @@
 target/
 build
+.build/
 output
 output.txt
 *.nupkg
@@ -84,6 +85,8 @@ packages/react-native/lib
 __pycache__/
 *.pyc
 # Generated example-app outputs
+vendor/indra-ocr/
+vendor/rten/
 examples/react-native-*/ios/Pods/
 examples/react-native-*/ios/build/
 examples/react-native-*/android/.gradle/

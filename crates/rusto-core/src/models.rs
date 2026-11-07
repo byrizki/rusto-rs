@@ -438,7 +438,11 @@ pub fn resolve_asset_local(
         .strip_suffix(".mnn")
         .or_else(|| asset_filename.strip_suffix(".rten"))
     {
-        for ext in ["rten", "mnn"] {
+        let exts: &[&str] = match crate::engine::active_backend() {
+            crate::engine::EngineBackend::Rten => &["rten", "onnx", "mnn"],
+            _ => &["mnn", "rten", "onnx"],
+        };
+        for ext in exts {
             let alt = cache_dir.join(format!("{stem}.{ext}"));
             if alt.exists() && fs::metadata(&alt).map(|m| m.len() > 0).unwrap_or(false) {
                 return Ok(alt);

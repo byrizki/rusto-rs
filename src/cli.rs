@@ -1,125 +1,134 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use rusto::{DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, RustO};
-use rusto::download::download_model_pipeline;
+use crate::{DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, OutputGranularity, RustO};
+use crate::download::download_model_pipeline;
 use rusto_core::models::{
     get_cache_dir, resolve_asset_local, resolve_base_pipeline,
 };
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum EngineKind {
+    /// Pure-Rust MNN runtime (rusto-nn) - safe, fast, zero-dependency default
+    RustoNn,
+    /// Pure-Rust RTen FlatBuffers runtime (rusto-rten)
+    Rten,
+    /// Alibaba MNN C++ runtime (rusto-mnn)
+    MnnCpp,
+}
+
 #[derive(Parser)]
-#[command(name = "rusto")]
 #[command(version)]
-#[command(about = "RustO! - Pure Rust OCR powered by Indra OCR and PaddleOCR engines", long_about = None)]
-struct Cli {
+#[command(about = "RustO! - Fast, memory-safe OCR powered by Indra OCR and PaddleOCR engines", long_about = None)]
+pub struct Cli {
     #[command(subcommand)]
-    command: Option<Commands>,
+    pub command: Option<Commands>,
 
     #[command(flatten)]
-    ocr: OcrArgs,
+    pub ocr: OcrArgs,
 }
 
 #[derive(Args, Clone)]
-struct OcrArgs {
+pub struct OcrArgs {
     /// Input image path
     #[arg(value_name = "IMAGE")]
-    image: Option<PathBuf>,
+    pub image: Option<PathBuf>,
 
     /// OCR model pipeline: "indraocr" (default), "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4", etc.
     #[arg(short, long, default_value = "indraocr")]
-    model: String,
+    pub model: String,
 
     /// Base model directory containing det, rec, and dict files (overridden by --det-model, --rec-model, --dict)
     #[arg(long, alias = "model-dir")]
-    model_path: Option<PathBuf>,
+    pub model_path: Option<PathBuf>,
 
     /// Target language: "latin" (default), "ja", "ko", "ar", "cyrillic", "devanagari", "chinese-cht", etc.
     #[arg(short, long)]
-    lang: Option<String>,
+    pub lang: Option<String>,
 
     /// Download model(s) to cache without running inference
     #[arg(long)]
-    download_only: bool,
+    pub download_only: bool,
 
-    /// Path to detection model (.rten / .onnx). Overrides model auto-download.
+    /// Path to detection model (.mnn / .rten / .onnx). Overrides model auto-download.
     #[arg(long)]
-    det_model: Option<PathBuf>,
+    pub det_model: Option<PathBuf>,
 
-    /// Path to recognition model (.rten / .onnx). Overrides model auto-download.
+    /// Path to recognition model (.mnn / .rten / .onnx). Overrides model auto-download.
     #[arg(long)]
-    rec_model: Option<PathBuf>,
+    pub rec_model: Option<PathBuf>,
 
     /// Path to dictionary / metadata file (.txt / .json). Overrides model auto-download.
     #[arg(long)]
-    dict: Option<PathBuf>,
+    pub dict: Option<PathBuf>,
 
     /// Custom model cache directory
     #[arg(long)]
-    cache_dir: Option<PathBuf>,
+    pub cache_dir: Option<PathBuf>,
 
     /// Enable neural reading order recovery
     #[arg(long)]
-    reading_order: bool,
+    pub reading_order: bool,
 
     /// Output format
     #[arg(short, long, value_enum, default_value_t = OutputFormat::Json)]
-    format: OutputFormat,
+    pub format: OutputFormat,
 
     /// Enable text line orientation classifier
     #[arg(long)]
-    enable_cls: bool,
+    pub enable_cls: bool,
 
     /// Path to text line orientation classifier model
     #[arg(long)]
-    cls_model: Option<PathBuf>,
+    pub cls_model: Option<PathBuf>,
 
     /// Enable document orientation classification
     #[arg(long)]
-    enable_orient: bool,
+    pub enable_orient: bool,
 
     /// Path to orientation classification model
     #[arg(long)]
-    orient_model: Option<PathBuf>,
+    pub orient_model: Option<PathBuf>,
 
     /// Enable text unwarping
     #[arg(long)]
-    enable_unwarp: bool,
+    pub enable_unwarp: bool,
 
-    /// Path to text unwarping model (uvdoc.rten)
+    /// Path to text unwarping model (uvdoc.rten / uvdoc.mnn)
     #[arg(long)]
-    unwarp_model: Option<PathBuf>,
+    pub unwarp_model: Option<PathBuf>,
 
     /// Enable document layout detection
     #[arg(long)]
-    enable_layout: bool,
+    pub enable_layout: bool,
 
     /// Document layout variant: "cdla" (default 10-class) or "publaynet" (5-class)
     #[arg(long)]
-    layout_variant: Option<String>,
+    pub layout_variant: Option<String>,
 
     /// Path to document layout detection model
     #[arg(long)]
-    layout_model: Option<PathBuf>,
+    pub layout_model: Option<PathBuf>,
 
     /// Maximum detection image dimension (default: configured in model, typically 960 or 736)
     #[arg(long)]
-    det_limit: Option<i32>,
+    pub det_limit: Option<i32>,
 
     /// Text recognition batch size (default: 6, or 1 for Indra OCR)
     #[arg(long, alias = "batch-num")]
-    rec_batch_num: Option<i32>,
+    pub rec_batch_num: Option<i32>,
 
     /// Minimum recognition confidence score threshold [0.0 - 1.0]
     #[arg(long, alias = "text-score")]
-    score_threshold: Option<f32>,
+    pub score_threshold: Option<f32>,
 
     /// Maximum image side length for preprocessing
     #[arg(long)]
-    max_side_len: Option<f32>,
+    pub max_side_len: Option<f32>,
 }
 
 #[derive(Subcommand)]
-enum Commands {
+pub enum Commands {
     /// Run OCR on an image file
     Ocr(OcrArgs),
     /// Download OCR models to the cache directory without running inference
@@ -127,46 +136,46 @@ enum Commands {
 }
 
 #[derive(Args)]
-struct DownloadArgs {
+pub struct DownloadArgs {
     /// OCR model pipeline to download: "indraocr" (default), "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4", etc.
     #[arg(short, long, default_value = "indraocr")]
-    model: String,
+    pub model: String,
 
     /// Target language: "latin" (default), "ja", "ko", "ar", "cyrillic", "devanagari", "chinese-cht", etc.
     #[arg(short, long)]
-    lang: Option<String>,
+    pub lang: Option<String>,
 
-    /// Download text-line orientation classifier model (ppocr_cls.rten)
+    /// Download text-line orientation classifier model
     #[arg(long)]
-    cls: bool,
+    pub cls: bool,
 
-    /// Download document orientation classifier model (ppocr_orient.rten / indra_orient.rten)
+    /// Download document orientation classifier model
     #[arg(long)]
-    orient: bool,
+    pub orient: bool,
 
-    /// Download document unwarping model (uvdoc.rten)
+    /// Download document unwarping model
     #[arg(long)]
-    unwarp: bool,
+    pub unwarp: bool,
 
-    /// Download document layout detection model (layout_cdla.rten or layout_publaynet.rten)
+    /// Download document layout detection model (layout_cdla or layout_publaynet)
     #[arg(long)]
-    layout: bool,
+    pub layout: bool,
 
     /// Document layout variant: "cdla" (default 10-class) or "publaynet" (5-class)
     #[arg(long)]
-    layout_variant: Option<String>,
+    pub layout_variant: Option<String>,
 
-    /// Download neural reading order model (indra_order.rten)
+    /// Download neural reading order model
     #[arg(long)]
-    reading_order: bool,
+    pub reading_order: bool,
 
     /// Custom model cache directory
     #[arg(long)]
-    cache_dir: Option<PathBuf>,
+    pub cache_dir: Option<PathBuf>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-enum OutputFormat {
+pub enum OutputFormat {
     /// JSON output with full details
     Json,
     /// Plain text, one line per detected text
@@ -181,8 +190,19 @@ enum OutputFormat {
     Spatial,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    rusto::ensure_rten_registered();
+pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
+    let bin_name = match engine {
+        EngineKind::RustoNn => "rusto",
+        EngineKind::Rten => {
+            crate::ensure_rten_registered();
+            "rusto-rten"
+        }
+        EngineKind::MnnCpp => {
+            crate::ensure_mnn_cpp_registered();
+            "rusto-mnn"
+        }
+    };
+
     let parsed = Cli::parse();
 
     let cli = match parsed.command {
@@ -223,8 +243,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(cli.layout_variant.as_deref().unwrap_or("cdla"))
             } else {
                 None
-            }
-            ,
+            },
             cli.reading_order,
             &cache_dir,
         )?;
@@ -235,19 +254,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let image_path = match cli.image {
         Some(path) => path,
         None => {
-            eprintln!("Error: Please provide an image path to run OCR (`rusto <IMAGE>` or `rusto ocr <IMAGE>`), or use `rusto download` to download models.");
+            eprintln!("Error: Please provide an image path to run OCR (`{bin_name} <IMAGE>` or `{bin_name} ocr <IMAGE>`), or use `{bin_name} download` to download models.");
             std::process::exit(1);
         }
     };
 
     let effective_dir = cli.model_path.as_deref().or_else(|| {
-        let p = std::path::Path::new(&cli.model);
+        let p = Path::new(&cli.model);
         if p.exists() {
             Some(p)
         } else {
             None
         }
     });
+
+    let (orient_file, unwarp_file, cls_file, layout_cdla_file, layout_publaynet_file, order_file) = match engine {
+        EngineKind::Rten => (
+            if cli.model.eq_ignore_ascii_case("indraocr") || cli.model.eq_ignore_ascii_case("indra") {
+                "indra_orient.rten"
+            } else {
+                "ppocr_orient.rten"
+            },
+            "uvdoc.rten",
+            "ppocr_cls.rten",
+            "layout_cdla.rten",
+            "layout_publaynet.rten",
+            "indra_order.rten",
+        ),
+        _ => (
+            if cli.model.eq_ignore_ascii_case("indraocr") || cli.model.eq_ignore_ascii_case("indra") {
+                "indra_orient.mnn"
+            } else {
+                "ppocr_orient.mnn"
+            },
+            "uvdoc.mnn",
+            "ppocr_cls.mnn",
+            "layout_cdla.mnn",
+            "layout_publaynet.mnn",
+            "indra_order.mnn",
+        ),
+    };
 
     let cache_dir = get_cache_dir(cli.cache_dir.as_deref());
     if effective_dir.is_none() {
@@ -261,25 +307,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &cache_dir,
         )
         .is_err()
-            || (cli.enable_cls && cli.cls_model.is_none() && resolve_asset_local(None, None, "cls", "ppocr_cls.rten", &cache_dir).is_err())
-            || (cli.enable_orient && cli.orient_model.is_none() && {
-                let orient_file = if cli.model.eq_ignore_ascii_case("indraocr") || cli.model.eq_ignore_ascii_case("indra") {
-                    "indra_orient.rten"
-                } else {
-                    "ppocr_orient.rten"
-                };
-                resolve_asset_local(None, None, "orient", orient_file, &cache_dir).is_err()
-            })
-            || (cli.enable_unwarp && cli.unwarp_model.is_none() && resolve_asset_local(None, None, "unwarp", "uvdoc.rten", &cache_dir).is_err())
+            || (cli.enable_cls && cli.cls_model.is_none() && resolve_asset_local(None, None, "cls", cls_file, &cache_dir).is_err())
+            || (cli.enable_orient && cli.orient_model.is_none() && resolve_asset_local(None, None, "orient", orient_file, &cache_dir).is_err())
+            || (cli.enable_unwarp && cli.unwarp_model.is_none() && resolve_asset_local(None, None, "unwarp", unwarp_file, &cache_dir).is_err())
             || ((cli.enable_layout || cli.layout_variant.is_some()) && cli.layout_model.is_none() && {
                 let layout_file = if cli.layout_variant.as_deref() == Some("publaynet") {
-                    "layout_publaynet.rten"
+                    layout_publaynet_file
                 } else {
-                    "layout_cdla.rten"
+                    layout_cdla_file
                 };
                 resolve_asset_local(None, None, "layout", layout_file, &cache_dir).is_err()
             })
-            || (cli.reading_order && resolve_asset_local(None, None, "order", "indra_order.rten", &cache_dir).is_err());
+            || (cli.reading_order && resolve_asset_local(None, None, "order", order_file, &cache_dir).is_err());
 
         if needs_download {
             eprintln!("Downloading missing {} model assets to {}...", cli.model, cache_dir.display());
@@ -312,15 +351,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let model_lower = cli.model.to_ascii_lowercase();
     let preset = if model_lower.contains("indra") || model_lower.contains("linenet") {
-        rusto::INDRA_MODEL_CONFIG
+        crate::INDRA_MODEL_CONFIG
     } else if model_lower.contains("v5") || model_lower.contains("ppocrv5") {
-        rusto::PPV5_MODEL_CONFIG
+        crate::PPV5_MODEL_CONFIG
     } else if model_lower.contains("v4") || model_lower.contains("ppocrv4") {
-        rusto::PPV4_MODEL_CONFIG
+        crate::PPV4_MODEL_CONFIG
     } else if model_lower.contains("v3") || model_lower.contains("ppocrv3") {
-        rusto::PPV3_MODEL_CONFIG
+        crate::PPV3_MODEL_CONFIG
     } else {
-        rusto::PPV6_MODEL_CONFIG
+        crate::PPV6_MODEL_CONFIG
     };
 
     let mut config = InitializeConfig::from_preset(preset, det_path, rec_path, dict_path);
@@ -330,20 +369,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cli.cls_model.as_deref(),
             effective_dir,
             "cls",
-            "ppocr_cls.rten",
+            cls_file,
             &cache_dir,
         )?;
         config = config.with_cls(cls_path);
     }
 
     if cli.enable_orient || cli.orient_model.is_some() {
-        let orient_file = if cli.model.eq_ignore_ascii_case("indraocr")
-            || cli.model.eq_ignore_ascii_case("indra")
-        {
-            "indra_orient.rten"
-        } else {
-            "ppocr_orient.rten"
-        };
         let orient_path = resolve_asset_local(
             cli.orient_model.as_deref(),
             effective_dir,
@@ -359,7 +391,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             cli.unwarp_model.as_deref(),
             effective_dir,
             "unwarp",
-            "uvdoc.rten",
+            unwarp_file,
             &cache_dir,
         )?;
         config = config.with_unwarp(unwarp_path);
@@ -367,9 +399,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if cli.enable_layout || cli.layout_model.is_some() || cli.layout_variant.is_some() {
         let layout_file = if cli.layout_variant.as_deref() == Some("publaynet") {
-            "layout_publaynet.rten"
+            layout_publaynet_file
         } else {
-            "layout_cdla.rten"
+            layout_cdla_file
         };
         let layout_path = resolve_asset_local(
             cli.layout_model.as_deref(),
@@ -386,7 +418,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             None,
             effective_dir,
             "order",
-            "indra_order.rten",
+            order_file,
             &cache_dir,
         )?;
         config.global.reading_order = true;
@@ -401,7 +433,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut options = OcrRunOptions::default();
     if cli.format == OutputFormat::Spatial {
-        options.output = rusto::OutputGranularity::Spatial;
+        options.output = OutputGranularity::Spatial;
     }
     if cli.enable_cls {
         options.line_classification = Some(true);
