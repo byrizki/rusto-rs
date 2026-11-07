@@ -23,16 +23,16 @@
 
 </div>
 
-**RustO!** is a pure-Rust Optical Character Recognition (OCR) engine and multi-platform toolkit. Powered by [DataLab Indra OCR](https://github.com/datalab-to/indra-ocr) and PaddleOCR models running on RustO's pure-Rust neural inference runtime and [RTen](https://github.com/robertknight/rten) (`.rten`), RustO! delivers fast, memory-safe text extraction and document layout understanding with zero C++ or OpenCV dependencies.
+**RustO!** is a pure-Rust Optical Character Recognition (OCR) engine and multi-platform toolkit. Powered by [DataLab Indra OCR](https://github.com/datalab-to/indra-ocr) and PaddleOCR models running on RustO's pure-Rust MNN neural inference runtime (`rusto-nn`) with pluggable [RTen](https://github.com/robertknight/rten) and ONNX support, RustO! delivers fast, memory-safe text extraction and document layout understanding with zero C++ or OpenCV dependencies.
 
 ---
 
 ## 🎯 Key Features
 
-- **Pure Rust Engine** — Zero C++ or OpenCV runtime dependencies. Build directly with `cargo build`.
-- **Flagship Indra OCR + PP-OCRv6** — DataLab Indra OCR (~5.5 MB, 439 ms OmniDocBench latency) by default alongside PP-OCRv6 (50+ languages unified), PP-OCRv5, and PP-OCRv4 (FP32 & INT8).
+- **Pure Rust MNN Engine (`rusto-nn`)** — Zero C++ or OpenCV runtime dependencies. SIMD vectorization (AVX-512, AVX2, NEON, WASM SIMD128) with pluggable RTen, ONNX, and hardware backends (WebGPU, CUDA). Build directly with `cargo build`.
+- **Flagship Indra OCR + PP-OCRv6** — DataLab Indra OCR (~5.4 MB, **45.98%** OmniDocBench accuracy) by default alongside PP-OCRv6 (50+ languages unified), PP-OCRv5, and PP-OCRv4 (FP32 & INT8).
 - **End-to-End Document Pipeline** — Built-in 3D UVDoc unwarping, orientation detection, PicoDet layout region classification (`regionId` / `layoutType`), and neural graph reading order (`indra_order.rten`).
-- **Unified Fluent Builder API** — Consistent `.withAutoUnwarp()`, `.withLayoutReading()`, `.asLines()` / `.asWords()` / `.asSpatial()`, and single `.run()` terminal execution across every SDK.
+- **Unified Fluent Builder API** — Consistent `.withAutoUnwarp()`, `.withLayoutReading()`, `.asLines()` / `.asWords()` / `.asSpatial()` / `.asTsv()`, and single `.run()` terminal execution across every SDK.
 - **12 Cross-Platform SDKs + CLI** — First-class libraries for Rust, Node.js, Python, Go, Java, .NET, Dart, Flutter, Web (WASM), React, React Native, iOS, Android, and C FFI, plus the `rusto` CLI.
 
 ---
@@ -64,8 +64,8 @@ Upgrading from **v0.3.x** to **v0.4.0** introduces a unified fluent builder API,
 
 | Aspect | v0.3.x | v0.4.0 (Current) |
 |---|---|---|
-| **Default Model** | PP-OCRv6 Tiny (~6 MB) | **DataLab Indra OCR** (~5.5 MB, **439.2 ms** latency) |
-| **Model Assets** | Bundled / platform model packages | **Decoupled standalone `.rten` files** with zero-config auto-download |
+| **Default Model** | PP-OCRv6 Tiny (~6 MB) | **DataLab Indra OCR** (~5.4 MB, **45.98%** OmniDoc accuracy) |
+| **Model Assets** | Bundled / platform model packages | **Decoupled standalone models on Hugging Face Hub** with zero-config auto-download |
 | **API Paradigm** | Monolithic `detectText(source, options)` | **Unified fluent builder chaining** ending in `.run()` / `.Run()` |
 | **Output Granularity** | Separate `*Spatial` methods | **`.asLines()` / `.asWords()` / `.asSpatial()`** (`as_*` / `As*`) |
 | **Layout & Unwarp** | Disjoint separate engine methods | **Pipelined directly** via `.withLayoutReading()`, `.withAutoUnwarp()` |
@@ -405,7 +405,7 @@ RustO! supports DataLab Indra OCR as its default flagship engine alongside PP-OC
 | **PP-OCRv6 Medium** | ~134 MB | **~75.7 MB** | Server-grade accuracy workloads |
 | **PP-OCRv5 / v4** | ~23–28 MB (Mobile) | — | Legacy pipelines & single-language packs |
 
-Pre-converted RTen models are distributed as standalone release assets on [GitHub Releases](https://github.com/byrizki/rusto-rs/releases) and downloaded automatically on first run by the CLI and native SDKs.
+Pre-trained models are distributed as standalone assets on [Hugging Face Hub (`byrizki/rten-models`)](https://huggingface.co/byrizki/rten-models) with native CORS support and downloaded automatically on first run by the CLI and native SDKs.
 
 👉 **[View Complete Multilingual OCR Guide & Model Matrix](https://byrizki.com/rusto-rs/en/advance-guide/multilingual-ocr)**
 
@@ -468,16 +468,16 @@ Empirically evaluated against official PaddleOCR and RapidOCR (C++ ONNX Runtime)
 
 | Capability / Metric | RustO! (Pure Rust Core) | OpenCV / C++ Stacks (RapidOCR / PaddleOCR) | Benchmark Reference |
 |---|:---:|:---:|---|
-| **CLI Binary Size (Self-Contained)** | ✅ **5.5 MB** | ❌ ~55 MB+ (libopencv + onnxruntime) | Production Linux x86-64 release |
+| **CLI Binary Size (Self-Contained)** | ✅ **8.3 MB** | ❌ ~55 MB+ (libopencv + onnxruntime) | Production Linux x86-64 release |
 | **C FFI Shared Library (`librusto.so`)** | ✅ **304 KB** | ❌ ~15–30 MB | Stripped release `.so` |
 | **Android Native Size (Per-ABI)** | ✅ **~1.8 MB** | ❌ ~20 MB+ (`libopencv.so` + ONNX) | Android release AAR |
 | **WebAssembly (WASM) Bundle** | ✅ **517 KB** (gzipped) | ❌ 3.78 MB (gzipped ONNX Runtime WASM) | Web client bundle size |
 | **Zero External C++ Dependencies** | ✅ Pure Rust (`cargo build`) | ❌ Requires CMake, OpenCV & NDK | Toolchain build dependencies |
-| **Peak Memory (OmniDocBench)** | ✅ **253.9 MB** (PP-OCRv6 Tiny) | ❌ 392.5 MB (RapidOCR) / 659.3 MB (PaddleOCR) | OmniDocBench full dataset peak RSS |
+| **Peak Memory (OmniDocBench)** | ✅ **177.8 MB - 252.8 MB** | ❌ 392.5 MB (RapidOCR) / 659.3 MB (PaddleOCR) | OmniDocBench full dataset peak RSS |
 | **Document Pipeline (1600×993 px)** | ⚡ **678.08 ms** (Det: 312 ms, Rec: 169 ms, 27 lines) | ⚡ 447.83 ms (C++ ONNX Runtime) | Base pipeline end-to-end benchmark |
-| **OmniDocBench Mean Latency** | ⚡ **439.18 ms** (Indra) / **1,104.41 ms** (Tiny) | ⚡ 605.30 ms (PaddleOCR) / 1,011.52 ms (RapidOCR) | OmniDocBench full evaluation |
+| **OmniDocBench Mean Latency** | ⚡ **1,166.8 ms** (Indra) / **1,172.5 ms** (Tiny) | ⚡ 605.3 ms (PaddleOCR) / 1,011.5 ms (RapidOCR) | OmniDocBench full evaluation |
 | **Transcription Parity (High-Res Scan)** | 🎯 **100% token identical** across all 27 lines | 🎯 Baseline reference | Character-for-character comparison |
-| **OmniDocBench Baseline Accuracy (1 - NED)** | 🎯 **45.34%** (PP-OCRv6 Tiny) | 🎯 45.33% (PaddleOCR Tiny) — **Δ < 0.01%** | Standard 1D reading order |
+| **OmniDocBench Baseline Accuracy (1 - NED)** | 🎯 **45.40%** (Tiny) / **45.98%** (Indra) | 🎯 45.33% (PaddleOCR Tiny) / 44.84% (RapidOCR) | Standard 1D reading order |
 | **Full Pipeline Accuracy (Reading Order)** | 🎯 **63.75%** (RustO Indra Full) | 🎯 63.76% (Indra Official) / 57.18% (Paddle Structure)| Graph neural reading order |
 | **Memory & Thread Safety** | ✅ Guaranteed by Rust borrow checker | ❌ Manual pointers & thread locks | Data-race free concurrency |
 
@@ -554,8 +554,8 @@ RustO! is inspired by and builds upon the work of:
 - **[DataLab](https://github.com/datalab-to)** — Creators of **[Indra OCR](https://github.com/datalab-to/indra-ocr)** models and the **[OmniDocBench](https://github.com/datalab-to/omnidocbench)** evaluation dataset
 - **[RapidOCR](https://github.com/RapidAI/RapidOCR)** — Architecture and OCR pipeline reference
 - **[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)** — Pretrained OCR models (PP-OCRv6, PP-OCRv5, PP-OCRv4)
-- **[RTen](https://github.com/robertknight/rten)** — Pure Rust deep learning inference engine powering RustO! v0.3+
-- **[Alibaba MNN](https://github.com/alibaba/MNN)** — High-performance inference engine that powered RustO! in version 0.2.x
+- **[Alibaba MNN](https://github.com/alibaba/MNN)** — Pioneered efficient mobile deep learning formats, executed natively in pure Rust via `rusto-nn`
+- **[RTen](https://github.com/robertknight/rten)** — Pure Rust deep learning inference engine supported in RustO!
 - **[Snyk](https://snyk.io)** — Developer security and vulnerability monitoring through the Snyk Open Source Program
 - **Rust Community** — `image`, `imageproc`, `nalgebra`, and `rayon` crates
 
@@ -571,6 +571,6 @@ If you use RustO! in your research or commercial application, please consider ci
   author = {Rizki & Contributors},
   year = {2024},
   url = {https://github.com/byrizki/rusto-rs},
-  note = {Based on RapidOCR and powered by PaddleOCR models with pure Rust RTen inference}
+  note = {Based on RapidOCR and powered by PaddleOCR models with pure Rust MNN (rusto-nn) inference}
 }
 ```

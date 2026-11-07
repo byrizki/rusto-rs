@@ -606,6 +606,17 @@ def main():
             pass
 
     # Define all model file lists for disk weight measurement
+    models_ppocr_tiny_mnn = [
+        MODELS_DIR / "PPOCR_v6_tiny" / "det.mnn",
+        MODELS_DIR / "PPOCR_v6_tiny" / "rec.mnn",
+        MODELS_DIR / "PPOCR_v6_tiny" / "dict.txt",
+    ]
+    models_opts_mnn = [
+        MODELS_DIR / "PPOCR_v6_tiny" / "cls.mnn",
+        MODELS_DIR / "PPOCR_v6_tiny" / "orient.mnn",
+        MODELS_DIR / "PPOCR_v6_tiny" / "uvdoc.mnn",
+        MODELS_DIR / "PPOCR_v6_tiny" / "layout_cdla.mnn",
+    ]
     models_ppocr_tiny = [
         MODELS_DIR / "PPOCR_v6_tiny" / "det.onnx",
         MODELS_DIR / "PPOCR_v6_tiny" / "rec.onnx",
@@ -626,16 +637,28 @@ def main():
         Path.home() / ".cache" / "ocrs" / "text-detection.onnx",
         Path.home() / ".cache" / "ocrs" / "text-recognition.onnx",
     ]
+    models_indra_base_mnn = [
+        MODELS_DIR / "indra" / "det.mnn",
+        MODELS_DIR / "indra" / "rec.mnn",
+        MODELS_DIR / "indra" / "meta.json",
+    ]
+    models_indra_full_mnn = [
+        MODELS_DIR / "indra" / "det.mnn",
+        MODELS_DIR / "indra" / "orient.rten",
+        MODELS_DIR / "indra" / "rec.mnn",
+        MODELS_DIR / "indra" / "indra_order.rten",
+        MODELS_DIR / "indra" / "meta.json",
+    ]
     models_indra_base = [
-        MODELS_DIR / "indra" / "det.onnx",
-        MODELS_DIR / "indra" / "rec.onnx",
+        MODELS_DIR / "indra" / "det.rten",
+        MODELS_DIR / "indra" / "rec.rten",
         MODELS_DIR / "indra" / "meta.json",
     ]
     models_indra_full = [
-        MODELS_DIR / "indra" / "det.onnx",
-        MODELS_DIR / "indra" / "orient.onnx",
-        MODELS_DIR / "indra" / "rec.onnx",
-        MODELS_DIR / "indra" / "order.onnx",
+        MODELS_DIR / "indra" / "det.rten",
+        MODELS_DIR / "indra" / "orient.rten",
+        MODELS_DIR / "indra" / "rec.rten",
+        MODELS_DIR / "indra" / "indra_order.rten",
         MODELS_DIR / "indra" / "meta.json",
     ]
     models_paddle_structure = [
@@ -659,10 +682,10 @@ def main():
         OMNIDOC_DIR / ".venv" / "lib" / "python3.12" / "site-packages" / "rapid_layout" / "models" / "layout_publaynet.onnx",
     ]
     models_rusto_structure_tiny = [
-        MODELS_DIR / "PPOCR_v6_tiny" / "det.onnx",
-        MODELS_DIR / "PPOCR_v6_tiny" / "rec.onnx",
+        MODELS_DIR / "PPOCR_v6_tiny" / "det.mnn",
+        MODELS_DIR / "PPOCR_v6_tiny" / "rec.mnn",
         MODELS_DIR / "PPOCR_v6_tiny" / "dict.txt",
-        MODELS_DIR / "PPOCR_v6_tiny" / "layout_cdla.onnx",
+        MODELS_DIR / "PPOCR_v6_tiny" / "layout_cdla.mnn",
     ]
     models_rusto_structure_small = [
         MODELS_DIR / "PPOCR_v6_small" / "det.onnx",
@@ -676,6 +699,20 @@ def main():
             "name": "RustO + PP-OCRv6 Tiny (Base)",
             "target": "Target 1",
             "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rusto_mnn_tiny": {
+            "name": "RustO + PP-OCRv6 Tiny (Pure-Rust MNN)",
+            "target": "Target 1 (MNN)",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rusto_rten_tiny": {
+            "name": "RustO + PP-OCRv6 Tiny (RTen)",
+            "target": "Target 1 (RTen)",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
             "model_size_mb": get_model_size_mb(models_ppocr_tiny),
             "engine_runtime": "Native Rust (RTen)",
         },
@@ -686,12 +723,19 @@ def main():
             "model_size_mb": get_model_size_mb(models_ppocr_small),
             "engine_runtime": "Native Rust (RTen)",
         },
+        "rusto_rten_small": {
+            "name": "RustO + PP-OCRv6 Small (RTen)",
+            "target": "Target 1 (RTen)",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_small),
+            "engine_runtime": "Native Rust (RTen)",
+        },
         "rusto_structure_tiny": {
             "name": "RustO + PP-Structure Tiny",
             "target": "Target 1 (Structure)",
             "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
             "model_size_mb": get_model_size_mb(models_rusto_structure_tiny),
-            "engine_runtime": "Native Rust (RTen)",
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
         },
         "rusto_structure_small": {
             "name": "RustO + PP-Structure Small",
@@ -704,8 +748,15 @@ def main():
             "name": "RustO Full Pipeline + PP-OCRv6 Tiny",
             "target": "Target 2",
             "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
-            "model_size_mb": get_model_size_mb(models_ppocr_tiny + models_opts),
-            "engine_runtime": "Native Rust (RTen)",
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_mnn + models_opts_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rusto_mnn_full_tiny": {
+            "name": "RustO Full Pipeline + PP-OCRv6 Tiny (Pure-Rust MNN)",
+            "target": "Target 2 (MNN)",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_mnn + models_opts_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
         },
         "rusto_full_small": {
             "name": "RustO Full Pipeline + PP-OCRv6 Small",
@@ -760,15 +811,43 @@ def main():
             "name": "RustO + Indra Models (Base)",
             "target": "Target 7",
             "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_indra_base_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rusto_mnn_indra_base": {
+            "name": "RustO + Indra Models (Pure-Rust MNN Base)",
+            "target": "Target 7 (MNN)",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_indra_base_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rusto_rten_indra_base": {
+            "name": "RustO + Indra Models (RTen Base)",
+            "target": "Target 7 (RTen)",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
             "model_size_mb": get_model_size_mb(models_indra_base),
-            "engine_runtime": "RustO Engine (Indra)",
+            "engine_runtime": "Native Rust (RTen)",
         },
         "rusto_indra_full": {
             "name": "RustO Full Pipeline + Indra Models",
             "target": "Target 8",
             "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_indra_full_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rusto_mnn_indra_full": {
+            "name": "RustO Full Pipeline + Indra Models (Pure-Rust MNN)",
+            "target": "Target 8 (MNN)",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_indra_full_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rusto_rten_indra_full": {
+            "name": "RustO Full Pipeline + Indra Models (RTen)",
+            "target": "Target 8 (RTen)",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
             "model_size_mb": get_model_size_mb(models_indra_full),
-            "engine_runtime": "RustO Full Engine (Indra)",
+            "engine_runtime": "Native Rust (RTen)",
         },
         "paddle_structure": {
             "name": "PaddleOCR + PP-Structure",
@@ -793,17 +872,19 @@ def main():
         },
     }
 
-    # 1. Target 1: RustO Base
+    # 1. Target 1: RustO Base (MNN for tiny, RTen/ONNX for small)
     for tier in ["tiny", "small"]:
         key = f"rusto_{tier}"
         if selected_targets and key not in selected_targets:
             continue
         m_dir = MODELS_DIR / f"PPOCR_v6_{tier}"
-        def make_cmd(path, m_dir=m_dir):
+        det_file = "det.mnn" if tier == "tiny" else "det.onnx"
+        rec_file = "rec.mnn" if tier == "tiny" else "rec.onnx"
+        def make_cmd(path, m_dir=m_dir, det_file=det_file, rec_file=rec_file):
             return [
                 str(RUSTO_BIN),
-                "--det-model", str(m_dir / "det.onnx"),
-                "--rec-model", str(m_dir / "rec.onnx"),
+                "--det-model", str(m_dir / det_file),
+                "--rec-model", str(m_dir / rec_file),
                 "--dict", str(m_dir / "dict.txt"),
                 "--det-limit", "960",
                 "--format", "text",
@@ -816,6 +897,64 @@ def main():
         stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
         results[key] = stats
 
+    # 1.1 Pure-Rust MNN (rusto-nn) vs RTen (rusto-rten) Explicit Targets
+    if not selected_targets or "rusto_mnn_tiny" in selected_targets:
+        m_dir = MODELS_DIR / "PPOCR_v6_tiny"
+        def make_cmd(path, m_dir=m_dir):
+            return [
+                str(RUSTO_BIN),
+                "--det-model", str(m_dir / "det.mnn"),
+                "--rec-model", str(m_dir / "rec.mnn"),
+                "--dict", str(m_dir / "dict.txt"),
+                "--det-limit", "960",
+                "--format", "text",
+                path,
+            ]
+        timings, neds, rss, page_neds = runner.run_cli_pipeline("rusto_mnn_tiny", make_cmd, warmup_img)
+        stats = compute_stats(timings, neds)
+        stats.update(pipeline_metadata["rusto_mnn_tiny"])
+        stats["peak_rss_mb"] = round(rss, 1)
+        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+        results["rusto_mnn_tiny"] = stats
+
+    if not selected_targets or "rusto_rten_tiny" in selected_targets:
+        m_dir = MODELS_DIR / "PPOCR_v6_tiny"
+        def make_cmd(path, m_dir=m_dir):
+            return [
+                str(RUSTO_BIN),
+                "--det-model", str(m_dir / "det.rten"),
+                "--rec-model", str(m_dir / "rec.rten"),
+                "--dict", str(m_dir / "dict.txt"),
+                "--det-limit", "960",
+                "--format", "text",
+                path,
+            ]
+        timings, neds, rss, page_neds = runner.run_cli_pipeline("rusto_rten_tiny", make_cmd, warmup_img)
+        stats = compute_stats(timings, neds)
+        stats.update(pipeline_metadata["rusto_rten_tiny"])
+        stats["peak_rss_mb"] = round(rss, 1)
+        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+        results["rusto_rten_tiny"] = stats
+
+    if not selected_targets or "rusto_rten_small" in selected_targets:
+        m_dir = MODELS_DIR / "PPOCR_v6_small"
+        def make_cmd(path, m_dir=m_dir):
+            return [
+                str(RUSTO_BIN),
+                "--det-model", str(m_dir / "det.onnx"),
+                "--rec-model", str(m_dir / "rec.onnx"),
+                "--dict", str(m_dir / "dict.txt"),
+                "--det-limit", "960",
+                "--format", "text",
+                path,
+            ]
+        timings, neds, rss, page_neds = runner.run_cli_pipeline("rusto_rten_small", make_cmd, warmup_img)
+        stats = compute_stats(timings, neds)
+        stats.update(pipeline_metadata["rusto_rten_small"])
+        stats["peak_rss_mb"] = round(rss, 1)
+        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+        results["rusto_rten_small"] = stats
+
     # 1.5 Target 1 (Structure): RustO + PP-Structure
     for tier in ["tiny", "small"]:
         key = f"rusto_structure_{tier}"
@@ -823,13 +962,16 @@ def main():
             continue
         m_dir = MODELS_DIR / f"PPOCR_v6_{tier}"
         opts_dir = MODELS_DIR / "PPOCR_v6_tiny"
-        def make_cmd(path, m_dir=m_dir, opts_dir=opts_dir):
+        det_file = "det.mnn" if tier == "tiny" else "det.onnx"
+        rec_file = "rec.mnn" if tier == "tiny" else "rec.onnx"
+        layout_file = "layout_cdla.mnn" if tier == "tiny" else "layout_cdla.onnx"
+        def make_cmd(path, m_dir=m_dir, opts_dir=opts_dir, det_file=det_file, rec_file=rec_file, layout_file=layout_file):
             return [
                 str(RUSTO_BIN),
-                "--det-model", str(m_dir / "det.onnx"),
-                "--rec-model", str(m_dir / "rec.onnx"),
+                "--det-model", str(m_dir / det_file),
+                "--rec-model", str(m_dir / rec_file),
                 "--dict", str(m_dir / "dict.txt"),
-                "--layout-model", str(opts_dir / "layout_cdla.onnx"), "--enable-layout",
+                "--layout-model", str(opts_dir / layout_file), "--enable-layout",
                 "--det-limit", "960",
                 "--format", "text",
                 path,
@@ -848,15 +990,20 @@ def main():
             continue
         m_dir = MODELS_DIR / f"PPOCR_v6_{tier}"
         opts_dir = MODELS_DIR / "PPOCR_v6_tiny"
-        def make_cmd(path, m_dir=m_dir, opts_dir=opts_dir):
+        det_file = "det.mnn" if tier == "tiny" else "det.onnx"
+        rec_file = "rec.mnn" if tier == "tiny" else "rec.onnx"
+        cls_file = "cls.mnn" if tier == "tiny" else "cls.onnx"
+        orient_file = "orient.mnn" if tier == "tiny" else "orient.onnx"
+        layout_file = "layout_cdla.mnn" if tier == "tiny" else "layout_cdla.onnx"
+        def make_cmd(path, m_dir=m_dir, opts_dir=opts_dir, det_file=det_file, rec_file=rec_file, cls_file=cls_file, orient_file=orient_file, layout_file=layout_file):
             return [
                 str(RUSTO_BIN),
-                "--det-model", str(m_dir / "det.onnx"),
-                "--rec-model", str(m_dir / "rec.onnx"),
+                "--det-model", str(m_dir / det_file),
+                "--rec-model", str(m_dir / rec_file),
                 "--dict", str(m_dir / "dict.txt"),
-                "--cls-model", str(opts_dir / "cls.onnx"), "--enable-cls",
-                "--orient-model", str(opts_dir / "orient.onnx"), "--enable-orient",
-                "--layout-model", str(opts_dir / "layout_cdla.onnx"), "--enable-layout",
+                "--cls-model", str(opts_dir / cls_file), "--enable-cls",
+                "--orient-model", str(opts_dir / orient_file), "--enable-orient",
+                "--layout-model", str(opts_dir / layout_file), "--enable-layout",
                 "--det-limit", "960",
                 "--format", "text",
                 path,
@@ -867,6 +1014,29 @@ def main():
         stats["peak_rss_mb"] = round(rss, 1)
         stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
         results[key] = stats
+
+    if not selected_targets or "rusto_mnn_full_tiny" in selected_targets:
+        m_dir = MODELS_DIR / "PPOCR_v6_tiny"
+        opts_dir = MODELS_DIR / "PPOCR_v6_tiny"
+        def make_cmd(path, m_dir=m_dir, opts_dir=opts_dir):
+            return [
+                str(RUSTO_BIN),
+                "--det-model", str(m_dir / "det.mnn"),
+                "--rec-model", str(m_dir / "rec.mnn"),
+                "--dict", str(m_dir / "dict.txt"),
+                "--cls-model", str(opts_dir / "cls.mnn"), "--enable-cls",
+                "--orient-model", str(opts_dir / "orient.mnn"), "--enable-orient",
+                "--layout-model", str(opts_dir / "layout_cdla.mnn"), "--enable-layout",
+                "--det-limit", "960",
+                "--format", "text",
+                path,
+            ]
+        timings, neds, rss, page_neds = runner.run_cli_pipeline("rusto_mnn_full_tiny", make_cmd, warmup_img)
+        stats = compute_stats(timings, neds)
+        stats.update(pipeline_metadata["rusto_mnn_full_tiny"])
+        stats["peak_rss_mb"] = round(rss, 1)
+        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+        results["rusto_mnn_full_tiny"] = stats
 
     # 3. Target 3: RapidOCR
     for tier in ["tiny", "small"]:
@@ -917,22 +1087,58 @@ def main():
         stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
         results["indra_ocr"] = stats
 
-    # 7 & 8: Target 7 & 8 (Indra Base & Full)
-    if not selected_targets or "rusto_indra_base" in selected_targets:
-        timings, neds, rss, page_neds = runner.run_indra_inprocess("rusto_indra_base", mode="base", warmup_img=warmup_img)
-        stats = compute_stats(timings, neds)
-        stats.update(pipeline_metadata["rusto_indra_base"])
-        stats["peak_rss_mb"] = round(rss, 1)
-        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
-        results["rusto_indra_base"] = stats
+    # 7 & 8: Target 7 & 8 (Indra Base & Full) via Native RustO CLI (Pure-Rust MNN default and RTen)
+    for engine_type, engine_key_base, engine_key_full in [
+        ("mnn", "rusto_mnn_indra_base", "rusto_mnn_indra_full"),
+        ("rten", "rusto_rten_indra_base", "rusto_rten_indra_full"),
+    ]:
+        det_ext = "mnn" if engine_type == "mnn" else "rten"
+        rec_ext = "mnn" if engine_type == "mnn" else "rten"
+        m_dir = MODELS_DIR / "indra"
 
-    if not selected_targets or "rusto_indra_full" in selected_targets:
-        timings, neds, rss, page_neds = runner.run_indra_inprocess("rusto_indra_full", mode="full", warmup_img=warmup_img)
-        stats = compute_stats(timings, neds)
-        stats.update(pipeline_metadata["rusto_indra_full"])
-        stats["peak_rss_mb"] = round(rss, 1)
-        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
-        results["rusto_indra_full"] = stats
+        # Base (Det + Rec)
+        if not selected_targets or engine_key_base in selected_targets or (engine_type == "mnn" and "rusto_indra_base" in selected_targets):
+            def make_indra_base_cmd(path, m_dir=m_dir, det_ext=det_ext, rec_ext=rec_ext):
+                return [
+                    str(RUSTO_BIN),
+                    "--det-model", str(m_dir / f"det.{det_ext}"),
+                    "--rec-model", str(m_dir / f"rec.{rec_ext}"),
+                    "--dict", str(m_dir / "meta.json"),
+                    "--format", "text",
+                    path,
+                ]
+            timings, neds, rss, page_neds = runner.run_cli_pipeline(engine_key_base, make_indra_base_cmd, warmup_img)
+            stats = compute_stats(timings, neds)
+            stats.update(pipeline_metadata[engine_key_base])
+            stats["peak_rss_mb"] = round(rss, 1)
+            stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+            results[engine_key_base] = stats
+            if engine_type == "mnn":
+                results["rusto_indra_base"] = dict(stats)
+                results["rusto_indra_base"].update(pipeline_metadata["rusto_indra_base"])
+
+        # Full (Det + Rec + Orient + Reading Order)
+        if not selected_targets or engine_key_full in selected_targets or (engine_type == "mnn" and "rusto_indra_full" in selected_targets):
+            def make_indra_full_cmd(path, m_dir=m_dir, det_ext=det_ext, rec_ext=rec_ext):
+                return [
+                    str(RUSTO_BIN),
+                    "--det-model", str(m_dir / f"det.{det_ext}"),
+                    "--rec-model", str(m_dir / f"rec.{rec_ext}"),
+                    "--dict", str(m_dir / "meta.json"),
+                    "--orient-model", str(m_dir / "orient.rten"), "--enable-orient",
+                    "--reading-order",
+                    "--format", "text",
+                    path,
+                ]
+            timings, neds, rss, page_neds = runner.run_cli_pipeline(engine_key_full, make_indra_full_cmd, warmup_img)
+            stats = compute_stats(timings, neds)
+            stats.update(pipeline_metadata[engine_key_full])
+            stats["peak_rss_mb"] = round(rss, 1)
+            stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+            results[engine_key_full] = stats
+            if engine_type == "mnn":
+                results["rusto_indra_full"] = dict(stats)
+                results["rusto_indra_full"].update(pipeline_metadata["rusto_indra_full"])
 
     # 9. Target 9: PaddleOCR PP-Structure
     if not selected_targets or "paddle_structure" in selected_targets:

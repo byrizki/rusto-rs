@@ -22,23 +22,27 @@ Evaluating across 30 diverse multi-column documents (academic literature, textbo
 
 | Engine / Runtime | Binary Size | Model Weights | Mean Latency ↓ | Peak RSS ↓ | Accuracy (1 - NED) ↑ |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| **RustO + Indra Models (Base)** | **5.5 MB** | **5.4 MB** | **439.2 ms** | 474.0 MB | **45.46%** |
-| **PaddleOCR + PP-OCRv6 Tiny** | 120.1 MB | 6.1 MB | 605.3 ms | 659.3 MB | 45.33% |
+| **PaddleOCR + PP-OCRv6 Tiny** | 120.1 MB | 6.1 MB | **605.3 ms** | 659.3 MB | 45.33% |
 | **RapidOCR + PP-OCRv6 Tiny** | 22.7 MB | 6.1 MB | 1,011.5 ms | 392.5 MB | 44.84% |
-| **RustO + PP-OCRv6 Tiny** | **5.5 MB** | 6.1 MB | **1,104.4 ms** | **253.9 MB** | 45.34% |
+| **RustO + Indra Models (RTen Base)** | **8.3 MB** | **5.4 MB** | **1,166.8 ms** | **200.1 MB** | **45.98%** |
+| **RustO + PP-OCRv6 Tiny (RTen)** | **8.3 MB** | 6.1 MB | **1,172.5 ms** | **177.8 MB** | **45.40%** |
+| **RustO + Indra Models (Pure-Rust MNN Base)** | **8.3 MB** | **5.4 MB** | 1,328.5 ms | 285.5 MB | **45.98%** |
+| **RustO + PP-OCRv6 Tiny (Pure-Rust MNN)** | **8.3 MB** | 5.9 MB | 1,577.8 ms | 252.8 MB | 43.21% |
+| **ocrs (RTen Original)** | 12.2 MB | 11.6 MB | 2,059.1 ms | 1,900.4 MB | 44.33% |
 | **PaddleOCR + PP-OCRv6 Small** | 120.1 MB | 29.8 MB | 2,390.5 ms | 928.7 MB | 44.68% |
 | **RapidOCR + PP-OCRv6 Small** | 22.7 MB | 29.8 MB | 3,522.0 ms | 508.3 MB | 44.55% |
-| **RustO + PP-OCRv6 Small** | **5.5 MB** | 29.8 MB | 3,700.4 ms | 477.9 MB | 44.57% |
+| **RustO + PP-OCRv6 Small (RTen)** | **8.3 MB** | 29.8 MB | 3,700.4 ms | 477.9 MB | 44.57% |
 
 ### Full Pipeline (Native Document Understanding & Layout Recovery)
 
 | Engine & Ecosystem | Pipeline Description | Latency ↓ | Peak RSS ↓ | Accuracy (1 - NED) ↑ |
 |:---|:---|:---:|:---:|:---:|
-| **RustO + Indra Full** | Pure Rust (`det` + `orient` + `rec` + `order.onnx`) | **442.5 ms** | **485.1 MB** | **63.75%** |
-| **Indra OCR (Official)** | Python ONNX (`det` + `orient` + `rec` + `order.onnx`) | 1,415.4 ms | 492.0 MB | 63.76% |
+| **RustO Full + Indra Models (RTen)** | Pure Rust (`det` + `orient` + `rec` + `order.rten`) | **1,244.9 ms** | **225.7 MB** | **46.00%** |
+| **RustO Full + Indra Models (Pure-Rust MNN)** | Pure Rust (`det` + `orient` + `rec` + `order.rten`) | **1,306.2 ms** | **315.5 MB** | **46.00%** |
+| **Indra OCR (Official Python)** | Python ONNX (`det` + `orient` + `rec` + `order.onnx`) | 1,415.4 ms | 492.0 MB | **63.76%** |
 | **PaddleOCR + PP-Structure** | Python Paddle (`det` + `rec` + `layout` + `sorted_boxes`) | 5,571.4 ms | 10,624.3 MB | 57.18% |
 | **RapidOCR + RapidLayout Tiny** | Python ONNX (`det` + `rec` + `layout` + `sorted_boxes`) | 1,177.5 ms | 449.5 MB | 53.85% |
-| **RustO + PP-Structure Tiny** | Pure Rust (`det` + `rec` + `layout_cdla.onnx`) | **1,474.3 ms** | **341.8 MB** | **51.33%** |
+| **RustO + PP-Structure Tiny** | Pure Rust (`det` + `rec` + `layout_cdla.mnn`) | **1,474.3 ms** | **341.8 MB** | 51.33% |
 
 ### Standalone & Hybrid Model Mixing (Indra Order + PP-OCR)
 
