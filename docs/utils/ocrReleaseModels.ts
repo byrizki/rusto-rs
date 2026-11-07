@@ -96,23 +96,16 @@ export function getLayoutModelCandidateUrls(
   if (layoutModelId === 'indra') {
     return dedupeStrings([
       `${cleanBase}/models/indraocr/order.mnn`,
-      `${cleanBase}/models/indraocr/indra_order.mnn`,
       `${cleanBase}/models/indraocr/order.rten`,
-      `${cleanBase}/models/indraocr/indra_order.rten`,
       `${cleanBase}/models/indraocr/order.onnx`,
-      `${cleanBase}/models/indraocr/indra_order.onnx`,
       `${cleanBase}/models/indra/order.mnn`,
-      `${cleanBase}/models/indra/indra_order.mnn`,
       `${cleanBase}/models/indra/order.rten`,
-      `${cleanBase}/models/indra/indra_order.rten`,
       `${cleanBase}/models/indra/order.onnx`,
+      `${cleanBase}/models/indra/indra_order.rten`,
       `${cleanBase}/models/indra/indra_order.onnx`,
       `${HUGGINGFACE_BASE}/indraocr/order.mnn`,
-      `${HUGGINGFACE_BASE}/indraocr/indra_order.mnn`,
       `${HUGGINGFACE_BASE}/indraocr/order.rten`,
-      `${HUGGINGFACE_BASE}/indraocr/indra_order.rten`,
       `${HUGGINGFACE_BASE}/indraocr/order.onnx`,
-      `${HUGGINGFACE_BASE}/indraocr/indra_order.onnx`,
     ]);
   }
   if (layoutModelId === 'cdla') {

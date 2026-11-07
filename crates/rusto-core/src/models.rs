@@ -31,10 +31,10 @@ pub fn normalize_model_name(name: Option<&str>) -> &'static str {
             "ppocrv6-tiny"
         }
         Some("ppocrv6-tiny-int8") | Some("tiny-int8") => "ppocrv6-tiny-int8",
-        Some("ppocrv5") | Some("ppv5") | Some("ppocrv5-mobile") | Some("v5") => "ppocrv5-mobile",
         Some("ppocrv5-server") | Some("v5-server") => "ppocrv5-server",
-        Some("ppocrv4") | Some("ppv4") | Some("ppocrv4-mobile") | Some("v4") => "ppocrv4-mobile",
+        Some("ppocrv5") | Some("ppv5") | Some("ppocrv5-mobile") | Some("v5") => "ppocrv5-mobile",
         Some("ppocrv4-server") | Some("v4-server") => "ppocrv4-server",
+        Some("ppocrv4") | Some("ppv4") | Some("ppocrv4-mobile") | Some("v4") => "ppocrv4-mobile",
         Some("ppocrv3") | Some("ppv3") | Some("ppocrv3-mobile") | Some("v3") => "ppocrv3-mobile",
         _ => "indraocr",
     }

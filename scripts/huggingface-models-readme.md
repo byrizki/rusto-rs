@@ -46,16 +46,16 @@ https://huggingface.co/byrizki/rusto-models/resolve/main/<folder>/<filename>
 | `indraocr/det` | 384 KB | 381 KB | 396 KB | Base Detection |
 | `indraocr/rec` | 4.9 MB | 4.9 MB | 4.9 MB | Base Recognition |
 | `indraocr/meta.json` | - | 207 KB | - | Vocabulary Metadata |
-| `indraocr/order` | - | 2.9 MB | 2.9 MB | Neural Reading Order & Column Sorter |
-| `indraocr/orient` | - | 360 KB | 370 KB | Page Orientation Classifier |
-| `indraocr/rec_cjk` | - | 9.8 MB | 9.8 MB | CJK Recognition (Chinese, Japanese, Korean) |
-| `indraocr/rec_rtl` | - | 4.6 MB | 4.7 MB | Right-to-Left Recognition (Arabic, Persian, Urdu) |
-| `indraocr/rec_world` | - | 5.4 MB | 5.4 MB | Extended World Languages Recognition |
-| `indraocr/script` | - | 188 KB | 191 KB | Script & Writing System Classifier |
-| `indraocr/mathcls` | - | 187 KB | 191 KB | Math Formula Detection / Classifier |
-| `indraocr/math_enc` | - | 9.5 MB | 9.5 MB | Math Formula Encoder |
-| `indraocr/math_dec_init` | - | 1.3 MB | 1.4 MB | Math Formula Decoder (Init Step) |
-| `indraocr/math_dec_step` | - | 8.1 MB | 8.1 MB | Math Formula Decoder (Autoregressive Step) |
+| `indraocr/order` | 2.9 MB | 2.9 MB | 2.9 MB | Neural Reading Order & Column Sorter |
+| `indraocr/orient` | 364 KB | 363 KB | 370 KB | Page Orientation Classifier |
+| `indraocr/rec_cjk` | 9.8 MB | 9.8 MB | 9.8 MB | CJK Recognition (Chinese, Japanese, Korean) |
+| `indraocr/rec_rtl` | 4.6 MB | 4.6 MB | 4.7 MB | Right-to-Left Recognition (Arabic, Persian, Urdu) |
+| `indraocr/rec_world` | 5.4 MB | 5.4 MB | 5.4 MB | Extended World Languages Recognition |
+| `indraocr/script` | 188 KB | 188 KB | 191 KB | Script & Writing System Classifier |
+| `indraocr/mathcls` | 187 KB | 187 KB | 191 KB | Math Formula Detection / Classifier |
+| `indraocr/math_enc` | 9.5 MB | 9.5 MB | 9.5 MB | Math Formula Encoder |
+| `indraocr/math_dec_init` | 1.3 MB | 1.3 MB | 1.4 MB | Math Formula Decoder (Init Step) |
+| `indraocr/math_dec_step` | 7.6 MB | 8.1 MB | 8.1 MB | Math Formula Decoder (Autoregressive Step) |
 | `indraocr/math_meta.json` | - | 7.7 KB | - | Math LaTeX Vocabulary |
 
 ### 2. PP-OCRv6 Tiers
@@ -63,25 +63,25 @@ https://huggingface.co/byrizki/rusto-models/resolve/main/<folder>/<filename>
 | Folder | Detection Formats | Recognition Formats | Dictionary | Description |
 |:---|:---|:---|:---:|:---|
 | `ppocrv6-tiny/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (27 KB) | PP-OCRv6 Tiny (Default Ultra-lightweight) |
-| `ppocrv6-tiny-int8/` | `det.onnx`, `det.rten` | `rec.onnx`, `rec.rten` | `dict.txt` (27 KB) | PP-OCRv6 Tiny INT8 Quantized |
-| `ppocrv6-small/` | `det.onnx` | `rec.onnx` | `dict.txt` (74 KB) | PP-OCRv6 Small High-Recall |
-| `ppocrv6-small-int8/` | `det.onnx`, `det.rten` | `rec.onnx`, `rec.rten` | `dict.txt` (74 KB) | PP-OCRv6 Small INT8 Quantized |
-| `ppocrv6-medium/` | `det.onnx` | `rec.onnx` | `dict.txt` (74 KB) | PP-OCRv6 Medium High-Capacity |
-| `ppocrv6-medium-int8/` | `det.onnx`, `det.rten` | `rec.onnx`, `rec.rten` | `dict.txt` (74 KB) | PP-OCRv6 Medium INT8 Quantized |
+| `ppocrv6-tiny-int8/` | `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (27 KB) | PP-OCRv6 Tiny INT8 Quantized |
+| `ppocrv6-small/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (74 KB) | PP-OCRv6 Small High-Recall |
+| `ppocrv6-small-int8/` | `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (74 KB) | PP-OCRv6 Small INT8 Quantized |
+| `ppocrv6-medium/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (74 KB) | PP-OCRv6 Medium High-Capacity |
+| `ppocrv6-medium-int8/` | `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (74 KB) | PP-OCRv6 Medium INT8 Quantized |
 
 ### 3. PP-OCRv5 Tiers
 
 | Folder | Detection Formats | Recognition Formats | Dictionary | Description |
 |:---|:---|:---|:---:|:---|
-| `ppocrv5-mobile/` | `det.onnx`, `det.rten` | `rec.onnx`, `rec.rten` | `dict.txt` (73 KB) | PP-OCRv5 Mobile |
-| `ppocrv5-server/` | `det.rten` | `rec.rten` | `dict.txt` (73 KB) | PP-OCRv5 Server |
+| `ppocrv5-mobile/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (73 KB) | PP-OCRv5 Mobile |
+| `ppocrv5-server/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (73 KB) | PP-OCRv5 Server (High Accuracy) |
 
 ### 4. PP-OCRv4 Tiers
 
 | Folder | Detection Formats | Recognition Formats | Dictionary | Description |
 |:---|:---|:---|:---:|:---|
-| `ppocrv4-mobile/` | `det.onnx`, `det.rten` | `rec.onnx`, `rec.rten` | `dict.txt` (26 KB) | PP-OCRv4 Mobile |
-| `ppocrv4-server/` | `det.rten` | `rec.rten` | `dict.txt` (26 KB) | PP-OCRv4 Server |
+| `ppocrv4-mobile/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (26 KB) | PP-OCRv4 Mobile |
+| `ppocrv4-server/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (26 KB) | PP-OCRv4 Server (High Accuracy) |
 
 ### 5. Document Intelligence & Pipeline Extras (`modules/`)
 

@@ -22,7 +22,7 @@ export const modelCategories: ModelCategoryMeta[] = [
   {
     id: 'ppocrv5',
     name: 'PP-OCRv5 Series',
-    description: 'Multilingual mobile and server production models',
+    description: 'Multilingual mobile production models',
   },
   {
     id: 'ppocrv4',

@@ -119,16 +119,6 @@ export const MODEL_RELEASE_ASSETS: Record<string, ModelAssetFiles> = {
     'ppocrv5_mobile_rec.onnx',
     'ppocrv5_dict.txt'
   ),
-  'ppocrv5-server': makeModelAsset(
-    'ppocrv5-server',
-    'det.rten',
-    'rec.rten',
-    'dict.txt',
-    'ppocrv5_server_det.rten',
-    'ppocrv5_server_rec.rten',
-    'ppocrv5_dict.txt'
-  ),
-
   'ppocrv4-mobile': makeModelAsset(
     'ppocrv4-mobile',
     'det.onnx',
@@ -136,15 +126,6 @@ export const MODEL_RELEASE_ASSETS: Record<string, ModelAssetFiles> = {
     'dict.txt',
     'ppocrv4_mobile_det.onnx',
     'ppocrv4_mobile_rec.onnx',
-    'ppocrv4_dict.txt'
-  ),
-  'ppocrv4-server': makeModelAsset(
-    'ppocrv4-server',
-    'det.rten',
-    'rec.rten',
-    'dict.txt',
-    'ppocrv4_server_det.rten',
-    'ppocrv4_server_rec.rten',
     'ppocrv4_dict.txt'
   ),
 

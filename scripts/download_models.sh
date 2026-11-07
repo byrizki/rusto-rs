@@ -240,10 +240,8 @@ download_indra() {
     pids+=($!)
 
     # Reading Order & Orientation
-    for ext in onnx rten; do
+    for ext in mnn onnx rten; do
         download_file_to "$dir" "order.$ext" "indraocr/order.$ext" &
-        pids+=($!)
-        download_file_to "$dir" "indra_order.$ext" "indraocr/indra_order.$ext" &
         pids+=($!)
         download_file_to "$dir" "orient.$ext" "indraocr/orient.$ext" &
         pids+=($!)

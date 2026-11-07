@@ -166,19 +166,6 @@ const coreModels: OcrModelOption[] = [
     6,
     ['PPv5', 'Mobile']
   ),
-  model(
-    'ppocrv5-server',
-    'PP-OCRv5 Server',
-    'ppv5',
-    'ppocrv5',
-    'PP-OCRv5 Series',
-    '~173 MB',
-    172800032,
-    'Server High-Capacity',
-    'Large capacity server model with highest parameter depth in v5.',
-    6,
-    ['PPv5', 'Server']
-  ),
 
   // --- PP-OCRv4 Series ---
   model(
@@ -193,19 +180,6 @@ const coreModels: OcrModelOption[] = [
     'Widely used lightweight v4 pipeline for fast document parsing.',
     6,
     ['PPv4', 'Mobile']
-  ),
-  model(
-    'ppocrv4-server',
-    'PP-OCRv4 Server',
-    'ppv4',
-    'ppocrv4',
-    'PP-OCRv4 Series',
-    '~204 MB',
-    203950889,
-    'Server Baseline',
-    'Full server model for heavy document workloads.',
-    6,
-    ['PPv4', 'Server']
   ),
 ];
 

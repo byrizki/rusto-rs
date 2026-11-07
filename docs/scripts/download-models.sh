@@ -91,6 +91,8 @@ download_file "$TARGET_DIR/modules/cls.mnn" "modules" "cls.mnn" "cls.mnn" "$REPO
 download_file "$TARGET_DIR/modules/uvdoc.mnn" "modules" "uvdoc.mnn" "uvdoc.mnn" "$REPO_ROOT/models/uvdoc.mnn"
 
 # Layout / reading order model for Indra OCR
+download_file "$TARGET_DIR/indraocr/order.mnn" "indraocr" "order.mnn" "indra_order.mnn" "$REPO_ROOT/models/indra/order.mnn"
+link_flat "$TARGET_DIR/indraocr/order.mnn" "indra_order.mnn"
 download_file "$TARGET_DIR/indraocr/order.rten" "indraocr" "order.rten" "indra_order.rten" "$REPO_ROOT/models/indra/order.rten"
 link_flat "$TARGET_DIR/indraocr/order.rten" "indra_order.rten"
 download_file "$TARGET_DIR/indraocr/order.onnx" "indraocr" "order.onnx" "indra_order.onnx" "$REPO_ROOT/models/indra/order.onnx"

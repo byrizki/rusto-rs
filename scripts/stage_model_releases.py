@@ -102,7 +102,6 @@ def stage_tier(models_dir: Path, hf_dir: Path, flat_dir: Path, tiers: list, v_di
                 )
                 if src:
                     stage_asset(src, hf_dir / folder / f"{kind}{ext}", flat_dir / f"{prefix}_{kind}{ext}")
-                    stage_asset(src, hf_dir / folder / f"{prefix}_{kind}{ext}", None)
                     found = True
             if not found:
                 print(f"⚠️ Missing {folder}/{kind} across all extensions in {models_dir}", file=sys.stderr)
@@ -114,7 +113,6 @@ def stage_tier(models_dir: Path, hf_dir: Path, flat_dir: Path, tiers: list, v_di
         )
         if dict_src:
             stage_asset(dict_src, hf_dir / folder / "dict.txt", flat_dir / f"{v_dict}_dict.txt")
-            stage_asset(dict_src, hf_dir / folder / f"{v_dict}_dict.txt", None)
 
 
 def stage_multilingual(models_dir: Path, hf_dir: Path, flat_dir: Path) -> None:
@@ -161,7 +159,6 @@ def stage_extras(models_dir: Path, hf_dir: Path, flat_dir: Path) -> None:
             )
             if src:
                 stage_asset(src, hf_dir / "modules" / f"{mod_name}{ext}", flat_dir / f"{flat_name}{ext}")
-                stage_asset(src, hf_dir / "modules" / f"{flat_name}{ext}", None)
 
     for canon_name, flat_name, candidate_prefixes in INDRA_SPECS:
         for ext in EXTENSIONS:
@@ -176,7 +173,6 @@ def stage_extras(models_dir: Path, hf_dir: Path, flat_dir: Path) -> None:
                     break
             if src:
                 stage_asset(src, hf_dir / "indraocr" / f"{canon_name}{ext}", flat_dir / f"{flat_name}{ext}")
-                stage_asset(src, hf_dir / "indraocr" / f"{flat_name}{ext}", None)
 
     for json_file, canon_dest, flat_dest in [
         ("indra/meta.json", "meta.json", "indra_meta.json"),
@@ -189,7 +185,6 @@ def stage_extras(models_dir: Path, hf_dir: Path, flat_dir: Path) -> None:
         )
         if src:
             stage_asset(src, hf_dir / "indraocr" / canon_dest, flat_dir / flat_dest)
-            stage_asset(src, hf_dir / "indraocr" / flat_dest, None)
 
 
 def generate_sha256sums(directory: Path) -> None:
