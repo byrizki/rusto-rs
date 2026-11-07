@@ -7,6 +7,7 @@ on:
     paths-ignore:
       - 'docs/**'
       - 'benchmarks/**'
+      - 'scripts/download_omnidocbench.sh'
       - '.github/workflows/benchmark.yml'
       - '.github/workflows/docs-ci.yml'
       - '.github/workflows/deploy-docs.yml'
@@ -19,6 +20,7 @@ on:
     paths-ignore:
       - 'docs/**'
       - 'benchmarks/**'
+      - 'scripts/download_omnidocbench.sh'
       - '.github/workflows/benchmark.yml'
       - '.github/workflows/docs-ci.yml'
       - '.github/workflows/deploy-docs.yml'
