@@ -458,6 +458,7 @@ class OcrRunOptions(_GeneratedOcrRunOptions):
         output: OutputGranularity = OutputGranularity.LINES,
         auto_unwarp: bool | None = None,
         layout_reading: bool | None = None,
+        layout_model: str | None = None,
         orientation_detection: bool | None = None,
         line_classification: bool | None = None,
         pre_detection: PreDetectionOptions | None = None,
@@ -471,6 +472,7 @@ class OcrRunOptions(_GeneratedOcrRunOptions):
             output=output,
             auto_unwarp=auto_unwarp,
             layout_reading=layout_reading,
+            layout_model=layout_model,
             orientation_detection=orientation_detection,
             line_classification=line_classification,
             pre_detection=pre_detection,
@@ -491,6 +493,7 @@ class DetectTextBuilder:
         self._output: OutputGranularity = OutputGranularity.LINES
         self._auto_unwarp: bool | None = None
         self._layout_reading: bool | None = None
+        self._layout_model: str | None = None
         self._orientation_detection: bool | None = None
         self._line_classification: bool | None = None
         self._pre_detection: PreDetectionOptions | None = None
@@ -543,6 +546,11 @@ class DetectTextBuilder:
     def with_layout_reading(self, enabled: bool = True) -> DetectTextBuilder:
         """Enable or disable document layout reading order analysis."""
         self._layout_reading = enabled
+        return self
+
+    def with_layout_model(self, model: str) -> DetectTextBuilder:
+        """Set layout model identifier."""
+        self._layout_model = model
         return self
 
     def with_orientation_detection(self, enabled: bool = True) -> DetectTextBuilder:
@@ -703,6 +711,7 @@ class DetectTextBuilder:
         self._output = options.output
         self._auto_unwarp = options.auto_unwarp
         self._layout_reading = options.layout_reading
+        self._layout_model = options.layout_model
         self._orientation_detection = options.orientation_detection
         self._line_classification = options.line_classification
         self._pre_detection = options.pre_detection
@@ -719,6 +728,7 @@ class DetectTextBuilder:
             output=self._output,
             auto_unwarp=self._auto_unwarp,
             layout_reading=self._layout_reading,
+            layout_model=self._layout_model,
             orientation_detection=self._orientation_detection,
             line_classification=self._line_classification,
             pre_detection=self._pre_detection,

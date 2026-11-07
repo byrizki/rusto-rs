@@ -540,7 +540,7 @@ static NSError *makeValidationError(NSString *message) {
             return nil;
         }
     }
-    NSSet *allowed = [NSSet setWithObjects:@"output", @"autoUnwarp", @"layoutReading",
+    NSSet *allowed = [NSSet setWithObjects:@"output", @"autoUnwarp", @"layoutReading", @"layoutModel",
                                           @"orientationDetection", @"lineClassification",
                                           @"preDetection", @"detection", @"postDetection",
                                           @"preRecognition", @"recognition", @"postRecognition", nil];
@@ -563,6 +563,14 @@ static NSError *makeValidationError(NSString *message) {
     for (NSString *key in @[@"autoUnwarp", @"layoutReading", @"orientationDetection", @"lineClassification"]) {
         if (options[key] != nil && !isJsonBoolean(options[key])) {
             if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ must be a boolean", key]);
+            return nil;
+        }
+    }
+
+    if (options[@"layoutModel"] != nil) {
+        id model = options[@"layoutModel"];
+        if (![model isKindOfClass:[NSString class]] || [model length] == 0) {
+            if (error) *error = makeValidationError(@"layoutModel must be a non-empty string");
             return nil;
         }
     }

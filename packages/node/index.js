@@ -63,6 +63,11 @@ class DetectTextBuilder {
     return this;
   }
 
+  withLayoutModel(model) {
+    this._options.layoutModel = model;
+    return this;
+  }
+
   withOrientationDetection(enabled = true) {
     this._options.orientationDetection = enabled;
     return this;

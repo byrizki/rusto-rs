@@ -204,6 +204,12 @@ public final class DetectTextBuilder {
     }
 
     @discardableResult
+    public func withLayoutModel(_ model: String) -> DetectTextBuilder {
+        self.options.layoutModel = model
+        return self
+    }
+
+    @discardableResult
     public func withOrientationDetection(_ enabled: Bool = true) -> DetectTextBuilder {
         self.options.orientationDetection = enabled
         return self
@@ -566,6 +572,7 @@ extension OcrRunOptions {
             output: .lines,
             autoUnwarp: nil,
             layoutReading: nil,
+            layoutModel: nil,
             orientationDetection: nil,
             lineClassification: nil,
             preDetection: nil,

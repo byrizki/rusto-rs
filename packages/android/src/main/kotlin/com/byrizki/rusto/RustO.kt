@@ -337,6 +337,7 @@ data class OcrRunOptions(
     val output: OutputGranularity = OutputGranularity.LINES,
     val autoUnwarp: Boolean? = null,
     val layoutReading: Boolean? = null,
+    val layoutModel: String? = null,
     val orientationDetection: Boolean? = null,
     val lineClassification: Boolean? = null,
     val preDetection: PreDetectionOptions? = null,
@@ -351,6 +352,7 @@ data class OcrRunOptions(
             put("output", output.wireValue)
             autoUnwarp?.let { put("autoUnwarp", it) }
             layoutReading?.let { put("layoutReading", it) }
+            layoutModel?.let { put("layoutModel", it) }
             orientationDetection?.let { put("orientationDetection", it) }
             lineClassification?.let { put("lineClassification", it) }
             preDetection?.let { p ->
@@ -616,6 +618,7 @@ class RustO private constructor(
             },
             autoUnwarp = options.autoUnwarp,
             layoutReading = options.layoutReading,
+            layoutModel = options.layoutModel,
             orientationDetection = options.orientationDetection,
             lineClassification = options.lineClassification,
             preDetection = options.preDetection?.let { p ->
@@ -775,6 +778,13 @@ class DetectTextBuilder(
      */
     fun withLayoutReading(enabled: Boolean = true): DetectTextBuilder = apply {
         options = options.copy(layoutReading = enabled)
+    }
+
+    /**
+     * Sets document layout or reading direction model identifier.
+     */
+    fun withLayoutModel(model: String): DetectTextBuilder = apply {
+        options = options.copy(layoutModel = model)
     }
 
     /**

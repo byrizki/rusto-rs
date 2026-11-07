@@ -1475,6 +1475,10 @@ public struct OcrRunOptions: Equatable, Hashable {
      */
     public var layoutReading: Bool?
     /**
+     * Document layout or reading direction model identifier.
+     */
+    public var layoutModel: String?
+    /**
      * Enable document orientation angle correction stage.
      */
     public var orientationDetection: Bool?
@@ -1520,6 +1524,9 @@ public struct OcrRunOptions: Equatable, Hashable {
          * Enable document layout analysis and reading order stage.
          */layoutReading: Bool?, 
         /**
+         * Document layout or reading direction model identifier.
+         */layoutModel: String?, 
+        /**
          * Enable document orientation angle correction stage.
          */orientationDetection: Bool?, 
         /**
@@ -1546,6 +1553,7 @@ public struct OcrRunOptions: Equatable, Hashable {
         self.output = output
         self.autoUnwarp = autoUnwarp
         self.layoutReading = layoutReading
+        self.layoutModel = layoutModel
         self.orientationDetection = orientationDetection
         self.lineClassification = lineClassification
         self.preDetection = preDetection
@@ -1575,6 +1583,7 @@ public struct FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer {
                 output: FfiConverterTypeOutputGranularity.read(from: &buf), 
                 autoUnwarp: FfiConverterOptionBool.read(from: &buf), 
                 layoutReading: FfiConverterOptionBool.read(from: &buf), 
+                layoutModel: FfiConverterOptionString.read(from: &buf), 
                 orientationDetection: FfiConverterOptionBool.read(from: &buf), 
                 lineClassification: FfiConverterOptionBool.read(from: &buf), 
                 preDetection: FfiConverterOptionTypePreDetectionOptions.read(from: &buf), 
@@ -1590,6 +1599,7 @@ public struct FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer {
         FfiConverterTypeOutputGranularity.write(value.output, into: &buf)
         FfiConverterOptionBool.write(value.autoUnwarp, into: &buf)
         FfiConverterOptionBool.write(value.layoutReading, into: &buf)
+        FfiConverterOptionString.write(value.layoutModel, into: &buf)
         FfiConverterOptionBool.write(value.orientationDetection, into: &buf)
         FfiConverterOptionBool.write(value.lineClassification, into: &buf)
         FfiConverterOptionTypePreDetectionOptions.write(value.preDetection, into: &buf)

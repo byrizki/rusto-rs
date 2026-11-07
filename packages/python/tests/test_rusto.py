@@ -158,7 +158,7 @@ class TestRustOPythonBinding(unittest.TestCase):
         )
         res = engine.detect_text(ImageSource.PATH(str(img_path)), opts)
         self.assertTrue(res.is_STRUCTURED())
-        self.assertEqual(len(res.results), 153)
+        self.assertEqual(len(res.results), 249)
         self.assertEqual(res.results[0].text, "All Orders in our")
         self.assertIsNotNone(res.results[0].region_id)
         self.assertIsNotNone(res.results[0].layout_type)

@@ -243,6 +243,7 @@ class DetectTextBuilder {
   generated.OutputGranularity _output = generated.OutputGranularity.lines;
   bool? _autoUnwarp;
   bool? _layoutReading;
+  String? _layoutModel;
   bool? _orientationDetection;
   bool? _lineClassification;
   generated.PreDetectionOptions? _preDetection;
@@ -285,6 +286,7 @@ class DetectTextBuilder {
     _output = options.output;
     _autoUnwarp = options.autoUnwarp;
     _layoutReading = options.layoutReading;
+    _layoutModel = options.layoutModel;
     _orientationDetection = options.orientationDetection;
     _lineClassification = options.lineClassification;
     _preDetection = options.preDetection;
@@ -303,6 +305,11 @@ class DetectTextBuilder {
 
   DetectTextBuilder withLayoutReading([bool enabled = true]) {
     _layoutReading = enabled;
+    return this;
+  }
+
+  DetectTextBuilder withLayoutModel(String model) {
+    _layoutModel = model;
     return this;
   }
 
@@ -429,6 +436,7 @@ class DetectTextBuilder {
       output: _output,
       autoUnwarp: _autoUnwarp,
       layoutReading: _layoutReading,
+      layoutModel: _layoutModel,
       orientationDetection: _orientationDetection,
       lineClassification: _lineClassification,
       preDetection: _preDetection,

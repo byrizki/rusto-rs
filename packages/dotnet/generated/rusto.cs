@@ -3035,6 +3035,9 @@ class FfiConverterTypeLayoutConfig : FfiConverterRustBuffer<LayoutConfig>
 /// <param name="LayoutReading">
 /// Enable document layout analysis and reading order stage.
 /// </param>
+/// <param name="LayoutModel">
+/// Document layout or reading direction model identifier.
+/// </param>
 /// <param name="OrientationDetection">
 /// Enable document orientation angle correction stage.
 /// </param>
@@ -3072,6 +3075,10 @@ public record OcrRunOptions(
     /// Enable document layout analysis and reading order stage.
     /// </summary>
     bool? LayoutReading,
+    /// <summary>
+    /// Document layout or reading direction model identifier.
+    /// </summary>
+    string? LayoutModel,
     /// <summary>
     /// Enable document orientation angle correction stage.
     /// </summary>
@@ -3116,6 +3123,7 @@ class FfiConverterTypeOcrRunOptions : FfiConverterRustBuffer<OcrRunOptions>
             Output: FfiConverterTypeOutputGranularity.INSTANCE.Read(stream),
             AutoUnwarp: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             LayoutReading: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
+            LayoutModel: FfiConverterOptionalString.INSTANCE.Read(stream),
             OrientationDetection: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             LineClassification: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             PreDetection: FfiConverterOptionalTypePreDetectionOptions.INSTANCE.Read(stream),
@@ -3133,6 +3141,7 @@ class FfiConverterTypeOcrRunOptions : FfiConverterRustBuffer<OcrRunOptions>
             + FfiConverterTypeOutputGranularity.INSTANCE.AllocationSize(value.Output)
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.AutoUnwarp)
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.LayoutReading)
+            + FfiConverterOptionalString.INSTANCE.AllocationSize(value.LayoutModel)
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.OrientationDetection)
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.LineClassification)
             + FfiConverterOptionalTypePreDetectionOptions.INSTANCE.AllocationSize(
@@ -3158,6 +3167,7 @@ class FfiConverterTypeOcrRunOptions : FfiConverterRustBuffer<OcrRunOptions>
         FfiConverterTypeOutputGranularity.INSTANCE.Write(value.Output, stream);
         FfiConverterOptionalBoolean.INSTANCE.Write(value.AutoUnwarp, stream);
         FfiConverterOptionalBoolean.INSTANCE.Write(value.LayoutReading, stream);
+        FfiConverterOptionalString.INSTANCE.Write(value.LayoutModel, stream);
         FfiConverterOptionalBoolean.INSTANCE.Write(value.OrientationDetection, stream);
         FfiConverterOptionalBoolean.INSTANCE.Write(value.LineClassification, stream);
         FfiConverterOptionalTypePreDetectionOptions.INSTANCE.Write(value.PreDetection, stream);

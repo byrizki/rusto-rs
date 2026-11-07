@@ -191,6 +191,7 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
                 "output",
                 "autoUnwarp",
                 "layoutReading",
+                "layoutModel",
                 "orientationDetection",
                 "lineClassification",
                 "preDetection",
@@ -214,6 +215,12 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
             return options.getBoolean(name)
         }
 
+        fun string(name: String): String? {
+            if (!options.hasKey(name) || options.isNull(name)) return null
+            require(options.getType(name) == ReadableType.String) { "OcrRunOptions.$name must be a string." }
+            return options.getString(name)!!.also { require(it.isNotBlank()) { "OcrRunOptions.$name must be non-empty." } }
+        }
+
         fun subMap(name: String): ReadableMap? {
             if (!options.hasKey(name) || options.isNull(name)) return null
             require(options.getType(name) == ReadableType.Map) { "OcrRunOptions.$name must be an object." }
@@ -224,6 +231,7 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
             output = OutputGranularity.entries.first { it.wireValue == output },
             autoUnwarp = boolean("autoUnwarp"),
             layoutReading = boolean("layoutReading"),
+            layoutModel = string("layoutModel"),
             orientationDetection = boolean("orientationDetection"),
             lineClassification = boolean("lineClassification"),
             preDetection = subMap("preDetection")?.let(::parsePreDetection),

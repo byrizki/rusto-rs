@@ -616,6 +616,8 @@ class OcrRunOptions {
     required this.autoUnwarp,
     /// Enable document layout analysis and reading order stage.
     required this.layoutReading,
+    /// Document layout or reading direction model identifier.
+    required this.layoutModel,
     /// Enable document orientation angle correction stage.
     required this.orientationDetection,
     /// Enable text line orientation classifier stage.
@@ -640,6 +642,8 @@ class OcrRunOptions {
   final bool? autoUnwarp;
   /// Enable document layout analysis and reading order stage.
   final bool? layoutReading;
+  /// Document layout or reading direction model identifier.
+  final String? layoutModel;
   /// Enable document orientation angle correction stage.
   final bool? orientationDetection;
   /// Enable text line orientation classifier stage.
@@ -662,6 +666,7 @@ class OcrRunOptions {
       'output': OutputGranularityFfiCodec.encode(this.output),
       'autoUnwarp': this.autoUnwarp,
       'layoutReading': this.layoutReading,
+      'layoutModel': this.layoutModel,
       'orientationDetection': this.orientationDetection,
       'lineClassification': this.lineClassification,
       'preDetection': this.preDetection == null ? null : (() { final __tmp = this.preDetection!; return __tmp.toJson(); })(),
@@ -678,6 +683,7 @@ class OcrRunOptions {
       output: OutputGranularityFfiCodec.decode(json['output'] as String),
       autoUnwarp: json['autoUnwarp'] == null ? null : json['autoUnwarp'] as bool,
       layoutReading: json['layoutReading'] == null ? null : json['layoutReading'] as bool,
+      layoutModel: json['layoutModel'] == null ? null : json['layoutModel'] as String,
       orientationDetection: json['orientationDetection'] == null ? null : json['orientationDetection'] as bool,
       lineClassification: json['lineClassification'] == null ? null : json['lineClassification'] as bool,
       preDetection: json['preDetection'] == null ? null : (() { final __tmp = json['preDetection']; return PreDetectionOptions.fromJson(__tmp as Map<String, dynamic>); })(),
@@ -693,6 +699,7 @@ class OcrRunOptions {
     OutputGranularity? output,
     Object? autoUnwarp = _sentinel,
     Object? layoutReading = _sentinel,
+    Object? layoutModel = _sentinel,
     Object? orientationDetection = _sentinel,
     Object? lineClassification = _sentinel,
     Object? preDetection = _sentinel,
@@ -706,6 +713,7 @@ class OcrRunOptions {
       output: output ?? this.output,
       autoUnwarp: autoUnwarp == _sentinel ? this.autoUnwarp : autoUnwarp as bool?,
       layoutReading: layoutReading == _sentinel ? this.layoutReading : layoutReading as bool?,
+      layoutModel: layoutModel == _sentinel ? this.layoutModel : layoutModel as String?,
       orientationDetection: orientationDetection == _sentinel ? this.orientationDetection : orientationDetection as bool?,
       lineClassification: lineClassification == _sentinel ? this.lineClassification : lineClassification as bool?,
       preDetection: preDetection == _sentinel ? this.preDetection : preDetection as PreDetectionOptions?,
@@ -719,16 +727,16 @@ class OcrRunOptions {
 
   @override
   String toString() {
-    return 'OcrRunOptions(output: $output, autoUnwarp: $autoUnwarp, layoutReading: $layoutReading, orientationDetection: $orientationDetection, lineClassification: $lineClassification, preDetection: $preDetection, detection: $detection, postDetection: $postDetection, preRecognition: $preRecognition, recognition: $recognition, postRecognition: $postRecognition)';
+    return 'OcrRunOptions(output: $output, autoUnwarp: $autoUnwarp, layoutReading: $layoutReading, layoutModel: $layoutModel, orientationDetection: $orientationDetection, lineClassification: $lineClassification, preDetection: $preDetection, detection: $detection, postDetection: $postDetection, preRecognition: $preRecognition, recognition: $recognition, postRecognition: $postRecognition)';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is OcrRunOptions && output == other.output && autoUnwarp == other.autoUnwarp && layoutReading == other.layoutReading && orientationDetection == other.orientationDetection && lineClassification == other.lineClassification && preDetection == other.preDetection && detection == other.detection && postDetection == other.postDetection && preRecognition == other.preRecognition && recognition == other.recognition && postRecognition == other.postRecognition;
+      other is OcrRunOptions && output == other.output && autoUnwarp == other.autoUnwarp && layoutReading == other.layoutReading && layoutModel == other.layoutModel && orientationDetection == other.orientationDetection && lineClassification == other.lineClassification && preDetection == other.preDetection && detection == other.detection && postDetection == other.postDetection && preRecognition == other.preRecognition && recognition == other.recognition && postRecognition == other.postRecognition;
 
   @override
-  int get hashCode => Object.hash(output, autoUnwarp, layoutReading, orientationDetection, lineClassification, preDetection, detection, postDetection, preRecognition, recognition, postRecognition);
+  int get hashCode => Object.hash(output, autoUnwarp, layoutReading, layoutModel, orientationDetection, lineClassification, preDetection, detection, postDetection, preRecognition, recognition, postRecognition);
 }
 
 /// Document orientation angle configuration (0°, 90°, 180°, 270°).
@@ -2487,6 +2495,12 @@ void _uniffiWriteOcrRunOptions(OcrRunOptions value, _UniFfiBinaryWriter writer) 
     writer.writeI8(1);
     writer.writeBool(value.layoutReading!);
   }
+  if (value.layoutModel == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeString(value.layoutModel!);
+  }
   if (value.orientationDetection == null) {
     writer.writeI8(0);
   } else {
@@ -2548,6 +2562,7 @@ OcrRunOptions _uniffiReadOcrRunOptions(_UniFfiBinaryReader reader) {
     output: _uniffiReadOutputGranularity(reader),
     autoUnwarp: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
     layoutReading: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    layoutModel: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
     orientationDetection: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
     lineClassification: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
     preDetection: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadPreDetectionOptions(reader); })(),

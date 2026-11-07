@@ -165,6 +165,8 @@ export interface OcrRunOptions {
   autoUnwarp?: boolean;
   /** Enable document layout reading order analysis. */
   layoutReading?: boolean;
+  /** Document layout or reading direction model identifier. */
+  layoutModel?: string;
   /** Enable 0°/90°/180°/270° document orientation detection and rotation. */
   orientationDetection?: boolean;
   /** Enable 180° text line orientation classification. */
@@ -195,6 +197,8 @@ export class DetectTextBuilder<TResult = TextResult[]> {
   withAutoUnwarp(enabled?: boolean): this;
   /** Enable or disable document layout reading order analysis. */
   withLayoutReading(enabled?: boolean): this;
+  /** Specify document layout or reading direction model identifier. */
+  withLayoutModel(model: string): this;
   /** Enable or disable document orientation detection. */
   withOrientationDetection(enabled?: boolean): this;
   /** Enable or disable text line orientation classification. */

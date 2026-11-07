@@ -137,6 +137,8 @@ export interface OcrRunOptions {
   autoUnwarp?: boolean;
   /** Enable document layout reading order analysis. */
   layoutReading?: boolean;
+  /** Document layout or reading direction model identifier. */
+  layoutModel?: string;
   /** Enable 0°/90°/180°/270° document orientation detection and rotation. */
   orientationDetection?: boolean;
   /** Enable 180° text line orientation classification. */
@@ -233,6 +235,7 @@ const OPTION_KEYS = [
   'output',
   'autoUnwarp',
   'layoutReading',
+  'layoutModel',
   'orientationDetection',
   'lineClassification',
   'preDetection',
@@ -496,6 +499,11 @@ function normalizeOptions(options: OcrRunOptions | undefined): OcrRunOptions {
       throw new TypeError(`OcrRunOptions.${key} must be a boolean.`);
   }
 
+  if (options.layoutModel !== undefined) {
+    if (typeof options.layoutModel !== 'string' || options.layoutModel.trim().length === 0)
+      throw new TypeError('OcrRunOptions.layoutModel must be a non-empty string.');
+  }
+
   normalizePreDetectionOptions(options.preDetection);
   normalizeDetectionOptions(options.detection);
   normalizePostDetectionOptions(options.postDetection);
@@ -581,6 +589,12 @@ export class DetectTextBuilder<TResult = TextResult[]> {
   /** Enable or disable document layout reading order analysis. */
   withLayoutReading(enabled = true): this {
     this._options.layoutReading = enabled;
+    return this;
+  }
+
+  /** Specify document layout or reading direction model identifier. */
+  withLayoutModel(model: string): this {
+    this._options.layoutModel = model;
     return this;
   }
 

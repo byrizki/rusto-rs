@@ -111,6 +111,7 @@ describe('React Native API', () => {
       .image({ uri: '/tmp/image.png' })
       .withAutoUnwarp(true)
       .withLayoutReading(true)
+      .withLayoutModel('cdla')
       .withOrientationDetection(true)
       .withLineClassification(true)
       .withPreDetection({ descreenStrength: 0.1 })
@@ -129,6 +130,7 @@ describe('React Native API', () => {
       {
         autoUnwarp: true,
         layoutReading: true,
+        layoutModel: 'cdla',
         orientationDetection: true,
         lineClassification: true,
         preDetection: { descreenStrength: 0.1 },

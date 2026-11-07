@@ -1355,6 +1355,8 @@ type OcrRunOptions struct {
 	AutoUnwarp *bool
 	// Enable document layout analysis and reading order stage.
 	LayoutReading *bool
+	// Document layout or reading direction model identifier.
+	LayoutModel *string
 	// Enable document orientation angle correction stage.
 	OrientationDetection *bool
 	// Enable text line orientation classifier stage.
@@ -1377,6 +1379,7 @@ func (r *OcrRunOptions) Destroy() {
 	FfiDestroyerOutputGranularity{}.Destroy(r.Output)
 	FfiDestroyerOptionalBool{}.Destroy(r.AutoUnwarp)
 	FfiDestroyerOptionalBool{}.Destroy(r.LayoutReading)
+	FfiDestroyerOptionalString{}.Destroy(r.LayoutModel)
 	FfiDestroyerOptionalBool{}.Destroy(r.OrientationDetection)
 	FfiDestroyerOptionalBool{}.Destroy(r.LineClassification)
 	FfiDestroyerOptionalPreDetectionOptions{}.Destroy(r.PreDetection)
@@ -1400,6 +1403,7 @@ func (c FfiConverterOcrRunOptions) Read(reader io.Reader) OcrRunOptions {
 		FfiConverterOutputGranularityINSTANCE.Read(reader),
 		FfiConverterOptionalBoolINSTANCE.Read(reader),
 		FfiConverterOptionalBoolINSTANCE.Read(reader),
+		FfiConverterOptionalStringINSTANCE.Read(reader),
 		FfiConverterOptionalBoolINSTANCE.Read(reader),
 		FfiConverterOptionalBoolINSTANCE.Read(reader),
 		FfiConverterOptionalPreDetectionOptionsINSTANCE.Read(reader),
@@ -1423,6 +1427,7 @@ func (c FfiConverterOcrRunOptions) Write(writer io.Writer, value OcrRunOptions) 
 	FfiConverterOutputGranularityINSTANCE.Write(writer, value.Output)
 	FfiConverterOptionalBoolINSTANCE.Write(writer, value.AutoUnwarp)
 	FfiConverterOptionalBoolINSTANCE.Write(writer, value.LayoutReading)
+	FfiConverterOptionalStringINSTANCE.Write(writer, value.LayoutModel)
 	FfiConverterOptionalBoolINSTANCE.Write(writer, value.OrientationDetection)
 	FfiConverterOptionalBoolINSTANCE.Write(writer, value.LineClassification)
 	FfiConverterOptionalPreDetectionOptionsINSTANCE.Write(writer, value.PreDetection)

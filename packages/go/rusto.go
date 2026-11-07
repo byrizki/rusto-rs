@@ -510,6 +510,7 @@ type OcrRunOptions struct {
 	Output               string                  `json:"output,omitempty"`
 	AutoUnwarp           *bool                   `json:"autoUnwarp,omitempty"`
 	LayoutReading        *bool                   `json:"layoutReading,omitempty"`
+	LayoutModel          *string                 `json:"layoutModel,omitempty"`
 	OrientationDetection *bool                   `json:"orientationDetection,omitempty"`
 	LineClassification   *bool                   `json:"lineClassification,omitempty"`
 	PreDetection         *PreDetectionOptions    `json:"preDetection,omitempty"`
@@ -590,6 +591,12 @@ func (b *DetectTextBuilder) WithAutoUnwarp(enabled bool) *DetectTextBuilder {
 // WithLayoutReading enables or disables document layout reading order analysis.
 func (b *DetectTextBuilder) WithLayoutReading(enabled bool) *DetectTextBuilder {
 	b.options.LayoutReading = &enabled
+	return b
+}
+
+// WithLayoutModel sets the document layout or reading direction model identifier.
+func (b *DetectTextBuilder) WithLayoutModel(model string) *DetectTextBuilder {
+	b.options.LayoutModel = &model
 	return b
 }
 

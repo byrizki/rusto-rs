@@ -40,7 +40,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "test": "jest",
+    "test": "jest --no-watchman",
     "test:both-arch": "cd example && npx tsx scripts/test-both-arch.ts",
     "test:e2e:maestro": "cd example && maestro test .maestro/ocr-flow.yaml",
     "test:e2e:android": "cd example && bash scripts/run-android-e2e.sh",

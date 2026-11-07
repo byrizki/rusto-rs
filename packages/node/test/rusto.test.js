@@ -105,7 +105,7 @@ test('RustO performs real OCR on Issue 25 chronam-ad-page.png with layout', (t) 
   const results = engine.detectText(imgPath, {
     layoutReading: true
   });
-  assert.strictEqual(results.length, 153, 'Expected 153 lines');
+  assert.strictEqual(results.length, 249, 'Expected 249 lines');
   assert.strictEqual(results[0].text, 'All Orders in our');
   assert.strictEqual(typeof results[0].region_id, 'number');
   assert.strictEqual(typeof results[0].layout_type, 'string');

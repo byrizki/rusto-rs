@@ -352,6 +352,9 @@ namespace RustODotnet
         [JsonPropertyName("layoutReading")]
         public bool? LayoutReading { get; set; }
 
+        [JsonPropertyName("layoutModel")]
+        public string LayoutModel { get; set; }
+
         [JsonPropertyName("orientationDetection")]
         public bool? OrientationDetection { get; set; }
 
@@ -505,6 +508,12 @@ namespace RustODotnet
         public DetectTextBuilder WithLayoutReading(bool enabled = true)
         {
             _options.LayoutReading = enabled;
+            return this;
+        }
+
+        public DetectTextBuilder WithLayoutModel(string model)
+        {
+            _options.LayoutModel = model;
             return this;
         }
 
@@ -948,6 +957,7 @@ namespace RustODotnet
                 Output = uniffiOutput,
                 AutoUnwarp = options.AutoUnwarp,
                 LayoutReading = options.LayoutReading,
+                LayoutModel = options.LayoutModel,
                 OrientationDetection = options.OrientationDetection,
                 LineClassification = options.LineClassification,
                 PreDetection = options.PreDetection != null ? new RustODotnet.Generated.PreDetectionOptions(

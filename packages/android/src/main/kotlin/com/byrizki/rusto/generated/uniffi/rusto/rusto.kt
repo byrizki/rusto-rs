@@ -2084,6 +2084,11 @@ data class OcrRunOptions (
     var `layoutReading`: kotlin.Boolean?
     , 
     /**
+     * Document layout or reading direction model identifier.
+     */
+    var `layoutModel`: kotlin.String?
+    , 
+    /**
      * Enable document orientation angle correction stage.
      */
     var `orientationDetection`: kotlin.Boolean?
@@ -2141,6 +2146,7 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterTypeOutputGranularity.read(buf),
             FfiConverterOptionalBoolean.read(buf),
             FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalString.read(buf),
             FfiConverterOptionalBoolean.read(buf),
             FfiConverterOptionalBoolean.read(buf),
             FfiConverterOptionalTypePreDetectionOptions.read(buf),
@@ -2156,6 +2162,7 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterTypeOutputGranularity.allocationSize(value.`output`) +
             FfiConverterOptionalBoolean.allocationSize(value.`autoUnwarp`) +
             FfiConverterOptionalBoolean.allocationSize(value.`layoutReading`) +
+            FfiConverterOptionalString.allocationSize(value.`layoutModel`) +
             FfiConverterOptionalBoolean.allocationSize(value.`orientationDetection`) +
             FfiConverterOptionalBoolean.allocationSize(value.`lineClassification`) +
             FfiConverterOptionalTypePreDetectionOptions.allocationSize(value.`preDetection`) +
@@ -2170,6 +2177,7 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterTypeOutputGranularity.write(value.`output`, buf)
             FfiConverterOptionalBoolean.write(value.`autoUnwarp`, buf)
             FfiConverterOptionalBoolean.write(value.`layoutReading`, buf)
+            FfiConverterOptionalString.write(value.`layoutModel`, buf)
             FfiConverterOptionalBoolean.write(value.`orientationDetection`, buf)
             FfiConverterOptionalBoolean.write(value.`lineClassification`, buf)
             FfiConverterOptionalTypePreDetectionOptions.write(value.`preDetection`, buf)

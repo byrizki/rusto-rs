@@ -2307,10 +2307,11 @@ class OcrRunOptions:
     """
     Per-request execution options for text detection.
 """
-    def __init__(self, *, output:OutputGranularity, auto_unwarp:typing.Optional[bool], layout_reading:typing.Optional[bool], orientation_detection:typing.Optional[bool], line_classification:typing.Optional[bool], pre_detection:typing.Optional[PreDetectionOptions], detection:typing.Optional[DetectionRunOptions], post_detection:typing.Optional[PostDetectionOptions], pre_recognition:typing.Optional[PreRecognitionOptions], recognition:typing.Optional[RecognitionRunOptions], post_recognition:typing.Optional[PostRecognitionOptions]):
+    def __init__(self, *, output:OutputGranularity, auto_unwarp:typing.Optional[bool], layout_reading:typing.Optional[bool], layout_model:typing.Optional[str], orientation_detection:typing.Optional[bool], line_classification:typing.Optional[bool], pre_detection:typing.Optional[PreDetectionOptions], detection:typing.Optional[DetectionRunOptions], post_detection:typing.Optional[PostDetectionOptions], pre_recognition:typing.Optional[PreRecognitionOptions], recognition:typing.Optional[RecognitionRunOptions], post_recognition:typing.Optional[PostRecognitionOptions]):
         self.output = output
         self.auto_unwarp = auto_unwarp
         self.layout_reading = layout_reading
+        self.layout_model = layout_model
         self.orientation_detection = orientation_detection
         self.line_classification = line_classification
         self.pre_detection = pre_detection
@@ -2324,13 +2325,15 @@ class OcrRunOptions:
 
     
     def __str__(self):
-        return "OcrRunOptions(output={}, auto_unwarp={}, layout_reading={}, orientation_detection={}, line_classification={}, pre_detection={}, detection={}, post_detection={}, pre_recognition={}, recognition={}, post_recognition={})".format(self.output, self.auto_unwarp, self.layout_reading, self.orientation_detection, self.line_classification, self.pre_detection, self.detection, self.post_detection, self.pre_recognition, self.recognition, self.post_recognition)
+        return "OcrRunOptions(output={}, auto_unwarp={}, layout_reading={}, layout_model={}, orientation_detection={}, line_classification={}, pre_detection={}, detection={}, post_detection={}, pre_recognition={}, recognition={}, post_recognition={})".format(self.output, self.auto_unwarp, self.layout_reading, self.layout_model, self.orientation_detection, self.line_classification, self.pre_detection, self.detection, self.post_detection, self.pre_recognition, self.recognition, self.post_recognition)
     def __eq__(self, other):
         if self.output != other.output:
             return False
         if self.auto_unwarp != other.auto_unwarp:
             return False
         if self.layout_reading != other.layout_reading:
+            return False
+        if self.layout_model != other.layout_model:
             return False
         if self.orientation_detection != other.orientation_detection:
             return False
@@ -2357,6 +2360,7 @@ class _UniffiFfiConverterTypeOcrRunOptions(_UniffiConverterRustBuffer):
             output=_UniffiFfiConverterTypeOutputGranularity.read(buf),
             auto_unwarp=_UniffiFfiConverterOptionalBoolean.read(buf),
             layout_reading=_UniffiFfiConverterOptionalBoolean.read(buf),
+            layout_model=_UniffiFfiConverterOptionalString.read(buf),
             orientation_detection=_UniffiFfiConverterOptionalBoolean.read(buf),
             line_classification=_UniffiFfiConverterOptionalBoolean.read(buf),
             pre_detection=_UniffiFfiConverterOptionalTypePreDetectionOptions.read(buf),
@@ -2372,6 +2376,7 @@ class _UniffiFfiConverterTypeOcrRunOptions(_UniffiConverterRustBuffer):
         _UniffiFfiConverterTypeOutputGranularity.check_lower(value.output)
         _UniffiFfiConverterOptionalBoolean.check_lower(value.auto_unwarp)
         _UniffiFfiConverterOptionalBoolean.check_lower(value.layout_reading)
+        _UniffiFfiConverterOptionalString.check_lower(value.layout_model)
         _UniffiFfiConverterOptionalBoolean.check_lower(value.orientation_detection)
         _UniffiFfiConverterOptionalBoolean.check_lower(value.line_classification)
         _UniffiFfiConverterOptionalTypePreDetectionOptions.check_lower(value.pre_detection)
@@ -2386,6 +2391,7 @@ class _UniffiFfiConverterTypeOcrRunOptions(_UniffiConverterRustBuffer):
         _UniffiFfiConverterTypeOutputGranularity.write(value.output, buf)
         _UniffiFfiConverterOptionalBoolean.write(value.auto_unwarp, buf)
         _UniffiFfiConverterOptionalBoolean.write(value.layout_reading, buf)
+        _UniffiFfiConverterOptionalString.write(value.layout_model, buf)
         _UniffiFfiConverterOptionalBoolean.write(value.orientation_detection, buf)
         _UniffiFfiConverterOptionalBoolean.write(value.line_classification, buf)
         _UniffiFfiConverterOptionalTypePreDetectionOptions.write(value.pre_detection, buf)
