@@ -82,6 +82,16 @@ impl Tensor {
         }
     }
 
+    /// Check whether this tensor uniquely owns a mutable f32 buffer
+    #[inline]
+    pub fn has_unique_float_buffer(&self) -> bool {
+        match &self.data {
+            TensorData::Float(_) => true,
+            TensorData::FloatShared(arc) => Arc::strong_count(arc) == 1,
+            _ => false,
+        }
+    }
+
     /// Extract underlying owned float buffer if uniquely owned
     pub fn into_owned_floats(self) -> Option<Vec<f32>> {
         match self.data {

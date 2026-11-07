@@ -104,7 +104,7 @@ pub fn conv2d(
         let k = config.in_channels;
         let n = hw_out;
 
-        if batch > 1 && n <= 256 && batch * n <= 4096 && m * k >= 16384 {
+        if batch > 1 && n <= 256 && batch * n <= 4096 && m * k >= 4096 {
             let n_total = batch * n;
             let needed_in = k * n_total;
             let needed_out = m * n_total;
@@ -171,7 +171,7 @@ pub fn conv2d(
     let m_gemm = out_c_per_group;
     let n_gemm = hw_out;
 
-    if batch > 1 && group == 1 && hw_out <= 256 && batch * hw_out <= 4096 && m_gemm * k_gemm >= 16384 {
+    if batch > 1 && group == 1 && hw_out <= 256 && batch * hw_out <= 4096 && m_gemm * k_gemm >= 4096 {
         let n_total = batch * hw_out;
         let needed_col = k_gemm * n_total;
         let needed_out = m_gemm * n_total;

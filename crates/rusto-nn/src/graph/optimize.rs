@@ -31,6 +31,7 @@ pub fn optimize_graph(graph: &mut Graph) {
 
     eliminate_identities(&mut graph.nodes, &graph_inputs, &graph_outputs);
     fuse_gelu_subgraphs(&mut graph.nodes, &graph_outputs);
+    fold_conv_scale(&mut graph.nodes, &graph_inputs, &graph_outputs);
     fuse_post_activations(&mut graph.nodes, &graph_inputs, &graph_outputs);
     pretranspose_const_matmul_b(&mut graph.nodes, &graph_outputs);
     sweep_dead_nodes_and_share_consts(&mut graph.nodes, &graph_outputs);
@@ -353,6 +354,77 @@ fn fuse_gelu_subgraphs(nodes: &mut [Node], graph_outputs: &HashSet<usize>) {
     }
 }
 
+fn fold_conv_scale(
+    nodes: &mut [Node],
+    graph_inputs: &HashSet<usize>,
+    graph_outputs: &HashSet<usize>,
+) {
+    let (mut producer_of, def_count, use_count) = build_def_use(nodes, graph_outputs);
+
+    for scale_idx in 0..nodes.len() {
+        if nodes[scale_idx].in_indices.len() != 1 || nodes[scale_idx].out_indices.len() != 1 {
+            continue;
+        }
+        if !matches!(nodes[scale_idx].op, OpKind::Scale { .. }) {
+            continue;
+        }
+
+        let mid_tid = nodes[scale_idx].in_indices[0];
+        let final_out_tid = nodes[scale_idx].out_indices[0];
+        if graph_inputs.contains(&mid_tid)
+            || def_count.get(&mid_tid).copied().unwrap_or(0) != 1
+            || use_count.get(&mid_tid).copied().unwrap_or(0) != 1
+        {
+            continue;
+        }
+
+        let Some(&prod_idx) = producer_of.get(&mid_tid) else { continue };
+        if prod_idx >= scale_idx || nodes[prod_idx].out_indices.len() != 1 {
+            continue;
+        }
+
+        let (left, right) = nodes.split_at_mut(scale_idx);
+        let prod_node = &mut left[prod_idx];
+        let scale_node = &mut right[0];
+
+        let folded = match (&mut prod_node.op, &scale_node.op) {
+            (OpKind::Conv(c), OpKind::Scale { scale, bias: scale_bias })
+                if c.activation == FusedActivation::None
+                    && c.out_channels > 0
+                    && c.out_channels == scale.len()
+                    && !c.weight.is_empty()
+                    && c.weight.len() % c.out_channels == 0 =>
+            {
+                let elems_per_oc = c.weight.len() / c.out_channels;
+                for oc in 0..c.out_channels {
+                    let s = scale[oc];
+                    for w in &mut c.weight[oc * elems_per_oc..(oc + 1) * elems_per_oc] {
+                        *w *= s;
+                    }
+                }
+                let mut new_bias = vec![0.0f32; c.out_channels];
+                for oc in 0..c.out_channels {
+                    let old_b = c.bias.as_ref().and_then(|bs| bs.get(oc).copied()).unwrap_or(0.0);
+                    let sb = scale_bias.as_ref().and_then(|bs| bs.get(oc).copied()).unwrap_or(0.0);
+                    new_bias[oc] = old_b * scale[oc] + sb;
+                }
+                c.bias = Some(new_bias);
+                true
+            }
+            _ => false,
+        };
+
+        if folded {
+            prod_node.out_indices[0] = final_out_tid;
+            scale_node.op = OpKind::NoOp;
+            scale_node.in_indices.clear();
+            scale_node.out_indices.clear();
+            producer_of.remove(&mid_tid);
+            producer_of.insert(final_out_tid, prod_idx);
+        }
+    }
+}
+
 fn match_fusable_activation(op: &OpKind) -> Option<FusedActivation> {
     match op {
         OpKind::Relu { slope } if *slope == 0.0 => Some(FusedActivation::Relu),
@@ -517,4 +589,162 @@ fn compute_last_use(
         }
     }
     last_use
+}
+
+pub(crate) fn compute_pruned_plan(
+    graph: &Graph,
+    requested_outputs: &[usize],
+) -> (Vec<bool>, Vec<usize>) {
+    let num_tensors = graph.tensor_names.len();
+    let num_nodes = graph.nodes.len();
+    let mut needed = vec![false; num_tensors];
+    for &tid in requested_outputs {
+        if tid < num_tensors {
+            needed[tid] = true;
+        }
+    }
+
+    let mut active = vec![false; num_nodes];
+    for (idx, node) in graph.nodes.iter().enumerate().rev() {
+        if matches!(node.op, OpKind::Input | OpKind::NoOp) {
+            continue;
+        }
+        if node
+            .out_indices
+            .iter()
+            .any(|&tid| tid < num_tensors && needed[tid])
+        {
+            active[idx] = true;
+            for &in_tid in &node.in_indices {
+                if in_tid < num_tensors {
+                    needed[in_tid] = true;
+                }
+            }
+        }
+    }
+
+    let mut last_use = vec![0usize; num_tensors];
+    for (op_idx, node) in graph.nodes.iter().enumerate() {
+        if !active[op_idx] {
+            continue;
+        }
+        for &out_tid in &node.out_indices {
+            if out_tid < num_tensors && last_use[out_tid] < op_idx {
+                last_use[out_tid] = op_idx;
+            }
+        }
+        for &in_tid in &node.in_indices {
+            if in_tid < num_tensors {
+                last_use[in_tid] = op_idx;
+            }
+        }
+    }
+
+    let name_to_idx: HashMap<&str, usize> = graph
+        .tensor_names
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.as_str(), i))
+        .collect();
+    for input_name in &graph.input_names {
+        if let Some(&tid) = name_to_idx.get(input_name.as_str()) {
+            if tid < num_tensors {
+                last_use[tid] = usize::MAX;
+            }
+        }
+    }
+    for &tid in requested_outputs {
+        if tid < num_tensors {
+            last_use[tid] = usize::MAX;
+        }
+    }
+
+    (active, last_use)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::graph::prepack::PrepackedConv;
+    use crate::schema::PadMode;
+
+    #[test]
+    fn test_fold_conv_scale_and_fuse_activation() {
+        let conv = PrepackedConv {
+            weight: vec![1.0, -2.0, 0.5, 4.0],
+            bias: Some(vec![0.5, -1.0]),
+            kernel_h: 1,
+            kernel_w: 1,
+            stride_h: 1,
+            stride_w: 1,
+            dilate_h: 1,
+            dilate_w: 1,
+            pad_mode: PadMode::VALID,
+            pad_x: 0,
+            pad_y: 0,
+            pads: None,
+            group: 1,
+            out_channels: 2,
+            activation: FusedActivation::None,
+            is_depthwise: false,
+        };
+
+        let nodes = vec![
+            Node {
+                name: "conv".into(),
+                in_indices: smallvec![0],
+                out_indices: smallvec![1],
+                op: OpKind::Conv(conv),
+            },
+            Node {
+                name: "bn".into(),
+                in_indices: smallvec![1],
+                out_indices: smallvec![2],
+                op: OpKind::Scale {
+                    scale: vec![2.0, 0.5],
+                    bias: Some(vec![1.0, 3.0]),
+                },
+            },
+            Node {
+                name: "act".into(),
+                in_indices: smallvec![2],
+                out_indices: smallvec![3],
+                op: OpKind::Unary(UnaryParams {
+                    op_type: UnaryOpType::HardSwish,
+                    activation: FusedActivation::None,
+                    table: None,
+                }),
+            },
+            Node {
+                name: "dead_tail".into(),
+                in_indices: smallvec![3],
+                out_indices: smallvec![4],
+                op: OpKind::LogSoftmax { axis: -1 },
+            },
+        ];
+
+        let mut graph = Graph::new(
+            nodes,
+            vec!["x".into(), "t1".into(), "t2".into(), "y".into(), "aux".into()],
+            vec!["x".into()],
+            vec!["y".into(), "aux".into()],
+            2,
+        );
+        optimize_graph(&mut graph);
+
+        assert_eq!(graph.nodes.len(), 2);
+        match &graph.nodes[0].op {
+            OpKind::Conv(c) => {
+                assert_eq!(c.activation, FusedActivation::HardSwish);
+                assert_eq!(c.weight, vec![2.0, -4.0, 0.25, 2.0]);
+                assert_eq!(c.bias, Some(vec![2.0, 2.5]));
+                assert_eq!(graph.nodes[0].out_indices.as_slice(), &[3]);
+            }
+            _ => panic!("expected folded Conv"),
+        }
+
+        let (active, pruned_last_use) = compute_pruned_plan(&graph, &[3]);
+        assert_eq!(active, vec![true, false]);
+        assert_eq!(pruned_last_use[3], usize::MAX);
+    }
 }

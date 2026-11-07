@@ -4,9 +4,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use crate::error::MnnError;
-use crate::graph::{execute_node, GraphContext};
+use crate::graph::optimize::compute_pruned_plan;
+use crate::graph::{execute_node_with_liveness, GraphContext};
 use crate::model::Model;
 use crate::tensor::Tensor;
+
+type PrunedPlan = Arc<(Vec<bool>, Vec<usize>)>;
 
 pub enum ModelHandle<'a> {
     Ref(&'a Model),
@@ -28,8 +31,10 @@ impl<'a> Deref for ModelHandle<'a> {
 pub struct Session<'a> {
     model: ModelHandle<'a>,
     input_map: HashMap<String, usize>,
+    output_map: HashMap<String, usize>,
     output_indices: Vec<(String, usize)>,
     ctx: RefCell<GraphContext>,
+    pruned_plans: RefCell<HashMap<Vec<usize>, PrunedPlan>>,
 }
 
 impl<'a> Session<'a> {
@@ -37,8 +42,10 @@ impl<'a> Session<'a> {
     pub fn new(model: &'a Model) -> Result<Self, MnnError> {
         let tensor_names = model.tensor_names();
         let mut name_to_index: HashMap<&str, usize> = HashMap::with_capacity(tensor_names.len());
+        let mut output_map: HashMap<String, usize> = HashMap::with_capacity(tensor_names.len());
         for (i, name) in tensor_names.iter().enumerate() {
             name_to_index.insert(name.as_str(), i);
+            output_map.insert(name.clone(), i);
         }
 
         let mut input_map = HashMap::new();
@@ -60,8 +67,10 @@ impl<'a> Session<'a> {
         Ok(Self {
             model: ModelHandle::Ref(model),
             input_map,
+            output_map,
             output_indices,
             ctx,
+            pruned_plans: RefCell::new(HashMap::new()),
         })
     }
 
@@ -69,8 +78,10 @@ impl<'a> Session<'a> {
     pub fn from_arc(model: Arc<Model>) -> Result<Session<'static>, MnnError> {
         let tensor_names = model.tensor_names();
         let mut name_to_index: HashMap<&str, usize> = HashMap::with_capacity(tensor_names.len());
+        let mut output_map: HashMap<String, usize> = HashMap::with_capacity(tensor_names.len());
         for (i, name) in tensor_names.iter().enumerate() {
             name_to_index.insert(name.as_str(), i);
+            output_map.insert(name.clone(), i);
         }
 
         let mut input_map = HashMap::new();
@@ -92,8 +103,10 @@ impl<'a> Session<'a> {
         Ok(Session {
             model: ModelHandle::Arc(model),
             input_map,
+            output_map,
             output_indices,
             ctx,
+            pruned_plans: RefCell::new(HashMap::new()),
         })
     }
 
@@ -120,7 +133,7 @@ impl<'a> Session<'a> {
         // Execute operations sequentially over Graph IR
         let graph = self.model.graph();
         for (i, node) in graph.nodes.iter().enumerate() {
-            if let Err(e) = execute_node(node, i, &mut *ctx) {
+            if let Err(e) = execute_node_with_liveness(node, i, &mut *ctx, Some(&graph.last_use)) {
                 return Err(MnnError::ExecutionError(format!(
                     "Op [{:>3}] {} ({}): {}",
                     i,
@@ -137,6 +150,78 @@ impl<'a> Session<'a> {
         for (name, idx) in &self.output_indices {
             let tensor = ctx.get_tensor(*idx)?.clone();
             outputs.insert(name.clone(), tensor);
+        }
+
+        Ok(outputs)
+    }
+
+    /// Execute forward inference computing only the subgraph needed for `output_names`
+    pub fn run_outputs(
+        &self,
+        inputs: &[(&str, &Tensor)],
+        output_names: &[&str],
+    ) -> Result<HashMap<String, Tensor>, MnnError> {
+        let mut requested: Vec<(&str, usize)> = Vec::with_capacity(output_names.len());
+        let mut key: Vec<usize> = Vec::with_capacity(output_names.len());
+        for &name in output_names {
+            let &idx = self.output_map.get(name).ok_or_else(|| {
+                MnnError::ExecutionError(format!(
+                    "Output name '{}' not found in model outputs {:?}",
+                    name,
+                    self.model.output_names()
+                ))
+            })?;
+            requested.push((name, idx));
+            key.push(idx);
+        }
+        key.sort_unstable();
+        key.dedup();
+
+        let graph = self.model.graph();
+        let plan = {
+            let mut plans = self.pruned_plans.borrow_mut();
+            Arc::clone(
+                plans
+                    .entry(key.clone())
+                    .or_insert_with(|| Arc::new(compute_pruned_plan(graph, &key))),
+            )
+        };
+        let (active_nodes, pruned_last_use) = plan.as_ref();
+
+        let mut ctx = self.ctx.borrow_mut();
+        ctx.reset();
+
+        for &(name, tensor) in inputs {
+            let &idx = self.input_map.get(name).ok_or_else(|| {
+                MnnError::ExecutionError(format!(
+                    "Input name '{}' not found in model inputs {:?}",
+                    name,
+                    self.model.input_names()
+                ))
+            })?;
+            ctx.set_tensor(idx, tensor.clone());
+        }
+
+        for (i, node) in graph.nodes.iter().enumerate() {
+            if !active_nodes[i] {
+                continue;
+            }
+            if let Err(e) = execute_node_with_liveness(node, i, &mut *ctx, Some(pruned_last_use)) {
+                return Err(MnnError::ExecutionError(format!(
+                    "Op [{:>3}] {} ({}): {}",
+                    i,
+                    node.op.kind_name(),
+                    node.name,
+                    e
+                )));
+            }
+            ctx.recycle_dead_inputs(node, i, pruned_last_use);
+        }
+
+        let mut outputs = HashMap::with_capacity(requested.len());
+        for (name, idx) in requested {
+            let tensor = ctx.get_tensor(idx)?.clone();
+            outputs.insert(name.to_string(), tensor);
         }
 
         Ok(outputs)
@@ -168,7 +253,7 @@ impl<'a> Session<'a> {
         for (i, node) in graph.nodes.iter().enumerate() {
             let type_name = node.op.kind_name().to_string();
             let t0 = std::time::Instant::now();
-            execute_node(node, i, &mut *ctx).map_err(|e| {
+            execute_node_with_liveness(node, i, &mut *ctx, Some(&graph.last_use)).map_err(|e| {
                 MnnError::ExecutionError(format!("Op [{}] {}: {}", i, node.op.kind_name(), e))
             })?;
             ctx.recycle_dead_inputs(node, i, &graph.last_use);
@@ -202,7 +287,7 @@ impl<'a> Session<'a> {
             let type_name = node.op.kind_name().to_string();
             let op_name = node.name.clone();
             let t0 = std::time::Instant::now();
-            execute_node(node, i, &mut *ctx).map_err(|e| {
+            execute_node_with_liveness(node, i, &mut *ctx, Some(&graph.last_use)).map_err(|e| {
                 MnnError::ExecutionError(format!("Op [{}] {}: {}", i, node.op.kind_name(), e))
             })?;
             ctx.recycle_dead_inputs(node, i, &graph.last_use);
@@ -227,11 +312,16 @@ impl<'a> Session<'a> {
             return Err(MnnError::ExecutionError("Model has no input tensors declared".into()));
         }
 
-        let results = self.run(&[(&input_names[0], input_tensor)])?;
         let output_names = self.model.output_names();
         if output_names.is_empty() {
             return Err(MnnError::ExecutionError("Model has no output tensors declared".into()));
         }
+
+        let results = if output_names.len() == 1 {
+            self.run(&[(&input_names[0], input_tensor)])?
+        } else {
+            self.run_outputs(&[(&input_names[0], input_tensor)], &[output_names[0].as_str()])?
+        };
 
         results
             .get(&output_names[0])

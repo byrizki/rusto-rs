@@ -616,10 +616,23 @@ impl MnnSession {
         let x_tensor = rusto_nn::Tensor::from_floats(&x_shape, x_data, rusto_nn::TensorLayout::NCHW);
         let widths_tensor = rusto_nn::Tensor::from_ints(&[widths.len()], widths);
 
-        let outputs = self
+        let wanted: Vec<&str> = self
             .session
-            .run(&[("x", &x_tensor), ("widths", &widths_tensor)])
-            .map_err(|e| EngineError::Engine(e.to_string()))?;
+            .model()
+            .output_names()
+            .iter()
+            .map(|s| s.as_str())
+            .filter(|&n| matches!(n, "ids" | "conf" | "len" | "lengths"))
+            .collect();
+        let outputs = if wanted.len() >= 2 {
+            self.session
+                .run_outputs(&[("x", &x_tensor), ("widths", &widths_tensor)], &wanted)
+                .map_err(|e| EngineError::Engine(e.to_string()))?
+        } else {
+            self.session
+                .run(&[("x", &x_tensor), ("widths", &widths_tensor)])
+                .map_err(|e| EngineError::Engine(e.to_string()))?
+        };
 
         let ids_tensor = outputs
             .get("ids")

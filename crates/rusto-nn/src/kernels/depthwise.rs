@@ -526,9 +526,256 @@ unsafe fn depthwise_5x1_s1_avx2(
     }
 }
 
+#[inline(always)]
+fn eval_depthwise_1d_point(
+    in_channel: &[f32],
+    w: &[f32],
+    bias: f32,
+    in_len: usize,
+    k: usize,
+    pad_before: usize,
+    out_idx: usize,
+) -> f32 {
+    let mut sum = bias;
+    let base = out_idx as isize - pad_before as isize;
+    for t in 0..k {
+        let idx = base + t as isize;
+        if idx >= 0 && (idx as usize) < in_len {
+            sum += in_channel[idx as usize] * w[t];
+        }
+    }
+    sum
+}
+
+#[inline(always)]
+fn extract_1d_s1_params(
+    in_h: usize,
+    in_w: usize,
+    out_h: usize,
+    out_w: usize,
+    config: &DepthwiseConv2dConfig,
+) -> Option<(usize, usize, usize, usize)> {
+    if in_h == 1
+        && out_h == 1
+        && config.kernel_h == 1
+        && config.stride_w == 1
+        && config.pad_top == 0
+        && config.pad_bottom == 0
+        && config.kernel_w >= 1
+    {
+        Some((in_w, out_w, config.kernel_w, config.pad_left))
+    } else if in_w == 1
+        && out_w == 1
+        && config.kernel_w == 1
+        && config.stride_h == 1
+        && config.pad_left == 0
+        && config.pad_right == 0
+        && config.kernel_h >= 1
+    {
+        Some((in_h, out_h, config.kernel_h, config.pad_top))
+    } else {
+        None
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn depthwise_1d_s1_avx2(
+    in_channel: &[f32],
+    w: &[f32],
+    bias: f32,
+    out_channel: &mut [f32],
+    in_len: usize,
+    out_len: usize,
+    k: usize,
+    pad_before: usize,
+    act: FusedActivation,
+) {
+    use core::arch::x86_64::*;
+
+    let b_vec = _mm256_set1_ps(bias);
+    let zero_vec = _mm256_setzero_ps();
+    let six_vec = _mm256_set1_ps(6.0);
+    let three_vec = _mm256_set1_ps(3.0);
+    let inv6_vec = _mm256_set1_ps(1.0 / 6.0);
+
+    let in_ptr = in_channel.as_ptr();
+    let out_ptr = out_channel.as_mut_ptr();
+
+    let start = pad_before.min(out_len);
+    for idx in 0..start {
+        let val = eval_depthwise_1d_point(in_channel, w, bias, in_len, k, pad_before, idx);
+        *out_ptr.add(idx) = apply_activation_scalar(val, act);
+    }
+
+    let mut idx = start;
+    while idx + 8 <= out_len && (idx - pad_before) + k + 7 <= in_len {
+        let base = idx - pad_before;
+        let mut acc = b_vec;
+        for t in 0..k {
+            let wt = _mm256_set1_ps(*w.get_unchecked(t));
+            let vin = _mm256_loadu_ps(in_ptr.add(base + t));
+            acc = _mm256_fmadd_ps(vin, wt, acc);
+        }
+
+        match act {
+            FusedActivation::None => {}
+            FusedActivation::Relu => {
+                acc = _mm256_max_ps(zero_vec, acc);
+            }
+            FusedActivation::Relu6 => {
+                acc = _mm256_min_ps(six_vec, _mm256_max_ps(zero_vec, acc));
+            }
+            FusedActivation::HardSwish => {
+                let p = _mm256_add_ps(acc, three_vec);
+                let cl = _mm256_min_ps(six_vec, _mm256_max_ps(zero_vec, p));
+                acc = _mm256_mul_ps(acc, _mm256_mul_ps(cl, inv6_vec));
+            }
+            _ => {
+                let mut tmp = [0.0f32; 8];
+                _mm256_storeu_ps(tmp.as_mut_ptr(), acc);
+                for v in &mut tmp {
+                    *v = apply_activation_scalar(*v, act);
+                }
+                acc = _mm256_loadu_ps(tmp.as_ptr());
+            }
+        }
+
+        _mm256_storeu_ps(out_ptr.add(idx), acc);
+        idx += 8;
+    }
+
+    while idx < out_len {
+        let val = eval_depthwise_1d_point(in_channel, w, bias, in_len, k, pad_before, idx);
+        *out_ptr.add(idx) = apply_activation_scalar(val, act);
+        idx += 1;
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn depthwise_5x5_sw2_avx2(
+    in_channel: &[f32],
+    w: &[f32],
+    bias: f32,
+    out_channel: &mut [f32],
+    in_h: usize,
+    in_w: usize,
+    out_h: usize,
+    out_w: usize,
+    config: &DepthwiseConv2dConfig,
+) {
+    use core::arch::x86_64::*;
+
+    let b_vec = _mm_set1_ps(bias);
+    let zero_vec = _mm_setzero_ps();
+    let six_vec = _mm_set1_ps(6.0);
+    let three_vec = _mm_set1_ps(3.0);
+    let inv6_vec = _mm_set1_ps(1.0 / 6.0);
+
+    let pad_top = config.pad_top;
+    let pad_left = config.pad_left;
+    let stride_h = config.stride_h;
+    let act = config.activation;
+
+    for oh in 0..out_h {
+        let ih_base = oh as isize * stride_h as isize - pad_top as isize;
+        if ih_base >= 0 && ih_base + 4 < in_h as isize {
+            let ih_u = ih_base as usize;
+            let out_row = out_channel.as_mut_ptr().add(oh * out_w);
+            let ow_start = pad_left.div_ceil(2).min(out_w);
+
+            for ow in 0..ow_start {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                *out_row.add(ow) = apply_activation_scalar(val, act);
+            }
+
+            let mut ow = ow_start;
+            while ow + 4 <= out_w && (ow * 2 - pad_left) + 12 <= in_w {
+                let iw = ow * 2 - pad_left;
+                let mut acc = b_vec;
+
+                for kh in 0..5 {
+                    let r_ptr = in_channel.as_ptr().add((ih_u + kh) * in_w + iw);
+                    let wk = w.as_ptr().add(kh * 5);
+                    let v0 = _mm_loadu_ps(r_ptr);
+                    let v1 = _mm_loadu_ps(r_ptr.add(4));
+                    let v2 = _mm_loadu_ps(r_ptr.add(8));
+
+                    let even01 = _mm_shuffle_ps(v0, v1, 0b10_00_10_00);
+                    let odd01 = _mm_shuffle_ps(v0, v1, 0b11_01_11_01);
+                    let even2 = _mm_shuffle_ps(v2, v2, 0b10_00_10_00);
+                    let odd2 = _mm_shuffle_ps(v2, v2, 0b11_01_11_01);
+
+                    let c2 = _mm_castsi128_ps(_mm_alignr_epi8(
+                        _mm_castps_si128(even2),
+                        _mm_castps_si128(even01),
+                        4,
+                    ));
+                    let c3 = _mm_castsi128_ps(_mm_alignr_epi8(
+                        _mm_castps_si128(odd2),
+                        _mm_castps_si128(odd01),
+                        4,
+                    ));
+                    let c4 = _mm_castsi128_ps(_mm_alignr_epi8(
+                        _mm_castps_si128(even2),
+                        _mm_castps_si128(even01),
+                        8,
+                    ));
+
+                    acc = _mm_fmadd_ps(even01, _mm_set1_ps(*wk), acc);
+                    acc = _mm_fmadd_ps(odd01, _mm_set1_ps(*wk.add(1)), acc);
+                    acc = _mm_fmadd_ps(c2, _mm_set1_ps(*wk.add(2)), acc);
+                    acc = _mm_fmadd_ps(c3, _mm_set1_ps(*wk.add(3)), acc);
+                    acc = _mm_fmadd_ps(c4, _mm_set1_ps(*wk.add(4)), acc);
+                }
+
+                match act {
+                    FusedActivation::None => {}
+                    FusedActivation::Relu => {
+                        acc = _mm_max_ps(zero_vec, acc);
+                    }
+                    FusedActivation::Relu6 => {
+                        acc = _mm_min_ps(six_vec, _mm_max_ps(zero_vec, acc));
+                    }
+                    FusedActivation::HardSwish => {
+                        let p = _mm_add_ps(acc, three_vec);
+                        let cl = _mm_min_ps(six_vec, _mm_max_ps(zero_vec, p));
+                        acc = _mm_mul_ps(acc, _mm_mul_ps(cl, inv6_vec));
+                    }
+                    _ => {
+                        let mut tmp = [0.0f32; 4];
+                        _mm_storeu_ps(tmp.as_mut_ptr(), acc);
+                        for v in &mut tmp {
+                            *v = apply_activation_scalar(*v, act);
+                        }
+                        acc = _mm_loadu_ps(tmp.as_ptr());
+                    }
+                }
+
+                _mm_storeu_ps(out_row.add(ow), acc);
+                ow += 4;
+            }
+
+            while ow < out_w {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                *out_row.add(ow) = apply_activation_scalar(val, act);
+                ow += 1;
+            }
+        } else {
+            for ow in 0..out_w {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                out_channel[oh * out_w + ow] = apply_activation_scalar(val, act);
+            }
+        }
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
 enum DepthwiseKernelKind {
+    #[allow(dead_code)]
+    Avx2_1dS1,
     #[allow(dead_code)]
     Avx2_3x3S1,
     #[allow(dead_code)]
@@ -536,15 +783,21 @@ enum DepthwiseKernelKind {
     #[allow(dead_code)]
     Avx2_3x3Sw2,
     #[allow(dead_code)]
+    Avx2_5x5Sw2,
+    #[allow(dead_code)]
     Avx2_5x1S1,
     #[allow(dead_code)]
     Neon_3x3S1,
+    #[allow(dead_code)]
+    Wasm_1dS1,
     #[allow(dead_code)]
     Wasm_3x3S1,
     #[allow(dead_code)]
     Wasm_5x5S1,
     #[allow(dead_code)]
     Wasm_3x3Sw2,
+    #[allow(dead_code)]
+    Wasm_5x5Sw2,
     #[allow(dead_code)]
     Wasm_5x1S1,
     Fallback,
@@ -889,6 +1142,142 @@ unsafe fn depthwise_5x1_s1_wasm(
     }
 }
 
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+unsafe fn depthwise_1d_s1_wasm(
+    in_channel: &[f32],
+    w: &[f32],
+    bias: f32,
+    out_channel: &mut [f32],
+    in_len: usize,
+    out_len: usize,
+    k: usize,
+    pad_before: usize,
+    act: FusedActivation,
+) {
+    use core::arch::wasm32::*;
+
+    let b_vec = f32x4_splat(bias);
+    let in_ptr = in_channel.as_ptr();
+    let out_ptr = out_channel.as_mut_ptr();
+
+    let start = pad_before.min(out_len);
+    for idx in 0..start {
+        let val = eval_depthwise_1d_point(in_channel, w, bias, in_len, k, pad_before, idx);
+        *out_ptr.add(idx) = apply_activation_scalar(val, act);
+    }
+
+    let mut idx = start;
+    while idx + 8 <= out_len && (idx - pad_before) + k + 7 <= in_len {
+        let base = idx - pad_before;
+        let mut acc0 = b_vec;
+        let mut acc1 = b_vec;
+        for t in 0..k {
+            let wt = f32x4_splat(*w.get_unchecked(t));
+            let p = in_ptr.add(base + t);
+            acc0 = f32x4_add(acc0, f32x4_mul(v128_load(p as *const v128), wt));
+            acc1 = f32x4_add(acc1, f32x4_mul(v128_load(p.add(4) as *const v128), wt));
+        }
+        v128_store(out_ptr.add(idx) as *mut v128, apply_dw_act_wasm(acc0, act));
+        v128_store(out_ptr.add(idx + 4) as *mut v128, apply_dw_act_wasm(acc1, act));
+        idx += 8;
+    }
+
+    while idx + 4 <= out_len && (idx - pad_before) + k + 3 <= in_len {
+        let base = idx - pad_before;
+        let mut acc = b_vec;
+        for t in 0..k {
+            let wt = f32x4_splat(*w.get_unchecked(t));
+            let v = v128_load(in_ptr.add(base + t) as *const v128);
+            acc = f32x4_add(acc, f32x4_mul(v, wt));
+        }
+        v128_store(out_ptr.add(idx) as *mut v128, apply_dw_act_wasm(acc, act));
+        idx += 4;
+    }
+
+    while idx < out_len {
+        let val = eval_depthwise_1d_point(in_channel, w, bias, in_len, k, pad_before, idx);
+        *out_ptr.add(idx) = apply_activation_scalar(val, act);
+        idx += 1;
+    }
+}
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+unsafe fn depthwise_5x5_sw2_wasm(
+    in_channel: &[f32],
+    w: &[f32],
+    bias: f32,
+    out_channel: &mut [f32],
+    in_h: usize,
+    in_w: usize,
+    out_h: usize,
+    out_w: usize,
+    config: &DepthwiseConv2dConfig,
+) {
+    use core::arch::wasm32::*;
+
+    let b_vec = f32x4_splat(bias);
+    let pad_top = config.pad_top;
+    let pad_left = config.pad_left;
+    let stride_h = config.stride_h;
+    let act = config.activation;
+
+    for oh in 0..out_h {
+        let ih_base = oh as isize * stride_h as isize - pad_top as isize;
+        if ih_base >= 0 && ih_base + 4 < in_h as isize {
+            let ih_u = ih_base as usize;
+            let out_row = out_channel.as_mut_ptr().add(oh * out_w);
+            let ow_start = pad_left.div_ceil(2).min(out_w);
+
+            for ow in 0..ow_start {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                *out_row.add(ow) = apply_activation_scalar(val, act);
+            }
+
+            let mut ow = ow_start;
+            while ow + 4 <= out_w && (ow * 2 - pad_left) + 12 <= in_w {
+                let iw = ow * 2 - pad_left;
+                let mut acc = b_vec;
+
+                for kh in 0..5 {
+                    let r_ptr = in_channel.as_ptr().add((ih_u + kh) * in_w + iw);
+                    let wk = w.as_ptr().add(kh * 5);
+                    let v0 = v128_load(r_ptr as *const v128);
+                    let v1 = v128_load(r_ptr.add(4) as *const v128);
+                    let v2 = v128_load(r_ptr.add(8) as *const v128);
+
+                    let c0 = i32x4_shuffle::<0, 2, 4, 6>(v0, v1);
+                    let c1 = i32x4_shuffle::<1, 3, 5, 7>(v0, v1);
+                    let c2 = i32x4_shuffle::<1, 2, 3, 4>(c0, v2);
+                    let c3 = i32x4_shuffle::<1, 2, 3, 5>(c1, v2);
+                    let c4 = i32x4_shuffle::<2, 3, 4, 6>(c0, v2);
+
+                    acc = f32x4_add(acc, f32x4_mul(c0, f32x4_splat(*wk)));
+                    acc = f32x4_add(acc, f32x4_mul(c1, f32x4_splat(*wk.add(1))));
+                    acc = f32x4_add(acc, f32x4_mul(c2, f32x4_splat(*wk.add(2))));
+                    acc = f32x4_add(acc, f32x4_mul(c3, f32x4_splat(*wk.add(3))));
+                    acc = f32x4_add(acc, f32x4_mul(c4, f32x4_splat(*wk.add(4))));
+                }
+
+                v128_store(out_row.add(ow) as *mut v128, apply_dw_act_wasm(acc, act));
+                ow += 4;
+            }
+
+            while ow < out_w {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                *out_row.add(ow) = apply_activation_scalar(val, act);
+                ow += 1;
+            }
+        } else {
+            for ow in 0..out_w {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                out_channel[oh * out_w + ow] = apply_activation_scalar(val, act);
+            }
+        }
+    }
+}
+
 #[cfg(target_arch = "aarch64")]
 #[target_feature(enable = "neon")]
 unsafe fn depthwise_3x3_s1_neon(
@@ -1020,6 +1409,26 @@ fn process_depthwise_channel(
     #[cfg(target_arch = "x86_64")]
     {
         match kernel_kind {
+            DepthwiseKernelKind::Avx2_1dS1 => {
+                if let Some((in_len, out_len, k, pad_before)) =
+                    extract_1d_s1_params(in_h, in_w, out_h, out_w, config)
+                {
+                    unsafe {
+                        depthwise_1d_s1_avx2(
+                            in_channel,
+                            w_channel,
+                            b_val,
+                            out_channel,
+                            in_len,
+                            out_len,
+                            k,
+                            pad_before,
+                            config.activation,
+                        );
+                    }
+                    return;
+                }
+            }
             DepthwiseKernelKind::Avx2_3x3S1 => {
                 unsafe {
                     depthwise_3x3_s1_avx2(
@@ -1055,6 +1464,22 @@ fn process_depthwise_channel(
             DepthwiseKernelKind::Avx2_3x3Sw2 => {
                 unsafe {
                     depthwise_3x3_sw2_avx2(
+                        in_channel,
+                        w_channel,
+                        b_val,
+                        out_channel,
+                        in_h,
+                        in_w,
+                        out_h,
+                        out_w,
+                        config,
+                    );
+                }
+                return;
+            }
+            DepthwiseKernelKind::Avx2_5x5Sw2 => {
+                unsafe {
+                    depthwise_5x5_sw2_avx2(
                         in_channel,
                         w_channel,
                         b_val,
@@ -1111,6 +1536,26 @@ fn process_depthwise_channel(
     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
     {
         match kernel_kind {
+            DepthwiseKernelKind::Wasm_1dS1 => {
+                if let Some((in_len, out_len, k, pad_before)) =
+                    extract_1d_s1_params(in_h, in_w, out_h, out_w, config)
+                {
+                    unsafe {
+                        depthwise_1d_s1_wasm(
+                            in_channel,
+                            w_channel,
+                            b_val,
+                            out_channel,
+                            in_len,
+                            out_len,
+                            k,
+                            pad_before,
+                            config.activation,
+                        );
+                    }
+                    return;
+                }
+            }
             DepthwiseKernelKind::Wasm_3x3S1 => {
                 unsafe {
                     depthwise_3x3_s1_wasm(
@@ -1130,6 +1575,14 @@ fn process_depthwise_channel(
             DepthwiseKernelKind::Wasm_3x3Sw2 => {
                 unsafe {
                     depthwise_3x3_sw2_wasm(
+                        in_channel, w_channel, b_val, out_channel, in_h, in_w, out_h, out_w, config,
+                    );
+                }
+                return;
+            }
+            DepthwiseKernelKind::Wasm_5x5Sw2 => {
+                unsafe {
+                    depthwise_5x5_sw2_wasm(
                         in_channel, w_channel, b_val, out_channel, in_h, in_w, out_h, out_w, config,
                     );
                 }
@@ -1180,12 +1633,16 @@ pub fn depthwise_conv2d_nchw(
         #[cfg(target_arch = "x86_64")]
         {
             if has_avx2 && config.dilate_h == 1 && config.dilate_w == 1 {
-                if config.kernel_h == 3 && config.kernel_w == 3 && config.stride_h == 1 && config.stride_w == 1 {
+                if extract_1d_s1_params(in_h, in_w, out_h, out_w, config).is_some() {
+                    DepthwiseKernelKind::Avx2_1dS1
+                } else if config.kernel_h == 3 && config.kernel_w == 3 && config.stride_h == 1 && config.stride_w == 1 {
                     DepthwiseKernelKind::Avx2_3x3S1
                 } else if config.kernel_h == 5 && config.kernel_w == 5 && config.stride_h == 1 && config.stride_w == 1 {
                     DepthwiseKernelKind::Avx2_5x5S1
                 } else if config.kernel_h == 3 && config.kernel_w == 3 && config.stride_w == 2 && (config.stride_h == 1 || config.stride_h == 2) {
                     DepthwiseKernelKind::Avx2_3x3Sw2
+                } else if config.kernel_h == 5 && config.kernel_w == 5 && config.stride_w == 2 && (config.stride_h == 1 || config.stride_h == 2) {
+                    DepthwiseKernelKind::Avx2_5x5Sw2
                 } else if config.kernel_h == 5 && config.kernel_w == 1 && config.stride_h == 1 && config.stride_w == 1 {
                     DepthwiseKernelKind::Avx2_5x1S1
                 } else {
@@ -1206,12 +1663,16 @@ pub fn depthwise_conv2d_nchw(
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         {
             if config.dilate_h == 1 && config.dilate_w == 1 {
-                if config.kernel_h == 3 && config.kernel_w == 3 && config.stride_h == 1 && config.stride_w == 1 {
+                if extract_1d_s1_params(in_h, in_w, out_h, out_w, config).is_some() {
+                    DepthwiseKernelKind::Wasm_1dS1
+                } else if config.kernel_h == 3 && config.kernel_w == 3 && config.stride_h == 1 && config.stride_w == 1 {
                     DepthwiseKernelKind::Wasm_3x3S1
                 } else if config.kernel_h == 5 && config.kernel_w == 5 && config.stride_h == 1 && config.stride_w == 1 {
                     DepthwiseKernelKind::Wasm_5x5S1
                 } else if config.kernel_h == 3 && config.kernel_w == 3 && config.stride_w == 2 && (config.stride_h == 1 || config.stride_h == 2) {
                     DepthwiseKernelKind::Wasm_3x3Sw2
+                } else if config.kernel_h == 5 && config.kernel_w == 5 && config.stride_w == 2 && (config.stride_h == 1 || config.stride_h == 2) {
+                    DepthwiseKernelKind::Wasm_5x5Sw2
                 } else if config.kernel_h == 5 && config.kernel_w == 1 && config.stride_h == 1 && config.stride_w == 1 && config.pad_left == 0 && config.pad_right == 0 && in_w >= out_w {
                     DepthwiseKernelKind::Wasm_5x1S1
                 } else {
@@ -1279,6 +1740,138 @@ pub fn depthwise_conv2d_nchw(
                 out_w,
                 config,
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run_reference(
+        input: &[f32],
+        batch: usize,
+        in_h: usize,
+        in_w: usize,
+        weight: &[f32],
+        bias: &[f32],
+        cfg: &DepthwiseConv2dConfig,
+    ) -> Vec<f32> {
+        let (out_h, out_w) = depthwise_conv2d_output_dims(in_h, in_w, cfg);
+        let hw_in = in_h * in_w;
+        let hw_out = out_h * out_w;
+        let ksz = cfg.kernel_h * cfg.kernel_w;
+        let mut out = vec![0.0f32; batch * cfg.channels * hw_out];
+        for b in 0..batch {
+            for c in 0..cfg.channels {
+                let in_c = &input[(b * cfg.channels + c) * hw_in..(b * cfg.channels + c + 1) * hw_in];
+                let w_c = &weight[c * ksz..(c + 1) * ksz];
+                let out_c = &mut out[(b * cfg.channels + c) * hw_out..(b * cfg.channels + c + 1) * hw_out];
+                for oh in 0..out_h {
+                    for ow in 0..out_w {
+                        let v = eval_depthwise_pixel(in_c, w_c, bias[c], in_h, in_w, oh, ow, cfg);
+                        out_c[oh * out_w + ow] = apply_activation_scalar(v, cfg.activation);
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn test_depthwise_1d_horizontal_and_vertical() {
+        for &len in &[5usize, 9, 17, 79, 80, 133] {
+            let channels = 4;
+            let batch = 2;
+            let input: Vec<f32> = (0..batch * channels * len)
+                .map(|i| ((i * 31) % 97) as f32 * 0.05 - 2.3)
+                .collect();
+            let weight: Vec<f32> = (0..channels * 9)
+                .map(|i| ((i * 19) % 41) as f32 * 0.04 - 0.8)
+                .collect();
+            let bias = vec![0.15, -0.25, 0.5, -1.1];
+
+            for act in [FusedActivation::None, FusedActivation::Relu, FusedActivation::HardSwish] {
+                let cfg_h = DepthwiseConv2dConfig {
+                    channels,
+                    kernel_h: 1,
+                    kernel_w: 9,
+                    stride_h: 1,
+                    stride_w: 1,
+                    pad_top: 0,
+                    pad_left: 4,
+                    pad_bottom: 0,
+                    pad_right: 4,
+                    dilate_h: 1,
+                    dilate_w: 1,
+                    activation: act,
+                };
+                let expected_h = run_reference(&input, batch, 1, len, &weight, &bias, &cfg_h);
+                let mut actual_h = vec![0.0f32; expected_h.len()];
+                depthwise_conv2d_nchw(&input, batch, 1, len, &weight, Some(&bias), &mut actual_h, &cfg_h);
+                for (i, (&e, &a)) in expected_h.iter().zip(&actual_h).enumerate() {
+                    assert!((e - a).abs() < 1e-4, "1x9 mismatch at {i} (len={len}): {e} vs {a}");
+                }
+
+                let cfg_v = DepthwiseConv2dConfig {
+                    channels,
+                    kernel_h: 9,
+                    kernel_w: 1,
+                    stride_h: 1,
+                    stride_w: 1,
+                    pad_top: 4,
+                    pad_left: 0,
+                    pad_bottom: 4,
+                    pad_right: 0,
+                    dilate_h: 1,
+                    dilate_w: 1,
+                    activation: act,
+                };
+                let expected_v = run_reference(&input, batch, len, 1, &weight, &bias, &cfg_v);
+                let mut actual_v = vec![0.0f32; expected_v.len()];
+                depthwise_conv2d_nchw(&input, batch, len, 1, &weight, Some(&bias), &mut actual_v, &cfg_v);
+                for (i, (&e, &a)) in expected_v.iter().zip(&actual_v).enumerate() {
+                    assert!((e - a).abs() < 1e-4, "9x1 mismatch at {i} (len={len}): {e} vs {a}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_depthwise_5x5_sw2() {
+        for &(in_h, in_w, sh) in &[(17usize, 31usize, 2usize), (24, 40, 2), (12, 35, 1)] {
+            let channels = 3;
+            let batch = 2;
+            let input: Vec<f32> = (0..batch * channels * in_h * in_w)
+                .map(|i| ((i * 23) % 89) as f32 * 0.06 - 2.5)
+                .collect();
+            let weight: Vec<f32> = (0..channels * 25)
+                .map(|i| ((i * 13) % 53) as f32 * 0.03 - 0.7)
+                .collect();
+            let bias = vec![0.2, -0.4, 0.9];
+
+            for act in [FusedActivation::None, FusedActivation::HardSwish] {
+                let cfg = DepthwiseConv2dConfig {
+                    channels,
+                    kernel_h: 5,
+                    kernel_w: 5,
+                    stride_h: sh,
+                    stride_w: 2,
+                    pad_top: 2,
+                    pad_left: 2,
+                    pad_bottom: 2,
+                    pad_right: 2,
+                    dilate_h: 1,
+                    dilate_w: 1,
+                    activation: act,
+                };
+                let expected = run_reference(&input, batch, in_h, in_w, &weight, &bias, &cfg);
+                let mut actual = vec![0.0f32; expected.len()];
+                depthwise_conv2d_nchw(&input, batch, in_h, in_w, &weight, Some(&bias), &mut actual, &cfg);
+                for (i, (&e, &a)) in expected.iter().zip(&actual).enumerate() {
+                    assert!((e - a).abs() < 1e-4, "5x5 sw2 mismatch at {i}: {e} vs {a}");
+                }
+            }
         }
     }
 }

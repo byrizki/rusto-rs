@@ -1,6 +1,6 @@
 use crate::error::MnnError;
 use crate::kernels::activation::apply_activation_slice;
-use crate::kernels::binary::binary_op;
+use crate::kernels::binary::{binary_op, try_binary_op_inplace_lhs};
 use crate::kernels::classification::{argmax, log_softmax, softmax, topk};
 use crate::kernels::conv::{conv2d, conv2d_output_dims, Conv2dConfig};
 use crate::kernels::deconv::{deconv2d, deconv2d_output_dims, Deconv2dConfig};
@@ -108,7 +108,7 @@ thread_local! {
 }
 
 #[inline(always)]
-pub fn alloc_tensor_buffer(len: usize) -> Vec<f32> {
+fn pop_pooled_buffer(len: usize) -> Option<Vec<f32>> {
     TENSOR_BUFFER_POOL.with(|cell| {
         let mut pool = cell.borrow_mut();
         let mut best_fit: Option<(usize, usize)> = None;
@@ -131,15 +131,33 @@ pub fn alloc_tensor_buffer(len: usize) -> Vec<f32> {
             }
         }
 
-        let pick = best_fit.or(largest).map(|(i, _)| pool.swap_remove(i));
-        if let Some(mut buf) = pick {
-            buf.clear();
-            buf.resize(len, 0.0);
-            buf
-        } else {
-            vec![0.0f32; len]
-        }
+        best_fit.or(largest).map(|(i, _)| pool.swap_remove(i))
     })
+}
+
+#[inline(always)]
+pub fn alloc_tensor_buffer(len: usize) -> Vec<f32> {
+    if let Some(mut buf) = pop_pooled_buffer(len) {
+        buf.clear();
+        buf.resize(len, 0.0);
+        buf
+    } else {
+        vec![0.0f32; len]
+    }
+}
+
+#[inline(always)]
+pub fn alloc_tensor_buffer_overwrite(len: usize) -> Vec<f32> {
+    if let Some(mut buf) = pop_pooled_buffer(len) {
+        if buf.len() >= len {
+            buf.truncate(len);
+        } else {
+            buf.resize(len, 0.0);
+        }
+        buf
+    } else {
+        vec![0.0f32; len]
+    }
 }
 
 #[inline(always)]
@@ -238,13 +256,40 @@ impl GraphContext {
             MnnError::ExecutionError(format!("Tensor index {} is uninitialized", idx))
         })
     }
+
+    #[inline]
+    pub fn take_unique_dead_float_buffer(
+        &mut self,
+        tid: usize,
+        op_idx: usize,
+        last_use: Option<&[usize]>,
+    ) -> Option<Vec<f32>> {
+        let lu = last_use?;
+        if tid >= lu.len() || lu[tid] != op_idx || tid >= self.tensors.len() {
+            return None;
+        }
+        if !self.tensors[tid].as_ref()?.has_unique_float_buffer() {
+            return None;
+        }
+        self.tensors[tid].take()?.into_owned_floats()
+    }
 }
 
 /// Execute a single graph IR node against the execution context
 pub fn execute_node(
     node: &Node,
-    _op_idx: usize,
+    op_idx: usize,
     ctx: &mut GraphContext,
+) -> Result<(), MnnError> {
+    execute_node_with_liveness(node, op_idx, ctx, None)
+}
+
+/// Execute a single graph IR node with optional tensor liveness metadata for in-place reuse
+pub fn execute_node_with_liveness(
+    node: &Node,
+    op_idx: usize,
+    ctx: &mut GraphContext,
+    last_use: Option<&[usize]>,
 ) -> Result<(), MnnError> {
     let in_indices = &node.in_indices;
     let out_indices = &node.out_indices;
@@ -320,7 +365,7 @@ pub fn execute_node(
                     activation: p.activation,
                 };
                 let (out_h, out_w) = depthwise_conv2d_output_dims(in_h, in_w, &dw_cfg);
-                let mut out_data = alloc_tensor_buffer(batch * in_channels * out_h * out_w);
+                let mut out_data = alloc_tensor_buffer_overwrite(batch * in_channels * out_h * out_w);
                 depthwise_conv2d_nchw(
                     &in_floats,
                     batch,
@@ -355,7 +400,11 @@ pub fn execute_node(
                     activation: p.activation,
                 };
                 let (out_h, out_w) = conv2d_output_dims(in_h, in_w, &cfg);
-                let mut out_data = alloc_tensor_buffer(batch * p.out_channels * out_h * out_w);
+                let mut out_data = if in_channels > 0 && p.kernel_h > 0 && p.kernel_w > 0 {
+                    alloc_tensor_buffer_overwrite(batch * p.out_channels * out_h * out_w)
+                } else {
+                    alloc_tensor_buffer(batch * p.out_channels * out_h * out_w)
+                };
                 conv2d(
                     &in_floats,
                     batch,
@@ -510,12 +559,15 @@ pub fn execute_node(
             if in_indices.len() < 2 || out_indices.is_empty() {
                 return Ok(());
             }
-            let lhs = ctx.get_tensor(in_indices[0])?;
-            let rhs = ctx.get_tensor(in_indices[1])?;
+            let lhs_tid = in_indices[0];
+            let rhs_tid = in_indices[1];
             let out_idx = out_indices[0];
 
-            let lhs_shape = lhs.shape();
-            let rhs_shape = rhs.shape();
+            let (lhs_shape, rhs_shape) = {
+                let lhs = ctx.get_tensor(lhs_tid)?;
+                let rhs = ctx.get_tensor(rhs_tid)?;
+                (lhs.shape().to_vec(), rhs.shape().to_vec())
+            };
 
             let ndim = lhs_shape.len().max(rhs_shape.len());
             let mut out_shape = vec![1usize; ndim];
@@ -534,21 +586,115 @@ pub fn execute_node(
                 out_shape[d] = l.max(r);
             }
 
-            let lhs_floats = lhs.as_f32_cow();
-            let rhs_floats = rhs.as_f32_cow();
-            let out_len = out_shape.iter().product::<usize>();
-            let mut out_data = alloc_tensor_buffer(out_len);
+            if lhs_tid != rhs_tid && lhs_shape == out_shape {
+                if let Some(mut lhs_buf) =
+                    ctx.take_unique_dead_float_buffer(lhs_tid, op_idx, last_use)
+                {
+                    let rhs_floats = ctx.get_tensor(rhs_tid)?.as_f32_cow();
+                    if try_binary_op_inplace_lhs(
+                        &lhs_shape,
+                        &mut lhs_buf,
+                        &rhs_shape,
+                        &rhs_floats,
+                        &out_shape,
+                        p.op_type,
+                        p.activation,
+                    ) {
+                        drop(rhs_floats);
+                        ctx.set_tensor(
+                            out_idx,
+                            Tensor::from_floats(&out_shape, lhs_buf, TensorLayout::NCHW),
+                        );
+                        return Ok(());
+                    }
+                    let out_len = out_shape.iter().product::<usize>();
+                    let mut out_data = alloc_tensor_buffer_overwrite(out_len);
+                    binary_op(
+                        &lhs_shape,
+                        &lhs_buf,
+                        &rhs_shape,
+                        &rhs_floats,
+                        &out_shape,
+                        &mut out_data,
+                        p.op_type,
+                        p.activation,
+                    );
+                    drop(rhs_floats);
+                    recycle_tensor_buffer(lhs_buf);
+                    ctx.set_tensor(
+                        out_idx,
+                        Tensor::from_floats(&out_shape, out_data, TensorLayout::NCHW),
+                    );
+                    return Ok(());
+                }
+            } else if lhs_tid != rhs_tid
+                && rhs_shape == out_shape
+                && matches!(
+                    p.op_type,
+                    crate::kernels::binary::BinaryOpType::Add
+                        | crate::kernels::binary::BinaryOpType::Mul
+                        | crate::kernels::binary::BinaryOpType::Min
+                        | crate::kernels::binary::BinaryOpType::Max
+                )
+            {
+                if let Some(mut rhs_buf) =
+                    ctx.take_unique_dead_float_buffer(rhs_tid, op_idx, last_use)
+                {
+                    let lhs_floats = ctx.get_tensor(lhs_tid)?.as_f32_cow();
+                    if try_binary_op_inplace_lhs(
+                        &rhs_shape,
+                        &mut rhs_buf,
+                        &lhs_shape,
+                        &lhs_floats,
+                        &out_shape,
+                        p.op_type,
+                        p.activation,
+                    ) {
+                        drop(lhs_floats);
+                        ctx.set_tensor(
+                            out_idx,
+                            Tensor::from_floats(&out_shape, rhs_buf, TensorLayout::NCHW),
+                        );
+                        return Ok(());
+                    }
+                    let out_len = out_shape.iter().product::<usize>();
+                    let mut out_data = alloc_tensor_buffer_overwrite(out_len);
+                    binary_op(
+                        &lhs_shape,
+                        &lhs_floats,
+                        &rhs_shape,
+                        &rhs_buf,
+                        &out_shape,
+                        &mut out_data,
+                        p.op_type,
+                        p.activation,
+                    );
+                    drop(lhs_floats);
+                    recycle_tensor_buffer(rhs_buf);
+                    ctx.set_tensor(
+                        out_idx,
+                        Tensor::from_floats(&out_shape, out_data, TensorLayout::NCHW),
+                    );
+                    return Ok(());
+                }
+            }
 
-            binary_op(
-                lhs_shape,
-                &lhs_floats,
-                rhs_shape,
-                &rhs_floats,
-                &out_shape,
-                &mut out_data,
-                p.op_type,
-                p.activation,
-            );
+            let out_len = out_shape.iter().product::<usize>();
+            let mut out_data = alloc_tensor_buffer_overwrite(out_len);
+            {
+                let lhs_floats = ctx.get_tensor(lhs_tid)?.as_f32_cow();
+                let rhs_floats = ctx.get_tensor(rhs_tid)?.as_f32_cow();
+                binary_op(
+                    &lhs_shape,
+                    &lhs_floats,
+                    &rhs_shape,
+                    &rhs_floats,
+                    &out_shape,
+                    &mut out_data,
+                    p.op_type,
+                    p.activation,
+                );
+            }
 
             let out_tensor = Tensor::from_floats(&out_shape, out_data, TensorLayout::NCHW);
             ctx.set_tensor(out_idx, out_tensor);
@@ -563,7 +709,7 @@ pub fn execute_node(
             let out_idx = out_indices[0];
 
             let in_floats = in_tensor.as_f32_cow();
-            let mut out_data = alloc_tensor_buffer(in_floats.len());
+            let mut out_data = alloc_tensor_buffer_overwrite(in_floats.len());
             unary_op(&in_floats, &mut out_data, p.op_type);
             if p.activation != FusedActivation::None {
                 apply_activation_slice(&mut out_data, p.activation);
@@ -578,10 +724,23 @@ pub fn execute_node(
             if in_indices.is_empty() || out_indices.is_empty() {
                 return Ok(());
             }
-            let in_tensor = ctx.get_tensor(in_indices[0])?;
+            let in_tid = in_indices[0];
             let out_idx = out_indices[0];
+            let (in_shape, in_layout) = {
+                let t = ctx.get_tensor(in_tid)?;
+                (t.shape().to_vec(), t.layout())
+            };
 
-            let mut out_data = in_tensor.to_f32_vec();
+            let mut out_data = if let Some(buf) =
+                ctx.take_unique_dead_float_buffer(in_tid, op_idx, last_use)
+            {
+                buf
+            } else {
+                let in_floats = ctx.get_tensor(in_tid)?.as_f32_cow();
+                let mut buf = alloc_tensor_buffer_overwrite(in_floats.len());
+                buf.copy_from_slice(&in_floats);
+                buf
+            };
             if *slope == 0.0 {
                 apply_activation_slice(&mut out_data, FusedActivation::Relu);
             } else {
@@ -591,7 +750,7 @@ pub fn execute_node(
                     }
                 }
             }
-            let out_tensor = Tensor::from_floats(in_tensor.shape(), out_data, in_tensor.layout());
+            let out_tensor = Tensor::from_floats(&in_shape, out_data, in_layout);
             ctx.set_tensor(out_idx, out_tensor);
             Ok(())
         }
@@ -600,10 +759,23 @@ pub fn execute_node(
             if in_indices.is_empty() || out_indices.is_empty() {
                 return Ok(());
             }
-            let in_tensor = ctx.get_tensor(in_indices[0])?;
+            let in_tid = in_indices[0];
             let out_idx = out_indices[0];
+            let (in_shape, in_layout) = {
+                let t = ctx.get_tensor(in_tid)?;
+                (t.shape().to_vec(), t.layout())
+            };
 
-            let mut out_data = in_tensor.to_f32_vec();
+            let mut out_data = if let Some(buf) =
+                ctx.take_unique_dead_float_buffer(in_tid, op_idx, last_use)
+            {
+                buf
+            } else {
+                let in_floats = ctx.get_tensor(in_tid)?.as_f32_cow();
+                let mut buf = alloc_tensor_buffer_overwrite(in_floats.len());
+                buf.copy_from_slice(&in_floats);
+                buf
+            };
             if *min_val == 0.0 && *max_val == 6.0 {
                 apply_activation_slice(&mut out_data, FusedActivation::Relu6);
             } else {
@@ -611,7 +783,7 @@ pub fn execute_node(
                     *v = v.max(*min_val).min(*max_val);
                 }
             }
-            let out_tensor = Tensor::from_floats(in_tensor.shape(), out_data, in_tensor.layout());
+            let out_tensor = Tensor::from_floats(&in_shape, out_data, in_layout);
             ctx.set_tensor(out_idx, out_tensor);
             Ok(())
         }
@@ -1244,7 +1416,7 @@ pub fn execute_node(
             let channels = if in_shape.len() > 1 { in_shape[1].max(1) } else { 1 };
             let spatial: usize = in_shape.iter().skip(2).product::<usize>().max(1);
             let in_floats = in_tensor.as_f32_cow();
-            let mut out_data = alloc_tensor_buffer(in_floats.len());
+            let mut out_data = alloc_tensor_buffer_overwrite(in_floats.len());
 
             let full_planes = in_floats.len() / spatial;
             for bc in 0..full_planes {
@@ -1373,7 +1545,7 @@ pub fn execute_node(
 
             let in_shape = in_tensor.shape();
             let in_floats = in_tensor.as_f32_cow();
-            let mut out_data = alloc_tensor_buffer(in_floats.len());
+            let mut out_data = alloc_tensor_buffer_overwrite(in_floats.len());
 
             let raw_axis = *axis;
             let actual_axis = if raw_axis < 0 {
@@ -1398,7 +1570,7 @@ pub fn execute_node(
 
             let in_shape = in_tensor.shape();
             let in_floats = in_tensor.as_f32_cow();
-            let mut out_data = alloc_tensor_buffer(in_floats.len());
+            let mut out_data = alloc_tensor_buffer_overwrite(in_floats.len());
 
             let ndim = in_shape.len();
             let raw_axis = *axis;
@@ -2074,7 +2246,11 @@ pub fn execute_node(
             out_shape.push(m);
             out_shape.push(n);
 
-            let mut out_data = alloc_tensor_buffer(batch_count * m * n);
+            let mut out_data = if p.beta == 0.0 && k > 0 {
+                alloc_tensor_buffer_overwrite(batch_count * m * n)
+            } else {
+                alloc_tensor_buffer(batch_count * m * n)
+            };
 
             if b_batches == 1 && !p.trans_a {
                 let b_transposed: Vec<f32>;

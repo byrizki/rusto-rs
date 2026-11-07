@@ -1,7 +1,7 @@
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
-use crate::kernels::activation::{apply_activation_scalar, FusedActivation};
+use crate::kernels::activation::{apply_activation_scalar, apply_activation_slice, FusedActivation};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOpType {
@@ -1256,6 +1256,305 @@ pub fn binary_op(
                 break;
             }
             coord[d] = 0;
+        }
+    }
+}
+
+#[inline]
+fn binary_inplace_slice(lhs: &mut [f32], rhs: &[f32], op: BinaryOpType, act: FusedActivation) {
+    debug_assert_eq!(lhs.len(), rhs.len());
+    match op {
+        BinaryOpType::Add => {
+            for (a, &b) in lhs.iter_mut().zip(rhs.iter()) {
+                *a += b;
+            }
+        }
+        BinaryOpType::Sub => {
+            for (a, &b) in lhs.iter_mut().zip(rhs.iter()) {
+                *a -= b;
+            }
+        }
+        BinaryOpType::Mul => {
+            for (a, &b) in lhs.iter_mut().zip(rhs.iter()) {
+                *a *= b;
+            }
+        }
+        BinaryOpType::Div => {
+            for (a, &b) in lhs.iter_mut().zip(rhs.iter()) {
+                *a = if b != 0.0 { *a / b } else { 0.0 };
+            }
+        }
+        BinaryOpType::Min => {
+            for (a, &b) in lhs.iter_mut().zip(rhs.iter()) {
+                *a = a.min(b);
+            }
+        }
+        BinaryOpType::Max => {
+            for (a, &b) in lhs.iter_mut().zip(rhs.iter()) {
+                *a = a.max(b);
+            }
+        }
+        _ => {
+            for (a, &b) in lhs.iter_mut().zip(rhs.iter()) {
+                *a = eval_binary(*a, b, op);
+            }
+        }
+    }
+    if act != FusedActivation::None {
+        apply_activation_slice(lhs, act);
+    }
+}
+
+#[inline]
+fn binary_inplace_scalar_rhs(lhs: &mut [f32], b: f32, op: BinaryOpType, act: FusedActivation) {
+    match op {
+        BinaryOpType::Add => {
+            for a in lhs.iter_mut() {
+                *a += b;
+            }
+        }
+        BinaryOpType::Sub => {
+            for a in lhs.iter_mut() {
+                *a -= b;
+            }
+        }
+        BinaryOpType::Mul => {
+            for a in lhs.iter_mut() {
+                *a *= b;
+            }
+        }
+        BinaryOpType::Div => {
+            if b != 0.0 {
+                for a in lhs.iter_mut() {
+                    *a /= b;
+                }
+            } else {
+                lhs.fill(0.0);
+            }
+        }
+        BinaryOpType::Min => {
+            for a in lhs.iter_mut() {
+                *a = a.min(b);
+            }
+        }
+        BinaryOpType::Max => {
+            for a in lhs.iter_mut() {
+                *a = a.max(b);
+            }
+        }
+        _ => {
+            for a in lhs.iter_mut() {
+                *a = eval_binary(*a, b, op);
+            }
+        }
+    }
+    if act != FusedActivation::None {
+        apply_activation_slice(lhs, act);
+    }
+}
+
+/// Mutate `lhs_buf` in-place when `lhs_shape == out_shape` and broadcasting is contiguous.
+pub fn try_binary_op_inplace_lhs(
+    lhs_shape: &[usize],
+    lhs_buf: &mut [f32],
+    rhs_shape: &[usize],
+    rhs_data: &[f32],
+    out_shape: &[usize],
+    op_type: BinaryOpType,
+    act: FusedActivation,
+) -> bool {
+    if lhs_shape != out_shape {
+        return false;
+    }
+    let out_len = out_shape.iter().product::<usize>();
+    if out_len == 0 {
+        return true;
+    }
+    let ndim = out_shape.len();
+    let rhs_expected = rhs_shape.iter().product::<usize>();
+    if ndim > 8
+        || ndim < rhs_shape.len()
+        || lhs_buf.len() < out_len
+        || rhs_data.len() < rhs_expected
+    {
+        return false;
+    }
+
+    let mut rhs_pad = [1usize; 8];
+    rhs_pad[ndim - rhs_shape.len()..ndim].copy_from_slice(rhs_shape);
+
+    let mut seg_mode = [BcastMode::Match; 8];
+    let mut seg_len = [0usize; 8];
+    let mut n_segs = 0usize;
+
+    for d in 0..ndim {
+        let od = out_shape[d];
+        let rd = rhs_pad[d];
+        if rd != od && rd != 1 {
+            return false;
+        }
+        if od <= 1 {
+            continue;
+        }
+        let mode = if rd == od { BcastMode::Match } else { BcastMode::Rhs };
+        if n_segs > 0 && seg_mode[n_segs - 1] == mode {
+            seg_len[n_segs - 1] *= od;
+        } else {
+            seg_mode[n_segs] = mode;
+            seg_len[n_segs] = od;
+            n_segs += 1;
+        }
+    }
+
+    let buf = &mut lhs_buf[..out_len];
+    match n_segs {
+        0 => {
+            let val = eval_binary(buf[0], rhs_data[0], op_type);
+            buf[0] = apply_activation_scalar(val, act);
+            true
+        }
+        1 => match seg_mode[0] {
+            BcastMode::Match => {
+                #[cfg(feature = "rayon")]
+                if out_len >= 8192 {
+                    buf.par_chunks_mut(4096).enumerate().for_each(|(ci, sub)| {
+                        let start = ci * 4096;
+                        binary_inplace_slice(sub, &rhs_data[start..start + sub.len()], op_type, act);
+                    });
+                    return true;
+                }
+                binary_inplace_slice(buf, &rhs_data[..out_len], op_type, act);
+                true
+            }
+            BcastMode::Rhs => {
+                let b = rhs_data[0];
+                #[cfg(feature = "rayon")]
+                if out_len >= 8192 {
+                    buf.par_chunks_mut(4096)
+                        .for_each(|sub| binary_inplace_scalar_rhs(sub, b, op_type, act));
+                    return true;
+                }
+                binary_inplace_scalar_rhs(buf, b, op_type, act);
+                true
+            }
+            BcastMode::Lhs => false,
+        },
+        2 => {
+            let (outer, inner) = (seg_len[0], seg_len[1]);
+            match (seg_mode[0], seg_mode[1]) {
+                (BcastMode::Rhs, BcastMode::Match) => {
+                    let r_slice = &rhs_data[..inner];
+                    #[cfg(feature = "rayon")]
+                    if outer >= 4 && out_len >= 8192 {
+                        buf.par_chunks_exact_mut(inner)
+                            .for_each(|sub| binary_inplace_slice(sub, r_slice, op_type, act));
+                        return true;
+                    }
+                    for sub in buf.chunks_exact_mut(inner) {
+                        binary_inplace_slice(sub, r_slice, op_type, act);
+                    }
+                    true
+                }
+                (BcastMode::Match, BcastMode::Rhs) => {
+                    #[cfg(feature = "rayon")]
+                    if outer >= 2 && out_len >= 4096 {
+                        buf.par_chunks_exact_mut(inner)
+                            .enumerate()
+                            .for_each(|(o, sub)| {
+                                binary_inplace_scalar_rhs(sub, rhs_data[o], op_type, act);
+                            });
+                        return true;
+                    }
+                    for (o, sub) in buf.chunks_exact_mut(inner).enumerate() {
+                        binary_inplace_scalar_rhs(sub, rhs_data[o], op_type, act);
+                    }
+                    true
+                }
+                _ => false,
+            }
+        }
+        3 => {
+            let (outer, mid, inner) = (seg_len[0], seg_len[1], seg_len[2]);
+            match (seg_mode[0], seg_mode[1], seg_mode[2]) {
+                (BcastMode::Match, BcastMode::Rhs, BcastMode::Match) => {
+                    for o in 0..outer {
+                        let r_slice = &rhs_data[o * inner..(o + 1) * inner];
+                        for m in 0..mid {
+                            let idx = (o * mid + m) * inner;
+                            binary_inplace_slice(&mut buf[idx..idx + inner], r_slice, op_type, act);
+                        }
+                    }
+                    true
+                }
+                (BcastMode::Rhs, BcastMode::Match, BcastMode::Rhs) => {
+                    #[cfg(feature = "rayon")]
+                    if outer * mid >= 2 && out_len >= 4096 {
+                        buf.par_chunks_exact_mut(inner)
+                            .enumerate()
+                            .for_each(|(i, sub)| {
+                                binary_inplace_scalar_rhs(sub, rhs_data[i % mid], op_type, act);
+                            });
+                        return true;
+                    }
+                    for (i, sub) in buf.chunks_exact_mut(inner).enumerate() {
+                        binary_inplace_scalar_rhs(sub, rhs_data[i % mid], op_type, act);
+                    }
+                    true
+                }
+                _ => false,
+            }
+        }
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_try_binary_op_inplace_lhs_broadcast_modes() {
+        let shape = [2, 3, 17];
+        let lhs_orig: Vec<f32> = (0..102).map(|i| (i as f32 - 40.0) * 0.13).collect();
+
+        for &(rhs_shape, rhs_len) in &[
+            (&[1usize][..], 1usize),
+            (&[17][..], 17),
+            (&[2, 3, 1][..], 6),
+            (&[2, 1, 17][..], 34),
+            (&[1, 3, 1][..], 3),
+            (&[2, 3, 17][..], 102),
+        ] {
+            let rhs: Vec<f32> = (0..rhs_len).map(|i| (i as f32 + 1.5) * 0.2).collect();
+            for &op in &[BinaryOpType::Add, BinaryOpType::Mul, BinaryOpType::Sub] {
+                let mut expected = vec![0.0f32; 102];
+                binary_op(
+                    &shape,
+                    &lhs_orig,
+                    rhs_shape,
+                    &rhs,
+                    &shape,
+                    &mut expected,
+                    op,
+                    FusedActivation::HardSwish,
+                );
+                let mut inplace = lhs_orig.clone();
+                assert!(try_binary_op_inplace_lhs(
+                    &shape,
+                    &mut inplace,
+                    rhs_shape,
+                    &rhs,
+                    &shape,
+                    op,
+                    FusedActivation::HardSwish,
+                ));
+                for (i, (&got, &exp)) in inplace.iter().zip(expected.iter()).enumerate() {
+                    assert!(
+                        (got - exp).abs() < 1e-5,
+                        "mismatch at {i} for rhs_shape={rhs_shape:?} op={op:?}: {got} vs {exp}"
+                    );
+                }
+            }
         }
     }
 }

@@ -51,17 +51,8 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Build WASM runtime from source
-        run: |
-          mkdir -p ../packages/web/src/wasm
-          mkdir -p public/wasm
-          echo "Compiling crates/rten-wasm with wasm-pack from source..."
-          (cd .. && wasm-pack build crates/rten-wasm --target web --out-dir "$PWD/packages/web/src/wasm")
-          rm -f ../packages/web/src/wasm/.gitignore
-          cp -f ../packages/web/src/wasm/rusto_rten_wasm_bg.wasm public/wasm/
-          echo "WASM runtime successfully compiled and deployed to public/wasm:"
-          ls -la public/wasm/
-          ls -la ../packages/web/src/wasm/
+      - name: Prepare WASM runtime from source
+        run: bash scripts/prepare-wasm.sh
 
       - name: Populate sample assets & models
         run: bash scripts/download-models.sh

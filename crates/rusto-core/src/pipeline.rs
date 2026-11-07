@@ -521,12 +521,12 @@ impl OcrPipeline {
             let target_widths = calculate_linenet_rec_target_widths(&sizes, rec_h);
             let batch_num = self.rec_batch_num.max(1);
 
-            for chunk in (0..img_num).collect::<Vec<_>>().chunks(batch_num) {
+            for chunk in crate::preprocess::plan_linenet_rec_batches(&target_widths, batch_num) {
                 let (batch_tensor, widths) =
-                    crate::preprocess::build_linenet_rec_batch(&crop_imgs, chunk, &target_widths, rec_h)?;
+                    crate::preprocess::build_linenet_rec_batch(&crop_imgs, &chunk, &target_widths, rec_h)?;
                 let (batch_ids, batch_confs) = self.rec.run_linenet_rec(batch_tensor, widths)?;
                 let decoded = self.decoder.decode_linenet_batch(batch_ids, batch_confs);
-                scatter_linenet_results(chunk, decoded, &mut all_texts);
+                scatter_linenet_results(&chunk, decoded, &mut all_texts);
             }
         } else {
             let (img_c, img_h, img_w) = (3usize, 48usize, 320usize);

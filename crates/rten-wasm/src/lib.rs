@@ -8,7 +8,7 @@ use rusto_core::{
     layout::sort_lines_reading_order,
     postprocess::{decode_dbnet_boxes_fast, decode_linenet_det_boxes_slice},
     preprocess::{
-        prepare_linenet_rec_crop_rgba, prepare_ppocr_rec_crop_rgba,
+        plan_linenet_rec_batches, prepare_linenet_rec_crop_rgba, prepare_ppocr_rec_crop_rgba,
         preprocess_linenet_det_rgba, preprocess_rgba_raw,
     },
     spatial::{cluster_text_results_into_lines, to_spatial_text, to_tsv},
@@ -370,32 +370,36 @@ impl RtenOcrPipeline {
                 }
             }
 
-            crops.sort_by_key(|c| (c.rec_h, c.rec_w, c.orig_idx));
+            let target_widths: Vec<usize> = crops.iter().map(|c| c.rec_w).collect();
+            let batch_groups = plan_linenet_rec_batches(&target_widths, batch_cap);
 
             let in_names = self.rec_model.input_names();
             let in_name0 = in_names.first().map(|s| s.as_str()).unwrap_or("x");
             let in_name1 = in_names.get(1).map(|s| s.as_str()).unwrap_or("widths");
+            let wanted_outputs: Vec<&str> = self
+                .rec_model
+                .output_names()
+                .iter()
+                .map(|s| s.as_str())
+                .filter(|&n| matches!(n, "ids" | "conf" | "len" | "lengths"))
+                .collect();
 
-            let mut i = 0;
-            while i < crops.len() {
-                let rec_h = crops[i].rec_h;
-                let rec_w = crops[i].rec_w;
-                let mut end = i + 1;
-                while end < crops.len()
-                    && end - i < batch_cap
-                    && crops[end].rec_h == rec_h
-                    && crops[end].rec_w == rec_w
-                {
-                    end += 1;
+            for group in batch_groups {
+                if group.is_empty() {
+                    continue;
                 }
-
-                let b = end - i;
+                let b = group.len();
+                let rec_h = crops[group[0]].rec_h;
+                let max_w = group.iter().map(|&ci| crops[ci].rec_w).max().unwrap_or(8);
+                let mut widths = Vec::with_capacity(b);
                 let batch_data = if b == 1 {
-                    crops[i].data.take().unwrap_or_default()
+                    widths.push(max_w as i32);
+                    crops[group[0]].data.take().unwrap_or_default()
                 } else {
-                    let mut buf = Vec::with_capacity(b * rec_h * rec_w);
-                    for item in &mut crops[i..end] {
-                        if let Some(d) = item.data.take() {
+                    let mut buf = Vec::with_capacity(b * rec_h * max_w);
+                    for &ci in &group {
+                        widths.push(max_w as i32);
+                        if let Some(d) = crops[ci].data.take() {
                             buf.extend_from_slice(&d);
                         }
                     }
@@ -403,13 +407,21 @@ impl RtenOcrPipeline {
                 };
 
                 let x_tensor =
-                    Tensor::from_floats(&[b, 1, rec_h, rec_w], batch_data, TensorLayout::NCHW);
-                let widths_tensor = Tensor::from_ints(&[b], vec![rec_w as i32; b]);
+                    Tensor::from_floats(&[b, 1, rec_h, max_w], batch_data, TensorLayout::NCHW);
+                let widths_tensor = Tensor::from_ints(&[b], widths);
 
-                let rec_outputs = self
-                    .rec_session
-                    .run(&[(in_name0, &x_tensor), (in_name1, &widths_tensor)])
-                    .map_err(|e| format!("Rec inference error: {:?}", e))?;
+                let rec_outputs = if wanted_outputs.len() >= 2 {
+                    self.rec_session
+                        .run_outputs(
+                            &[(in_name0, &x_tensor), (in_name1, &widths_tensor)],
+                            &wanted_outputs,
+                        )
+                        .map_err(|e| format!("Rec inference error: {:?}", e))?
+                } else {
+                    self.rec_session
+                        .run(&[(in_name0, &x_tensor), (in_name1, &widths_tensor)])
+                        .map_err(|e| format!("Rec inference error: {:?}", e))?
+                };
 
                 let ids_tensor = rec_outputs
                     .get("ids")
@@ -434,7 +446,8 @@ impl RtenOcrPipeline {
                         ids_vec.len() / b.max(1)
                     };
 
-                    for (local_idx, item) in crops[i..end].iter().enumerate() {
+                    for (local_idx, &ci) in group.iter().enumerate() {
+                        let item = &crops[ci];
                         let row_start = local_idx * max_len;
                         let row_end = (row_start + max_len).min(ids_vec.len());
                         if row_start >= row_end {
@@ -457,8 +470,6 @@ impl RtenOcrPipeline {
                         }
                     }
                 }
-
-                i = end;
             }
         } else {
             let mut crops = Vec::with_capacity(raw_boxes.len());
@@ -581,7 +592,7 @@ impl RtenOcrPipeline {
             max_side_len,
         )?;
 
-        let results = self.recognize_boxes_batched(&processed_rgba, orig_w, orig_h, &raw_boxes, 8)?;
+        let results = self.recognize_boxes_batched(&processed_rgba, orig_w, orig_h, &raw_boxes, 12)?;
 
         serde_json::to_string(&results).map_err(|e| format!("Serialization error: {:?}", e))
     }
@@ -713,7 +724,7 @@ impl RtenOcrPipeline {
             .recognition
             .as_ref()
             .and_then(|r| r.batch_size)
-            .unwrap_or(8)
+            .unwrap_or(1)
             .max(1) as usize;
 
         let recognized: Vec<TextResult> = self

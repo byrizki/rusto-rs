@@ -7,8 +7,9 @@ use crate::engine::InferenceSession;
 use crate::error::CoreError;
 use crate::image::Mat;
 pub use crate::preprocess::{
-    build_linenet_rec_batch, calculate_linenet_rec_target_widths, plan_rec_batches,
-    prepare_linenet_rec_crop, resize_norm_rec_img, stack_rec_batch, RecBatchItem, RecBatchPlan,
+    build_linenet_rec_batch, calculate_linenet_rec_target_widths, plan_linenet_rec_batches,
+    plan_rec_batches, prepare_linenet_rec_crop, resize_norm_rec_img, stack_rec_batch,
+    RecBatchItem, RecBatchPlan,
 };
 use crate::types::RecConfig;
 
@@ -77,12 +78,12 @@ impl<S: InferenceSession> TextRecognizer<S> {
             let target_widths = calculate_linenet_rec_target_widths(&sizes, rec_h);
             let batch_num = (self.cfg.rec_batch_num as usize).max(1);
 
-            for chunk in (0..img_num).collect::<Vec<_>>().chunks(batch_num) {
+            for chunk in plan_linenet_rec_batches(&target_widths, batch_num) {
                 let (batch_tensor, widths) =
-                    build_linenet_rec_batch(&img_list, chunk, &target_widths, rec_h)?;
+                    build_linenet_rec_batch(&img_list, &chunk, &target_widths, rec_h)?;
                 let (batch_ids, batch_confs) = self.session.run_linenet_rec(batch_tensor, widths)?;
                 let decoded = self.decoder.decode_linenet_batch(batch_ids, batch_confs);
-                scatter_linenet_results(chunk, decoded, &mut all_texts);
+                scatter_linenet_results(&chunk, decoded, &mut all_texts);
             }
         } else {
             let (img_c, img_h, img_w) = (

@@ -584,6 +584,134 @@ pub fn log_softmax(
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn argmax_row_avx2(row: &[f32]) -> (i32, f32) {
+    use core::arch::x86_64::*;
+
+    let len = row.len();
+    let chunks = len / 8;
+    let ptr = row.as_ptr();
+
+    let mut max_vec = _mm256_set1_ps(f32::NEG_INFINITY);
+    let mut best_idx = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
+    let mut cur_idx = best_idx;
+    let step = _mm256_set1_epi32(8);
+
+    for i in 0..chunks {
+        let v = _mm256_loadu_ps(ptr.add(i * 8));
+        let gt = _mm256_cmp_ps::<_CMP_GT_OQ>(v, max_vec);
+        max_vec = _mm256_blendv_ps(max_vec, v, gt);
+        best_idx = _mm256_castps_si256(_mm256_blendv_ps(
+            _mm256_castsi256_ps(best_idx),
+            _mm256_castsi256_ps(cur_idx),
+            gt,
+        ));
+        cur_idx = _mm256_add_epi32(cur_idx, step);
+    }
+
+    let mut vals = [0.0f32; 8];
+    let mut idxs = [0i32; 8];
+    _mm256_storeu_ps(vals.as_mut_ptr(), max_vec);
+    _mm256_storeu_si256(idxs.as_mut_ptr() as *mut __m256i, best_idx);
+
+    let mut max_val = f32::NEG_INFINITY;
+    let mut max_idx = 0i32;
+    if chunks > 0 {
+        for l in 0..8 {
+            if vals[l] > max_val || (vals[l] == max_val && idxs[l] < max_idx) {
+                max_val = vals[l];
+                max_idx = idxs[l];
+            }
+        }
+    }
+
+    for a in (chunks * 8)..len {
+        let v = *ptr.add(a);
+        if v > max_val {
+            max_val = v;
+            max_idx = a as i32;
+        }
+    }
+
+    (max_idx, max_val)
+}
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+unsafe fn argmax_row_wasm(row: &[f32]) -> (i32, f32) {
+    use core::arch::wasm32::*;
+
+    let len = row.len();
+    let chunks = len / 4;
+    let ptr = row.as_ptr();
+
+    let mut max_vec = f32x4_splat(f32::NEG_INFINITY);
+    let mut best_idx = i32x4(0, 1, 2, 3);
+    let mut cur_idx = best_idx;
+    let step = i32x4_splat(4);
+
+    for i in 0..chunks {
+        let v = v128_load(ptr.add(i * 4) as *const v128);
+        let gt = f32x4_gt(v, max_vec);
+        max_vec = v128_bitselect(v, max_vec, gt);
+        best_idx = v128_bitselect(cur_idx, best_idx, gt);
+        cur_idx = i32x4_add(cur_idx, step);
+    }
+
+    let mut vals = [0.0f32; 4];
+    let mut idxs = [0i32; 4];
+    v128_store(vals.as_mut_ptr() as *mut v128, max_vec);
+    v128_store(idxs.as_mut_ptr() as *mut v128, best_idx);
+
+    let mut max_val = f32::NEG_INFINITY;
+    let mut max_idx = 0i32;
+    if chunks > 0 {
+        for l in 0..4 {
+            if vals[l] > max_val || (vals[l] == max_val && idxs[l] < max_idx) {
+                max_val = vals[l];
+                max_idx = idxs[l];
+            }
+        }
+    }
+
+    for a in (chunks * 4)..len {
+        let v = *ptr.add(a);
+        if v > max_val {
+            max_val = v;
+            max_idx = a as i32;
+        }
+    }
+
+    (max_idx, max_val)
+}
+
+#[inline]
+pub fn argmax_row(row: &[f32]) -> (i32, f32) {
+    #[cfg(target_arch = "x86_64")]
+    {
+        if is_x86_feature_detected!("avx2") {
+            return unsafe { argmax_row_avx2(row) };
+        }
+    }
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        return unsafe { argmax_row_wasm(row) };
+    }
+    #[allow(unreachable_code)]
+    {
+        let mut max_val = f32::NEG_INFINITY;
+        let mut max_idx = 0i32;
+        for (a, &v) in row.iter().enumerate() {
+            if v > max_val {
+                max_val = v;
+                max_idx = a as i32;
+            }
+        }
+        (max_idx, max_val)
+    }
+}
+
 /// Fast greedy CTC decode shortcut directly from logits or probabilities
 pub fn ctc_greedy_argmax_tokens(
     probs_or_logits: &[f32],
@@ -595,15 +723,8 @@ pub fn ctc_greedy_argmax_tokens(
 
     for t in 0..timesteps {
         let row = &probs_or_logits[t * vocab_size..(t + 1) * vocab_size];
-        let mut best_idx = 0usize;
-        let mut best_val = f32::NEG_INFINITY;
-        for (i, &v) in row.iter().enumerate() {
-            if v > best_val {
-                best_val = v;
-                best_idx = i;
-            }
-        }
-        tokens.push(best_idx);
+        let (best_idx, best_val) = argmax_row(row);
+        tokens.push(best_idx as usize);
         confs.push(best_val);
     }
 
@@ -634,15 +755,7 @@ pub fn argmax(
     if inner_size == 1 {
         for outer in 0..outer_size {
             let row = &input[outer * axis_size..(outer + 1) * axis_size];
-            let mut max_val = f32::NEG_INFINITY;
-            let mut max_idx = 0i32;
-            for (a, &v) in row.iter().enumerate() {
-                if v > max_val {
-                    max_val = v;
-                    max_idx = a as i32;
-                }
-            }
-            out_indices[outer] = max_idx;
+            out_indices[outer] = argmax_row(row).0;
         }
         return;
     }

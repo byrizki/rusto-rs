@@ -1,6 +1,27 @@
 use ndarray::{Array3, Array4};
 use crate::error::CoreError;
-use crate::image::{self, sample_bilinear, Mat, Size, INTER_LINEAR};
+use crate::image::{self, Mat, Size, INTER_LINEAR};
+
+#[inline]
+fn build_bilinear_table(
+    out_len: usize,
+    start: f32,
+    step: f32,
+    src_len: usize,
+    elem_stride: usize,
+) -> Vec<(usize, usize, f32, f32)> {
+    let max_coord = (src_len.saturating_sub(1)) as f32;
+    let max_idx = src_len.saturating_sub(1);
+    let mut tab = Vec::with_capacity(out_len);
+    for i in 0..out_len {
+        let s = (start + (i as f32 + 0.5) * step - 0.5).clamp(0.0, max_coord);
+        let i0 = s.floor() as usize;
+        let i1 = (i0 + 1).min(max_idx);
+        let f1 = s - i0 as f32;
+        tab.push((i0 * elem_stride, i1 * elem_stride, 1.0 - f1, f1));
+    }
+    tab
+}
 
 pub struct DetPreProcess {
     pub limit_side_len: i32,
@@ -71,25 +92,34 @@ impl DetPreProcess {
         let w = size.width as usize;
 
         let mut out = Array4::<f32>::zeros((1, 3, h, w));
-        let scale = 1.0 / 255.0;
+        let scale_b = 1.0 / (255.0 * self.std[0]);
+        let bias_b = -self.mean[0] / self.std[0];
+        let scale_g = 1.0 / (255.0 * self.std[1]);
+        let bias_g = -self.mean[1] / self.std[1];
+        let scale_r = 1.0 / (255.0 * self.std[2]);
+        let bias_r = -self.mean[2] / self.std[2];
 
-        let mean_b = self.mean[0];
-        let mean_g = self.mean[1];
-        let mean_r = self.mean[2];
-        let std_b = self.std[0];
-        let std_g = self.std[1];
-        let std_r = self.std[2];
+        if let Some(rgb) = img.as_dynamic().as_rgb8() {
+            let raw = rgb.as_raw();
+            let plane_size = h * w;
+            let out_slice = out.as_slice_mut().expect("contiguous array");
+            let (b_plane, rest) = out_slice.split_at_mut(plane_size);
+            let (g_plane, r_plane) = rest.split_at_mut(plane_size);
+            for i in 0..plane_size {
+                let px = i * 3;
+                r_plane[i] = raw[px] as f32 * scale_r + bias_r;
+                g_plane[i] = raw[px + 1] as f32 * scale_g + bias_g;
+                b_plane[i] = raw[px + 2] as f32 * scale_b + bias_b;
+            }
+            return Ok(out);
+        }
 
         for y in 0..h {
             for x in 0..w {
                 let pix = img.get_pixel(x as u32, y as u32);
-                let r = pix[0] as f32 * scale;
-                let g = pix[1] as f32 * scale;
-                let b = pix[2] as f32 * scale;
-
-                out[[0, 0, y, x]] = (b - mean_b) / std_b;
-                out[[0, 1, y, x]] = (g - mean_g) / std_g;
-                out[[0, 2, y, x]] = (r - mean_r) / std_r;
+                out[[0, 0, y, x]] = pix[2] as f32 * scale_b + bias_b;
+                out[[0, 1, y, x]] = pix[1] as f32 * scale_g + bias_g;
+                out[[0, 2, y, x]] = pix[0] as f32 * scale_r + bias_r;
             }
         }
 
@@ -121,22 +151,45 @@ impl DetPreProcess {
         let scale_w = target_w as f32 / orig_w as f32;
         let scale_h = target_h as f32 / orig_h as f32;
 
-        let mut det_input = vec![0.0f32; target_w * target_h * 3];
+        let plane_size = target_w * target_h;
+        let mut det_input = vec![0.0f32; plane_size * 3];
+        if orig_w == 0 || orig_h == 0 || rgba.len() < orig_w * orig_h * 4 {
+            return (det_input, target_w, target_h, scale_w, scale_h);
+        }
 
-        for ty in 0..target_h {
-            let sy = ((ty as f32 + 0.5) / scale_h - 0.5).clamp(0.0, (orig_h.saturating_sub(1)) as f32);
-            for tx in 0..target_w {
-                let sx = ((tx as f32 + 0.5) / scale_w - 0.5).clamp(0.0, (orig_w.saturating_sub(1)) as f32);
-                let (r, g, b) = image::sample_bilinear(rgba, orig_w, orig_h, sx, sy);
+        let x_tab = build_bilinear_table(target_w, 0.0, 1.0 / scale_w, orig_w, 4);
+        let y_tab = build_bilinear_table(target_h, 0.0, 1.0 / scale_h, orig_h, orig_w * 4);
 
-                let bn = (b / 255.0 - mean[0]) / std[0];
-                let gn = (g / 255.0 - mean[1]) / std[1];
-                let rn = (r / 255.0 - mean[2]) / std[2];
+        let scale_b = 1.0 / (255.0 * std[0]);
+        let bias_b = -mean[0] / std[0];
+        let scale_g = 1.0 / (255.0 * std[1]);
+        let bias_g = -mean[1] / std[1];
+        let scale_r = 1.0 / (255.0 * std[2]);
+        let bias_r = -mean[2] / std[2];
 
-                let pixel_idx = ty * target_w + tx;
-                det_input[pixel_idx] = bn;
-                det_input[target_h * target_w + pixel_idx] = gn;
-                det_input[2 * target_h * target_w + pixel_idx] = rn;
+        let row_bytes = orig_w * 4;
+        let (b_plane, rest) = det_input.split_at_mut(plane_size);
+        let (g_plane, r_plane) = rest.split_at_mut(plane_size);
+
+        for (ty, &(ry0, ry1, wy0, wy1)) in y_tab.iter().enumerate() {
+            let row0 = &rgba[ry0..ry0 + row_bytes];
+            let row1 = &rgba[ry1..ry1 + row_bytes];
+            let dst_off = ty * target_w;
+            let b_row = &mut b_plane[dst_off..dst_off + target_w];
+            let g_row = &mut g_plane[dst_off..dst_off + target_w];
+            let r_row = &mut r_plane[dst_off..dst_off + target_w];
+
+            for (tx, &(ox0, ox1, wx0, wx1)) in x_tab.iter().enumerate() {
+                let r = (row0[ox0] as f32 * wx0 + row0[ox1] as f32 * wx1) * wy0
+                    + (row1[ox0] as f32 * wx0 + row1[ox1] as f32 * wx1) * wy1;
+                let g = (row0[ox0 + 1] as f32 * wx0 + row0[ox1 + 1] as f32 * wx1) * wy0
+                    + (row1[ox0 + 1] as f32 * wx0 + row1[ox1 + 1] as f32 * wx1) * wy1;
+                let b = (row0[ox0 + 2] as f32 * wx0 + row0[ox1 + 2] as f32 * wx1) * wy0
+                    + (row1[ox0 + 2] as f32 * wx0 + row1[ox1 + 2] as f32 * wx1) * wy1;
+
+                b_row[tx] = b * scale_b + bias_b;
+                g_row[tx] = g * scale_g + bias_g;
+                r_row[tx] = r * scale_r + bias_r;
             }
         }
 
@@ -188,12 +241,44 @@ pub fn prepare_linenet_det_input(
     target_w: usize,
     target_h: usize,
 ) -> Result<Array4<f32>, CoreError> {
-    let orig_w = img.cols() as f32;
-    let orig_h = img.rows() as f32;
+    let orig_w_u = img.cols().max(0) as usize;
+    let orig_h_u = img.rows().max(0) as usize;
+    let mut input = Array4::<f32>::zeros((1, 1, target_h, target_w));
+    if orig_w_u == 0 || orig_h_u == 0 || target_w == 0 || target_h == 0 {
+        return Ok(input);
+    }
+
+    let orig_w = orig_w_u as f32;
+    let orig_h = orig_h_u as f32;
     let scale_w = target_w as f32 / orig_w;
     let scale_h = target_h as f32 / orig_h;
 
-    let mut input = Array4::<f32>::zeros((1, 1, target_h, target_w));
+    if let Some(rgb) = img.as_dynamic().as_rgb8() {
+        let raw = rgb.as_raw();
+        let row_bytes = orig_w_u * 3;
+        let x_tab = build_bilinear_table(target_w, 0.0, 1.0 / scale_w, orig_w_u, 3);
+        let y_tab = build_bilinear_table(target_h, 0.0, 1.0 / scale_h, orig_h_u, row_bytes);
+        let out_slice = input.as_slice_mut().expect("contiguous array");
+
+        const WR: f32 = 0.299 / 255.0;
+        const WG: f32 = 0.587 / 255.0;
+        const WB: f32 = 0.114 / 255.0;
+
+        for (ty, &(ry0, ry1, wy0, wy1)) in y_tab.iter().enumerate() {
+            let row0 = &raw[ry0..ry0 + row_bytes];
+            let row1 = &raw[ry1..ry1 + row_bytes];
+            let dst_row = &mut out_slice[ty * target_w..(ty + 1) * target_w];
+            for (tx, &(ox0, ox1, wx0, wx1)) in x_tab.iter().enumerate() {
+                let l00 = row0[ox0] as f32 * WR + row0[ox0 + 1] as f32 * WG + row0[ox0 + 2] as f32 * WB;
+                let l10 = row0[ox1] as f32 * WR + row0[ox1 + 1] as f32 * WG + row0[ox1 + 2] as f32 * WB;
+                let l01 = row1[ox0] as f32 * WR + row1[ox0 + 1] as f32 * WG + row1[ox0 + 2] as f32 * WB;
+                let l11 = row1[ox1] as f32 * WR + row1[ox1 + 1] as f32 * WG + row1[ox1 + 2] as f32 * WB;
+                let gray_norm = (l00 * wx0 + l10 * wx1) * wy0 + (l01 * wx0 + l11 * wx1) * wy1;
+                dst_row[tx] = (1.0 - gray_norm).clamp(0.0, 1.0);
+            }
+        }
+        return Ok(input);
+    }
 
     for ty in 0..target_h {
         let sy = ((ty as f32 + 0.5) / scale_h - 0.5).clamp(0.0, orig_h - 1.0);
@@ -245,7 +330,7 @@ pub fn prepare_linenet_rec_crop_rgba(
     let exp_y1 = (y1 + 1.6 * box_h).min(orig_h as f32);
     let crop_w = exp_x1 - exp_x0;
     let crop_h = exp_y1 - exp_y0;
-    if crop_w < 4.0 || crop_h < 4.0 {
+    if crop_w < 4.0 || crop_h < 4.0 || orig_w == 0 || orig_h == 0 || rgba.len() < orig_w * orig_h * 4 {
         return None;
     }
 
@@ -253,15 +338,27 @@ pub fn prepare_linenet_rec_crop_rgba(
     let target_w = (96.0 * (crop_w / crop_h)).round() as usize;
     let rec_w = ((target_w + 7) / 8 * 8).clamp(8, 4096);
 
+    let x_tab = build_bilinear_table(rec_w, exp_x0, crop_w / rec_w as f32, orig_w, 4);
+    let y_tab = build_bilinear_table(rec_h, exp_y0, crop_h / rec_h as f32, orig_h, orig_w * 4);
+
+    const WR: f32 = 0.299 / 255.0;
+    const WG: f32 = 0.587 / 255.0;
+    const WB: f32 = 0.114 / 255.0;
+
+    let row_bytes = orig_w * 4;
     let mut rec_input = vec![0.0f32; rec_h * rec_w];
-    for ry in 0..rec_h {
-        let sy = exp_y0 + (ry as f32 + 0.5) * (crop_h / rec_h as f32) - 0.5;
-        for rx in 0..rec_w {
-            let sx = exp_x0 + (rx as f32 + 0.5) * (crop_w / rec_w as f32) - 0.5;
-            let (r, g, b) = image::sample_bilinear(rgba, orig_w, orig_h, sx, sy);
-            let gray = 0.299 * r + 0.587 * g + 0.114 * b;
-            let ink = (1.0 - gray / 255.0).clamp(0.0, 1.0);
-            rec_input[ry * rec_w + rx] = ink;
+    for (ry, &(ry0, ry1, wy0, wy1)) in y_tab.iter().enumerate() {
+        let row0 = &rgba[ry0..ry0 + row_bytes];
+        let row1 = &rgba[ry1..ry1 + row_bytes];
+        let dst_row = &mut rec_input[ry * rec_w..(ry + 1) * rec_w];
+
+        for (rx, &(ox0, ox1, wx0, wx1)) in x_tab.iter().enumerate() {
+            let l00 = row0[ox0] as f32 * WR + row0[ox0 + 1] as f32 * WG + row0[ox0 + 2] as f32 * WB;
+            let l10 = row0[ox1] as f32 * WR + row0[ox1 + 1] as f32 * WG + row0[ox1 + 2] as f32 * WB;
+            let l01 = row1[ox0] as f32 * WR + row1[ox0 + 1] as f32 * WG + row1[ox0 + 2] as f32 * WB;
+            let l11 = row1[ox1] as f32 * WR + row1[ox1 + 1] as f32 * WG + row1[ox1 + 2] as f32 * WB;
+            let gray_norm = (l00 * wx0 + l10 * wx1) * wy0 + (l01 * wx0 + l11 * wx1) * wy1;
+            dst_row[rx] = (1.0 - gray_norm).clamp(0.0, 1.0);
         }
     }
 
@@ -289,7 +386,7 @@ pub fn prepare_ppocr_rec_crop_rgba(
 
     let crop_w = exp_x1 - exp_x0;
     let crop_h = exp_y1 - exp_y0;
-    if crop_w < 4.0 || crop_h < 4.0 {
+    if crop_w < 4.0 || crop_h < 4.0 || orig_w == 0 || orig_h == 0 || rgba.len() < orig_w * orig_h * 4 {
         return None;
     }
 
@@ -297,22 +394,35 @@ pub fn prepare_ppocr_rec_crop_rgba(
     let target_w = (48.0 * (crop_w / crop_h)).ceil() as usize;
     let rec_w = ((target_w as f32 / 32.0).ceil() as usize * 32).clamp(64, 960);
 
-    let mut rec_input = vec![0.0f32; rec_h * rec_w * 3];
+    let x_tab = build_bilinear_table(rec_w, exp_x0, crop_w / rec_w as f32, orig_w, 4);
+    let y_tab = build_bilinear_table(rec_h, exp_y0, crop_h / rec_h as f32, orig_h, orig_w * 4);
 
-    for ry in 0..rec_h {
-        let sy = exp_y0 + (ry as f32 + 0.5) * (crop_h / rec_h as f32) - 0.5;
-        for rx in 0..rec_w {
-            let sx = exp_x0 + (rx as f32 + 0.5) * (crop_w / rec_w as f32) - 0.5;
-            let (r, g, b) = image::sample_bilinear(rgba, orig_w, orig_h, sx, sy);
+    const SCALE: f32 = 2.0 / 255.0;
+    let plane_size = rec_h * rec_w;
+    let row_bytes = orig_w * 4;
+    let mut rec_input = vec![0.0f32; plane_size * 3];
+    let (b_plane, rest) = rec_input.split_at_mut(plane_size);
+    let (g_plane, r_plane) = rest.split_at_mut(plane_size);
 
-            let bn = (b / 255.0 - 0.5) / 0.5;
-            let gn = (g / 255.0 - 0.5) / 0.5;
-            let rn = (r / 255.0 - 0.5) / 0.5;
+    for (ry, &(ry0, ry1, wy0, wy1)) in y_tab.iter().enumerate() {
+        let row0 = &rgba[ry0..ry0 + row_bytes];
+        let row1 = &rgba[ry1..ry1 + row_bytes];
+        let dst_off = ry * rec_w;
+        let b_row = &mut b_plane[dst_off..dst_off + rec_w];
+        let g_row = &mut g_plane[dst_off..dst_off + rec_w];
+        let r_row = &mut r_plane[dst_off..dst_off + rec_w];
 
-            let pixel_idx = ry * rec_w + rx;
-            rec_input[pixel_idx] = bn;
-            rec_input[rec_h * rec_w + pixel_idx] = gn;
-            rec_input[2 * rec_h * rec_w + pixel_idx] = rn;
+        for (rx, &(ox0, ox1, wx0, wx1)) in x_tab.iter().enumerate() {
+            let r = (row0[ox0] as f32 * wx0 + row0[ox1] as f32 * wx1) * wy0
+                + (row1[ox0] as f32 * wx0 + row1[ox1] as f32 * wx1) * wy1;
+            let g = (row0[ox0 + 1] as f32 * wx0 + row0[ox1 + 1] as f32 * wx1) * wy0
+                + (row1[ox0 + 1] as f32 * wx0 + row1[ox1 + 1] as f32 * wx1) * wy1;
+            let b = (row0[ox0 + 2] as f32 * wx0 + row0[ox1 + 2] as f32 * wx1) * wy0
+                + (row1[ox0 + 2] as f32 * wx0 + row1[ox1 + 2] as f32 * wx1) * wy1;
+
+            b_row[rx] = b * SCALE - 1.0;
+            g_row[rx] = g * SCALE - 1.0;
+            r_row[rx] = r * SCALE - 1.0;
         }
     }
 
@@ -325,13 +435,42 @@ pub fn prepare_linenet_rec_crop(
     target_w: usize,
 ) -> Result<ndarray::Array2<f32>, CoreError> {
     let mut out = ndarray::Array2::<f32>::zeros((target_h, target_w));
-    let orig_w = img.cols() as f32;
-    let orig_h = img.rows() as f32;
-    if orig_w <= 0.0 || orig_h <= 0.0 {
+    let orig_w_u = img.cols().max(0) as usize;
+    let orig_h_u = img.rows().max(0) as usize;
+    if orig_w_u == 0 || orig_h_u == 0 || target_w == 0 || target_h == 0 {
         return Ok(out);
     }
+    let orig_w = orig_w_u as f32;
+    let orig_h = orig_h_u as f32;
     let scale_w = target_w as f32 / orig_w;
     let scale_h = target_h as f32 / orig_h;
+
+    if let Some(rgb) = img.as_dynamic().as_rgb8() {
+        let raw = rgb.as_raw();
+        let row_bytes = orig_w_u * 3;
+        let x_tab = build_bilinear_table(target_w, 0.0, 1.0 / scale_w, orig_w_u, 3);
+        let y_tab = build_bilinear_table(target_h, 0.0, 1.0 / scale_h, orig_h_u, row_bytes);
+        let out_slice = out.as_slice_mut().expect("contiguous array");
+
+        const WR: f32 = 0.299 / 255.0;
+        const WG: f32 = 0.587 / 255.0;
+        const WB: f32 = 0.114 / 255.0;
+
+        for (ty, &(ry0, ry1, wy0, wy1)) in y_tab.iter().enumerate() {
+            let row0 = &raw[ry0..ry0 + row_bytes];
+            let row1 = &raw[ry1..ry1 + row_bytes];
+            let dst_row = &mut out_slice[ty * target_w..(ty + 1) * target_w];
+            for (tx, &(ox0, ox1, wx0, wx1)) in x_tab.iter().enumerate() {
+                let l00 = row0[ox0] as f32 * WR + row0[ox0 + 1] as f32 * WG + row0[ox0 + 2] as f32 * WB;
+                let l10 = row0[ox1] as f32 * WR + row0[ox1 + 1] as f32 * WG + row0[ox1 + 2] as f32 * WB;
+                let l01 = row1[ox0] as f32 * WR + row1[ox0 + 1] as f32 * WG + row1[ox0 + 2] as f32 * WB;
+                let l11 = row1[ox1] as f32 * WR + row1[ox1 + 1] as f32 * WG + row1[ox1 + 2] as f32 * WB;
+                let gray_norm = (l00 * wx0 + l10 * wx1) * wy0 + (l01 * wx0 + l11 * wx1) * wy1;
+                dst_row[tx] = (1.0 - gray_norm).clamp(0.0, 1.0);
+            }
+        }
+        return Ok(out);
+    }
 
     for ty in 0..target_h {
         let sy = ((ty as f32 + 0.5) / scale_h - 0.5).clamp(0.0, orig_h - 1.0);
@@ -403,13 +542,30 @@ pub fn preprocess_linenet_det_rgba(
         calculate_linenet_dims(orig_w as i32, orig_h as i32, limit, limit_type);
 
     let mut det_input = vec![0.0f32; target_w * target_h];
-    for ty in 0..target_h {
-        let sy = (ty as f32 + 0.5) / scale_h - 0.5;
-        for tx in 0..target_w {
-            let sx = (tx as f32 + 0.5) / scale_w - 0.5;
-            let (r, g, b) = sample_bilinear(rgba, orig_w, orig_h, sx, sy);
-            let gray: f32 = 0.299 * r + 0.587 * g + 0.114 * b;
-            det_input[ty * target_w + tx] = (1.0f32 - gray / 255.0f32).clamp(0.0f32, 1.0f32);
+    if orig_w == 0 || orig_h == 0 || rgba.len() < orig_w * orig_h * 4 {
+        return (det_input, target_w, target_h, scale_w, scale_h);
+    }
+
+    let x_tab = build_bilinear_table(target_w, 0.0, 1.0 / scale_w, orig_w, 4);
+    let y_tab = build_bilinear_table(target_h, 0.0, 1.0 / scale_h, orig_h, orig_w * 4);
+
+    const WR: f32 = 0.299 / 255.0;
+    const WG: f32 = 0.587 / 255.0;
+    const WB: f32 = 0.114 / 255.0;
+
+    let row_bytes = orig_w * 4;
+    for (ty, &(ry0, ry1, wy0, wy1)) in y_tab.iter().enumerate() {
+        let row0 = &rgba[ry0..ry0 + row_bytes];
+        let row1 = &rgba[ry1..ry1 + row_bytes];
+        let dst_row = &mut det_input[ty * target_w..(ty + 1) * target_w];
+
+        for (tx, &(ox0, ox1, wx0, wx1)) in x_tab.iter().enumerate() {
+            let l00 = row0[ox0] as f32 * WR + row0[ox0 + 1] as f32 * WG + row0[ox0 + 2] as f32 * WB;
+            let l10 = row0[ox1] as f32 * WR + row0[ox1 + 1] as f32 * WG + row0[ox1 + 2] as f32 * WB;
+            let l01 = row1[ox0] as f32 * WR + row1[ox0 + 1] as f32 * WG + row1[ox0 + 2] as f32 * WB;
+            let l11 = row1[ox1] as f32 * WR + row1[ox1 + 1] as f32 * WG + row1[ox1 + 2] as f32 * WB;
+            let gray_norm = (l00 * wx0 + l10 * wx1) * wy0 + (l01 * wx0 + l11 * wx1) * wy1;
+            dst_row[tx] = (1.0 - gray_norm).clamp(0.0, 1.0);
         }
     }
 
@@ -685,6 +841,35 @@ pub fn plan_rec_batches(sizes: &[(f32, f32)], batch_num: usize, default_wh_ratio
     }
 }
 
+/// Group LineNet recognition crop indices into batches of identical target width.
+///
+/// Right-padding shorter crops would alter the patch-embedding border of the padded
+/// samples, so only exact-width crops share a batch and results match single-crop runs.
+pub fn plan_linenet_rec_batches(target_widths: &[usize], batch_num: usize) -> Vec<Vec<usize>> {
+    let n = target_widths.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let batch_cap = batch_num.max(1);
+
+    let mut sorted: Vec<usize> = (0..n).collect();
+    sorted.sort_by_key(|&idx| (target_widths[idx], idx));
+
+    let mut batches: Vec<Vec<usize>> = Vec::new();
+    let mut current_w = 0usize;
+    for idx in sorted {
+        let w = target_widths[idx];
+        match batches.last_mut() {
+            Some(last) if w == current_w && last.len() < batch_cap => last.push(idx),
+            _ => {
+                current_w = w;
+                batches.push(vec![idx]);
+            }
+        }
+    }
+    batches
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -698,6 +883,41 @@ mod tests {
         assert_eq!(plan.batches[0].indices, vec![2, 0]);
         assert_eq!(plan.batches[1].indices, vec![1]);
         assert_eq!(plan.batches[1].max_wh_ratio, 6.0);
+    }
+
+    #[test]
+    fn test_plan_linenet_rec_batches_groups_exact_widths() {
+        let widths = vec![640, 80, 80, 88, 640, 80, 1280];
+        let batches = plan_linenet_rec_batches(&widths, 2);
+        assert_eq!(
+            batches,
+            vec![vec![1, 2], vec![5], vec![3], vec![0, 4], vec![6]]
+        );
+        assert_eq!(plan_linenet_rec_batches(&widths, 1).len(), widths.len());
+    }
+
+    #[test]
+    fn test_preprocess_rgba_raw_matches_sample_bilinear() {
+        let orig_w = 37usize;
+        let orig_h = 23usize;
+        let rgba: Vec<u8> = (0..orig_w * orig_h * 4)
+            .map(|i| ((i * 73 + 19) % 256) as u8)
+            .collect();
+        let mean = [0.485, 0.456, 0.406];
+        let std = [0.229, 0.224, 0.225];
+        let (got, tw, th, sw, sh) =
+            DetPreProcess::preprocess_rgba_raw(&rgba, orig_w, orig_h, 64, "max", mean, std);
+        for ty in 0..th {
+            let sy = ((ty as f32 + 0.5) / sh - 0.5).clamp(0.0, (orig_h - 1) as f32);
+            for tx in 0..tw {
+                let sx = ((tx as f32 + 0.5) / sw - 0.5).clamp(0.0, (orig_w - 1) as f32);
+                let (r, g, b) = image::sample_bilinear(&rgba, orig_w, orig_h, sx, sy);
+                let idx = ty * tw + tx;
+                assert!((got[idx] - (b / 255.0 - mean[0]) / std[0]).abs() < 1e-5);
+                assert!((got[th * tw + idx] - (g / 255.0 - mean[1]) / std[1]).abs() < 1e-5);
+                assert!((got[2 * th * tw + idx] - (r / 255.0 - mean[2]) / std[2]).abs() < 1e-5);
+            }
+        }
     }
 }
 
