@@ -122,6 +122,36 @@ pub fn preprocess_orient_image(
     Ok(arr.insert_axis(ndarray::Axis(0)))
 }
 
+/// Resize and convert to single-channel ink map for Indra orientation classification.
+pub fn preprocess_indra_orient_image(
+    image: &Mat,
+    target_side: i32,
+) -> Result<Array4<f32>, CoreError> {
+    let side = target_side.max(1);
+    let max_dim = (image.cols().max(image.rows())) as f32;
+    let s = side as f32 / max_dim;
+    let new_w = (image.cols() as f32 * s).round().max(1.0) as i32;
+    let new_h = (image.rows() as f32 * s).round().max(1.0) as i32;
+
+    let mut resized = Mat::default();
+    image::resize(image, &mut resized, Size::new(new_w, new_h), INTER_LINEAR)?;
+
+    let side_usize = side as usize;
+    let mut data = vec![0.0f32; side_usize * side_usize];
+
+    for y in 0..new_h as usize {
+        for x in 0..new_w as usize {
+            let px = resized.get_pixel(x as u32, y as u32);
+            let gray = 0.299 * px[0] as f32 + 0.587 * px[1] as f32 + 0.114 * px[2] as f32;
+            data[y * side_usize + x] = 1.0 - (gray / 255.0);
+        }
+    }
+
+    let arr = Array3::from_shape_vec((1, side_usize, side_usize), data)
+        .map_err(|e| CoreError::Preprocess(e.to_string()))?;
+    Ok(arr.insert_axis(ndarray::Axis(0)))
+}
+
 /// Postprocess model output logits into an orientation and confidence score.
 pub fn postprocess_orient_logits(logits: &[f32]) -> Result<(Orientation, f32), CoreError> {
     if logits.is_empty() {

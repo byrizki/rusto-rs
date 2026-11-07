@@ -20,7 +20,9 @@ use crate::layout::{
     postprocess_picodet, preprocess_layout_image, resolve_layout_target_dimensions, LayoutRegion,
     PicoDetInput,
 };
-use crate::orient::{postprocess_orient_tensor, preprocess_orient_image, Orientation};
+use crate::orient::{
+    postprocess_orient_tensor, preprocess_indra_orient_image, preprocess_orient_image, Orientation,
+};
 use crate::postprocess::{decode_det_predictions, sort_det_boxes};
 use crate::preprocess::{
     calculate_linenet_rec_target_widths, plan_rec_batches, prepare_det_input,
@@ -271,9 +273,14 @@ impl OcrPipeline {
         if global.use_orient && self.orient.is_some() {
             if let Some(orient_session) = &mut self.orient {
                 let start_orient = Instant::now();
-                let [_, h, w] = [3, 48, 192];
-                let input_tensor = preprocess_orient_image(&working_img, w, h, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])?;
-                let output = orient_session.run(input_tensor.into_dyn())?;
+                let output = if orient_session.input_channels() == 1 {
+                    let input_tensor = preprocess_indra_orient_image(&working_img, 768)?;
+                    orient_session.run(input_tensor.into_dyn())?
+                } else {
+                    let [_, h, w] = [3, 48, 192];
+                    let input_tensor = preprocess_orient_image(&working_img, w, h, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])?;
+                    orient_session.run(input_tensor.into_dyn())?
+                };
                 let (det_orientation, conf) = postprocess_orient_tensor(&output)?;
                 elapse_orient = start_orient.elapsed().as_secs_f64();
 

@@ -44,7 +44,6 @@ pub fn load_mnn(slice: &[u8]) -> Result<Graph, MnnError> {
                     input_names.push(name.to_string());
                 }
                 if let Some(inp) = op.main_as_input() {
-                    println!("MNN INPUT: name={:?}, dtype={:?}", op.name(), inp.dtype());
                     if let Some(dims) = inp.dims() {
                         if dims.len() >= 2 {
                             let c = dims.get(1);
