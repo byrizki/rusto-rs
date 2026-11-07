@@ -2,7 +2,7 @@ import 'package:rusto/rusto.dart';
 
 void main() {
   final engine = RustO.initialize();
-  print('RustO Engine version: ${engine.version()}');
+  print('RustO Engine version: ${RustO.version()}');
 
   final result = engine
       .detectTextBuilder()

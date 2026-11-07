@@ -20,3 +20,7 @@ flutter:
         pluginClass: RustOPlugin
       ios:
         pluginClass: RustOPlugin
+
+dependency_overrides:
+  rusto:
+    path: ../dart
