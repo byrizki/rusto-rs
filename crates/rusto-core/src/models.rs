@@ -371,8 +371,8 @@ pub fn find_in_model_dir(dir: &Path, kind: &str) -> Option<PathBuf> {
 
 pub fn resolve_default_model_dir_asset(dir: &Path, kind: &str, filename: &str) -> PathBuf {
     let default_name = match kind {
-        "det" => "det.rten",
-        "rec" => "rec.rten",
+        "det" => "det.mnn",
+        "rec" => "rec.mnn",
         "dict" => {
             if filename.ends_with(".json") {
                 "meta.json"
@@ -380,11 +380,11 @@ pub fn resolve_default_model_dir_asset(dir: &Path, kind: &str, filename: &str) -
                 "dict.txt"
             }
         }
-        "cls" => "cls.rten",
-        "orient" => "orient.rten",
-        "unwarp" => "uvdoc.rten",
-        "layout" => "layout_cdla.rten",
-        "order" => "indra_order.rten",
+        "cls" => "cls.mnn",
+        "orient" => "orient.mnn",
+        "unwarp" => "uvdoc.mnn",
+        "layout" => "layout_cdla.mnn",
+        "order" => "indra_order.mnn",
         _ => filename,
     };
     dir.join(default_name)
