@@ -193,6 +193,7 @@ pub struct Graph {
     pub input_names: Vec<String>,
     pub output_names: Vec<String>,
     pub input_channels: usize,
+    pub last_use: Vec<usize>,
 }
 
 impl Graph {
@@ -203,12 +204,15 @@ impl Graph {
         output_names: Vec<String>,
         input_channels: usize,
     ) -> Self {
-        Self {
+        let mut graph = Self {
             nodes,
             tensor_names,
             input_names,
             output_names,
             input_channels,
-        }
+            last_use: Vec::new(),
+        };
+        super::optimize::optimize_graph(&mut graph);
+        graph
     }
 }

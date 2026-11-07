@@ -213,6 +213,87 @@ pub unsafe fn softmax_row_avx512(in_row: &[f32], out_row: &mut [f32]) {
     }
 }
 
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[inline(always)]
+unsafe fn exp_approx_wasm(x: core::arch::wasm32::v128) -> core::arch::wasm32::v128 {
+    use core::arch::wasm32::*;
+
+    let min_x = f32x4_splat(-87.33654f32);
+    let max_x = f32x4_splat(88.722839f32);
+    let underflow_mask = f32x4_ge(x, min_x);
+    let xc = f32x4_pmin(f32x4_pmax(x, min_x), max_x);
+
+    let log2_e = f32x4_splat(1.4426950408889634f32);
+    let k = f32x4_nearest(f32x4_mul(xc, log2_e));
+    let f = f32x4_sub(f32x4_mul(xc, log2_e), k);
+
+    let c1 = f32x4_splat(0.69314718056f32);
+    let c2 = f32x4_splat(0.24022650696f32);
+    let c3 = f32x4_splat(0.05550410866f32);
+    let c4 = f32x4_splat(0.00961812911f32);
+    let c5 = f32x4_splat(0.00133335581f32);
+
+    let mut p = f32x4_add(f32x4_mul(c5, f), c4);
+    p = f32x4_add(f32x4_mul(p, f), c3);
+    p = f32x4_add(f32x4_mul(p, f), c2);
+    p = f32x4_add(f32x4_mul(p, f), c1);
+    p = f32x4_add(f32x4_mul(p, f), f32x4_splat(1.0f32));
+
+    let k_i = i32x4_trunc_sat_f32x4(k);
+    let pow2_k = i32x4_shl(i32x4_add(k_i, i32x4_splat(127)), 23);
+
+    v128_and(f32x4_mul(p, pow2_k), underflow_mask)
+}
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+pub unsafe fn softmax_row_wasm(in_row: &[f32], out_row: &mut [f32]) {
+    use core::arch::wasm32::*;
+
+    let len = in_row.len();
+    let chunks = len / 4;
+    let in_ptr = in_row.as_ptr();
+    let out_ptr = out_row.as_mut_ptr();
+
+    let mut max_vec = f32x4_splat(f32::NEG_INFINITY);
+    for i in 0..chunks {
+        max_vec = f32x4_pmax(max_vec, v128_load(in_ptr.add(i * 4) as *const v128));
+    }
+    let mut max_val = f32x4_extract_lane::<0>(max_vec)
+        .max(f32x4_extract_lane::<1>(max_vec))
+        .max(f32x4_extract_lane::<2>(max_vec))
+        .max(f32x4_extract_lane::<3>(max_vec));
+    for i in (chunks * 4)..len {
+        max_val = max_val.max(*in_ptr.add(i));
+    }
+    let max_v = f32x4_splat(max_val);
+
+    let mut sum_vec = f32x4_splat(0.0);
+    for i in 0..chunks {
+        let v = v128_load(in_ptr.add(i * 4) as *const v128);
+        let e = exp_approx_wasm(f32x4_sub(v, max_v));
+        v128_store(out_ptr.add(i * 4) as *mut v128, e);
+        sum_vec = f32x4_add(sum_vec, e);
+    }
+    let mut sum_exp = (f32x4_extract_lane::<0>(sum_vec) + f32x4_extract_lane::<1>(sum_vec))
+        + (f32x4_extract_lane::<2>(sum_vec) + f32x4_extract_lane::<3>(sum_vec));
+    for i in (chunks * 4)..len {
+        let e = (*in_ptr.add(i) - max_val).exp();
+        *out_ptr.add(i) = e;
+        sum_exp += e;
+    }
+
+    let inv_sum = 1.0 / sum_exp.max(1e-12);
+    let inv_v = f32x4_splat(inv_sum);
+    for i in 0..chunks {
+        let e = v128_load(out_ptr.add(i * 4) as *const v128);
+        v128_store(out_ptr.add(i * 4) as *mut v128, f32x4_mul(e, inv_v));
+    }
+    for i in (chunks * 4)..len {
+        *out_ptr.add(i) *= inv_sum;
+    }
+}
+
 pub fn softmax_row(in_row: &[f32], out_row: &mut [f32]) {
     #[cfg(target_arch = "x86_64")]
     {
@@ -229,6 +310,14 @@ pub fn softmax_row(in_row: &[f32], out_row: &mut [f32]) {
             }
         }
     }
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        unsafe {
+            softmax_row_wasm(in_row, out_row);
+            return;
+        }
+    }
+    #[allow(unreachable_code)]
     softmax_row_scalar(in_row, out_row);
 }
 
@@ -322,7 +411,108 @@ pub fn log_softmax_row_scalar(in_row: &[f32], out_row: &mut [f32]) {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn log_softmax_row_avx2(in_row: &[f32], out_row: &mut [f32]) {
+    let len = in_row.len();
+    let chunks = len / 8;
+    let in_ptr = in_row.as_ptr();
+    let out_ptr = out_row.as_mut_ptr();
+
+    let mut max_vec = _mm256_set1_ps(f32::NEG_INFINITY);
+    for i in 0..chunks {
+        max_vec = _mm256_max_ps(max_vec, _mm256_loadu_ps(in_ptr.add(i * 8)));
+    }
+    let mut max_val = hmax_avx2(max_vec);
+    for i in (chunks * 8)..len {
+        max_val = max_val.max(*in_ptr.add(i));
+    }
+    let max_v = _mm256_set1_ps(max_val);
+
+    let mut sum_vec = _mm256_setzero_ps();
+    for i in 0..chunks {
+        let v = _mm256_loadu_ps(in_ptr.add(i * 8));
+        sum_vec = _mm256_add_ps(sum_vec, exp_approx_avx2(_mm256_sub_ps(v, max_v)));
+    }
+    let mut sum_exp = hsum_avx2(sum_vec);
+    for i in (chunks * 8)..len {
+        sum_exp += (*in_ptr.add(i) - max_val).exp();
+    }
+
+    let log_sum_exp = max_val + sum_exp.max(1e-12).ln();
+    let lse_v = _mm256_set1_ps(log_sum_exp);
+    for i in 0..chunks {
+        let v = _mm256_loadu_ps(in_ptr.add(i * 8));
+        _mm256_storeu_ps(out_ptr.add(i * 8), _mm256_sub_ps(v, lse_v));
+    }
+    for i in (chunks * 8)..len {
+        *out_ptr.add(i) = *in_ptr.add(i) - log_sum_exp;
+    }
+}
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+unsafe fn log_softmax_row_wasm(in_row: &[f32], out_row: &mut [f32]) {
+    use core::arch::wasm32::*;
+
+    let len = in_row.len();
+    let chunks = len / 4;
+    let in_ptr = in_row.as_ptr();
+    let out_ptr = out_row.as_mut_ptr();
+
+    let mut max_vec = f32x4_splat(f32::NEG_INFINITY);
+    for i in 0..chunks {
+        max_vec = f32x4_pmax(max_vec, v128_load(in_ptr.add(i * 4) as *const v128));
+    }
+    let mut max_val = f32x4_extract_lane::<0>(max_vec)
+        .max(f32x4_extract_lane::<1>(max_vec))
+        .max(f32x4_extract_lane::<2>(max_vec))
+        .max(f32x4_extract_lane::<3>(max_vec));
+    for i in (chunks * 4)..len {
+        max_val = max_val.max(*in_ptr.add(i));
+    }
+    let max_v = f32x4_splat(max_val);
+
+    let mut sum_vec = f32x4_splat(0.0);
+    for i in 0..chunks {
+        let v = v128_load(in_ptr.add(i * 4) as *const v128);
+        sum_vec = f32x4_add(sum_vec, exp_approx_wasm(f32x4_sub(v, max_v)));
+    }
+    let mut sum_exp = (f32x4_extract_lane::<0>(sum_vec) + f32x4_extract_lane::<1>(sum_vec))
+        + (f32x4_extract_lane::<2>(sum_vec) + f32x4_extract_lane::<3>(sum_vec));
+    for i in (chunks * 4)..len {
+        sum_exp += (*in_ptr.add(i) - max_val).exp();
+    }
+
+    let log_sum_exp = max_val + sum_exp.max(1e-12).ln();
+    let lse_v = f32x4_splat(log_sum_exp);
+    for i in 0..chunks {
+        let v = v128_load(in_ptr.add(i * 4) as *const v128);
+        v128_store(out_ptr.add(i * 4) as *mut v128, f32x4_sub(v, lse_v));
+    }
+    for i in (chunks * 4)..len {
+        *out_ptr.add(i) = *in_ptr.add(i) - log_sum_exp;
+    }
+}
+
 pub fn log_softmax_row(in_row: &[f32], out_row: &mut [f32]) {
+    #[cfg(target_arch = "x86_64")]
+    {
+        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            unsafe {
+                log_softmax_row_avx2(in_row, out_row);
+                return;
+            }
+        }
+    }
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        unsafe {
+            log_softmax_row_wasm(in_row, out_row);
+            return;
+        }
+    }
+    #[allow(unreachable_code)]
     log_softmax_row_scalar(in_row, out_row);
 }
 
@@ -441,6 +631,22 @@ pub fn argmax(
 
     assert!(out_indices.len() >= outer_size * inner_size);
 
+    if inner_size == 1 {
+        for outer in 0..outer_size {
+            let row = &input[outer * axis_size..(outer + 1) * axis_size];
+            let mut max_val = f32::NEG_INFINITY;
+            let mut max_idx = 0i32;
+            for (a, &v) in row.iter().enumerate() {
+                if v > max_val {
+                    max_val = v;
+                    max_idx = a as i32;
+                }
+            }
+            out_indices[outer] = max_idx;
+        }
+        return;
+    }
+
     for outer in 0..outer_size {
         for inner in 0..inner_size {
             let mut max_val = f32::NEG_INFINITY;
@@ -469,30 +675,90 @@ pub fn topk(
     out_values: &mut [f32],
     out_indices: &mut [i32],
 ) {
+    if k == 0 || k_dim == 0 || outer_size == 0 {
+        return;
+    }
     assert!(out_values.len() >= outer_size * k);
     assert!(out_indices.len() >= outer_size * k);
 
+    let k_eff = k.min(k_dim);
+
+    if k_eff == 1 {
+        for outer in 0..outer_size {
+            let slice = &input[outer * k_dim..(outer + 1) * k_dim];
+            let mut best_val = slice[0];
+            let mut best_idx = 0i32;
+            for (i, &v) in slice.iter().enumerate().skip(1) {
+                if v > best_val {
+                    best_val = v;
+                    best_idx = i as i32;
+                }
+            }
+            out_values[outer * k] = best_val;
+            out_indices[outer * k] = best_idx;
+        }
+        return;
+    }
+
+    if k_eff <= 8 {
+        for outer in 0..outer_size {
+            let slice = &input[outer * k_dim..(outer + 1) * k_dim];
+            let val_slice = &mut out_values[outer * k..(outer + 1) * k];
+            let idx_slice = &mut out_indices[outer * k..(outer + 1) * k];
+
+            let mut top_v = [f32::NEG_INFINITY; 8];
+            let mut top_i = [0i32; 8];
+
+            for (i, &v) in slice.iter().enumerate().take(k_eff) {
+                let mut pos = i;
+                while pos > 0 && v > top_v[pos - 1] {
+                    top_v[pos] = top_v[pos - 1];
+                    top_i[pos] = top_i[pos - 1];
+                    pos -= 1;
+                }
+                top_v[pos] = v;
+                top_i[pos] = i as i32;
+            }
+
+            let mut min_top = top_v[k_eff - 1];
+            for (i, &v) in slice.iter().enumerate().skip(k_eff) {
+                if v > min_top {
+                    let mut pos = k_eff - 1;
+                    while pos > 0 && v > top_v[pos - 1] {
+                        top_v[pos] = top_v[pos - 1];
+                        top_i[pos] = top_i[pos - 1];
+                        pos -= 1;
+                    }
+                    top_v[pos] = v;
+                    top_i[pos] = i as i32;
+                    min_top = top_v[k_eff - 1];
+                }
+            }
+
+            val_slice[..k_eff].copy_from_slice(&top_v[..k_eff]);
+            idx_slice[..k_eff].copy_from_slice(&top_i[..k_eff]);
+        }
+        return;
+    }
+
+    let mut pairs: Vec<(f32, i32)> = Vec::with_capacity(k_dim);
     for outer in 0..outer_size {
         let slice = &input[outer * k_dim..(outer + 1) * k_dim];
         let val_slice = &mut out_values[outer * k..(outer + 1) * k];
         let idx_slice = &mut out_indices[outer * k..(outer + 1) * k];
 
-        // For small K (typical in OCR: k=1 or k=5), simple selection sort is fastest
-        let mut pairs: Vec<(f32, i32)> = slice
-            .iter()
-            .enumerate()
-            .map(|(i, &v)| (v, i as i32))
-            .collect();
+        pairs.clear();
+        pairs.extend(slice.iter().enumerate().map(|(i, &v)| (v, i as i32)));
 
-        pairs.select_nth_unstable_by(k - 1, |a, b| {
+        pairs.select_nth_unstable_by(k_eff - 1, |a, b| {
             b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        pairs[..k].sort_unstable_by(|a, b| {
+        pairs[..k_eff].sort_unstable_by(|a, b| {
             b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        for i in 0..k {
+        for i in 0..k_eff {
             val_slice[i] = pairs[i].0;
             idx_slice[i] = pairs[i].1;
         }
@@ -551,6 +817,33 @@ mod tests {
                         "AVX2 mismatch at {}: scalar={}, avx2={}, diff={}",
                         i, out_scalar[i], out_256[i], diff
                     );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_topk_fast_paths() {
+        let outer = 4;
+        let k_dim = 257;
+        let mut input = vec![0.0f32; outer * k_dim];
+        for (i, v) in input.iter_mut().enumerate() {
+            *v = ((i * 37) % 101) as f32 * 0.13 - 6.5 + (i as f32) * 1e-5;
+        }
+
+        for k in [1usize, 5, 8, 12] {
+            let mut vals = vec![0.0f32; outer * k];
+            let mut idxs = vec![0i32; outer * k];
+            topk(&input, outer, k_dim, k, &mut vals, &mut idxs);
+
+            for o in 0..outer {
+                let row = &input[o * k_dim..(o + 1) * k_dim];
+                let mut expected: Vec<(f32, i32)> =
+                    row.iter().enumerate().map(|(i, &v)| (v, i as i32)).collect();
+                expected.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+                for j in 0..k {
+                    assert_eq!(idxs[o * k + j], expected[j].1);
+                    assert!((vals[o * k + j] - expected[j].0).abs() < 1e-6);
                 }
             }
         }

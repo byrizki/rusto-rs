@@ -281,8 +281,9 @@ impl RtenOcrPipeline {
 
             let sh = det_outputs.shape().to_vec();
             if sh.len() >= 4 && sh[1] >= 3 {
+                let det_slice = det_outputs.as_f32_cow();
                 Ok(decode_linenet_det_boxes_slice(
-                    &det_outputs.to_f32_vec(),
+                    &det_slice,
                     sh[2],
                     sh[3],
                     orig_w as f32,
@@ -311,7 +312,7 @@ impl RtenOcrPipeline {
             let det_outputs = self.det_session.run_single(&det_tensor)
                 .map_err(|e| format!("Det inference error: {:?}", e))?;
 
-            let heat_map = det_outputs.to_f32_vec();
+            let heat_map = det_outputs.as_f32_cow();
             Ok(decode_dbnet_boxes_fast(
                 &heat_map,
                 target_w,
@@ -327,85 +328,220 @@ impl RtenOcrPipeline {
         }
     }
 
-    fn recognize_box(
+    fn recognize_boxes_batched(
         &self,
         processed_rgba: &[u8],
         orig_w: usize,
         orig_h: usize,
-        box_coords: [f32; 4],
-        det_score: f32,
-    ) -> Result<Option<TextResult>, String> {
-        let [x0, y0, x1, y1] = box_coords;
+        raw_boxes: &[([f32; 4], f32)],
+        batch_size: usize,
+    ) -> Result<Vec<TextResult>, String> {
+        if raw_boxes.is_empty() {
+            return Ok(Vec::new());
+        }
 
+        let batch_cap = batch_size.max(1);
+        let mut slot_results: Vec<Option<TextResult>> = vec![None; raw_boxes.len()];
         let rec_in_channels = self.rec_model.input_channels();
 
+        struct CropEntry {
+            orig_idx: usize,
+            box_coords: [f32; 4],
+            det_score: f32,
+            data: Option<Vec<f32>>,
+            rec_w: usize,
+            rec_h: usize,
+        }
+
         if rec_in_channels == 1 {
-            // LineNet recognition (e.g. Indra OCR)
-            let (rec_input, rec_w, rec_h) = match prepare_linenet_rec_crop_rgba(processed_rgba, orig_w, orig_h, box_coords) {
-                Some(crop) => crop,
-                None => return Ok(None),
-            };
+            let mut crops = Vec::with_capacity(raw_boxes.len());
+            for (orig_idx, &(box_coords, det_score)) in raw_boxes.iter().enumerate() {
+                if let Some((rec_input, rec_w, rec_h)) =
+                    prepare_linenet_rec_crop_rgba(processed_rgba, orig_w, orig_h, box_coords)
+                {
+                    crops.push(CropEntry {
+                        orig_idx,
+                        box_coords,
+                        det_score,
+                        data: Some(rec_input),
+                        rec_w,
+                        rec_h,
+                    });
+                }
+            }
+
+            crops.sort_by_key(|c| (c.rec_h, c.rec_w, c.orig_idx));
 
             let in_names = self.rec_model.input_names();
             let in_name0 = in_names.first().map(|s| s.as_str()).unwrap_or("x");
             let in_name1 = in_names.get(1).map(|s| s.as_str()).unwrap_or("widths");
 
-            let x_tensor = Tensor::from_floats(&[1, 1, rec_h, rec_w], rec_input, TensorLayout::NCHW);
-            let widths_tensor = Tensor::from_ints(&[1], vec![rec_w as i32]);
+            let mut i = 0;
+            while i < crops.len() {
+                let rec_h = crops[i].rec_h;
+                let rec_w = crops[i].rec_w;
+                let mut end = i + 1;
+                while end < crops.len()
+                    && end - i < batch_cap
+                    && crops[end].rec_h == rec_h
+                    && crops[end].rec_w == rec_w
+                {
+                    end += 1;
+                }
 
-            let rec_outputs = self.rec_session.run(&[
-                (in_name0, &x_tensor),
-                (in_name1, &widths_tensor),
-            ]).map_err(|e| format!("Rec inference error: {:?}", e))?;
+                let b = end - i;
+                let batch_data = if b == 1 {
+                    crops[i].data.take().unwrap_or_default()
+                } else {
+                    let mut buf = Vec::with_capacity(b * rec_h * rec_w);
+                    for item in &mut crops[i..end] {
+                        if let Some(d) = item.data.take() {
+                            buf.extend_from_slice(&d);
+                        }
+                    }
+                    buf
+                };
 
-            let ids_vec = rec_outputs.get("ids")
-                .map(|t| t.to_i32_vec())
-                .or_else(|| rec_outputs.values().next().map(|t| t.to_i32_vec()))
-                .unwrap_or_default();
-            let conf_vec = rec_outputs.get("conf")
-                .map(|t| t.to_f32_vec())
-                .or_else(|| rec_outputs.values().nth(1).map(|t| t.to_f32_vec()))
-                .unwrap_or_default();
-            let len_val = rec_outputs.get("len")
-                .or_else(|| rec_outputs.get("lengths"))
-                .and_then(|t| t.to_i32_vec().first().copied())
-                .map(|l| l as usize)
-                .or_else(|| rec_outputs.values().nth(2).and_then(|t| t.to_i32_vec().first().copied().map(|l| l as usize)))
-                .unwrap_or(ids_vec.len());
+                let x_tensor =
+                    Tensor::from_floats(&[b, 1, rec_h, rec_w], batch_data, TensorLayout::NCHW);
+                let widths_tensor = Tensor::from_ints(&[b], vec![rec_w as i32; b]);
 
-            let (trimmed, avg_conf) = match self.decoder.decode_linenet_tokens(&ids_vec, &conf_vec, len_val) {
-                Some(res) => res,
-                None => return Ok(None),
-            };
-            let text_score = composite_ocr_score(det_score, avg_conf);
+                let rec_outputs = self
+                    .rec_session
+                    .run(&[(in_name0, &x_tensor), (in_name1, &widths_tensor)])
+                    .map_err(|e| format!("Rec inference error: {:?}", e))?;
 
-            Ok(Some(TextResult::from_coords(x0, y0, x1, y1, trimmed, text_score)))
-        } else {
-            // Standard PP-OCR SVTR recognition
-            let (rec_input, rec_w, rec_h) = match prepare_ppocr_rec_crop_rgba(processed_rgba, orig_w, orig_h, box_coords) {
-                Some(crop) => crop,
-                None => return Ok(None),
-            };
+                let ids_tensor = rec_outputs
+                    .get("ids")
+                    .or_else(|| rec_outputs.values().next());
+                let conf_tensor = rec_outputs
+                    .get("conf")
+                    .or_else(|| rec_outputs.values().nth(1));
+                let len_tensor = rec_outputs
+                    .get("len")
+                    .or_else(|| rec_outputs.get("lengths"))
+                    .or_else(|| rec_outputs.values().nth(2));
 
-            let rec_tensor = Tensor::from_floats(&[1, 3, rec_h, rec_w], rec_input, TensorLayout::NCHW);
-            let rec_outputs = self.rec_session.run_single(&rec_tensor)
-                .map_err(|e| format!("Rec inference error: {:?}", e))?;
+                if let (Some(ids_t), Some(conf_t)) = (ids_tensor, conf_tensor) {
+                    let ids_vec = ids_t.to_i32_vec();
+                    let conf_cow = conf_t.as_f32_cow();
+                    let lens_vec = len_tensor.map(|t| t.to_i32_vec()).unwrap_or_default();
 
-            let sh = rec_outputs.shape().to_vec();
-            if sh.len() < 3 {
-                return Ok(None);
+                    let ids_shape = ids_t.shape();
+                    let max_len = if ids_shape.len() >= 2 {
+                        ids_shape[1]
+                    } else {
+                        ids_vec.len() / b.max(1)
+                    };
+
+                    for (local_idx, item) in crops[i..end].iter().enumerate() {
+                        let row_start = local_idx * max_len;
+                        let row_end = (row_start + max_len).min(ids_vec.len());
+                        if row_start >= row_end {
+                            continue;
+                        }
+                        let ids_row = &ids_vec[row_start..row_end];
+                        let conf_row = &conf_cow[row_start..row_end.min(conf_cow.len())];
+                        let valid_len = lens_vec
+                            .get(local_idx)
+                            .map(|&l| (l.max(0) as usize).min(ids_row.len()))
+                            .unwrap_or(ids_row.len());
+
+                        if let Some((trimmed, avg_conf)) =
+                            self.decoder.decode_linenet_tokens(ids_row, conf_row, valid_len)
+                        {
+                            let [x0, y0, x1, y1] = item.box_coords;
+                            let text_score = composite_ocr_score(item.det_score, avg_conf);
+                            slot_results[item.orig_idx] =
+                                Some(TextResult::from_coords(x0, y0, x1, y1, trimmed, text_score));
+                        }
+                    }
+                }
+
+                i = end;
             }
-            let (seq_len, num_classes) = (sh[1], sh[2]);
-            let rec_data = rec_outputs.to_f32_vec();
+        } else {
+            let mut crops = Vec::with_capacity(raw_boxes.len());
+            for (orig_idx, &(box_coords, det_score)) in raw_boxes.iter().enumerate() {
+                if let Some((rec_input, rec_w, rec_h)) =
+                    prepare_ppocr_rec_crop_rgba(processed_rgba, orig_w, orig_h, box_coords)
+                {
+                    crops.push(CropEntry {
+                        orig_idx,
+                        box_coords,
+                        det_score,
+                        data: Some(rec_input),
+                        rec_w,
+                        rec_h,
+                    });
+                }
+            }
 
-            let (trimmed, avg_conf) = match self.decoder.decode_single_crop(&rec_data, seq_len, num_classes) {
-                Some(res) => res,
-                None => return Ok(None),
-            };
-            let text_score = composite_ocr_score(det_score, avg_conf);
+            crops.sort_by_key(|c| (c.rec_h, c.rec_w, c.orig_idx));
 
-            Ok(Some(TextResult::from_coords(x0, y0, x1, y1, trimmed, text_score)))
+            let mut i = 0;
+            while i < crops.len() {
+                let rec_h = crops[i].rec_h;
+                let rec_w = crops[i].rec_w;
+                let mut end = i + 1;
+                while end < crops.len()
+                    && end - i < batch_cap
+                    && crops[end].rec_h == rec_h
+                    && crops[end].rec_w == rec_w
+                {
+                    end += 1;
+                }
+
+                let b = end - i;
+                let batch_data = if b == 1 {
+                    crops[i].data.take().unwrap_or_default()
+                } else {
+                    let mut buf = Vec::with_capacity(b * 3 * rec_h * rec_w);
+                    for item in &mut crops[i..end] {
+                        if let Some(d) = item.data.take() {
+                            buf.extend_from_slice(&d);
+                        }
+                    }
+                    buf
+                };
+
+                let rec_tensor =
+                    Tensor::from_floats(&[b, 3, rec_h, rec_w], batch_data, TensorLayout::NCHW);
+                let rec_outputs = self
+                    .rec_session
+                    .run_single(&rec_tensor)
+                    .map_err(|e| format!("Rec inference error: {:?}", e))?;
+
+                let sh = rec_outputs.shape();
+                if sh.len() >= 3 {
+                    let (seq_len, num_classes) = (sh[1], sh[2]);
+                    let stride = seq_len * num_classes;
+                    let rec_data = rec_outputs.as_f32_cow();
+
+                    for (local_idx, item) in crops[i..end].iter().enumerate() {
+                        let start = local_idx * stride;
+                        let stop = start + stride;
+                        if stop > rec_data.len() {
+                            break;
+                        }
+                        if let Some((trimmed, avg_conf)) = self.decoder.decode_single_crop(
+                            &rec_data[start..stop],
+                            seq_len,
+                            num_classes,
+                        ) {
+                            let [x0, y0, x1, y1] = item.box_coords;
+                            let text_score = composite_ocr_score(item.det_score, avg_conf);
+                            slot_results[item.orig_idx] =
+                                Some(TextResult::from_coords(x0, y0, x1, y1, trimmed, text_score));
+                        }
+                    }
+                }
+
+                i = end;
+            }
         }
+
+        Ok(slot_results.into_iter().flatten().collect())
     }
 
     /// Run full OCR pipeline directly in WebAssembly with calibrated image optimization
@@ -445,12 +581,7 @@ impl RtenOcrPipeline {
             max_side_len,
         )?;
 
-        let mut results = Vec::new();
-        for (box_coords, det_score) in raw_boxes {
-            if let Some(res) = self.recognize_box(&processed_rgba, orig_w, orig_h, box_coords, det_score)? {
-                results.push(res);
-            }
-        }
+        let results = self.recognize_boxes_batched(&processed_rgba, orig_w, orig_h, &raw_boxes, 8)?;
 
         serde_json::to_string(&results).map_err(|e| format!("Serialization error: {:?}", e))
     }
@@ -578,14 +709,18 @@ impl RtenOcrPipeline {
             .and_then(|p| p.score_threshold)
             .unwrap_or(0.5);
 
-        let mut recognized: Vec<TextResult> = Vec::new();
-        for (box_coords, det_score) in raw_boxes {
-            if let Some(res) = self.recognize_box(&processed_rgba, orig_w, orig_h, box_coords, det_score)? {
-                if res.score >= score_thresh {
-                    recognized.push(res);
-                }
-            }
-        }
+        let batch_size = options
+            .recognition
+            .as_ref()
+            .and_then(|r| r.batch_size)
+            .unwrap_or(8)
+            .max(1) as usize;
+
+        let recognized: Vec<TextResult> = self
+            .recognize_boxes_batched(&processed_rgba, orig_w, orig_h, &raw_boxes, batch_size)?
+            .into_iter()
+            .filter(|res| res.score >= score_thresh)
+            .collect();
 
         let line_y = options.pre_recognition.as_ref().and_then(|pr| pr.line_y_threshold);
         let word_x = options.pre_recognition.as_ref().and_then(|pr| pr.word_x_threshold);

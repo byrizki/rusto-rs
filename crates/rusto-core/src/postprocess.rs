@@ -495,6 +495,7 @@ pub fn decode_dbnet_boxes_fast(
 ) -> Vec<([f32; 4], f32)> {
     let mut raw_boxes = Vec::new();
     let mut visited = vec![false; target_w * target_h];
+    let mut queue = std::collections::VecDeque::with_capacity(256);
 
     for y in 0..target_h {
         for x in 0..target_w {
@@ -503,7 +504,7 @@ pub fn decode_dbnet_boxes_fast(
                 continue;
             }
 
-            let mut queue = std::collections::VecDeque::new();
+            queue.clear();
             queue.push_back((x, y));
             visited[idx] = true;
 
@@ -595,22 +596,32 @@ pub fn decode_linenet_det_boxes_slice(
         return Vec::new();
     }
 
-    let mut prob = vec![0.0f32; plane];
-    for i in 0..plane {
-        let logit = det_data[i];
-        prob[i] = 1.0 / (1.0 + (-logit).exp());
-    }
+    let logit_guard = if det_thresh > 0.0 && det_thresh < 1.0 {
+        -((1.0 - det_thresh) / det_thresh).ln() - 1e-4
+    } else {
+        f32::NEG_INFINITY
+    };
+
+    let prob_at = |idx: usize| -> f32 {
+        let logit = det_data[idx];
+        if logit < logit_guard {
+            0.0
+        } else {
+            1.0 / (1.0 + (-logit).exp())
+        }
+    };
 
     let mut visited = vec![false; plane];
     let mut raw_boxes = Vec::new();
+    let mut queue = std::collections::VecDeque::with_capacity(256);
 
     for y in 0..out_h {
         for x in 0..out_w {
             let idx = y * out_w + x;
-            if visited[idx] || prob[idx] < det_thresh {
+            if visited[idx] || prob_at(idx) < det_thresh {
                 continue;
             }
-            let mut queue = std::collections::VecDeque::new();
+            queue.clear();
             queue.push_back((x, y));
             visited[idx] = true;
 
@@ -626,7 +637,7 @@ pub fn decode_linenet_det_boxes_slice(
                 let ys = (cy as f32 + 0.5) * 2.0;
                 sum_top += ys - det_data[plane + cidx];
                 sum_bot += ys + det_data[2 * plane + cidx];
-                sum_prob += prob[cidx];
+                sum_prob += 1.0 / (1.0 + (-det_data[cidx]).exp());
                 count += 1;
 
                 if cx < min_x { min_x = cx; }
@@ -640,7 +651,7 @@ pub fn decode_linenet_det_boxes_slice(
                 ] {
                     if nx < out_w && ny < out_h {
                         let nidx = ny * out_w + nx;
-                        if !visited[nidx] && prob[nidx] >= det_thresh {
+                        if !visited[nidx] && prob_at(nidx) >= det_thresh {
                             visited[nidx] = true;
                             queue.push_back((nx, ny));
                         }

@@ -8,6 +8,7 @@ use crate::kernels::gemm::gemm;
 
 thread_local! {
     static COL_BUF: RefCell<Vec<f32>> = const { RefCell::new(Vec::new()) };
+    static BATCH_OUT_BUF: RefCell<Vec<f32>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Configuration parameters for 2D convolution
@@ -82,6 +83,9 @@ pub fn conv2d(
 
     let expected_out_len = batch * config.out_channels * hw_out;
     assert!(output.len() >= expected_out_len, "Output buffer size too small");
+    if batch == 0 || hw_out == 0 {
+        return;
+    }
 
     // Fast path: 1x1 Pointwise Convolution (no im2col, direct continuous GEMM)
     if config.kernel_h == 1
@@ -100,6 +104,57 @@ pub fn conv2d(
         let k = config.in_channels;
         let n = hw_out;
 
+        if batch > 1 && n <= 256 && batch * n <= 4096 && m * k >= 16384 {
+            let n_total = batch * n;
+            let needed_in = k * n_total;
+            let needed_out = m * n_total;
+            COL_BUF.with(|col_cell| {
+                BATCH_OUT_BUF.with(|out_cell| {
+                    let mut col_vec = col_cell.borrow_mut();
+                    if col_vec.len() < needed_in {
+                        col_vec.resize(needed_in, 0.0);
+                    }
+                    let col_buf = &mut col_vec[..needed_in];
+
+                    let mut out_vec = out_cell.borrow_mut();
+                    if out_vec.len() < needed_out {
+                        out_vec.resize(needed_out, 0.0);
+                    }
+                    let out_buf = &mut out_vec[..needed_out];
+
+                    for b in 0..batch {
+                        let in_b = &input[b * k * n..(b + 1) * k * n];
+                        for c in 0..k {
+                            col_buf[c * n_total + b * n..c * n_total + (b + 1) * n]
+                                .copy_from_slice(&in_b[c * n..(c + 1) * n]);
+                        }
+                    }
+
+                    gemm(
+                        m,
+                        n_total,
+                        k,
+                        weight,
+                        col_buf,
+                        out_buf,
+                        1.0,
+                        0.0,
+                        bias,
+                        config.activation,
+                    );
+
+                    for c in 0..m {
+                        let src_c = &out_buf[c * n_total..(c + 1) * n_total];
+                        for b in 0..batch {
+                            output[(b * m + c) * n..(b * m + c + 1) * n]
+                                .copy_from_slice(&src_c[b * n..(b + 1) * n]);
+                        }
+                    }
+                });
+            });
+            return;
+        }
+
         for b in 0..batch {
             let in_b = &input[b * k * n..(b + 1) * k * n];
             let out_b = &mut output[b * m * n..(b + 1) * m * n];
@@ -115,6 +170,69 @@ pub fn conv2d(
     let k_gemm = in_c_per_group * config.kernel_h * config.kernel_w;
     let m_gemm = out_c_per_group;
     let n_gemm = hw_out;
+
+    if batch > 1 && group == 1 && hw_out <= 256 && batch * hw_out <= 4096 && m_gemm * k_gemm >= 16384 {
+        let n_total = batch * hw_out;
+        let needed_col = k_gemm * n_total;
+        let needed_out = m_gemm * n_total;
+
+        COL_BUF.with(|col_cell| {
+            BATCH_OUT_BUF.with(|out_cell| {
+                let mut col_vec = col_cell.borrow_mut();
+                if col_vec.len() < needed_col {
+                    col_vec.resize(needed_col, 0.0);
+                }
+                let col_buf = &mut col_vec[..needed_col];
+
+                let mut out_vec = out_cell.borrow_mut();
+                if out_vec.len() < needed_out {
+                    out_vec.resize(needed_out, 0.0);
+                }
+                let out_buf = &mut out_vec[..needed_out];
+
+                for b in 0..batch {
+                    let in_batch =
+                        &input[b * config.in_channels * hw_in..(b + 1) * config.in_channels * hw_in];
+                    im2col_strided(
+                        in_batch,
+                        0,
+                        in_c_per_group,
+                        in_h,
+                        in_w,
+                        out_h,
+                        out_w,
+                        config,
+                        col_buf,
+                        n_total,
+                        b * hw_out,
+                    );
+                }
+
+                gemm(
+                    m_gemm,
+                    n_total,
+                    k_gemm,
+                    weight,
+                    col_buf,
+                    out_buf,
+                    1.0,
+                    0.0,
+                    bias,
+                    config.activation,
+                );
+
+                for c in 0..m_gemm {
+                    let src_c = &out_buf[c * n_total..(c + 1) * n_total];
+                    for b in 0..batch {
+                        output[(b * m_gemm + c) * hw_out..(b * m_gemm + c + 1) * hw_out]
+                            .copy_from_slice(&src_c[b * hw_out..(b + 1) * hw_out]);
+                    }
+                }
+            });
+        });
+        return;
+    }
+
     let needed_col_len = k_gemm * n_gemm;
 
     COL_BUF.with(|cell| {
@@ -181,6 +299,36 @@ fn im2col(
     out_w: usize,
     config: &Conv2dConfig,
     col_buf: &mut [f32],
+) {
+    let hw_out = out_h * out_w;
+    im2col_strided(
+        in_batch,
+        c_start,
+        num_channels,
+        in_h,
+        in_w,
+        out_h,
+        out_w,
+        config,
+        col_buf,
+        hw_out,
+        0,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn im2col_strided(
+    in_batch: &[f32],
+    c_start: usize,
+    num_channels: usize,
+    in_h: usize,
+    in_w: usize,
+    out_h: usize,
+    out_w: usize,
+    config: &Conv2dConfig,
+    col_buf: &mut [f32],
+    col_stride: usize,
+    col_offset: usize,
 ) {
     let hw_out = out_h * out_w;
     let hw_in = in_h * in_w;
@@ -271,7 +419,7 @@ fn im2col(
 
     #[cfg(feature = "rayon")]
     {
-        if num_channels * k_spatial >= 4 {
+        if col_stride == hw_out && col_offset == 0 && num_channels * k_spatial >= 4 {
             col_buf
                 .par_chunks_exact_mut(hw_out)
                 .enumerate()
@@ -284,7 +432,101 @@ fn im2col(
 
     let total_rows = num_channels * k_spatial;
     for row in 0..total_rows {
-        let col_row = &mut col_buf[row * hw_out..(row + 1) * hw_out];
+        let start = row * col_stride + col_offset;
+        let col_row = &mut col_buf[start..start + hw_out];
         fill_row(row, col_row);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_batched_conv2d_matches_single_batch() {
+        let batch = 5;
+        let in_c = 128;
+        let out_c = 144;
+        let in_h = 5;
+        let in_w = 7;
+
+        let input: Vec<f32> = (0..batch * in_c * in_h * in_w)
+            .map(|i| ((i * 19) % 41) as f32 * 0.05 - 1.0)
+            .collect();
+        let bias: Vec<f32> = (0..out_c).map(|i| (i as f32 - 20.0) * 0.02).collect();
+
+        let cfg_1x1 = Conv2dConfig {
+            in_channels: in_c,
+            out_channels: out_c,
+            kernel_h: 1,
+            kernel_w: 1,
+            activation: FusedActivation::Relu,
+            ..Default::default()
+        };
+        let w_1x1: Vec<f32> = (0..out_c * in_c)
+            .map(|i| ((i * 13) % 29) as f32 * 0.03 - 0.4)
+            .collect();
+        let mut out_batched = vec![0.0f32; batch * out_c * in_h * in_w];
+        conv2d(&input, batch, in_h, in_w, &w_1x1, Some(&bias), &mut out_batched, &cfg_1x1);
+
+        for b in 0..batch {
+            let mut out_single = vec![0.0f32; out_c * in_h * in_w];
+            conv2d(
+                &input[b * in_c * in_h * in_w..(b + 1) * in_c * in_h * in_w],
+                1,
+                in_h,
+                in_w,
+                &w_1x1,
+                Some(&bias),
+                &mut out_single,
+                &cfg_1x1,
+            );
+            for (j, (&got, &exp)) in out_batched[b * out_c * in_h * in_w..(b + 1) * out_c * in_h * in_w]
+                .iter()
+                .zip(out_single.iter())
+                .enumerate()
+            {
+                assert!((got - exp).abs() < 1e-5, "1x1 mismatch at b={b} j={j}: {got} vs {exp}");
+            }
+        }
+
+        let cfg_3x3 = Conv2dConfig {
+            in_channels: in_c,
+            out_channels: out_c,
+            kernel_h: 3,
+            kernel_w: 3,
+            pad_top: 1,
+            pad_bottom: 1,
+            pad_left: 1,
+            pad_right: 1,
+            activation: FusedActivation::HardSwish,
+            ..Default::default()
+        };
+        let w_3x3: Vec<f32> = (0..out_c * in_c * 9)
+            .map(|i| ((i * 7) % 31) as f32 * 0.02 - 0.3)
+            .collect();
+        let mut out_batched_3x3 = vec![0.0f32; batch * out_c * in_h * in_w];
+        conv2d(&input, batch, in_h, in_w, &w_3x3, Some(&bias), &mut out_batched_3x3, &cfg_3x3);
+
+        for b in 0..batch {
+            let mut out_single = vec![0.0f32; out_c * in_h * in_w];
+            conv2d(
+                &input[b * in_c * in_h * in_w..(b + 1) * in_c * in_h * in_w],
+                1,
+                in_h,
+                in_w,
+                &w_3x3,
+                Some(&bias),
+                &mut out_single,
+                &cfg_3x3,
+            );
+            for (j, (&got, &exp)) in out_batched_3x3[b * out_c * in_h * in_w..(b + 1) * out_c * in_h * in_w]
+                .iter()
+                .zip(out_single.iter())
+                .enumerate()
+            {
+                assert!((got - exp).abs() < 1e-5, "3x3 mismatch at b={b} j={j}: {got} vs {exp}");
+            }
+        }
     }
 }

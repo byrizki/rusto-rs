@@ -160,6 +160,104 @@ pub fn concat(
     }
 }
 
+fn copy_strided_nd(
+    input: &[f32],
+    in_shape: &[usize],
+    actual_begins: &[usize],
+    actual_steps: &[usize],
+    out_shape: &[usize],
+    out_len: usize,
+    output: &mut [f32],
+) {
+    let ndim = in_shape.len();
+    if out_len == 0 || input.is_empty() {
+        return;
+    }
+    if ndim == 0 {
+        output[0] = input[0];
+        return;
+    }
+
+    let mut in_strides = [1usize; 8];
+    let mut in_strides_vec;
+    let strides_slice: &mut [usize] = if ndim <= 8 {
+        &mut in_strides[..ndim]
+    } else {
+        in_strides_vec = vec![1usize; ndim];
+        &mut in_strides_vec
+    };
+    for i in (0..ndim.saturating_sub(1)).rev() {
+        strides_slice[i] = strides_slice[i + 1] * in_shape[i + 1];
+    }
+
+    // Copy largest contiguous trailing block when trailing axes have unit stride
+    if actual_steps[ndim - 1] == 1 {
+        let mut contig_axis = ndim - 1;
+        while contig_axis > 0
+            && actual_begins[contig_axis] == 0
+            && out_shape[contig_axis] == in_shape[contig_axis]
+            && actual_steps[contig_axis - 1] == 1
+        {
+            contig_axis -= 1;
+        }
+
+        let chunk_len = out_shape[contig_axis] * strides_slice[contig_axis];
+        let base_inner_offset = actual_begins[contig_axis] * strides_slice[contig_axis];
+
+        if contig_axis == 0 {
+            output[..chunk_len]
+                .copy_from_slice(&input[base_inner_offset..base_inner_offset + chunk_len]);
+            return;
+        }
+
+        let num_chunks = out_len / chunk_len;
+        let mut coord_arr = [0usize; 8];
+        let mut coord_vec;
+        let coord: &mut [usize] = if contig_axis <= 8 {
+            &mut coord_arr[..contig_axis]
+        } else {
+            coord_vec = vec![0usize; contig_axis];
+            &mut coord_vec
+        };
+
+        for chunk_idx in 0..num_chunks {
+            let mut in_idx = base_inner_offset;
+            for d in 0..contig_axis {
+                in_idx += (actual_begins[d] + coord[d] * actual_steps[d]) * strides_slice[d];
+            }
+            let out_start = chunk_idx * chunk_len;
+            output[out_start..out_start + chunk_len]
+                .copy_from_slice(&input[in_idx..in_idx + chunk_len]);
+
+            for d in (0..contig_axis).rev() {
+                coord[d] += 1;
+                if coord[d] < out_shape[d] {
+                    break;
+                }
+                coord[d] = 0;
+            }
+        }
+        return;
+    }
+
+    let mut coord = vec![0usize; ndim];
+    for out_idx in 0..out_len {
+        let mut in_idx = 0;
+        for d in 0..ndim {
+            in_idx += (actual_begins[d] + coord[d] * actual_steps[d]) * strides_slice[d];
+        }
+        output[out_idx] = input[in_idx];
+
+        for d in (0..ndim).rev() {
+            coord[d] += 1;
+            if coord[d] < out_shape[d] {
+                break;
+            }
+            coord[d] = 0;
+        }
+    }
+}
+
 /// TensorFlow-style Slice: begins and sizes
 pub fn slice_tf(
     input: &[f32],
@@ -175,28 +273,16 @@ pub fn slice_tf(
     let out_len: usize = sizes.iter().product();
     assert!(output.len() >= out_len);
 
-    let mut in_strides = vec![1usize; ndim];
-    for i in (0..ndim.saturating_sub(1)).rev() {
-        in_strides[i] = in_strides[i + 1] * in_shape[i + 1];
-    }
+    let unit_steps = [1usize; 8];
+    let unit_vec;
+    let steps: &[usize] = if ndim <= 8 {
+        &unit_steps[..ndim]
+    } else {
+        unit_vec = vec![1usize; ndim];
+        &unit_vec
+    };
 
-    let mut out_coord = vec![0usize; ndim];
-    for out_idx in 0..out_len {
-        let mut in_idx = 0;
-        for d in 0..ndim {
-            in_idx += (begins[d] + out_coord[d]) * in_strides[d];
-        }
-        output[out_idx] = input[in_idx];
-
-        // Advance out_coord
-        for d in (0..ndim).rev() {
-            out_coord[d] += 1;
-            if out_coord[d] < sizes[d] {
-                break;
-            }
-            out_coord[d] = 0;
-        }
-    }
+    copy_strided_nd(input, in_shape, begins, steps, sizes, out_len, output);
 }
 
 /// ScatterND updates into data tensor
@@ -363,27 +449,15 @@ pub fn strided_slice(
     output.clear();
     output.resize(out_len, 0.0);
 
-    let mut in_strides = vec![1usize; ndim];
-    for i in (0..ndim.saturating_sub(1)).rev() {
-        in_strides[i] = in_strides[i + 1] * in_shape[i + 1];
-    }
-
-    let mut coord = vec![0usize; ndim];
-    for out_idx in 0..out_len {
-        let mut in_idx = 0;
-        for d in 0..ndim {
-            in_idx += (actual_begins[d] + coord[d] * actual_steps[d]) * in_strides[d];
-        }
-        output[out_idx] = input[in_idx];
-
-        for d in (0..ndim).rev() {
-            coord[d] += 1;
-            if coord[d] < out_shape[d] {
-                break;
-            }
-            coord[d] = 0;
-        }
-    }
+    copy_strided_nd(
+        input,
+        in_shape,
+        &actual_begins,
+        &actual_steps,
+        out_shape,
+        out_len,
+        output,
+    );
 }
 
 /// Gather slices along specified axis

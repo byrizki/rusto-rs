@@ -17,6 +17,7 @@ use crate::tensor::{Tensor, TensorLayout};
 
 pub mod ir;
 pub mod loader;
+pub mod optimize;
 pub mod prepack;
 
 pub use ir::*;
@@ -110,7 +111,28 @@ thread_local! {
 pub fn alloc_tensor_buffer(len: usize) -> Vec<f32> {
     TENSOR_BUFFER_POOL.with(|cell| {
         let mut pool = cell.borrow_mut();
-        if let Some(mut buf) = pool.pop() {
+        let mut best_fit: Option<(usize, usize)> = None;
+        let mut largest: Option<(usize, usize)> = None;
+
+        for (i, buf) in pool.iter().enumerate() {
+            let cap = buf.capacity();
+            if cap >= len {
+                match best_fit {
+                    None => best_fit = Some((i, cap)),
+                    Some((_, best_cap)) if cap < best_cap => best_fit = Some((i, cap)),
+                    _ => {}
+                }
+            } else {
+                match largest {
+                    None => largest = Some((i, cap)),
+                    Some((_, max_cap)) if cap > max_cap => largest = Some((i, cap)),
+                    _ => {}
+                }
+            }
+        }
+
+        let pick = best_fit.or(largest).map(|(i, _)| pool.swap_remove(i));
+        if let Some(mut buf) = pick {
             buf.clear();
             buf.resize(len, 0.0);
             buf
@@ -122,6 +144,9 @@ pub fn alloc_tensor_buffer(len: usize) -> Vec<f32> {
 
 #[inline(always)]
 pub fn recycle_tensor_buffer(buf: Vec<f32>) {
+    if buf.capacity() == 0 {
+        return;
+    }
     TENSOR_BUFFER_POOL.with(|cell| {
         let mut pool = cell.borrow_mut();
         if pool.len() < 128 {
@@ -149,6 +174,22 @@ impl GraphContext {
             if let Some(t) = slot.take() {
                 if let Some(vec) = t.into_owned_floats() {
                     recycle_tensor_buffer(vec);
+                }
+            }
+        }
+    }
+
+    #[inline]
+    pub fn recycle_dead_inputs(&mut self, node: &Node, op_idx: usize, last_use: &[usize]) {
+        for &in_tid in &node.in_indices {
+            if in_tid < last_use.len()
+                && last_use[in_tid] == op_idx
+                && !node.out_indices.contains(&in_tid)
+            {
+                if let Some(t) = self.tensors[in_tid].take() {
+                    if let Some(vec) = t.into_owned_floats() {
+                        recycle_tensor_buffer(vec);
+                    }
                 }
             }
         }
@@ -220,7 +261,7 @@ pub fn execute_node(
 
         OpKind::ConvertTensor => {
             if !in_indices.is_empty() && !out_indices.is_empty() {
-                let src = ctx.get_tensor(in_indices[0])?.clone();
+                let src = ctx.get_tensor_mut(in_indices[0])?.share();
                 ctx.set_tensor(out_indices[0], src);
             }
             Ok(())
@@ -770,7 +811,7 @@ pub fn execute_node(
             let resolved_shape = compute_reshape_dims(in_tensor.shape(), &target_dims)
                 .map_err(MnnError::ExecutionError)?;
 
-            let mut out_t = in_tensor.clone();
+            let mut out_t = ctx.get_tensor_mut(in_indices[0])?.share();
             out_t.set_shape(&resolved_shape);
             ctx.set_tensor(out_idx, out_t);
             Ok(())
@@ -1120,7 +1161,7 @@ pub fn execute_node(
                 out_shape.push(1);
             }
 
-            let mut out_t = in_tensor.clone();
+            let mut out_t = ctx.get_tensor_mut(in_indices[0])?.share();
             out_t.set_shape(&out_shape);
             ctx.set_tensor(out_idx, out_t);
             Ok(())
@@ -1171,7 +1212,7 @@ pub fn execute_node(
                 }
             }
 
-            let mut out_t = in_tensor.clone();
+            let mut out_t = ctx.get_tensor_mut(in_indices[0])?.share();
             out_t.set_shape(&out_shape);
             ctx.set_tensor(out_idx, out_t);
             Ok(())
@@ -1184,29 +1225,44 @@ pub fn execute_node(
             let in_tensor = ctx.get_tensor(in_indices[0])?;
             let out_idx = out_indices[0];
 
-            let (scale_data, bias_data) = if in_indices.len() > 1 {
+            let (scale_cow, bias_cow) = if in_indices.len() > 1 {
                 let s_t = ctx.get_tensor(in_indices[1])?;
                 let b_t = if in_indices.len() > 2 {
-                    Some(ctx.get_tensor(in_indices[2])?.to_f32_vec())
+                    Some(ctx.get_tensor(in_indices[2])?.as_f32_cow())
                 } else {
-                    bias.clone()
+                    bias.as_ref().map(|b| std::borrow::Cow::Borrowed(b.as_slice()))
                 };
-                (s_t.to_f32_vec(), b_t)
+                (s_t.as_f32_cow(), b_t)
             } else {
-                (scale.clone(), bias.clone())
+                (
+                    std::borrow::Cow::Borrowed(scale.as_slice()),
+                    bias.as_ref().map(|b| std::borrow::Cow::Borrowed(b.as_slice())),
+                )
             };
 
             let in_shape = in_tensor.shape();
-            let channels = if in_shape.len() > 1 { in_shape[1] } else { 1 };
+            let channels = if in_shape.len() > 1 { in_shape[1].max(1) } else { 1 };
             let spatial: usize = in_shape.iter().skip(2).product::<usize>().max(1);
             let in_floats = in_tensor.as_f32_cow();
             let mut out_data = alloc_tensor_buffer(in_floats.len());
 
-            for (i, &val) in in_floats.iter().enumerate() {
+            let full_planes = in_floats.len() / spatial;
+            for bc in 0..full_planes {
+                let c = bc % channels;
+                let s = scale_cow.get(c).copied().unwrap_or(1.0);
+                let b = bias_cow.as_ref().and_then(|bs| bs.get(c).copied()).unwrap_or(0.0);
+                let start = bc * spatial;
+                let in_plane = &in_floats[start..start + spatial];
+                let out_plane = &mut out_data[start..start + spatial];
+                for i in 0..spatial {
+                    out_plane[i] = in_plane[i] * s + b;
+                }
+            }
+            for i in (full_planes * spatial)..in_floats.len() {
                 let c = (i / spatial) % channels;
-                let s = scale_data.get(c).copied().unwrap_or(1.0);
-                let b = bias_data.as_ref().and_then(|b| b.get(c).copied()).unwrap_or(0.0);
-                out_data[i] = val * s + b;
+                let s = scale_cow.get(c).copied().unwrap_or(1.0);
+                let b = bias_cow.as_ref().and_then(|bs| bs.get(c).copied()).unwrap_or(0.0);
+                out_data[i] = in_floats[i] * s + b;
             }
 
             let out_tensor = Tensor::from_floats(in_shape, out_data, in_tensor.layout());
@@ -1285,24 +1341,25 @@ pub fn execute_node(
             }
             let actual_axis = (ax as usize).min(in_shape.len());
 
-            let mut out_t = in_tensor.clone();
-            if end_ax == 0 {
+            let new_shape = if end_ax == 0 {
                 let d0: usize = in_shape[..actual_axis].iter().product::<usize>().max(1);
                 let d1: usize = in_shape[actual_axis..].iter().product::<usize>().max(1);
-                out_t.set_shape(&[d0, d1]);
+                vec![d0, d1]
             } else {
                 let end_idx = (end_ax as usize).min(in_shape.len() - 1);
-                let mut new_shape = Vec::new();
+                let mut ns = Vec::new();
                 for i in 0..actual_axis {
-                    new_shape.push(in_shape[i]);
+                    ns.push(in_shape[i]);
                 }
                 let middle: usize = in_shape[actual_axis..=end_idx].iter().product::<usize>().max(1);
-                new_shape.push(middle);
+                ns.push(middle);
                 for i in (end_idx + 1)..in_shape.len() {
-                    new_shape.push(in_shape[i]);
+                    ns.push(in_shape[i]);
                 }
-                out_t.set_shape(&new_shape);
-            }
+                ns
+            };
+            let mut out_t = ctx.get_tensor_mut(in_indices[0])?.share();
+            out_t.set_shape(&new_shape);
             ctx.set_tensor(out_idx, out_t);
             Ok(())
         }
@@ -1736,12 +1793,86 @@ pub fn execute_node(
                 out_shape[d] = c.max(t).max(f);
             }
 
-            let cond_floats = cond_tensor.to_f32_vec();
-            let true_floats = true_tensor.to_f32_vec();
-            let false_floats = false_tensor.to_f32_vec();
+            let cond_floats = cond_tensor.as_f32_cow();
+            let true_floats = true_tensor.as_f32_cow();
+            let false_floats = false_tensor.as_f32_cow();
 
             let total_len: usize = out_shape.iter().product();
-            let mut out_data = vec![0.0f32; total_len];
+            if total_len == 0 {
+                let out_tensor = Tensor::from_floats(&out_shape, Vec::new(), TensorLayout::NCHW);
+                ctx.set_tensor(out_idx, out_tensor);
+                return Ok(());
+            }
+            let mut out_data = alloc_tensor_buffer(total_len);
+
+            let t_is_scalar = true_floats.len() == 1;
+            let f_is_scalar = false_floats.len() == 1;
+            let t_matches = true_floats.len() == total_len;
+            let f_matches = false_floats.len() == total_len;
+
+            if (t_matches || t_is_scalar) && (f_matches || f_is_scalar) {
+                let cond_pad = ndim - cond_shape.len();
+                let leading_ones = out_shape[..cond_pad].iter().all(|&d| d == 1);
+                if leading_ones {
+                    let mut prefix_end = cond_shape.len();
+                    while prefix_end > 0 && cond_shape[prefix_end - 1] == 1 {
+                        prefix_end -= 1;
+                    }
+                    let prefix_matches = (0..prefix_end).all(|d| cond_shape[d] == out_shape[cond_pad + d]);
+                    if prefix_matches {
+                        let outer = cond_floats.len();
+                        let inner = total_len / outer.max(1);
+                        if outer * inner == total_len {
+                            if inner == 1 {
+                                match (t_is_scalar, f_is_scalar) {
+                                    (false, false) => {
+                                        for i in 0..total_len {
+                                            out_data[i] = if cond_floats[i] != 0.0 { true_floats[i] } else { false_floats[i] };
+                                        }
+                                    }
+                                    (true, false) => {
+                                        let tv = true_floats[0];
+                                        for i in 0..total_len {
+                                            out_data[i] = if cond_floats[i] != 0.0 { tv } else { false_floats[i] };
+                                        }
+                                    }
+                                    (false, true) => {
+                                        let fv = false_floats[0];
+                                        for i in 0..total_len {
+                                            out_data[i] = if cond_floats[i] != 0.0 { true_floats[i] } else { fv };
+                                        }
+                                    }
+                                    (true, true) => {
+                                        let tv = true_floats[0];
+                                        let fv = false_floats[0];
+                                        for i in 0..total_len {
+                                            out_data[i] = if cond_floats[i] != 0.0 { tv } else { fv };
+                                        }
+                                    }
+                                }
+                            } else {
+                                for o in 0..outer {
+                                    let dst = &mut out_data[o * inner..(o + 1) * inner];
+                                    if cond_floats[o] != 0.0 {
+                                        if t_is_scalar {
+                                            dst.fill(true_floats[0]);
+                                        } else {
+                                            dst.copy_from_slice(&true_floats[o * inner..(o + 1) * inner]);
+                                        }
+                                    } else if f_is_scalar {
+                                        dst.fill(false_floats[0]);
+                                    } else {
+                                        dst.copy_from_slice(&false_floats[o * inner..(o + 1) * inner]);
+                                    }
+                                }
+                            }
+                            let out_tensor = Tensor::from_floats(&out_shape, out_data, TensorLayout::NCHW);
+                            ctx.set_tensor(out_idx, out_tensor);
+                            return Ok(());
+                        }
+                    }
+                }
+            }
 
             let mut coord = vec![0usize; ndim];
             for i in 0..total_len {
@@ -1837,9 +1968,9 @@ pub fn execute_node(
             if in_indices.is_empty() || out_indices.is_empty() {
                 return Ok(());
             }
-            let in_tensor = ctx.get_tensor(in_indices[0])?;
             let out_idx = out_indices[0];
-            ctx.set_tensor(out_idx, in_tensor.clone());
+            let out_t = ctx.get_tensor_mut(in_indices[0])?.share();
+            ctx.set_tensor(out_idx, out_t);
             Ok(())
         }
 
@@ -1920,61 +2051,104 @@ pub fn execute_node(
                 if b_shape.len() > 1 { b_shape[b_shape.len() - 1] } else { 1 }
             };
 
-            let a_transposed: Vec<f32>;
-            let a_buf: &[f32] = if p.trans_a {
-                let mut trans = vec![0.0f32; m * k];
-                for r in 0..m {
-                    for c in 0..k {
-                        trans[r * k + c] = a_floats[c * m + r];
-                    }
-                }
-                a_transposed = trans;
-                &a_transposed
-            } else {
-                &a_floats
-            };
-
-            let b_transposed: Vec<f32>;
-            let b_buf: &[f32] = if p.trans_b {
-                let mut trans = vec![0.0f32; k * n];
-                for r in 0..k {
-                    for c in 0..n {
-                        trans[r * n + c] = b_floats[c * k + r];
-                    }
-                }
-                b_transposed = trans;
-                &b_transposed
-            } else {
-                &b_floats
-            };
-
-            let batch_dims = if a_shape.len() > 2 {
+            let a_batch_dims = if a_shape.len() > 2 {
                 &a_shape[..a_shape.len() - 2]
             } else {
                 &[]
             };
-            let batch_count: usize = batch_dims.iter().product::<usize>().max(1);
+            let b_batch_dims = if b_shape.len() > 2 {
+                &b_shape[..b_shape.len() - 2]
+            } else {
+                &[]
+            };
+            let a_batches: usize = a_batch_dims.iter().product::<usize>().max(1);
+            let b_batches: usize = b_batch_dims.iter().product::<usize>().max(1);
+            let batch_count = a_batches.max(b_batches);
+            let out_batch_dims = if a_batch_dims.len() >= b_batch_dims.len() {
+                a_batch_dims
+            } else {
+                b_batch_dims
+            };
 
-            let mut out_shape = batch_dims.to_vec();
+            let mut out_shape = out_batch_dims.to_vec();
             out_shape.push(m);
             out_shape.push(n);
 
             let mut out_data = alloc_tensor_buffer(batch_count * m * n);
-            for b_i in 0..batch_count {
-                let a_slice = &a_buf[b_i * m * k..(b_i + 1) * m * k];
-                let out_slice = &mut out_data[b_i * m * n..(b_i + 1) * m * n];
+
+            if b_batches == 1 && !p.trans_a {
+                let b_transposed: Vec<f32>;
+                let b_buf: &[f32] = if p.trans_b {
+                    let mut trans = vec![0.0f32; k * n];
+                    for r in 0..k {
+                        for c in 0..n {
+                            trans[r * n + c] = b_floats[c * k + r];
+                        }
+                    }
+                    b_transposed = trans;
+                    &b_transposed
+                } else {
+                    &b_floats[..k * n]
+                };
+
                 crate::kernels::gemm::gemm(
-                    m,
+                    batch_count * m,
                     n,
                     k,
-                    a_slice,
+                    &a_floats[..batch_count * m * k],
                     b_buf,
-                    out_slice,
+                    &mut out_data,
                     p.alpha,
                     p.beta,
                     None,
                     FusedActivation::None,
                 );
+            } else {
+                let mut a_trans = if p.trans_a { vec![0.0f32; m * k] } else { Vec::new() };
+                let mut b_trans = if p.trans_b { vec![0.0f32; k * n] } else { Vec::new() };
+
+                for b_i in 0..batch_count {
+                    let a_bi = if a_batches == 1 { 0 } else { b_i % a_batches };
+                    let b_bi = if b_batches == 1 { 0 } else { b_i % b_batches };
+                    let a_raw = &a_floats[a_bi * m * k..(a_bi + 1) * m * k];
+                    let b_raw = &b_floats[b_bi * k * n..(b_bi + 1) * k * n];
+
+                    let a_slice: &[f32] = if p.trans_a {
+                        for r in 0..m {
+                            for c in 0..k {
+                                a_trans[r * k + c] = a_raw[c * m + r];
+                            }
+                        }
+                        &a_trans
+                    } else {
+                        a_raw
+                    };
+
+                    let b_slice: &[f32] = if p.trans_b {
+                        for r in 0..k {
+                            for c in 0..n {
+                                b_trans[r * n + c] = b_raw[c * k + r];
+                            }
+                        }
+                        &b_trans
+                    } else {
+                        b_raw
+                    };
+
+                    let out_slice = &mut out_data[b_i * m * n..(b_i + 1) * m * n];
+                    crate::kernels::gemm::gemm(
+                        m,
+                        n,
+                        k,
+                        a_slice,
+                        b_slice,
+                        out_slice,
+                        p.alpha,
+                        p.beta,
+                        None,
+                        FusedActivation::None,
+                    );
+                }
             }
 
             let out_tensor = Tensor::from_floats(&out_shape, out_data, TensorLayout::NCHW);

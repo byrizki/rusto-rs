@@ -24,7 +24,6 @@ pub fn apply_activation_scalar(x: f32, act: FusedActivation) -> f32 {
         FusedActivation::HardSwish => x * ((x + 3.0) / 6.0).clamp(0.0, 1.0),
         FusedActivation::Tanh => x.tanh(),
         FusedActivation::Gelu => {
-            // Fast approximation: 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
             let x3 = x * x * x;
             let inner = 0.79788456 * (x + 0.044715 * x3);
             0.5 * x * (1.0 + inner.tanh())
@@ -48,6 +47,15 @@ pub fn apply_activation_slice(slice: &mut [f32], act: FusedActivation) {
         }
     }
 
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        unsafe {
+            apply_activation_wasm_slice(slice, act);
+            return;
+        }
+    }
+
+    #[allow(unreachable_code)]
     for v in slice.iter_mut() {
         *v = apply_activation_scalar(*v, act);
     }
@@ -127,3 +135,73 @@ unsafe fn apply_activation_avx2(slice: &mut [f32], act: FusedActivation) {
     }
 }
 
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+unsafe fn apply_activation_wasm_slice(slice: &mut [f32], act: FusedActivation) {
+    use core::arch::wasm32::*;
+
+    let len = slice.len();
+    let chunks = len / 4;
+    let ptr = slice.as_mut_ptr();
+
+    match act {
+        FusedActivation::Relu => {
+            let zero = f32x4_splat(0.0);
+            for i in 0..chunks {
+                let v = v128_load(ptr.add(i * 4) as *const v128);
+                v128_store(ptr.add(i * 4) as *mut v128, f32x4_pmax(v, zero));
+            }
+        }
+        FusedActivation::Relu6 => {
+            let zero = f32x4_splat(0.0);
+            let six = f32x4_splat(6.0);
+            for i in 0..chunks {
+                let v = v128_load(ptr.add(i * 4) as *const v128);
+                v128_store(ptr.add(i * 4) as *mut v128, f32x4_pmin(f32x4_pmax(v, zero), six));
+            }
+        }
+        FusedActivation::Clip(min, max) => {
+            let min_v = f32x4_splat(min);
+            let max_v = f32x4_splat(max);
+            for i in 0..chunks {
+                let v = v128_load(ptr.add(i * 4) as *const v128);
+                v128_store(ptr.add(i * 4) as *mut v128, f32x4_pmin(f32x4_pmax(v, min_v), max_v));
+            }
+        }
+        FusedActivation::HardSigmoid { alpha, beta } => {
+            let zero = f32x4_splat(0.0);
+            let one = f32x4_splat(1.0);
+            let alpha_v = f32x4_splat(alpha);
+            let beta_v = f32x4_splat(beta);
+            for i in 0..chunks {
+                let v = v128_load(ptr.add(i * 4) as *const v128);
+                let linear = f32x4_add(f32x4_mul(v, alpha_v), beta_v);
+                let res = f32x4_pmin(f32x4_pmax(linear, zero), one);
+                v128_store(ptr.add(i * 4) as *mut v128, res);
+            }
+        }
+        FusedActivation::HardSwish => {
+            let zero = f32x4_splat(0.0);
+            let six = f32x4_splat(6.0);
+            let three = f32x4_splat(3.0);
+            let inv_six = f32x4_splat(1.0 / 6.0);
+            for i in 0..chunks {
+                let v = v128_load(ptr.add(i * 4) as *const v128);
+                let v_p3 = f32x4_add(v, three);
+                let clamped = f32x4_pmin(f32x4_pmax(v_p3, zero), six);
+                let res = f32x4_mul(v, f32x4_mul(clamped, inv_six));
+                v128_store(ptr.add(i * 4) as *mut v128, res);
+            }
+        }
+        _ => {
+            for v in slice.iter_mut() {
+                *v = apply_activation_scalar(*v, act);
+            }
+            return;
+        }
+    }
+
+    for i in (chunks * 4)..len {
+        slice[i] = apply_activation_scalar(slice[i], act);
+    }
+}

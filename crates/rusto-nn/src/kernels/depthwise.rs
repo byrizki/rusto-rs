@@ -539,7 +539,354 @@ enum DepthwiseKernelKind {
     Avx2_5x1S1,
     #[allow(dead_code)]
     Neon_3x3S1,
+    #[allow(dead_code)]
+    Wasm_3x3S1,
+    #[allow(dead_code)]
+    Wasm_5x5S1,
+    #[allow(dead_code)]
+    Wasm_3x3Sw2,
+    #[allow(dead_code)]
+    Wasm_5x1S1,
     Fallback,
+}
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+#[inline]
+unsafe fn apply_dw_act_wasm(
+    acc: core::arch::wasm32::v128,
+    act: FusedActivation,
+) -> core::arch::wasm32::v128 {
+    use core::arch::wasm32::*;
+    match act {
+        FusedActivation::None => acc,
+        FusedActivation::Relu => f32x4_pmax(acc, f32x4_splat(0.0)),
+        FusedActivation::Relu6 => f32x4_pmin(f32x4_pmax(acc, f32x4_splat(0.0)), f32x4_splat(6.0)),
+        FusedActivation::HardSwish => {
+            let zero = f32x4_splat(0.0);
+            let six = f32x4_splat(6.0);
+            let p = f32x4_add(acc, f32x4_splat(3.0));
+            let cl = f32x4_pmin(f32x4_pmax(p, zero), six);
+            f32x4_mul(acc, f32x4_mul(cl, f32x4_splat(1.0 / 6.0)))
+        }
+        _ => {
+            let mut arr = [0.0f32; 4];
+            v128_store(arr.as_mut_ptr() as *mut v128, acc);
+            for x in &mut arr {
+                *x = apply_activation_scalar(*x, act);
+            }
+            v128_load(arr.as_ptr() as *const v128)
+        }
+    }
+}
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+unsafe fn depthwise_3x3_s1_wasm(
+    in_channel: &[f32],
+    w: &[f32],
+    bias: f32,
+    out_channel: &mut [f32],
+    in_h: usize,
+    in_w: usize,
+    out_h: usize,
+    out_w: usize,
+    config: &DepthwiseConv2dConfig,
+) {
+    use core::arch::wasm32::*;
+
+    let b_vec = f32x4_splat(bias);
+    let w00 = f32x4_splat(w[0]);
+    let w01 = f32x4_splat(w[1]);
+    let w02 = f32x4_splat(w[2]);
+    let w10 = f32x4_splat(w[3]);
+    let w11 = f32x4_splat(w[4]);
+    let w12 = f32x4_splat(w[5]);
+    let w20 = f32x4_splat(w[6]);
+    let w21 = f32x4_splat(w[7]);
+    let w22 = f32x4_splat(w[8]);
+
+    let pad_top = config.pad_top;
+    let pad_left = config.pad_left;
+    let act = config.activation;
+    let v_limit = (in_w + pad_left).saturating_sub(2).min(out_w);
+
+    for oh in 0..out_h {
+        let ih_base = oh as isize - pad_top as isize;
+        if ih_base >= 0 && ih_base + 2 < in_h as isize {
+            let ih_u = ih_base as usize;
+            let r0 = in_channel.as_ptr().add(ih_u * in_w);
+            let r1 = in_channel.as_ptr().add((ih_u + 1) * in_w);
+            let r2 = in_channel.as_ptr().add((ih_u + 2) * in_w);
+            let out_row = out_channel.as_mut_ptr().add(oh * out_w);
+
+            let ow_start = pad_left.min(out_w);
+            for ow in 0..ow_start {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                *out_row.add(ow) = apply_activation_scalar(val, act);
+            }
+
+            let mut ow = ow_start;
+            while ow + 4 <= v_limit {
+                let iw = ow - pad_left;
+                let mut acc = b_vec;
+
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r0.add(iw) as *const v128), w00));
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r0.add(iw + 1) as *const v128), w01));
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r0.add(iw + 2) as *const v128), w02));
+
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r1.add(iw) as *const v128), w10));
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r1.add(iw + 1) as *const v128), w11));
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r1.add(iw + 2) as *const v128), w12));
+
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r2.add(iw) as *const v128), w20));
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r2.add(iw + 1) as *const v128), w21));
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r2.add(iw + 2) as *const v128), w22));
+
+                v128_store(out_row.add(ow) as *mut v128, apply_dw_act_wasm(acc, act));
+                ow += 4;
+            }
+
+            while ow < out_w {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                *out_row.add(ow) = apply_activation_scalar(val, act);
+                ow += 1;
+            }
+        } else {
+            for ow in 0..out_w {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                out_channel[oh * out_w + ow] = apply_activation_scalar(val, act);
+            }
+        }
+    }
+}
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+unsafe fn depthwise_5x5_s1_wasm(
+    in_channel: &[f32],
+    w: &[f32],
+    bias: f32,
+    out_channel: &mut [f32],
+    in_h: usize,
+    in_w: usize,
+    out_h: usize,
+    out_w: usize,
+    config: &DepthwiseConv2dConfig,
+) {
+    use core::arch::wasm32::*;
+
+    let b_vec = f32x4_splat(bias);
+    let mut w_vec = [f32x4_splat(0.0); 25];
+    for i in 0..25 {
+        w_vec[i] = f32x4_splat(w[i]);
+    }
+
+    let pad_top = config.pad_top;
+    let pad_left = config.pad_left;
+    let act = config.activation;
+    let v_limit = (in_w + pad_left).saturating_sub(4).min(out_w);
+
+    for oh in 0..out_h {
+        let ih_base = oh as isize - pad_top as isize;
+        if ih_base >= 0 && ih_base + 4 < in_h as isize {
+            let ih_u = ih_base as usize;
+            let rows = [
+                in_channel.as_ptr().add(ih_u * in_w),
+                in_channel.as_ptr().add((ih_u + 1) * in_w),
+                in_channel.as_ptr().add((ih_u + 2) * in_w),
+                in_channel.as_ptr().add((ih_u + 3) * in_w),
+                in_channel.as_ptr().add((ih_u + 4) * in_w),
+            ];
+            let out_row = out_channel.as_mut_ptr().add(oh * out_w);
+
+            let ow_start = pad_left.min(out_w);
+            for ow in 0..ow_start {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                *out_row.add(ow) = apply_activation_scalar(val, act);
+            }
+
+            let mut ow = ow_start;
+            while ow + 4 <= v_limit {
+                let iw = ow - pad_left;
+                let mut acc = b_vec;
+                for (kh, &r_ptr) in rows.iter().enumerate() {
+                    let wb = kh * 5;
+                    acc = f32x4_add(acc, f32x4_mul(v128_load(r_ptr.add(iw) as *const v128), w_vec[wb]));
+                    acc = f32x4_add(acc, f32x4_mul(v128_load(r_ptr.add(iw + 1) as *const v128), w_vec[wb + 1]));
+                    acc = f32x4_add(acc, f32x4_mul(v128_load(r_ptr.add(iw + 2) as *const v128), w_vec[wb + 2]));
+                    acc = f32x4_add(acc, f32x4_mul(v128_load(r_ptr.add(iw + 3) as *const v128), w_vec[wb + 3]));
+                    acc = f32x4_add(acc, f32x4_mul(v128_load(r_ptr.add(iw + 4) as *const v128), w_vec[wb + 4]));
+                }
+                v128_store(out_row.add(ow) as *mut v128, apply_dw_act_wasm(acc, act));
+                ow += 4;
+            }
+
+            while ow < out_w {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                *out_row.add(ow) = apply_activation_scalar(val, act);
+                ow += 1;
+            }
+        } else {
+            for ow in 0..out_w {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                out_channel[oh * out_w + ow] = apply_activation_scalar(val, act);
+            }
+        }
+    }
+}
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+unsafe fn depthwise_3x3_sw2_wasm(
+    in_channel: &[f32],
+    w: &[f32],
+    bias: f32,
+    out_channel: &mut [f32],
+    in_h: usize,
+    in_w: usize,
+    out_h: usize,
+    out_w: usize,
+    config: &DepthwiseConv2dConfig,
+) {
+    use core::arch::wasm32::*;
+
+    let b_vec = f32x4_splat(bias);
+    let w00 = f32x4_splat(w[0]);
+    let w01 = f32x4_splat(w[1]);
+    let w02 = f32x4_splat(w[2]);
+    let w10 = f32x4_splat(w[3]);
+    let w11 = f32x4_splat(w[4]);
+    let w12 = f32x4_splat(w[5]);
+    let w20 = f32x4_splat(w[6]);
+    let w21 = f32x4_splat(w[7]);
+    let w22 = f32x4_splat(w[8]);
+
+    let pad_top = config.pad_top;
+    let pad_left = config.pad_left;
+    let stride_h = config.stride_h;
+    let act = config.activation;
+    let in_w_plus_pad = in_w + pad_left;
+
+    for oh in 0..out_h {
+        let ih_base = oh as isize * stride_h as isize - pad_top as isize;
+        if ih_base >= 0 && ih_base + 2 < in_h as isize {
+            let ih_u = ih_base as usize;
+            let r0 = in_channel.as_ptr().add(ih_u * in_w);
+            let r1 = in_channel.as_ptr().add((ih_u + 1) * in_w);
+            let r2 = in_channel.as_ptr().add((ih_u + 2) * in_w);
+            let out_row = out_channel.as_mut_ptr().add(oh * out_w);
+
+            let ow_start = pad_left.div_ceil(2).min(out_w);
+            for ow in 0..ow_start {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                *out_row.add(ow) = apply_activation_scalar(val, act);
+            }
+
+            let mut ow = ow_start;
+            while ow + 4 <= out_w && ow * 2 + 8 < in_w_plus_pad {
+                let iw = ow * 2 - pad_left;
+                let mut acc = b_vec;
+
+                macro_rules! accum_sw2_row {
+                    ($r:expr, $wk0:expr, $wk1:expr, $wk2:expr) => {{
+                        let v0 = v128_load($r.add(iw) as *const v128);
+                        let v1 = v128_load($r.add(iw + 4) as *const v128);
+                        let c0 = i32x4_shuffle::<0, 2, 4, 6>(v0, v1);
+                        let c1 = i32x4_shuffle::<1, 3, 5, 7>(v0, v1);
+                        let c2 = f32x4_replace_lane::<3>(i32x4_shuffle::<2, 4, 6, 6>(v0, v1), *$r.add(iw + 8));
+                        acc = f32x4_add(acc, f32x4_mul(c0, $wk0));
+                        acc = f32x4_add(acc, f32x4_mul(c1, $wk1));
+                        acc = f32x4_add(acc, f32x4_mul(c2, $wk2));
+                    }};
+                }
+
+                accum_sw2_row!(r0, w00, w01, w02);
+                accum_sw2_row!(r1, w10, w11, w12);
+                accum_sw2_row!(r2, w20, w21, w22);
+
+                v128_store(out_row.add(ow) as *mut v128, apply_dw_act_wasm(acc, act));
+                ow += 4;
+            }
+
+            while ow < out_w {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                *out_row.add(ow) = apply_activation_scalar(val, act);
+                ow += 1;
+            }
+        } else {
+            for ow in 0..out_w {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                out_channel[oh * out_w + ow] = apply_activation_scalar(val, act);
+            }
+        }
+    }
+}
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+unsafe fn depthwise_5x1_s1_wasm(
+    in_channel: &[f32],
+    w: &[f32],
+    bias: f32,
+    out_channel: &mut [f32],
+    in_h: usize,
+    in_w: usize,
+    out_h: usize,
+    out_w: usize,
+    config: &DepthwiseConv2dConfig,
+) {
+    use core::arch::wasm32::*;
+
+    let b_vec = f32x4_splat(bias);
+    let w0 = f32x4_splat(w[0]);
+    let w1 = f32x4_splat(w[1]);
+    let w2 = f32x4_splat(w[2]);
+    let w3 = f32x4_splat(w[3]);
+    let w4 = f32x4_splat(w[4]);
+
+    let pad_top = config.pad_top;
+    let act = config.activation;
+    let chunks = out_w / 4;
+
+    for oh in 0..out_h {
+        let ih_base = oh as isize - pad_top as isize;
+        if ih_base >= 0 && ih_base + 4 < in_h as isize {
+            let ih_u = ih_base as usize;
+            let r0 = in_channel.as_ptr().add(ih_u * in_w);
+            let r1 = in_channel.as_ptr().add((ih_u + 1) * in_w);
+            let r2 = in_channel.as_ptr().add((ih_u + 2) * in_w);
+            let r3 = in_channel.as_ptr().add((ih_u + 3) * in_w);
+            let r4 = in_channel.as_ptr().add((ih_u + 4) * in_w);
+            let out_row = out_channel.as_mut_ptr().add(oh * out_w);
+
+            for c_idx in 0..chunks {
+                let ow = c_idx * 4;
+                let mut acc = b_vec;
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r0.add(ow) as *const v128), w0));
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r1.add(ow) as *const v128), w1));
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r2.add(ow) as *const v128), w2));
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r3.add(ow) as *const v128), w3));
+                acc = f32x4_add(acc, f32x4_mul(v128_load(r4.add(ow) as *const v128), w4));
+                v128_store(out_row.add(ow) as *mut v128, apply_dw_act_wasm(acc, act));
+            }
+
+            for ow in (chunks * 4)..out_w {
+                let sum = bias
+                    + *r0.add(ow) * w[0]
+                    + *r1.add(ow) * w[1]
+                    + *r2.add(ow) * w[2]
+                    + *r3.add(ow) * w[3]
+                    + *r4.add(ow) * w[4];
+                *out_row.add(ow) = apply_activation_scalar(sum, act);
+            }
+        } else {
+            for ow in 0..out_w {
+                let val = eval_depthwise_pixel(in_channel, w, bias, in_h, in_w, oh, ow, config);
+                out_channel[oh * out_w + ow] = apply_activation_scalar(val, act);
+            }
+        }
+    }
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -761,6 +1108,45 @@ fn process_depthwise_channel(
         }
     }
 
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        match kernel_kind {
+            DepthwiseKernelKind::Wasm_3x3S1 => {
+                unsafe {
+                    depthwise_3x3_s1_wasm(
+                        in_channel, w_channel, b_val, out_channel, in_h, in_w, out_h, out_w, config,
+                    );
+                }
+                return;
+            }
+            DepthwiseKernelKind::Wasm_5x5S1 => {
+                unsafe {
+                    depthwise_5x5_s1_wasm(
+                        in_channel, w_channel, b_val, out_channel, in_h, in_w, out_h, out_w, config,
+                    );
+                }
+                return;
+            }
+            DepthwiseKernelKind::Wasm_3x3Sw2 => {
+                unsafe {
+                    depthwise_3x3_sw2_wasm(
+                        in_channel, w_channel, b_val, out_channel, in_h, in_w, out_h, out_w, config,
+                    );
+                }
+                return;
+            }
+            DepthwiseKernelKind::Wasm_5x1S1 => {
+                unsafe {
+                    depthwise_5x1_s1_wasm(
+                        in_channel, w_channel, b_val, out_channel, in_h, in_w, out_h, out_w, config,
+                    );
+                }
+                return;
+            }
+            _ => {}
+        }
+    }
+
     let act = config.activation;
     for oh in 0..out_h {
         for ow in 0..out_w {
@@ -817,7 +1203,29 @@ pub fn depthwise_conv2d_nchw(
                 DepthwiseKernelKind::Fallback
             }
         }
-        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+        {
+            if config.dilate_h == 1 && config.dilate_w == 1 {
+                if config.kernel_h == 3 && config.kernel_w == 3 && config.stride_h == 1 && config.stride_w == 1 {
+                    DepthwiseKernelKind::Wasm_3x3S1
+                } else if config.kernel_h == 5 && config.kernel_w == 5 && config.stride_h == 1 && config.stride_w == 1 {
+                    DepthwiseKernelKind::Wasm_5x5S1
+                } else if config.kernel_h == 3 && config.kernel_w == 3 && config.stride_w == 2 && (config.stride_h == 1 || config.stride_h == 2) {
+                    DepthwiseKernelKind::Wasm_3x3Sw2
+                } else if config.kernel_h == 5 && config.kernel_w == 1 && config.stride_h == 1 && config.stride_w == 1 && config.pad_left == 0 && config.pad_right == 0 && in_w >= out_w {
+                    DepthwiseKernelKind::Wasm_5x1S1
+                } else {
+                    DepthwiseKernelKind::Fallback
+                }
+            } else {
+                DepthwiseKernelKind::Fallback
+            }
+        }
+        #[cfg(not(any(
+            target_arch = "x86_64",
+            target_arch = "aarch64",
+            all(target_arch = "wasm32", target_feature = "simd128")
+        )))]
         {
             DepthwiseKernelKind::Fallback
         }

@@ -82,11 +82,27 @@ impl Tensor {
         }
     }
 
-    /// Extract underlying owned float buffer if not shared
+    /// Extract underlying owned float buffer if uniquely owned
     pub fn into_owned_floats(self) -> Option<Vec<f32>> {
         match self.data {
             TensorData::Float(v) => Some(v),
+            TensorData::FloatShared(arc) => Arc::try_unwrap(arc).ok(),
             _ => None,
+        }
+    }
+
+    /// Convert owned buffer storage into Arc-backed shared storage for O(1) cloning
+    pub fn into_shared(self) -> Self {
+        let data = match self.data {
+            TensorData::Float(v) => TensorData::FloatShared(Arc::new(v)),
+            TensorData::FloatShared(arc) => TensorData::FloatShared(arc),
+            TensorData::Int32(v) => TensorData::Int32Shared(Arc::new(v)),
+            TensorData::Int32Shared(arc) => TensorData::Int32Shared(arc),
+        };
+        Self {
+            data,
+            shape: self.shape,
+            layout: self.layout,
         }
     }
 

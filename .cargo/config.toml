@@ -56,3 +56,7 @@ rustflags = [
     "-C", "link-arg=-framework", "-C", "link-arg=CoreML",
     "-C", "link-arg=-framework", "-C", "link-arg=Accelerate",
 ]
+
+# WebAssembly target configuration
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+simd128"]

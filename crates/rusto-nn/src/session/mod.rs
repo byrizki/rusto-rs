@@ -118,7 +118,8 @@ impl<'a> Session<'a> {
         }
 
         // Execute operations sequentially over Graph IR
-        for (i, node) in self.model.graph().nodes.iter().enumerate() {
+        let graph = self.model.graph();
+        for (i, node) in graph.nodes.iter().enumerate() {
             if let Err(e) = execute_node(node, i, &mut *ctx) {
                 return Err(MnnError::ExecutionError(format!(
                     "Op [{:>3}] {} ({}): {}",
@@ -128,6 +129,7 @@ impl<'a> Session<'a> {
                     e
                 )));
             }
+            ctx.recycle_dead_inputs(node, i, &graph.last_use);
         }
 
         // Collect outputs
@@ -162,12 +164,14 @@ impl<'a> Session<'a> {
         }
 
         let mut op_durations: HashMap<String, (usize, std::time::Duration)> = HashMap::new();
-        for (i, node) in self.model.graph().nodes.iter().enumerate() {
+        let graph = self.model.graph();
+        for (i, node) in graph.nodes.iter().enumerate() {
             let type_name = node.op.kind_name().to_string();
             let t0 = std::time::Instant::now();
             execute_node(node, i, &mut *ctx).map_err(|e| {
                 MnnError::ExecutionError(format!("Op [{}] {}: {}", i, node.op.kind_name(), e))
             })?;
+            ctx.recycle_dead_inputs(node, i, &graph.last_use);
             let dt = t0.elapsed();
             let entry = op_durations.entry(type_name).or_insert((0, std::time::Duration::ZERO));
             entry.0 += 1;
@@ -193,13 +197,15 @@ impl<'a> Session<'a> {
         }
 
         let mut op_timings = Vec::new();
-        for (i, node) in self.model.graph().nodes.iter().enumerate() {
+        let graph = self.model.graph();
+        for (i, node) in graph.nodes.iter().enumerate() {
             let type_name = node.op.kind_name().to_string();
             let op_name = node.name.clone();
             let t0 = std::time::Instant::now();
             execute_node(node, i, &mut *ctx).map_err(|e| {
                 MnnError::ExecutionError(format!("Op [{}] {}: {}", i, node.op.kind_name(), e))
             })?;
+            ctx.recycle_dead_inputs(node, i, &graph.last_use);
             let dt = t0.elapsed();
             op_timings.push((i, type_name, op_name, dt));
         }
