@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use std::time::Instant;
-use ndarray::{Array3, ArrayD};
-use serde::{Deserialize, Serialize};
+use crate::tensor::{Array2, Array3, Array4, ArrayD, Axis};
+use nanoserde::{DeJson, SerJson};
 use crate::engine::InferenceSession;
 use crate::error::CoreError;
 use crate::image::{self, Mat, Size, INTER_LINEAR};
 use crate::types::LayoutConfig;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, DeJson, SerJson)]
 pub struct BBox {
     pub x_min: i32,
     pub y_min: i32,
@@ -57,7 +57,7 @@ impl BBox {
 }
 
 /// Layout element types
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, DeJson, SerJson)]
 pub enum LayoutType {
     Text = 0,
     Title = 1,
@@ -122,7 +122,7 @@ impl LayoutType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, DeJson, SerJson)]
 pub struct LayoutRegion {
     pub bbox: BBox,
     pub layout_type: LayoutType,
@@ -183,7 +183,7 @@ pub fn preprocess_layout_image(
     new_h: i32,
     mean: [f32; 3],
     std: [f32; 3],
-) -> Result<(ndarray::Array4<f32>, f32, f32), CoreError> {
+) -> Result<(Array4<f32>, f32, f32), CoreError> {
     let size = image.size()?;
     let (h, w) = (size.height, size.width);
 
@@ -215,30 +215,30 @@ pub fn preprocess_layout_image(
         }
     }
 
-    let arr = ndarray::Array3::from_shape_vec((3, new_h as usize, new_w as usize), data)
+    let arr = Array3::from_shape_vec((3, new_h as usize, new_w as usize), data)
         .map_err(|e| CoreError::Preprocess(e.to_string()))?;
 
-    Ok((arr.insert_axis(ndarray::Axis(0)), scale_w, scale_h))
+    Ok((arr.insert_axis(Axis(0)), scale_w, scale_h))
 }
 
 pub fn build_layout_model_inputs(
-    input_tensor: ndarray::Array4<f32>,
+    input_tensor: Array4<f32>,
     model_path: &std::path::Path,
     new_h: i32,
     new_w: i32,
     scale_h: f32,
     scale_w: f32,
-) -> Result<std::collections::HashMap<String, ndarray::ArrayD<f32>>, CoreError> {
+) -> Result<std::collections::HashMap<String, ArrayD<f32>>, CoreError> {
     let mut inputs = std::collections::HashMap::new();
     inputs.insert("image".to_string(), input_tensor.into_dyn());
 
     let p_str = model_path.to_string_lossy();
     if p_str.contains("doclayout") {
-        let im_shape = ndarray::Array2::from_shape_vec((1, 2), vec![new_h as f32, new_w as f32])
+        let im_shape = Array2::from_shape_vec((1, 2), vec![new_h as f32, new_w as f32])
             .map_err(|e| CoreError::InvalidShape(e.to_string()))?;
         inputs.insert("im_shape".to_string(), im_shape.into_dyn());
 
-        let scale_factor = ndarray::Array2::from_shape_vec((1, 2), vec![scale_h, scale_w])
+        let scale_factor = Array2::from_shape_vec((1, 2), vec![scale_h, scale_w])
             .map_err(|e| CoreError::InvalidShape(e.to_string()))?;
         inputs.insert("scale_factor".to_string(), scale_factor.into_dyn());
     }
@@ -539,7 +539,7 @@ pub fn preprocess_rtdetr(
 
     let arr = Array3::from_shape_vec((3, target, target), data)
         .map_err(|e| CoreError::Preprocess(e.to_string()))?;
-    Ok((arr.insert_axis(ndarray::Axis(0)).into_dyn(), scale, scale, orig_w, orig_h))
+    Ok((arr.insert_axis(Axis(0)).into_dyn(), scale, scale, orig_w, orig_h))
 }
 
 /// Resize and normalize an image for SLANet (488×488, [0,1] range, pure-Rust).
@@ -562,7 +562,7 @@ pub fn preprocess_slanet(image: &Mat) -> Result<ArrayD<f32>, CoreError> {
 
     let arr = Array3::from_shape_vec((3, target_h, target_w), data)
         .map_err(|e| CoreError::Preprocess(e.to_string()))?;
-    Ok(arr.insert_axis(ndarray::Axis(0)).into_dyn())
+    Ok(arr.insert_axis(Axis(0)).into_dyn())
 }
 
 /// IoU between two axis-aligned boxes `[x1,y1,x2,y2]`.
@@ -636,11 +636,7 @@ pub fn postprocess_picodet(input: PicoDetInput<'_>) -> Result<Vec<LayoutRegion>,
                 _ => continue,
             };
             if points != exp_points { continue; }
-            let cow = if let Some(s) = tensor.as_slice() {
-                std::borrow::Cow::Borrowed(s)
-            } else {
-                std::borrow::Cow::Owned(tensor.iter().copied().collect())
-            };
+            let cow = std::borrow::Cow::Borrowed(tensor.as_slice());
             if last_dim == 32 {
                 matched_boxes = Some(cow);
             } else {
@@ -827,8 +823,10 @@ pub fn postprocess_direct_layout_boxes(
             found_direct = true;
             break;
         } else if shape.len() == 3 && shape[2] == 6 {
-            let batch0 = tensor.index_axis(ndarray::Axis(0), 0);
-            for row in batch0.outer_iter() {
+            let n_boxes = shape[1];
+            let slice = tensor.as_slice();
+            for i in 0..n_boxes {
+                let row = &slice[i * 6..(i + 1) * 6];
                 raw_boxes.push([row[0], row[1], row[2], row[3], row[4], row[5]]);
             }
             found_direct = true;
@@ -943,14 +941,14 @@ impl<S: InferenceSession> LayoutDetector<S> {
         )
     }
 
-    pub fn preprocess(&self, image: &Mat) -> Result<(ndarray::Array4<f32>, f32, f32), CoreError> {
+    pub fn preprocess(&self, image: &Mat) -> Result<(Array4<f32>, f32, f32), CoreError> {
         let (new_h, new_w) = self.target_dimensions();
         preprocess_layout_image(image, new_w, new_h, self.config.mean, self.config.std)
     }
 
     pub fn postprocess(
         &self,
-        outputs: HashMap<String, ndarray::ArrayD<f32>>,
+        outputs: HashMap<String, ArrayD<f32>>,
         orig_w: i32,
         orig_h: i32,
         new_w: i32,

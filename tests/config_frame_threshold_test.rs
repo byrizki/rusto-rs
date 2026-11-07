@@ -36,8 +36,8 @@ fn test_text_result_serde() {
         layout_type: None,
     };
 
-    let json = serde_json::to_string(&result).expect("Serialize TextResult");
-    let deserialized: TextResult = serde_json::from_str(&json).expect("Deserialize TextResult");
+    let json = nanoserde::SerJson::serialize_json(&result);
+    let deserialized: TextResult = nanoserde::DeJson::deserialize_json(&json).expect("Deserialize TextResult");
 
     assert_eq!(result, deserialized);
     assert_eq!(deserialized.frame.width, 100.0);
@@ -86,7 +86,7 @@ fn test_rusto_runtime_options_are_root_level_and_serialize() {
         ..Default::default()
     };
     options.validate().expect("valid runtime options");
-    let json = serde_json::to_string(&options).expect("Serialize options");
+    let json = nanoserde::SerJson::serialize_json(&options);
     assert!(json.contains("\"postDetection\""));
     assert!(json.contains("\"minHeight\":24.0"));
     assert!(json.contains("\"detection\""));

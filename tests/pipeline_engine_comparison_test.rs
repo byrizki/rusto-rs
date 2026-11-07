@@ -498,7 +498,7 @@ fn test_debug_compare_rten_vs_rusto_nn() {
 
     // Create an input tensor simulating ink text on white background:
     // height = 96, width = 288. Background = 0.0 (no ink). Text bars = 1.0 (ink).
-    let mut x_arr = ndarray::Array4::<f32>::zeros((1, 1, 96, 288));
+    let mut x_arr = rusto_core::tensor::Array4::<f32>::zeros([1, 1, 96, 288]);
     for y in 20..76 {
         for x in (30..250).step_by(10) {
             for dx in 0..4 {

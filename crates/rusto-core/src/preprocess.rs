@@ -1,4 +1,4 @@
-use ndarray::{Array3, Array4};
+use crate::tensor::{Array2, Array3, Array4};
 use crate::error::CoreError;
 use crate::image::{self, Mat, Size, INTER_LINEAR};
 
@@ -102,7 +102,7 @@ impl DetPreProcess {
         if let Some(rgb) = img.as_dynamic().as_rgb8() {
             let raw = rgb.as_raw();
             let plane_size = h * w;
-            let out_slice = out.as_slice_mut().expect("contiguous array");
+            let out_slice = out.as_mut_slice();
             let (b_plane, rest) = out_slice.split_at_mut(plane_size);
             let (g_plane, r_plane) = rest.split_at_mut(plane_size);
             for i in 0..plane_size {
@@ -258,7 +258,7 @@ pub fn prepare_linenet_det_input(
         let row_bytes = orig_w_u * 3;
         let x_tab = build_bilinear_table(target_w, 0.0, 1.0 / scale_w, orig_w_u, 3);
         let y_tab = build_bilinear_table(target_h, 0.0, 1.0 / scale_h, orig_h_u, row_bytes);
-        let out_slice = input.as_slice_mut().expect("contiguous array");
+        let out_slice = input.as_mut_slice();
 
         const WR: f32 = 0.299 / 255.0;
         const WG: f32 = 0.587 / 255.0;
@@ -483,8 +483,8 @@ pub fn prepare_linenet_rec_crop(
     img: &Mat,
     target_h: usize,
     target_w: usize,
-) -> Result<ndarray::Array2<f32>, CoreError> {
-    let mut out = ndarray::Array2::<f32>::zeros((target_h, target_w));
+) -> Result<Array2<f32>, CoreError> {
+    let mut out = Array2::<f32>::zeros((target_h, target_w));
     let orig_w_u = img.cols().max(0) as usize;
     let orig_h_u = img.rows().max(0) as usize;
     if orig_w_u == 0 || orig_h_u == 0 || target_w == 0 || target_h == 0 {
@@ -500,7 +500,7 @@ pub fn prepare_linenet_rec_crop(
         let row_bytes = orig_w_u * 3;
         let x_tab = build_bilinear_table(target_w, 0.0, 1.0 / scale_w, orig_w_u, 3);
         let y_tab = build_bilinear_table(target_h, 0.0, 1.0 / scale_h, orig_h_u, row_bytes);
-        let out_slice = out.as_slice_mut().expect("contiguous array");
+        let out_slice = out.as_mut_slice();
 
         const WR: f32 = 0.299 / 255.0;
         const WG: f32 = 0.587 / 255.0;
@@ -636,7 +636,7 @@ pub fn resize_norm_rec_img(
     img_c: usize,
     img_h: usize,
     max_wh_ratio: f32,
-) -> Result<ndarray::Array3<f32>, CoreError> {
+) -> Result<Array3<f32>, CoreError> {
     let img_width = (img_h as f32 * max_wh_ratio).round() as i32;
 
     let h = img.rows();
@@ -669,13 +669,13 @@ pub fn resize_norm_rec_img(
     let valid_w = w2.min(target_w);
     let valid_h = h2.min(img_h);
 
-    let mut out = ndarray::Array3::<f32>::zeros((img_c, img_h, target_w));
+    let mut out = Array3::<f32>::zeros((img_c, img_h, target_w));
 
     if img_c == 3 && resized.as_dynamic().as_rgb8().is_some() {
         let rgb = resized.as_dynamic().as_rgb8().unwrap();
         let raw: &[u8] = rgb.as_raw();
         let stride = w2 * 3;
-        let out_slice = out.as_slice_mut().expect("contiguous array");
+        let out_slice = out.as_mut_slice();
         let (b_plane, rest) = out_slice.split_at_mut(plane_size);
         let (g_plane, r_plane) = rest.split_at_mut(plane_size);
 
@@ -832,9 +832,13 @@ pub fn stack_rec_batch(
     batch_img_width: usize,
 ) -> Array4<f32> {
     let n = norm_batch.len();
+    let item_len = img_c * img_h * batch_img_width;
     let mut batch = Array4::<f32>::zeros((n, img_c, img_h, batch_img_width));
+    let batch_slice = batch.as_mut_slice();
     for (i, arr) in norm_batch.iter().enumerate() {
-        batch.slice_mut(ndarray::s![i, .., .., ..]).assign(arr);
+        let src = arr.as_slice();
+        let copy_len = src.len().min(item_len);
+        batch_slice[i * item_len..i * item_len + copy_len].copy_from_slice(&src[..copy_len]);
     }
     batch
 }

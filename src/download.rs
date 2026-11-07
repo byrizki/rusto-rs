@@ -7,36 +7,115 @@ use rusto_core::models::{
     plan_assets_download, plan_pipeline_download, ModelDownloadTarget,
 };
 
+fn run_curl(url: &str, part_path: &Path) -> Result<(), String> {
+    let mut cmd = std::process::Command::new("curl");
+    cmd.arg("-fsSL")
+        .arg("-o")
+        .arg(part_path)
+        .arg(url);
+
+    match cmd.status() {
+        Ok(status) if status.success() => Ok(()),
+        Ok(status) => Err(format!("curl exited with code {}", status.code().unwrap_or(-1))),
+        Err(e) => Err(format!("failed to spawn curl: {e}")),
+    }
+}
+
+#[cfg(unix)]
+fn run_wget(url: &str, part_path: &Path) -> Result<(), String> {
+    let mut cmd = std::process::Command::new("wget");
+    cmd.arg("-q")
+        .arg("-O")
+        .arg(part_path)
+        .arg(url);
+
+    match cmd.status() {
+        Ok(status) if status.success() => Ok(()),
+        Ok(status) => Err(format!("wget exited with code {}", status.code().unwrap_or(-1))),
+        Err(e) => Err(format!("failed to spawn wget: {e}")),
+    }
+}
+
+#[cfg(windows)]
+fn run_powershell(url: &str, part_path: &Path) -> Result<(), String> {
+    let script = format!(
+        "$ProgressPreference = 'SilentlyContinue'; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('{}', '{}')",
+        url.replace('\'', "''"),
+        part_path.display().to_string().replace('\'', "''")
+    );
+    let mut cmd = std::process::Command::new("powershell");
+    cmd.args(["-NoProfile", "-NonInteractive", "-Command", &script]);
+
+    match cmd.status() {
+        Ok(status) if status.success() => Ok(()),
+        Ok(status) => Err(format!("powershell exited with code {}", status.code().unwrap_or(-1))),
+        Err(e) => Err(format!("failed to spawn powershell: {e}")),
+    }
+}
+
+fn download_native(url: &str, part_path: &Path) -> Result<(), String> {
+    match run_curl(url, part_path) {
+        Ok(()) => return Ok(()),
+        Err(curl_err) => {
+            let _ = fs::remove_file(part_path);
+
+            #[cfg(unix)]
+            {
+                if let Ok(()) = run_wget(url, part_path) {
+                    return Ok(());
+                }
+                let _ = fs::remove_file(part_path);
+            }
+
+            #[cfg(windows)]
+            {
+                if let Ok(()) = run_powershell(url, part_path) {
+                    return Ok(());
+                }
+                let _ = fs::remove_file(part_path);
+            }
+
+            Err(format!(
+                "OS native download failed ({curl_err}). Ensure 'curl' or 'wget' is installed and network connectivity is active."
+            ))
+        }
+    }
+}
+
 /// Downloads a model asset from URL directly into target file path using a temporary file.
 pub fn stream_url_to_file(
     download_url: &str,
     target_path: &Path,
     asset_filename: &str,
 ) -> Result<(), CoreError> {
-    let response = ureq::get(download_url).call().map_err(|e| {
+    if let Some(parent) = target_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+
+    let part_path = target_path.with_extension("part");
+
+    download_native(download_url, &part_path).map_err(|e| {
+        let _ = fs::remove_file(&part_path);
         CoreError::Model(format!(
             "Failed to download model '{}' from {}: {}",
             asset_filename, download_url, e
         ))
     })?;
 
-    let part_path = target_path.with_extension("part");
-    let mut file = fs::File::create(&part_path).map_err(|e| {
+    let meta = fs::metadata(&part_path).map_err(|e| {
+        let _ = fs::remove_file(&part_path);
         CoreError::Model(format!(
-            "Failed to create temporary file '{}': {}",
-            part_path.display(),
-            e
+            "Downloaded model file '{}' is inaccessible: {}",
+            asset_filename, e
         ))
     })?;
-
-    if let Err(e) = std::io::copy(&mut response.into_reader(), &mut file) {
+    if meta.len() == 0 {
         let _ = fs::remove_file(&part_path);
         return Err(CoreError::Model(format!(
-            "Network/disk write error while downloading {}: {}",
-            asset_filename, e
+            "Downloaded model file '{}' is empty (0 bytes)",
+            asset_filename
         )));
     }
-    drop(file);
 
     fs::rename(&part_path, target_path).map_err(|e| {
         let _ = fs::remove_file(&part_path);
@@ -110,6 +189,54 @@ pub fn download_asset(asset_filename: &str, target_path: &Path) -> Result<PathBu
     download_target(&target)
 }
 
+#[derive(Default, nanoserde::DeJson)]
+struct NestedSubSection {
+    enabled: Option<bool>,
+    #[nserde(rename = "use")]
+    use_flag: Option<bool>,
+}
+
+#[derive(Default, nanoserde::DeJson)]
+struct AutoDownloadMeta {
+    model: Option<String>,
+    models: Option<String>,
+    template: Option<String>,
+    lang: Option<String>,
+    #[nserde(rename = "cacheDir")]
+    cache_dir_camel: Option<String>,
+    #[nserde(rename = "cache_dir")]
+    cache_dir_snake: Option<String>,
+    #[nserde(rename = "useCls")]
+    use_cls_camel: Option<bool>,
+    #[nserde(rename = "use_cls")]
+    use_cls_snake: Option<bool>,
+    classification: Option<NestedSubSection>,
+    #[nserde(rename = "useOrient")]
+    use_orient_camel: Option<bool>,
+    #[nserde(rename = "use_orient")]
+    use_orient_snake: Option<bool>,
+    orientation: Option<NestedSubSection>,
+    #[nserde(rename = "useUnwarp")]
+    use_unwarp_camel: Option<bool>,
+    #[nserde(rename = "use_unwarp")]
+    use_unwarp_snake: Option<bool>,
+    unwarp: Option<NestedSubSection>,
+    #[nserde(rename = "useLayout")]
+    use_layout_camel: Option<bool>,
+    #[nserde(rename = "use_layout")]
+    use_layout_snake: Option<bool>,
+    layout: Option<NestedSubSection>,
+    #[nserde(rename = "layoutVariant")]
+    layout_variant_camel: Option<String>,
+    #[nserde(rename = "layout_variant")]
+    layout_variant_snake: Option<String>,
+    #[nserde(rename = "enableReadingOrder")]
+    enable_reading_order_camel: Option<bool>,
+    #[nserde(rename = "enable_reading_order")]
+    enable_reading_order_snake: Option<bool>,
+    reading_order: Option<bool>,
+}
+
 /// Parses an `InitializeConfig` from JSON, automatically downloading missing canonical model
 /// assets into the local cache directory when no explicit missing local path/directory is set.
 pub fn parse_config_with_auto_download(
@@ -125,48 +252,58 @@ pub fn parse_config_with_auto_download(
         return Err(CoreError::Model(format!("Invalid config JSON: {first_err}")));
     }
 
-    let val: serde_json::Value = serde_json::from_str(json_str)
+    let meta: AutoDownloadMeta = nanoserde::DeJson::deserialize_json(json_str)
         .map_err(|e| CoreError::Model(format!("Invalid config JSON: {e}")))?;
 
-    let str_field = |keys: &[&str]| -> Option<&str> {
-        keys.iter()
-            .find_map(|k| val.get(*k).and_then(|v| v.as_str()))
-            .filter(|s| !s.trim().is_empty())
-    };
-    let bool_field = |keys: &[&str]| -> Option<bool> {
-        keys.iter().find_map(|k| val.get(*k).and_then(|v| v.as_bool()))
-    };
-    let nested_enabled = |section: &str, top_keys: &[&str]| -> bool {
-        bool_field(top_keys)
-            .or_else(|| {
-                val.get(section)
-                    .and_then(|s| s.get("enabled").or_else(|| s.get("use")))
-                    .and_then(|v| v.as_bool())
-            })
-            .unwrap_or(false)
-    };
+    let model = meta
+        .model
+        .as_deref()
+        .or(meta.models.as_deref())
+        .or(meta.template.as_deref())
+        .filter(|s| !s.trim().is_empty());
+    let lang = meta.lang.as_deref().filter(|s| !s.trim().is_empty());
+    let cache_dir_str = meta
+        .cache_dir_camel
+        .as_deref()
+        .or(meta.cache_dir_snake.as_deref())
+        .filter(|s| !s.trim().is_empty());
+    let cache_dir = rusto_core::models::get_cache_dir(cache_dir_str.map(Path::new));
 
-    let model = str_field(&["model", "models", "template"]);
-    let lang = str_field(&["lang"]);
-    let cache_dir = rusto_core::models::get_cache_dir(
-        str_field(&["cacheDir", "cache_dir"]).map(Path::new),
-    );
-    let include_cls = nested_enabled("classification", &["useCls", "use_cls"]);
-    let include_orient = nested_enabled("orientation", &["useOrient", "use_orient"]);
-    let include_unwarp = nested_enabled("unwarp", &["useUnwarp", "use_unwarp"]);
-    let layout_variant_str = str_field(&["layoutVariant", "layout_variant"]);
-    let include_layout = nested_enabled("layout", &["useLayout", "use_layout"]) || layout_variant_str.is_some();
+    let include_cls = meta
+        .use_cls_camel
+        .or(meta.use_cls_snake)
+        .or_else(|| meta.classification.as_ref().and_then(|c| c.enabled.or(c.use_flag)))
+        .unwrap_or(false);
+    let include_orient = meta
+        .use_orient_camel
+        .or(meta.use_orient_snake)
+        .or_else(|| meta.orientation.as_ref().and_then(|c| c.enabled.or(c.use_flag)))
+        .unwrap_or(false);
+    let include_unwarp = meta
+        .use_unwarp_camel
+        .or(meta.use_unwarp_snake)
+        .or_else(|| meta.unwarp.as_ref().and_then(|c| c.enabled.or(c.use_flag)))
+        .unwrap_or(false);
+    let layout_variant_str = meta
+        .layout_variant_camel
+        .as_deref()
+        .or(meta.layout_variant_snake.as_deref());
+    let include_layout = meta
+        .use_layout_camel
+        .or(meta.use_layout_snake)
+        .or_else(|| meta.layout.as_ref().and_then(|c| c.enabled.or(c.use_flag)))
+        .unwrap_or(false)
+        || layout_variant_str.is_some();
     let layout_variant = if include_layout {
         Some(layout_variant_str.unwrap_or("cdla"))
     } else {
         None
     };
-    let include_reading_order = bool_field(&[
-        "enableReadingOrder",
-        "enable_reading_order",
-        "reading_order",
-    ])
-    .unwrap_or(false);
+    let include_reading_order = meta
+        .enable_reading_order_camel
+        .or(meta.enable_reading_order_snake)
+        .or(meta.reading_order)
+        .unwrap_or(false);
 
     download_model_pipeline(
         model,

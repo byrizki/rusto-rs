@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use ndarray::{ArrayD, IxDyn};
+use rusto::ArrayD;
 use rusto::{
     CoreError, DetectTextResult, DocUnwarper, ImageSource, InferenceSession, InitializeConfig, LayoutConfig,
     LayoutDetector, LayoutType, OcrRunOptions, RustO, UnwarpConfig,
@@ -77,14 +77,14 @@ fn test_ocr_run_options_overrides() {
         }
     }"#;
 
-    let options: OcrRunOptions = serde_json::from_str(options_json).expect("Deserialize OcrRunOptions");
+    let options: OcrRunOptions = nanoserde::DeJson::deserialize_json(options_json).expect("Deserialize OcrRunOptions");
     assert_eq!(options.line_classification, Some(true));
     assert_eq!(options.orientation_detection, Some(true));
     assert_eq!(options.auto_unwarp, Some(true));
     assert_eq!(options.layout_reading, Some(true));
     assert_eq!(options.post_recognition.as_ref().unwrap().score_threshold, Some(0.75));
 
-    let reserialized = serde_json::to_string(&options).expect("Serialize OcrRunOptions");
+    let reserialized = nanoserde::SerJson::serialize_json(&options);
     assert!(reserialized.contains("\"autoUnwarp\":true"));
     assert!(reserialized.contains("\"layoutReading\":true"));
     assert!(reserialized.contains("\"lineClassification\":true"));
@@ -102,8 +102,7 @@ impl InferenceSession for MockLayoutSession {
         for b in &self.output_boxes {
             flat.extend_from_slice(b);
         }
-        let arr = ArrayD::from_shape_vec(IxDyn(&[1, n, 6]), flat)
-            .map_err(|e| CoreError::Model(e.to_string()))?;
+        let arr = ArrayD::<f32>::from_data(&[1, n, 6], flat);
         Ok(arr)
     }
 
@@ -117,8 +116,7 @@ impl InferenceSession for MockLayoutSession {
         &mut self,
         _inputs: HashMap<String, ArrayD<f32>>,
     ) -> Result<HashMap<String, ArrayD<f32>>, CoreError> {
-        let dummy = ArrayD::from_shape_vec(IxDyn(&[1, 1, 1]), vec![0.0])
-            .map_err(|e| CoreError::Model(e.to_string()))?;
+        let dummy = ArrayD::zeros([1, 1, 1]);
         self.run_all(dummy)
     }
 
@@ -165,7 +163,6 @@ struct MockUnwarpSession;
 impl InferenceSession for MockUnwarpSession {
     fn run(&mut self, _input: ArrayD<f32>) -> Result<ArrayD<f32>, CoreError> {
         // Mock UVDoc 2D displacement field mesh [1, 2, 45, 31]
-        let shape = IxDyn(&[1, 2, 45, 31]);
         let total = 2 * 45 * 31;
         let mut grid_data = Vec::with_capacity(total);
         for c in 0..2 {
@@ -180,8 +177,7 @@ impl InferenceSession for MockUnwarpSession {
                 }
             }
         }
-        let arr = ArrayD::from_shape_vec(shape, grid_data)
-            .map_err(|e| CoreError::Model(e.to_string()))?;
+        let arr = ArrayD::<f32>::from_data(&[1, 2, 45, 31], grid_data);
         Ok(arr)
     }
 
@@ -195,8 +191,7 @@ impl InferenceSession for MockUnwarpSession {
         &mut self,
         _inputs: HashMap<String, ArrayD<f32>>,
     ) -> Result<HashMap<String, ArrayD<f32>>, CoreError> {
-        let dummy = ArrayD::from_shape_vec(IxDyn(&[1, 1, 1]), vec![0.0])
-            .map_err(|e| CoreError::Model(e.to_string()))?;
+        let dummy = ArrayD::zeros([1, 1, 1]);
         self.run_all(dummy)
     }
 

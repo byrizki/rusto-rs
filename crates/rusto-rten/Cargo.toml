@@ -11,7 +11,6 @@ categories = ["science", "computer-vision"]
 [dependencies]
 rten = { version = "0.27.0", features = ["onnx_format", "rten_format"] }
 rten-tensor = "0.27.0"
-ndarray = "0.16"
 thiserror = "1.0"
 rusto-core = { path = "../rusto-core", version = "0.4.0", default-features = false }
 

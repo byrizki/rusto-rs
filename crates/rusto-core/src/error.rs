@@ -12,6 +12,8 @@ pub enum CoreError {
     Image(String),
     #[error("Model error: {0}")]
     Model(String),
+    #[error("Config error: {0}")]
+    Config(String),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }

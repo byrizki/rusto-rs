@@ -83,7 +83,7 @@ fn rgb_matches_png_and_checks_ffi_contract() {
     assert!(ocr
         .detect_text_rgb(&padded[..padded.len() - 1], w, h, stride, &opts)
         .is_err());
-    let config_json = CString::new(serde_json::to_string(&config).unwrap()).unwrap();
+    let config_json = CString::new(config.to_json().unwrap()).unwrap();
     let options = CString::new("{}").unwrap();
     let handle = unsafe { rocr_initialize(config_json.as_ptr()) };
     assert!(!handle.is_null());

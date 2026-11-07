@@ -1,16 +1,20 @@
-use serde::{Deserialize, Serialize};
+use nanoserde::{DeJson, SerJson};
 use crate::error::CoreError;
 use crate::image::{Mat, Point2f};
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, Default, DeJson, SerJson, PartialEq)]
 pub struct CalibrationOptions {
     pub enabled: Option<bool>,
+    #[nserde(rename = "descreenBackground")]
     pub descreen_background: Option<bool>,
+    #[nserde(rename = "descreenStrength")]
     pub descreen_strength: Option<f32>,
+    #[nserde(rename = "flattenIllumination")]
     pub flatten_illumination: Option<bool>,
+    #[nserde(rename = "autoLevels")]
     pub auto_levels: Option<bool>,
     pub sharpen: Option<bool>,
+    #[nserde(rename = "redChannelContrast")]
     pub red_channel_contrast: Option<bool>,
 }
 
@@ -74,12 +78,14 @@ impl CalibrationOptions {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, Default, DeJson, SerJson, PartialEq)]
 pub struct OptimizationOptions {
     pub enabled: Option<bool>,
+    #[nserde(rename = "targetMaxSide")]
     pub target_max_side: Option<u32>,
+    #[nserde(rename = "cropPaddingX")]
     pub crop_padding_x: Option<f32>,
+    #[nserde(rename = "cropPaddingY")]
     pub crop_padding_y: Option<f32>,
 }
 

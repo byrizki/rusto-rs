@@ -10,13 +10,13 @@ fn test_calibration_options_serde() {
         .with_descreen_strength(1.25)
         .with_sharpen(true);
 
-    let json = serde_json::to_string(&calib).expect("serialize calibration options");
+    let json = nanoserde::SerJson::serialize_json(&calib);
     assert!(json.contains("\"descreenBackground\":true"));
     assert!(json.contains("\"descreenStrength\":1.25"));
     assert!(json.contains("\"sharpen\":true"));
 
     let deserialized: CalibrationOptions =
-        serde_json::from_str(&json).expect("deserialize calibration options");
+        nanoserde::DeJson::deserialize_json(&json).expect("deserialize calibration options");
     assert_eq!(deserialized.descreen_strength, Some(1.25));
     assert_eq!(deserialized.descreen_background, Some(true));
 }
@@ -27,13 +27,13 @@ fn test_optimization_options_serde() {
         .with_target_max_side(960)
         .with_crop_padding(0.06, 0.08);
 
-    let json = serde_json::to_string(&opt).expect("serialize optimization options");
+    let json = nanoserde::SerJson::serialize_json(&opt);
     assert!(json.contains("\"targetMaxSide\":960"));
     assert!(json.contains("\"cropPaddingX\":0.06"));
     assert!(json.contains("\"cropPaddingY\":0.08"));
 
     let deserialized: OptimizationOptions =
-        serde_json::from_str(&json).expect("deserialize optimization options");
+        nanoserde::DeJson::deserialize_json(&json).expect("deserialize optimization options");
     assert_eq!(deserialized.target_max_side, Some(960));
     assert_eq!(deserialized.crop_padding_x, Some(0.06));
     assert_eq!(deserialized.crop_padding_y, Some(0.08));
@@ -52,7 +52,7 @@ fn test_runtime_options_with_calibration_and_optimization() {
     };
 
     options.validate().expect("options should be valid");
-    let json = serde_json::to_string(&options).expect("serialize OcrRunOptions");
+    let json = nanoserde::SerJson::serialize_json(&options);
     assert!(json.contains("\"preDetection\""));
     assert!(json.contains("\"descreenStrength\":0.5"));
     assert!(json.contains("\"targetMaxSide\":800"));

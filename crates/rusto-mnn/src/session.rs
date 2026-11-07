@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::path::Path;
 
-use ndarray::{Array4, ArrayD, IxDyn};
+use rusto_core::tensor::{Array4, ArrayD, Tensor};
 use thiserror::Error;
 
 use crate::ffi;
@@ -22,7 +22,7 @@ pub enum MnnCppError {
     Execution(i32),
 
     #[error("Shape error: {0}")]
-    Shape(#[from] ndarray::ShapeError),
+    Shape(String),
 }
 
 pub struct MnnCppSession {
@@ -81,11 +81,7 @@ impl MnnCppSession {
             self.channels = shape[1] as usize;
         }
 
-        let slice = if let Some(s) = input.as_slice() {
-            s.to_vec()
-        } else {
-            input.iter().copied().collect()
-        };
+        let slice = input.as_slice();
 
         unsafe {
             let res = ffi::MNN_Interpreter_resizeTensor(
@@ -149,7 +145,7 @@ impl MnnCppSession {
                 return Err(MnnCppError::Tensor(format!("Get output data failed: {copy_res}")));
             }
 
-            ArrayD::from_shape_vec(IxDyn(&out_shape), out_data).map_err(MnnCppError::Shape)
+            Ok(Tensor::from_data(&out_shape, out_data))
         }
     }
 
@@ -159,11 +155,7 @@ impl MnnCppSession {
             self.channels = shape[1] as usize;
         }
 
-        let slice = if let Some(s) = input.as_slice() {
-            s.to_vec()
-        } else {
-            input.iter().copied().collect()
-        };
+        let slice = input.as_slice();
 
         unsafe {
             let res = ffi::MNN_Interpreter_resizeTensor(
@@ -226,11 +218,7 @@ impl MnnCppSession {
             for (name, tensor) in &inputs {
                 let c_name = CString::new(name.as_str())
                     .map_err(|e| MnnCppError::Tensor(e.to_string()))?;
-                let slice = if let Some(s) = tensor.as_slice() {
-                    s.to_vec()
-                } else {
-                    tensor.iter().copied().collect()
-                };
+                let slice = tensor.as_slice();
 
                 let set_res = ffi::MNN_Session_setHostInputFloat(
                     self.net,
@@ -261,11 +249,7 @@ impl MnnCppSession {
         let x_shape: Vec<i32> = x.shape().iter().map(|&d| d as i32).collect();
         let widths_shape: Vec<i32> = vec![widths.len() as i32];
 
-        let x_slice = if let Some(s) = x.as_slice() {
-            s.to_vec()
-        } else {
-            x.iter().copied().collect()
-        };
+        let x_slice = x.as_slice();
 
         unsafe {
             let c_x = CString::new("x").unwrap();
@@ -431,8 +415,7 @@ impl MnnCppSession {
             );
 
             if copy_res >= 0 {
-                let arr = ArrayD::from_shape_vec(IxDyn(&out_shape), out_data)
-                    .map_err(MnnCppError::Shape)?;
+                let arr = Tensor::from_data(&out_shape, out_data);
                 map.insert(name, arr);
             }
         }

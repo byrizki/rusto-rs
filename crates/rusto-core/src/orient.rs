@@ -1,11 +1,11 @@
 use std::time::Instant;
-use ndarray::{Array3, Array4, ArrayD};
+use crate::tensor::{Array3, Array4, ArrayD, Axis};
 use crate::engine::InferenceSession;
 use crate::error::CoreError;
 use crate::image::{self, Mat, Size, INTER_LINEAR, Point2f};
 use crate::types::OrientConfig;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, nanoserde::DeJson, nanoserde::SerJson)]
 pub struct OrientOutput {
     pub orientation: Orientation,
     pub confidence: f32,
@@ -13,7 +13,7 @@ pub struct OrientOutput {
 }
 
 /// Orientation classification result
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, nanoserde::DeJson, nanoserde::SerJson)]
 pub enum Orientation {
     /// 0 degrees (normal)
     Normal = 0,
@@ -119,7 +119,7 @@ pub fn preprocess_orient_image(
 
     let arr = Array3::from_shape_vec((3, target_h as usize, target_w as usize), data)
         .map_err(|e| CoreError::Preprocess(e.to_string()))?;
-    Ok(arr.insert_axis(ndarray::Axis(0)))
+    Ok(arr.insert_axis(Axis(0)))
 }
 
 /// Resize and convert to single-channel ink map for Indra orientation classification.
@@ -149,7 +149,7 @@ pub fn preprocess_indra_orient_image(
 
     let arr = Array3::from_shape_vec((1, side_usize, side_usize), data)
         .map_err(|e| CoreError::Preprocess(e.to_string()))?;
-    Ok(arr.insert_axis(ndarray::Axis(0)))
+    Ok(arr.insert_axis(Axis(0)))
 }
 
 /// Postprocess model output logits into an orientation and confidence score.
@@ -173,14 +173,14 @@ pub fn postprocess_orient_logits(logits: &[f32]) -> Result<(Orientation, f32), C
 
 /// Postprocess model output dynamic tensor into an orientation and confidence score.
 pub fn postprocess_orient_tensor(output: &ArrayD<f32>) -> Result<(Orientation, f32), CoreError> {
-    let output_2d = output
-        .view()
-        .into_dimensionality::<ndarray::Ix2>()
-        .map_err(|e| CoreError::Postprocess(format!("Invalid output shape: {}", e)))?;
-    let logits = output_2d.row(0);
-    let logits_slice = logits
-        .as_slice()
-        .ok_or_else(|| CoreError::Postprocess("Non-contiguous logits buffer".to_string()))?;
+    let logits_slice = if output.shape().len() >= 2 {
+        output.row(0)
+    } else {
+        output.as_slice()
+    };
+    if logits_slice.is_empty() {
+        return Err(CoreError::Postprocess("Non-contiguous or empty logits buffer".to_string()));
+    }
     postprocess_orient_logits(logits_slice)
 }
 

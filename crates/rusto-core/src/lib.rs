@@ -19,6 +19,7 @@ pub mod models;
 pub mod det;
 pub mod rec;
 pub mod doc;
+pub mod tensor;
 pub mod engine;
 pub mod pipeline;
 pub use pipeline as pipelines;
@@ -44,6 +45,7 @@ pub use table::{
     TableStructureConfig,
 };
 pub use unwarp::UnwarpOutput;
+pub use tensor::{Array2, Array3, Array4, ArrayD, Axis, Tensor};
 pub use engine::*;
 
 /// Returns the engine library version string.

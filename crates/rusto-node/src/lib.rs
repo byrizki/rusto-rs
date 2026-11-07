@@ -49,7 +49,7 @@ impl JsRustO {
     #[napi]
     pub fn detect_text_file(&mut self, path: String, options_json: Option<String>) -> Result<String> {
         let options = match options_json {
-            Some(json) if !json.trim().is_empty() => serde_json::from_str::<OcrRunOptions>(&json)
+            Some(json) if !json.trim().is_empty() => <OcrRunOptions as nanoserde::DeJson>::deserialize_json(&json)
                 .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid options JSON: {e}")))?,
             _ => OcrRunOptions::default(),
         };
@@ -58,17 +58,15 @@ impl JsRustO {
             .map_err(|e| Error::new(Status::GenericFailure, format!("Detection failed: {e}")))?;
 
         match result {
-            DetectTextResult::Structured(items) => serde_json::to_string(&items)
-                .map_err(|e| Error::new(Status::GenericFailure, format!("Serialization failed: {e}"))),
-            DetectTextResult::Spatial(text) => serde_json::to_string(&text)
-                .map_err(|e| Error::new(Status::GenericFailure, format!("Serialization failed: {e}"))),
+            DetectTextResult::Structured(items) => Ok(nanoserde::SerJson::serialize_json(&items)),
+            DetectTextResult::Spatial(text) => Ok(nanoserde::SerJson::serialize_json(&text)),
         }
     }
 
     #[napi]
     pub fn detect_text_data(&mut self, data: Buffer, options_json: Option<String>) -> Result<String> {
         let options = match options_json {
-            Some(json) if !json.trim().is_empty() => serde_json::from_str::<OcrRunOptions>(&json)
+            Some(json) if !json.trim().is_empty() => <OcrRunOptions as nanoserde::DeJson>::deserialize_json(&json)
                 .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid options JSON: {e}")))?,
             _ => OcrRunOptions::default(),
         };
@@ -78,17 +76,15 @@ impl JsRustO {
             .map_err(|e| Error::new(Status::GenericFailure, format!("Detection failed: {e}")))?;
 
         match result {
-            DetectTextResult::Structured(items) => serde_json::to_string(&items)
-                .map_err(|e| Error::new(Status::GenericFailure, format!("Serialization failed: {e}"))),
-            DetectTextResult::Spatial(text) => serde_json::to_string(&text)
-                .map_err(|e| Error::new(Status::GenericFailure, format!("Serialization failed: {e}"))),
+            DetectTextResult::Structured(items) => Ok(nanoserde::SerJson::serialize_json(&items)),
+            DetectTextResult::Spatial(text) => Ok(nanoserde::SerJson::serialize_json(&text)),
         }
     }
 
     #[napi]
     pub fn detect_text_spatial(&mut self, path: String, options_json: Option<String>) -> Result<String> {
         let mut options = match options_json {
-            Some(json) if !json.trim().is_empty() => serde_json::from_str::<OcrRunOptions>(&json)
+            Some(json) if !json.trim().is_empty() => <OcrRunOptions as nanoserde::DeJson>::deserialize_json(&json)
                 .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid options JSON: {e}")))?,
             _ => OcrRunOptions::default(),
         };
@@ -113,7 +109,7 @@ impl JsRustO {
         options_json: Option<String>,
     ) -> Result<String> {
         let options = match options_json {
-            Some(json) if !json.trim().is_empty() => serde_json::from_str::<OcrRunOptions>(&json)
+            Some(json) if !json.trim().is_empty() => <OcrRunOptions as nanoserde::DeJson>::deserialize_json(&json)
                 .map_err(|e| Error::new(Status::InvalidArg, format!("Invalid options JSON: {e}")))?,
             _ => OcrRunOptions::default(),
         };
@@ -125,10 +121,8 @@ impl JsRustO {
             .map_err(|e| Error::new(Status::GenericFailure, format!("RGB detection failed: {e}")))?;
 
         match result {
-            DetectTextResult::Structured(items) => serde_json::to_string(&items)
-                .map_err(|e| Error::new(Status::GenericFailure, format!("Serialization failed: {e}"))),
-            DetectTextResult::Spatial(text) => serde_json::to_string(&text)
-                .map_err(|e| Error::new(Status::GenericFailure, format!("Serialization failed: {e}"))),
+            DetectTextResult::Structured(items) => Ok(nanoserde::SerJson::serialize_json(&items)),
+            DetectTextResult::Spatial(text) => Ok(nanoserde::SerJson::serialize_json(&text)),
         }
     }
 

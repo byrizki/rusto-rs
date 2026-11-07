@@ -1,5 +1,5 @@
 use std::time::Instant;
-use ndarray::{Array3, Array4, ArrayD};
+use crate::tensor::{Array3, Array4, ArrayD, Axis};
 use ::image::{DynamicImage, ImageBuffer, Rgb};
 use crate::engine::InferenceSession;
 use crate::error::CoreError;
@@ -41,7 +41,7 @@ pub fn preprocess_unwarp(
     let arr = Array3::from_shape_vec((3, target_h, target_w), data)
         .map_err(|e| CoreError::Preprocess(e.to_string()))?;
 
-    Ok(arr.insert_axis(ndarray::Axis(0)))
+    Ok(arr.insert_axis(Axis(0)))
 }
 
 /// Decode direct RGB unwarped image from model output tensor.

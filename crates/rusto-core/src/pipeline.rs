@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use ndarray::Array4;
+use crate::tensor::{Array3, Array4};
 
 use crate::cal_rec_boxes::CalRecBoxes;
 use crate::calibration::apply_calibration;
@@ -556,7 +556,7 @@ impl OcrPipeline {
             let plan = plan_rec_batches(&sizes, self.rec_batch_num.max(1), default_wh_ratio);
 
             for batch_item in plan.batches {
-                let mut norm_batch: Vec<ndarray::Array3<f32>> = Vec::with_capacity(batch_item.indices.len());
+                let mut norm_batch: Vec<Array3<f32>> = Vec::with_capacity(batch_item.indices.len());
                 for &idx in &batch_item.indices {
                     norm_batch.push(resize_norm_rec_img(&crop_imgs[idx], img_c, img_h, batch_item.max_wh_ratio)?);
                 }
@@ -564,7 +564,7 @@ impl OcrPipeline {
                 let batch_img_width = (img_h as f32 * batch_item.max_wh_ratio).round() as usize;
                 let batch = stack_rec_batch(&norm_batch, img_c, img_h, batch_img_width);
                 let preds_dyn = self.rec.run(batch.into_dyn())?;
-                let preds: ndarray::Array3<f32> = preds_dyn
+                let preds: Array3<f32> = preds_dyn
                     .into_dimensionality()
                     .map_err(|_| CoreError::InvalidShape("recognition output must be 3D".into()))?;
 

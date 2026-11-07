@@ -44,7 +44,7 @@ pub fn find_contours(binary_img: &GrayImage) -> Vec<Contour> {
 
 pub fn find_contours_with_pred(
     binary_img: &GrayImage,
-    pred: Option<&ndarray::Array4<f32>>,
+    pred: Option<&crate::tensor::Array4<f32>>,
 ) -> Vec<Contour> {
     let (width, height) = binary_img.dimensions();
     let w_usize = width as usize;

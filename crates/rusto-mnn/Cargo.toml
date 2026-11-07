@@ -9,7 +9,6 @@ keywords = ["mnn", "deep-learning", "ffi", "alibaba-mnn"]
 categories = ["science", "computer-vision"]
 
 [dependencies]
-ndarray = "0.16"
 thiserror = "1.0"
 rusto-core = { path = "../rusto-core", version = "0.4.0", default-features = false }
 

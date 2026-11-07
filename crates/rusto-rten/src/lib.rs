@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use ndarray::{Array, ArrayD};
+use rusto_core::tensor::{Array4, ArrayD, Tensor};
 pub use rten::{Dimension, Model, ModelOptions, NodeId, RunOptions, ThreadPool, Value, ValueOrView};
 pub use rten_tensor::AsView;
 pub use rten_tensor::Layout;
@@ -17,9 +17,6 @@ pub enum RtenError {
     #[error("RTen run error: {0}")]
     Run(#[from] rten::RunError),
 
-    #[error("Shape error: {0}")]
-    Shape(#[from] ndarray::ShapeError),
-
     #[error("Output error: {0}")]
     Output(String),
 
@@ -29,7 +26,7 @@ pub enum RtenError {
 
 pub type LineNetRecOutput = (Vec<Vec<i32>>, Vec<Vec<f32>>);
 
-pub fn convert_output_to_array(value: &Value) -> Result<ArrayD<f32>, RtenError> {
+pub fn convert_output_to_array(value: &Value) -> Result<Tensor, RtenError> {
     match value {
         Value::FloatTensor(t) => {
             let shape = t.shape().to_vec();
@@ -38,26 +35,22 @@ pub fn convert_output_to_array(value: &Value) -> Result<ArrayD<f32>, RtenError> 
             } else {
                 t.iter().copied().collect()
             };
-            let array = Array::from_shape_vec(shape, data)?;
-            Ok(array.into_dyn())
+            Ok(Tensor::from_data(&shape, data))
         }
         Value::Int32Tensor(t) => {
             let shape = t.shape().to_vec();
             let data: Vec<f32> = t.iter().map(|&x| x as f32).collect();
-            let array = Array::from_shape_vec(shape, data)?;
-            Ok(array.into_dyn())
+            Ok(Tensor::from_data(&shape, data))
         }
         Value::Int8Tensor(t) => {
             let shape = t.shape().to_vec();
             let data: Vec<f32> = t.iter().map(|&x| x as f32).collect();
-            let array = Array::from_shape_vec(shape, data)?;
-            Ok(array.into_dyn())
+            Ok(Tensor::from_data(&shape, data))
         }
         Value::UInt8Tensor(t) => {
             let shape = t.shape().to_vec();
             let data: Vec<f32> = t.iter().map(|&x| x as f32).collect();
-            let array = Array::from_shape_vec(shape, data)?;
-            Ok(array.into_dyn())
+            Ok(Tensor::from_data(&shape, data))
         }
         _ => Err(RtenError::Output("Unsupported output tensor type".into())),
     }
@@ -140,14 +133,8 @@ impl RtenSession {
         let out_ids = self.model.output_ids();
         let run_opts = self.run_options();
 
-        let outputs = if let Some(slice) = input.as_slice() {
-            let view = TensorView::from_data(&shape, slice);
-            self.model.run(vec![(in_id, view.into())], out_ids, run_opts)?
-        } else {
-            let data: Vec<f32> = input.iter().copied().collect();
-            let tensor = RtenTensor::<f32>::from_data(&shape, data);
-            self.model.run(vec![(in_id, tensor.view().into())], out_ids, run_opts)?
-        };
+        let view = TensorView::from_data(&shape, input.as_slice());
+        let outputs = self.model.run(vec![(in_id, view.into())], out_ids, run_opts)?;
 
         if outputs.is_empty() {
             return Err(RtenError::Output("Model produced no outputs".into()));
@@ -165,14 +152,8 @@ impl RtenSession {
         let in_id = in_ids[0];
         let out_ids = self.model.output_ids();
 
-        let outputs = if let Some(slice) = input.as_slice() {
-            let view = TensorView::from_data(&shape, slice);
-            self.model.run(vec![(in_id, view.into())], out_ids, None)?
-        } else {
-            let data: Vec<f32> = input.iter().copied().collect();
-            let tensor = RtenTensor::<f32>::from_data(&shape, data);
-            self.model.run(vec![(in_id, tensor.view().into())], out_ids, None)?
-        };
+        let view = TensorView::from_data(&shape, input.as_slice());
+        let outputs = self.model.run(vec![(in_id, view.into())], out_ids, None)?;
 
         let mut results = HashMap::new();
         for (i, out_id) in out_ids.iter().enumerate() {
@@ -211,11 +192,7 @@ impl RtenSession {
             };
 
             let shape: Vec<usize> = input.shape().to_vec();
-            let data: Vec<f32> = if let Some(slice) = input.as_slice() {
-                slice.to_vec()
-            } else {
-                input.iter().copied().collect()
-            };
+            let data: Vec<f32> = input.as_slice().to_vec();
             rten_tensors.push((node_id, RtenTensor::<f32>::from_data(&shape, data)));
         }
 
@@ -246,7 +223,7 @@ impl RtenSession {
 
     pub fn run_linenet_rec(
         &mut self,
-        x: &ndarray::Array4<f32>,
+        x: &Array4<f32>,
         widths: &[i32],
     ) -> Result<LineNetRecOutput, RtenError> {
         let in_ids = self.model.input_ids();
@@ -257,11 +234,7 @@ impl RtenSession {
         }
 
         let x_shape: Vec<usize> = x.shape().to_vec();
-        let x_data: Vec<f32> = if let Some(slice) = x.as_slice() {
-            slice.to_vec()
-        } else {
-            x.iter().copied().collect()
-        };
+        let x_data: Vec<f32> = x.as_slice().to_vec();
         let x_tensor = RtenTensor::<f32>::from_data(&x_shape, x_data);
         let widths_tensor = RtenTensor::<i32>::from_data(&[widths.len()], widths.to_vec());
 
@@ -357,7 +330,7 @@ impl rusto_core::engine::InferenceSession for RtenSession {
 
     fn run_linenet_rec(
         &mut self,
-        x: ndarray::Array4<f32>,
+        x: Array4<f32>,
         widths: Vec<i32>,
     ) -> Result<rusto_core::engine::LineNetRecOutput, rusto_core::CoreError> {
         self.run_linenet_rec(&x, &widths)

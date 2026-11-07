@@ -15,7 +15,7 @@ fn test_rusto_rten_load_and_run() {
     let mut session = RtenSession::from_file(&det_path, 1).expect("Failed to load det.rten");
     assert_eq!(session.input_channels(), 3);
 
-    let dummy_input = ndarray::Array4::<f32>::zeros((1, 3, 64, 64)).into_dyn();
+    let dummy_input = rusto_core::tensor::Tensor::zeros([1, 3, 64, 64]);
     let out = session.run(&dummy_input).expect("Failed to run inference");
     assert!(!out.is_empty());
 }

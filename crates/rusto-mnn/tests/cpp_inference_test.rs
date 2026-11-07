@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use ndarray::Array4;
+use rusto_core::tensor::Array4;
 use rusto_mnn::MnnCppSession;
 
 fn get_repo_root() -> PathBuf {

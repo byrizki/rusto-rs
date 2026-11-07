@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use serde::{Deserialize, Serialize};
+use nanoserde::{DeJson, SerJson};
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum RustoBindingError {
@@ -35,7 +35,7 @@ impl From<rusto_core::CoreError> for RustoBindingError {
 }
 
 /// 2D coordinate point representing vertex location in pixels.
-#[derive(uniffi::Record, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(uniffi::Record, Clone, Copy, Debug, PartialEq, DeJson, SerJson)]
 pub struct Point2D {
     /// Horizontal coordinate (X).
     pub x: f32,
@@ -44,7 +44,7 @@ pub struct Point2D {
 }
 
 /// Axis-aligned bounding box frame with position and size in pixels.
-#[derive(uniffi::Record, Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(uniffi::Record, Clone, Copy, Debug, PartialEq, DeJson, SerJson)]
 pub struct Frame {
     /// Width of the bounding box.
     pub width: f32,
@@ -57,7 +57,7 @@ pub struct Frame {
 }
 
 /// Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
-#[derive(uniffi::Record, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(uniffi::Record, Clone, Debug, PartialEq, DeJson, SerJson)]
 pub struct TextResult {
     /// Recognized text string.
     pub text: String,
@@ -74,7 +74,7 @@ pub struct TextResult {
 }
 
 /// Output format granularity for text detection.
-#[derive(uniffi::Enum, Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(uniffi::Enum, Clone, Copy, Debug, Default, PartialEq, Eq, DeJson, SerJson)]
 pub enum OutputGranularity {
     /// Group recognized tokens into lines (default).
     #[default]
@@ -106,8 +106,7 @@ pub enum DetectTextResult {
 }
 
 /// Pre-detection image conditioning and resolution optimization options.
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct PreDetectionOptions {
     /// Descreen filtering strength (0.0 - 1.0).
     pub descreen_strength: Option<f32>,
@@ -120,8 +119,7 @@ pub struct PreDetectionOptions {
 }
 
 /// Image detection stage options.
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct DetectionRunOptions {
     /// Target side length constraint for image resizing. Default: 960.
     pub limit_side_len: Option<i32>,
@@ -134,8 +132,7 @@ pub struct DetectionRunOptions {
 }
 
 /// Post-detection polygon extraction, thresholding, and box filtering options.
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct PostDetectionOptions {
     /// Binarization probability cutoff threshold. Default: 0.3.
     pub threshold: Option<f32>,
@@ -160,8 +157,7 @@ pub struct PostDetectionOptions {
 }
 
 /// Pre-recognition text line/word clustering tolerances.
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct PreRecognitionOptions {
     /// Vertical center tolerance multiplier for same-line grouping. Default: 0.5.
     pub line_y_threshold: Option<f32>,
@@ -170,24 +166,21 @@ pub struct PreRecognitionOptions {
 }
 
 /// Text recognition inference parameters.
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct RecognitionRunOptions {
     /// Recognition batch size. Default: 10.
     pub batch_size: Option<i32>,
 }
 
 /// Post-recognition confidence score filtering.
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct PostRecognitionOptions {
     /// Minimum recognition confidence score threshold [0.0 - 1.0].
     pub score_threshold: Option<f32>,
 }
 
 /// Per-request execution options for text detection.
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct OcrRunOptions {
     /// Output format granularity: Lines (default), Words, or Spatial.
     pub output: OutputGranularity,
@@ -214,8 +207,7 @@ pub struct OcrRunOptions {
 }
 
 /// Text detection model configuration.
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct DetectionConfig {
     /// Whether detection stage is enabled.
     pub enabled: Option<bool>,
@@ -238,8 +230,7 @@ pub struct DetectionConfig {
 }
 
 /// Text recognition model configuration.
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct RecognitionConfig {
     /// Whether recognition stage is enabled.
     pub enabled: Option<bool>,
@@ -252,8 +243,7 @@ pub struct RecognitionConfig {
 }
 
 /// Line classification configuration (180° rotation detection).
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct ClassificationConfig {
     /// Whether classification stage is enabled.
     pub enabled: Option<bool>,
@@ -264,8 +254,7 @@ pub struct ClassificationConfig {
 }
 
 /// Document orientation angle configuration (0°, 90°, 180°, 270°).
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct OrientationConfig {
     /// Whether orientation stage is enabled.
     pub enabled: Option<bool>,
@@ -276,8 +265,7 @@ pub struct OrientationConfig {
 }
 
 /// Document dewarping model configuration.
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct UnwarpConfig {
     /// Whether unwarp stage is enabled.
     pub enabled: Option<bool>,
@@ -286,7 +274,7 @@ pub struct UnwarpConfig {
 }
 
 /// Category of document layout region.
-#[derive(uniffi::Enum, Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(uniffi::Enum, Clone, Copy, Debug, PartialEq, Eq, DeJson, SerJson)]
 pub enum LayoutType {
     Text,
     Title,
@@ -301,8 +289,7 @@ pub enum LayoutType {
 }
 
 /// Document layout analysis model configuration.
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct LayoutConfig {
     /// Whether layout stage is enabled.
     pub enabled: Option<bool>,
@@ -319,8 +306,7 @@ pub struct LayoutConfig {
 }
 
 /// Engine initialization configuration specifying model paths, preset, and optional extensions.
-#[derive(uniffi::Record, Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct InitializeConfig {
     /// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
     pub model: Option<String>,
@@ -525,8 +511,7 @@ pub fn default_ocr_run_options() -> OcrRunOptions {
 }
 
 fn convert_init_config(config: &InitializeConfig) -> Result<rusto_core::config::InitializeConfig, RustoBindingError> {
-    let json = serde_json::to_string(config)
-        .map_err(|e| RustoBindingError::Initialization { msg: e.to_string() })?;
+    let json = nanoserde::SerJson::serialize_json(config);
     crate::download::parse_config_with_auto_download(&json)
         .map_err(|e| RustoBindingError::Initialization { msg: e.to_string() })
 }

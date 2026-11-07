@@ -1,12 +1,12 @@
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
 
 use crate::calibration::{CalibrationOptions, OptimizationOptions};
+use crate::error::CoreError;
 use crate::models;
 use crate::types::{ClsConfig, DetConfig, GlobalConfig, LayoutConfig, OrientConfig, RecConfig, UnwarpConfig};
 
 /// Preset configuration for OCR model architectures
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ModelPreset {
     pub det_limit_side_len: i32,
     pub det_limit_type: &'static str,
@@ -91,7 +91,7 @@ pub const INDRA_MODEL_CONFIG: ModelPreset = ModelPreset {
 };
 
 /// Main configuration for OCR engine
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct InitializeConfig {
     pub det: DetConfig,
     pub rec: RecConfig,
@@ -110,169 +110,723 @@ impl Default for InitializeConfig {
     }
 }
 
-#[derive(Deserialize, Default, Clone, Debug)]
+#[derive(nanoserde::DeJson, nanoserde::SerJson, Default, Clone, Debug)]
 struct DetectionConfigJson {
-    #[serde(alias = "useDet", alias = "use_det")]
-    enabled: Option<bool>,
-    #[serde(alias = "modelPath", alias = "detModelPath", alias = "model_path", alias = "det_model_path")]
-    model_path: Option<PathBuf>,
-    #[serde(alias = "detThresh", alias = "det_thresh")]
-    thresh: Option<f32>,
-    #[serde(alias = "boxThresh", alias = "detBoxThresh", alias = "box_thresh", alias = "det_box_thresh")]
-    box_thresh: Option<f32>,
-    #[serde(alias = "unclipRatio", alias = "unclip_ratio")]
-    unclip_ratio: Option<f32>,
-    #[serde(alias = "limitSideLen", alias = "limit_side_len")]
-    limit_side_len: Option<i32>,
-    #[serde(alias = "limitType", alias = "limit_type")]
-    limit_type: Option<String>,
-    #[serde(alias = "useDilation", alias = "use_dilation")]
-    use_dilation: Option<bool>,
-    #[serde(alias = "scoreMode", alias = "score_mode", alias = "detScoreMode", alias = "det_score_mode")]
-    score_mode: Option<String>,
+    pub enabled: Option<bool>,
+    #[nserde(rename = "useDet")]
+    pub use_det_camel: Option<bool>,
+    #[nserde(rename = "use_det")]
+    pub use_det_snake: Option<bool>,
+
+    #[nserde(rename = "modelPath")]
+    pub model_path_camel: Option<String>,
+    #[nserde(rename = "detModelPath")]
+    pub det_model_path_camel: Option<String>,
+    #[nserde(rename = "model_path")]
+    pub model_path_snake: Option<String>,
+    #[nserde(rename = "det_model_path")]
+    pub det_model_path_snake: Option<String>,
+
+    pub thresh: Option<f32>,
+    #[nserde(rename = "detThresh")]
+    pub det_thresh_camel: Option<f32>,
+    #[nserde(rename = "det_thresh")]
+    pub det_thresh_snake: Option<f32>,
+
+    #[nserde(rename = "boxThresh")]
+    pub box_thresh_camel: Option<f32>,
+    #[nserde(rename = "detBoxThresh")]
+    pub det_box_thresh_camel: Option<f32>,
+    #[nserde(rename = "box_thresh")]
+    pub box_thresh_snake: Option<f32>,
+    #[nserde(rename = "det_box_thresh")]
+    pub det_box_thresh_snake: Option<f32>,
+
+    #[nserde(rename = "unclipRatio")]
+    pub unclip_ratio_camel: Option<f32>,
+    #[nserde(rename = "unclip_ratio")]
+    pub unclip_ratio_snake: Option<f32>,
+
+    #[nserde(rename = "limitSideLen")]
+    pub limit_side_len_camel: Option<i32>,
+    #[nserde(rename = "limit_side_len")]
+    pub limit_side_len_snake: Option<i32>,
+
+    #[nserde(rename = "limitType")]
+    pub limit_type_camel: Option<String>,
+    #[nserde(rename = "limit_type")]
+    pub limit_type_snake: Option<String>,
+
+    #[nserde(rename = "useDilation")]
+    pub use_dilation_camel: Option<bool>,
+    #[nserde(rename = "use_dilation")]
+    pub use_dilation_snake: Option<bool>,
+
+    #[nserde(rename = "scoreMode")]
+    pub score_mode_camel: Option<String>,
+    #[nserde(rename = "detScoreMode")]
+    pub det_score_mode_camel: Option<String>,
+    #[nserde(rename = "score_mode")]
+    pub score_mode_snake: Option<String>,
+    #[nserde(rename = "det_score_mode")]
+    pub det_score_mode_snake: Option<String>,
 }
 
-#[derive(Deserialize, Default, Clone, Debug)]
+impl DetectionConfigJson {
+    fn enabled(&self) -> Option<bool> {
+        self.enabled.or(self.use_det_camel).or(self.use_det_snake)
+    }
+    fn model_path(&self) -> Option<&str> {
+        self.model_path_camel.as_deref()
+            .or(self.det_model_path_camel.as_deref())
+            .or(self.model_path_snake.as_deref())
+            .or(self.det_model_path_snake.as_deref())
+    }
+    fn thresh(&self) -> Option<f32> {
+        self.thresh.or(self.det_thresh_camel).or(self.det_thresh_snake)
+    }
+    fn box_thresh(&self) -> Option<f32> {
+        self.box_thresh_camel
+            .or(self.det_box_thresh_camel)
+            .or(self.box_thresh_snake)
+            .or(self.det_box_thresh_snake)
+    }
+    fn unclip_ratio(&self) -> Option<f32> {
+        self.unclip_ratio_camel.or(self.unclip_ratio_snake)
+    }
+    fn limit_side_len(&self) -> Option<i32> {
+        self.limit_side_len_camel.or(self.limit_side_len_snake)
+    }
+    fn limit_type(&self) -> Option<&str> {
+        self.limit_type_camel.as_deref().or(self.limit_type_snake.as_deref())
+    }
+    fn use_dilation(&self) -> Option<bool> {
+        self.use_dilation_camel.or(self.use_dilation_snake)
+    }
+    fn score_mode(&self) -> Option<&str> {
+        self.score_mode_camel.as_deref()
+            .or(self.det_score_mode_camel.as_deref())
+            .or(self.score_mode_snake.as_deref())
+            .or(self.det_score_mode_snake.as_deref())
+    }
+}
+
+#[derive(nanoserde::DeJson, nanoserde::SerJson, Default, Clone, Debug)]
 struct RecognitionConfigJson {
-    #[serde(alias = "useRec", alias = "use_rec")]
-    enabled: Option<bool>,
-    #[serde(alias = "modelPath", alias = "recModelPath", alias = "model_path", alias = "rec_model_path")]
-    model_path: Option<PathBuf>,
-    #[serde(alias = "dictPath", alias = "dict_path")]
-    dict_path: Option<PathBuf>,
-    #[serde(alias = "scoreThresh", alias = "textScore", alias = "score_thresh", alias = "text_score")]
-    score_thresh: Option<f32>,
-    #[serde(alias = "returnWordBox", alias = "return_word_box")]
-    return_word_box: Option<bool>,
-    #[serde(alias = "returnSingleCharBox", alias = "return_single_char_box")]
-    return_single_char_box: Option<bool>,
-    #[serde(alias = "recBatchNum", alias = "rec_batch_num", alias = "batchNum", alias = "batch_num")]
-    rec_batch_num: Option<i32>,
+    pub enabled: Option<bool>,
+    #[nserde(rename = "useRec")]
+    pub use_rec_camel: Option<bool>,
+    #[nserde(rename = "use_rec")]
+    pub use_rec_snake: Option<bool>,
+
+    #[nserde(rename = "modelPath")]
+    pub model_path_camel: Option<String>,
+    #[nserde(rename = "recModelPath")]
+    pub rec_model_path_camel: Option<String>,
+    #[nserde(rename = "model_path")]
+    pub model_path_snake: Option<String>,
+    #[nserde(rename = "rec_model_path")]
+    pub rec_model_path_snake: Option<String>,
+
+    #[nserde(rename = "dictPath")]
+    pub dict_path_camel: Option<String>,
+    #[nserde(rename = "dict_path")]
+    pub dict_path_snake: Option<String>,
+
+    #[nserde(rename = "scoreThresh")]
+    pub score_thresh_camel: Option<f32>,
+    #[nserde(rename = "textScore")]
+    pub text_score_camel: Option<f32>,
+    #[nserde(rename = "score_thresh")]
+    pub score_thresh_snake: Option<f32>,
+    #[nserde(rename = "text_score")]
+    pub text_score_snake: Option<f32>,
+
+    #[nserde(rename = "returnWordBox")]
+    pub return_word_box_camel: Option<bool>,
+    #[nserde(rename = "return_word_box")]
+    pub return_word_box_snake: Option<bool>,
+
+    #[nserde(rename = "returnSingleCharBox")]
+    pub return_single_char_box_camel: Option<bool>,
+    #[nserde(rename = "return_single_char_box")]
+    pub return_single_char_box_snake: Option<bool>,
+
+    #[nserde(rename = "recBatchNum")]
+    pub rec_batch_num_camel: Option<i32>,
+    #[nserde(rename = "batchNum")]
+    pub batch_num_camel: Option<i32>,
+    #[nserde(rename = "rec_batch_num")]
+    pub rec_batch_num_snake: Option<i32>,
+    #[nserde(rename = "batch_num")]
+    pub batch_num_snake: Option<i32>,
 }
 
-#[derive(Deserialize, Default, Clone, Debug)]
+impl RecognitionConfigJson {
+    fn enabled(&self) -> Option<bool> {
+        self.enabled.or(self.use_rec_camel).or(self.use_rec_snake)
+    }
+    fn model_path(&self) -> Option<&str> {
+        self.model_path_camel.as_deref()
+            .or(self.rec_model_path_camel.as_deref())
+            .or(self.model_path_snake.as_deref())
+            .or(self.rec_model_path_snake.as_deref())
+    }
+    fn dict_path(&self) -> Option<&str> {
+        self.dict_path_camel.as_deref().or(self.dict_path_snake.as_deref())
+    }
+    fn score_thresh(&self) -> Option<f32> {
+        self.score_thresh_camel
+            .or(self.text_score_camel)
+            .or(self.score_thresh_snake)
+            .or(self.text_score_snake)
+    }
+    fn return_word_box(&self) -> Option<bool> {
+        self.return_word_box_camel.or(self.return_word_box_snake)
+    }
+    fn return_single_char_box(&self) -> Option<bool> {
+        self.return_single_char_box_camel.or(self.return_single_char_box_snake)
+    }
+    fn rec_batch_num(&self) -> Option<i32> {
+        self.rec_batch_num_camel
+            .or(self.batch_num_camel)
+            .or(self.rec_batch_num_snake)
+            .or(self.batch_num_snake)
+    }
+}
+
+#[derive(nanoserde::DeJson, nanoserde::SerJson, Default, Clone, Debug)]
 struct ClassificationConfigJson {
-    #[serde(alias = "useCls", alias = "use_cls")]
-    enabled: Option<bool>,
-    #[serde(alias = "modelPath", alias = "clsModelPath", alias = "model_path", alias = "cls_model_path")]
-    model_path: Option<PathBuf>,
-    #[serde(alias = "thresh", alias = "clsThreshold", alias = "cls_thresh", alias = "cls_threshold")]
-    threshold: Option<f32>,
+    pub enabled: Option<bool>,
+    #[nserde(rename = "useCls")]
+    pub use_cls_camel: Option<bool>,
+    #[nserde(rename = "use_cls")]
+    pub use_cls_snake: Option<bool>,
+
+    #[nserde(rename = "modelPath")]
+    pub model_path_camel: Option<String>,
+    #[nserde(rename = "clsModelPath")]
+    pub cls_model_path_camel: Option<String>,
+    #[nserde(rename = "model_path")]
+    pub model_path_snake: Option<String>,
+    #[nserde(rename = "cls_model_path")]
+    pub cls_model_path_snake: Option<String>,
+
+    pub thresh: Option<f32>,
+    pub threshold: Option<f32>,
+    #[nserde(rename = "clsThreshold")]
+    pub cls_threshold_camel: Option<f32>,
+    #[nserde(rename = "cls_thresh")]
+    pub cls_thresh_snake: Option<f32>,
+    #[nserde(rename = "cls_threshold")]
+    pub cls_threshold_snake: Option<f32>,
 }
 
-#[derive(Deserialize, Default, Clone, Debug)]
+impl ClassificationConfigJson {
+    fn enabled(&self) -> Option<bool> {
+        self.enabled.or(self.use_cls_camel).or(self.use_cls_snake)
+    }
+    fn model_path(&self) -> Option<&str> {
+        self.model_path_camel.as_deref()
+            .or(self.cls_model_path_camel.as_deref())
+            .or(self.model_path_snake.as_deref())
+            .or(self.cls_model_path_snake.as_deref())
+    }
+    fn threshold(&self) -> Option<f32> {
+        self.threshold
+            .or(self.thresh)
+            .or(self.cls_threshold_camel)
+            .or(self.cls_thresh_snake)
+            .or(self.cls_threshold_snake)
+    }
+}
+
+#[derive(nanoserde::DeJson, nanoserde::SerJson, Default, Clone, Debug)]
 struct OrientationConfigJson {
-    #[serde(alias = "useOrient", alias = "use_orient")]
-    enabled: Option<bool>,
-    #[serde(alias = "modelPath", alias = "orientModelPath", alias = "model_path", alias = "orient_model_path")]
-    model_path: Option<PathBuf>,
-    #[serde(alias = "thresh", alias = "orientThreshold", alias = "orient_thresh", alias = "orient_threshold")]
-    threshold: Option<f32>,
+    pub enabled: Option<bool>,
+    #[nserde(rename = "useOrient")]
+    pub use_orient_camel: Option<bool>,
+    #[nserde(rename = "use_orient")]
+    pub use_orient_snake: Option<bool>,
+
+    #[nserde(rename = "modelPath")]
+    pub model_path_camel: Option<String>,
+    #[nserde(rename = "orientModelPath")]
+    pub orient_model_path_camel: Option<String>,
+    #[nserde(rename = "model_path")]
+    pub model_path_snake: Option<String>,
+    #[nserde(rename = "orient_model_path")]
+    pub orient_model_path_snake: Option<String>,
+
+    pub thresh: Option<f32>,
+    pub threshold: Option<f32>,
+    #[nserde(rename = "orientThreshold")]
+    pub orient_threshold_camel: Option<f32>,
+    #[nserde(rename = "orient_thresh")]
+    pub orient_thresh_snake: Option<f32>,
+    #[nserde(rename = "orient_threshold")]
+    pub orient_threshold_snake: Option<f32>,
 }
 
-#[derive(Deserialize, Default, Clone, Debug)]
+impl OrientationConfigJson {
+    fn enabled(&self) -> Option<bool> {
+        self.enabled.or(self.use_orient_camel).or(self.use_orient_snake)
+    }
+    fn model_path(&self) -> Option<&str> {
+        self.model_path_camel.as_deref()
+            .or(self.orient_model_path_camel.as_deref())
+            .or(self.model_path_snake.as_deref())
+            .or(self.orient_model_path_snake.as_deref())
+    }
+    fn threshold(&self) -> Option<f32> {
+        self.threshold
+            .or(self.thresh)
+            .or(self.orient_threshold_camel)
+            .or(self.orient_thresh_snake)
+            .or(self.orient_threshold_snake)
+    }
+}
+
+#[derive(nanoserde::DeJson, nanoserde::SerJson, Default, Clone, Debug)]
 struct UnwarpConfigJson {
-    #[serde(alias = "useUnwarp", alias = "use_unwarp")]
-    enabled: Option<bool>,
-    #[serde(alias = "modelPath", alias = "unwarpModelPath", alias = "model_path", alias = "unwarp_model_path")]
-    model_path: Option<PathBuf>,
+    pub enabled: Option<bool>,
+    #[nserde(rename = "useUnwarp")]
+    pub use_unwarp_camel: Option<bool>,
+    #[nserde(rename = "use_unwarp")]
+    pub use_unwarp_snake: Option<bool>,
+
+    #[nserde(rename = "modelPath")]
+    pub model_path_camel: Option<String>,
+    #[nserde(rename = "unwarpModelPath")]
+    pub unwarp_model_path_camel: Option<String>,
+    #[nserde(rename = "model_path")]
+    pub model_path_snake: Option<String>,
+    #[nserde(rename = "unwarp_model_path")]
+    pub unwarp_model_path_snake: Option<String>,
 }
 
-#[derive(Deserialize, Default, Clone, Debug)]
+impl UnwarpConfigJson {
+    fn enabled(&self) -> Option<bool> {
+        self.enabled.or(self.use_unwarp_camel).or(self.use_unwarp_snake)
+    }
+    fn model_path(&self) -> Option<&str> {
+        self.model_path_camel.as_deref()
+            .or(self.unwarp_model_path_camel.as_deref())
+            .or(self.model_path_snake.as_deref())
+            .or(self.unwarp_model_path_snake.as_deref())
+    }
+}
+
+#[derive(nanoserde::DeJson, nanoserde::SerJson, Default, Clone, Debug)]
 struct LayoutConfigJson {
-    #[serde(alias = "useLayout", alias = "use_layout")]
-    enabled: Option<bool>,
-    #[serde(alias = "modelPath", alias = "layoutModelPath", alias = "model_path", alias = "layout_model_path")]
-    model_path: Option<PathBuf>,
-    #[serde(alias = "confThresh", alias = "conf_thresh", alias = "threshold")]
-    conf_thresh: Option<f32>,
-    #[serde(alias = "targetSize", alias = "target_size")]
-    target_size: Option<i32>,
-    #[serde(alias = "targetHeight", alias = "target_height")]
-    target_height: Option<i32>,
-    #[serde(alias = "targetWidth", alias = "target_width")]
-    target_width: Option<i32>,
-    #[serde(alias = "yThresholdMultiplier", alias = "y_threshold_multiplier")]
-    y_threshold_multiplier: Option<f32>,
-    #[serde(alias = "xThresholdMultiplier", alias = "x_threshold_multiplier")]
-    x_threshold_multiplier: Option<f32>,
+    pub enabled: Option<bool>,
+    #[nserde(rename = "useLayout")]
+    pub use_layout_camel: Option<bool>,
+    #[nserde(rename = "use_layout")]
+    pub use_layout_snake: Option<bool>,
+
+    #[nserde(rename = "modelPath")]
+    pub model_path_camel: Option<String>,
+    #[nserde(rename = "layoutModelPath")]
+    pub layout_model_path_camel: Option<String>,
+    #[nserde(rename = "model_path")]
+    pub model_path_snake: Option<String>,
+    #[nserde(rename = "layout_model_path")]
+    pub layout_model_path_snake: Option<String>,
+
+    #[nserde(rename = "confThresh")]
+    pub conf_thresh_camel: Option<f32>,
+    #[nserde(rename = "conf_thresh")]
+    pub conf_thresh_snake: Option<f32>,
+    pub threshold: Option<f32>,
+
+    #[nserde(rename = "targetSize")]
+    pub target_size_camel: Option<i32>,
+    #[nserde(rename = "target_size")]
+    pub target_size_snake: Option<i32>,
+
+    #[nserde(rename = "targetHeight")]
+    pub target_height_camel: Option<i32>,
+    #[nserde(rename = "target_height")]
+    pub target_height_snake: Option<i32>,
+
+    #[nserde(rename = "targetWidth")]
+    pub target_width_camel: Option<i32>,
+    #[nserde(rename = "target_width")]
+    pub target_width_snake: Option<i32>,
+
+    #[nserde(rename = "yThresholdMultiplier")]
+    pub y_threshold_multiplier_camel: Option<f32>,
+    #[nserde(rename = "y_threshold_multiplier")]
+    pub y_threshold_multiplier_snake: Option<f32>,
+
+    #[nserde(rename = "xThresholdMultiplier")]
+    pub x_threshold_multiplier_camel: Option<f32>,
+    #[nserde(rename = "x_threshold_multiplier")]
+    pub x_threshold_multiplier_snake: Option<f32>,
 }
 
-#[derive(Deserialize, Default, Clone, Debug)]
+impl LayoutConfigJson {
+    fn enabled(&self) -> Option<bool> {
+        self.enabled.or(self.use_layout_camel).or(self.use_layout_snake)
+    }
+    fn model_path(&self) -> Option<&str> {
+        self.model_path_camel.as_deref()
+            .or(self.layout_model_path_camel.as_deref())
+            .or(self.model_path_snake.as_deref())
+            .or(self.layout_model_path_snake.as_deref())
+    }
+    fn conf_thresh(&self) -> Option<f32> {
+        self.conf_thresh_camel.or(self.conf_thresh_snake).or(self.threshold)
+    }
+    fn target_size(&self) -> Option<i32> {
+        self.target_size_camel.or(self.target_size_snake)
+    }
+    fn target_height(&self) -> Option<i32> {
+        self.target_height_camel.or(self.target_height_snake)
+    }
+    fn target_width(&self) -> Option<i32> {
+        self.target_width_camel.or(self.target_width_snake)
+    }
+    fn y_threshold_multiplier(&self) -> Option<f32> {
+        self.y_threshold_multiplier_camel.or(self.y_threshold_multiplier_snake)
+    }
+    fn x_threshold_multiplier(&self) -> Option<f32> {
+        self.x_threshold_multiplier_camel.or(self.x_threshold_multiplier_snake)
+    }
+}
+
+#[derive(nanoserde::DeJson, nanoserde::SerJson, Default, Clone, Debug)]
 struct FlatConfig {
-    #[serde(alias = "models")]
-    model: Option<String>,
-    template: Option<String>,
-    #[serde(alias = "modelPath", alias = "model_path", alias = "modelDir", alias = "model_dir")]
-    model_path: Option<PathBuf>,
-    lang: Option<String>,
-    #[serde(alias = "cacheDir", alias = "cache_dir")]
-    cache_dir: Option<PathBuf>,
-    #[serde(alias = "enableReadingOrder", alias = "enable_reading_order", alias = "reading_order")]
-    enable_reading_order: Option<bool>,
-    #[serde(alias = "layoutVariant", alias = "layout_variant")]
-    layout_variant: Option<String>,
+    pub model: Option<String>,
+    pub models: Option<String>,
+    pub template: Option<String>,
 
-    #[serde(alias = "detModelPath", alias = "det_model_path", alias = "detPath", alias = "det_path")]
-    det_model_path: Option<PathBuf>,
-    #[serde(alias = "recModelPath", alias = "rec_model_path", alias = "recPath", alias = "rec_path")]
-    rec_model_path: Option<PathBuf>,
-    #[serde(alias = "dictPath", alias = "dict_path")]
-    dict_path: Option<PathBuf>,
-    #[serde(alias = "clsModelPath", alias = "cls_model_path", alias = "clsPath", alias = "cls_path")]
-    cls_model_path: Option<PathBuf>,
-    #[serde(alias = "orientModelPath", alias = "orient_model_path", alias = "orientPath", alias = "orient_path")]
-    orient_model_path: Option<PathBuf>,
-    #[serde(alias = "unwarpModelPath", alias = "unwarp_model_path", alias = "unwarpPath", alias = "unwarp_path")]
-    unwarp_model_path: Option<PathBuf>,
-    #[serde(alias = "layoutModelPath", alias = "layout_model_path", alias = "layoutPath", alias = "layout_path")]
-    layout_model_path: Option<PathBuf>,
+    #[nserde(rename = "modelPath")]
+    pub model_path_camel: Option<String>,
+    #[nserde(rename = "model_path")]
+    pub model_path_snake: Option<String>,
+    #[nserde(rename = "modelDir")]
+    pub model_dir_camel: Option<String>,
+    #[nserde(rename = "model_dir")]
+    pub model_dir_snake: Option<String>,
 
-    #[serde(alias = "detThresh", alias = "det_thresh")]
-    det_thresh: Option<f32>,
-    #[serde(alias = "detBoxThresh", alias = "box_thresh", alias = "boxThresh", alias = "det_box_thresh")]
-    box_thresh: Option<f32>,
-    #[serde(alias = "unclipRatio", alias = "unclip_ratio")]
-    unclip_ratio: Option<f32>,
-    #[serde(alias = "limitSideLen", alias = "limit_side_len")]
-    limit_side_len: Option<i32>,
-    #[serde(alias = "limitType", alias = "limit_type")]
-    limit_type: Option<String>,
-    #[serde(alias = "useDilation", alias = "use_dilation")]
-    use_dilation: Option<bool>,
-    #[serde(alias = "scoreMode", alias = "score_mode", alias = "detScoreMode", alias = "det_score_mode")]
-    score_mode: Option<String>,
-    #[serde(alias = "maxCandidates", alias = "max_candidates")]
-    max_candidates: Option<i32>,
+    pub lang: Option<String>,
 
-    #[serde(alias = "textScore", alias = "scoreThresh", alias = "score_thresh", alias = "text_score")]
-    text_score: Option<f32>,
-    #[serde(alias = "returnWordBox", alias = "return_word_box")]
-    return_word_box: Option<bool>,
-    #[serde(alias = "returnSingleCharBox", alias = "return_single_char_box")]
-    return_single_char_box: Option<bool>,
-    #[serde(alias = "recBatchNum", alias = "rec_batch_num", alias = "batchNum", alias = "batch_num")]
-    rec_batch_num: Option<i32>,
+    #[nserde(rename = "cacheDir")]
+    pub cache_dir_camel: Option<String>,
+    #[nserde(rename = "cache_dir")]
+    pub cache_dir_snake: Option<String>,
 
-    #[serde(alias = "useDet", alias = "use_det")]
-    use_det: Option<bool>,
-    #[serde(alias = "useRec", alias = "use_rec")]
-    use_rec: Option<bool>,
-    #[serde(alias = "useCls", alias = "use_cls")]
-    use_cls: Option<bool>,
-    #[serde(alias = "useOrient", alias = "use_orient")]
-    use_orient: Option<bool>,
-    #[serde(alias = "useUnwarp", alias = "use_unwarp")]
-    use_unwarp: Option<bool>,
-    #[serde(alias = "useLayout", alias = "use_layout")]
-    use_layout: Option<bool>,
+    #[nserde(rename = "enableReadingOrder")]
+    pub enable_reading_order_camel: Option<bool>,
+    #[nserde(rename = "enable_reading_order")]
+    pub enable_reading_order_snake: Option<bool>,
+    #[nserde(rename = "reading_order")]
+    pub reading_order: Option<bool>,
 
-    detection: Option<DetectionConfigJson>,
-    recognition: Option<RecognitionConfigJson>,
-    classification: Option<ClassificationConfigJson>,
-    orientation: Option<OrientationConfigJson>,
-    unwarp: Option<UnwarpConfigJson>,
-    layout: Option<LayoutConfigJson>,
+    #[nserde(rename = "layoutVariant")]
+    pub layout_variant_camel: Option<String>,
+    #[nserde(rename = "layout_variant")]
+    pub layout_variant_snake: Option<String>,
+
+    #[nserde(rename = "detModelPath")]
+    pub det_model_path_camel: Option<String>,
+    #[nserde(rename = "det_model_path")]
+    pub det_model_path_snake: Option<String>,
+    #[nserde(rename = "detPath")]
+    pub det_path_camel: Option<String>,
+    #[nserde(rename = "det_path")]
+    pub det_path_snake: Option<String>,
+
+    #[nserde(rename = "recModelPath")]
+    pub rec_model_path_camel: Option<String>,
+    #[nserde(rename = "rec_model_path")]
+    pub rec_model_path_snake: Option<String>,
+    #[nserde(rename = "recPath")]
+    pub rec_path_camel: Option<String>,
+    #[nserde(rename = "rec_path")]
+    pub rec_path_snake: Option<String>,
+
+    #[nserde(rename = "dictPath")]
+    pub dict_path_camel: Option<String>,
+    #[nserde(rename = "dict_path")]
+    pub dict_path_snake: Option<String>,
+
+    #[nserde(rename = "clsModelPath")]
+    pub cls_model_path_camel: Option<String>,
+    #[nserde(rename = "cls_model_path")]
+    pub cls_model_path_snake: Option<String>,
+    #[nserde(rename = "clsPath")]
+    pub cls_path_camel: Option<String>,
+    #[nserde(rename = "cls_path")]
+    pub cls_path_snake: Option<String>,
+
+    #[nserde(rename = "orientModelPath")]
+    pub orient_model_path_camel: Option<String>,
+    #[nserde(rename = "orient_model_path")]
+    pub orient_model_path_snake: Option<String>,
+    #[nserde(rename = "orientPath")]
+    pub orient_path_camel: Option<String>,
+    #[nserde(rename = "orient_path")]
+    pub orient_path_snake: Option<String>,
+
+    #[nserde(rename = "unwarpModelPath")]
+    pub unwarp_model_path_camel: Option<String>,
+    #[nserde(rename = "unwarp_model_path")]
+    pub unwarp_model_path_snake: Option<String>,
+    #[nserde(rename = "unwarpPath")]
+    pub unwarp_path_camel: Option<String>,
+    #[nserde(rename = "unwarp_path")]
+    pub unwarp_path_snake: Option<String>,
+
+    #[nserde(rename = "layoutModelPath")]
+    pub layout_model_path_camel: Option<String>,
+    #[nserde(rename = "layout_model_path")]
+    pub layout_model_path_snake: Option<String>,
+    #[nserde(rename = "layoutPath")]
+    pub layout_path_camel: Option<String>,
+    #[nserde(rename = "layout_path")]
+    pub layout_path_snake: Option<String>,
+
+    #[nserde(rename = "detThresh")]
+    pub det_thresh_camel: Option<f32>,
+    #[nserde(rename = "det_thresh")]
+    pub det_thresh_snake: Option<f32>,
+
+    #[nserde(rename = "boxThresh")]
+    pub box_thresh_camel: Option<f32>,
+    #[nserde(rename = "detBoxThresh")]
+    pub det_box_thresh_camel: Option<f32>,
+    #[nserde(rename = "box_thresh")]
+    pub box_thresh_snake: Option<f32>,
+    #[nserde(rename = "det_box_thresh")]
+    pub det_box_thresh_snake: Option<f32>,
+
+    #[nserde(rename = "unclipRatio")]
+    pub unclip_ratio_camel: Option<f32>,
+    #[nserde(rename = "unclip_ratio")]
+    pub unclip_ratio_snake: Option<f32>,
+
+    #[nserde(rename = "limitSideLen")]
+    pub limit_side_len_camel: Option<i32>,
+    #[nserde(rename = "limit_side_len")]
+    pub limit_side_len_snake: Option<i32>,
+
+    #[nserde(rename = "limitType")]
+    pub limit_type_camel: Option<String>,
+    #[nserde(rename = "limit_type")]
+    pub limit_type_snake: Option<String>,
+
+    #[nserde(rename = "useDilation")]
+    pub use_dilation_camel: Option<bool>,
+    #[nserde(rename = "use_dilation")]
+    pub use_dilation_snake: Option<bool>,
+
+    #[nserde(rename = "scoreMode")]
+    pub score_mode_camel: Option<String>,
+    #[nserde(rename = "detScoreMode")]
+    pub det_score_mode_camel: Option<String>,
+    #[nserde(rename = "score_mode")]
+    pub score_mode_snake: Option<String>,
+    #[nserde(rename = "det_score_mode")]
+    pub det_score_mode_snake: Option<String>,
+
+    #[nserde(rename = "maxCandidates")]
+    pub max_candidates_camel: Option<i32>,
+    #[nserde(rename = "max_candidates")]
+    pub max_candidates_snake: Option<i32>,
+
+    #[nserde(rename = "textScore")]
+    pub text_score_camel: Option<f32>,
+    #[nserde(rename = "scoreThresh")]
+    pub score_thresh_camel: Option<f32>,
+    #[nserde(rename = "score_thresh")]
+    pub score_thresh_snake: Option<f32>,
+    #[nserde(rename = "text_score")]
+    pub text_score_snake: Option<f32>,
+
+    #[nserde(rename = "returnWordBox")]
+    pub return_word_box_camel: Option<bool>,
+    #[nserde(rename = "return_word_box")]
+    pub return_word_box_snake: Option<bool>,
+
+    #[nserde(rename = "returnSingleCharBox")]
+    pub return_single_char_box_camel: Option<bool>,
+    #[nserde(rename = "return_single_char_box")]
+    pub return_single_char_box_snake: Option<bool>,
+
+    #[nserde(rename = "recBatchNum")]
+    pub rec_batch_num_camel: Option<i32>,
+    #[nserde(rename = "batchNum")]
+    pub batch_num_camel: Option<i32>,
+    #[nserde(rename = "rec_batch_num")]
+    pub rec_batch_num_snake: Option<i32>,
+    #[nserde(rename = "batch_num")]
+    pub batch_num_snake: Option<i32>,
+
+    #[nserde(rename = "useDet")]
+    pub use_det_camel: Option<bool>,
+    #[nserde(rename = "use_det")]
+    pub use_det_snake: Option<bool>,
+
+    #[nserde(rename = "useRec")]
+    pub use_rec_camel: Option<bool>,
+    #[nserde(rename = "use_rec")]
+    pub use_rec_snake: Option<bool>,
+
+    #[nserde(rename = "useCls")]
+    pub use_cls_camel: Option<bool>,
+    #[nserde(rename = "use_cls")]
+    pub use_cls_snake: Option<bool>,
+
+    #[nserde(rename = "useOrient")]
+    pub use_orient_camel: Option<bool>,
+    #[nserde(rename = "use_orient")]
+    pub use_orient_snake: Option<bool>,
+
+    #[nserde(rename = "useUnwarp")]
+    pub use_unwarp_camel: Option<bool>,
+    #[nserde(rename = "use_unwarp")]
+    pub use_unwarp_snake: Option<bool>,
+
+    #[nserde(rename = "useLayout")]
+    pub use_layout_camel: Option<bool>,
+    #[nserde(rename = "use_layout")]
+    pub use_layout_snake: Option<bool>,
+
+    pub detection: Option<DetectionConfigJson>,
+    pub recognition: Option<RecognitionConfigJson>,
+    pub classification: Option<ClassificationConfigJson>,
+    pub orientation: Option<OrientationConfigJson>,
+    pub unwarp: Option<UnwarpConfigJson>,
+    pub layout: Option<LayoutConfigJson>,
+}
+
+impl FlatConfig {
+    fn model(&self) -> Option<&str> {
+        self.model.as_deref().or(self.models.as_deref()).or(self.template.as_deref())
+    }
+    fn model_path(&self) -> Option<&str> {
+        self.model_path_camel.as_deref()
+            .or(self.model_path_snake.as_deref())
+            .or(self.model_dir_camel.as_deref())
+            .or(self.model_dir_snake.as_deref())
+    }
+    fn cache_dir(&self) -> Option<&str> {
+        self.cache_dir_camel.as_deref().or(self.cache_dir_snake.as_deref())
+    }
+    fn enable_reading_order(&self) -> Option<bool> {
+        self.enable_reading_order_camel.or(self.enable_reading_order_snake).or(self.reading_order)
+    }
+    fn layout_variant(&self) -> Option<&str> {
+        self.layout_variant_camel.as_deref().or(self.layout_variant_snake.as_deref())
+    }
+    fn det_model_path(&self) -> Option<&str> {
+        self.det_model_path_camel.as_deref()
+            .or(self.det_model_path_snake.as_deref())
+            .or(self.det_path_camel.as_deref())
+            .or(self.det_path_snake.as_deref())
+    }
+    fn rec_model_path(&self) -> Option<&str> {
+        self.rec_model_path_camel.as_deref()
+            .or(self.rec_model_path_snake.as_deref())
+            .or(self.rec_path_camel.as_deref())
+            .or(self.rec_path_snake.as_deref())
+    }
+    fn dict_path(&self) -> Option<&str> {
+        self.dict_path_camel.as_deref().or(self.dict_path_snake.as_deref())
+    }
+    fn cls_model_path(&self) -> Option<&str> {
+        self.cls_model_path_camel.as_deref()
+            .or(self.cls_model_path_snake.as_deref())
+            .or(self.cls_path_camel.as_deref())
+            .or(self.cls_path_snake.as_deref())
+    }
+    fn orient_model_path(&self) -> Option<&str> {
+        self.orient_model_path_camel.as_deref()
+            .or(self.orient_model_path_snake.as_deref())
+            .or(self.orient_path_camel.as_deref())
+            .or(self.orient_path_snake.as_deref())
+    }
+    fn unwarp_model_path(&self) -> Option<&str> {
+        self.unwarp_model_path_camel.as_deref()
+            .or(self.unwarp_model_path_snake.as_deref())
+            .or(self.unwarp_path_camel.as_deref())
+            .or(self.unwarp_path_snake.as_deref())
+    }
+    fn layout_model_path(&self) -> Option<&str> {
+        self.layout_model_path_camel.as_deref()
+            .or(self.layout_model_path_snake.as_deref())
+            .or(self.layout_path_camel.as_deref())
+            .or(self.layout_path_snake.as_deref())
+    }
+    fn det_thresh(&self) -> Option<f32> {
+        self.det_thresh_camel.or(self.det_thresh_snake)
+    }
+    fn box_thresh(&self) -> Option<f32> {
+        self.box_thresh_camel
+            .or(self.det_box_thresh_camel)
+            .or(self.box_thresh_snake)
+            .or(self.det_box_thresh_snake)
+    }
+    fn unclip_ratio(&self) -> Option<f32> {
+        self.unclip_ratio_camel.or(self.unclip_ratio_snake)
+    }
+    fn limit_side_len(&self) -> Option<i32> {
+        self.limit_side_len_camel.or(self.limit_side_len_snake)
+    }
+    fn limit_type(&self) -> Option<&str> {
+        self.limit_type_camel.as_deref().or(self.limit_type_snake.as_deref())
+    }
+    fn use_dilation(&self) -> Option<bool> {
+        self.use_dilation_camel.or(self.use_dilation_snake)
+    }
+    fn score_mode(&self) -> Option<&str> {
+        self.score_mode_camel.as_deref()
+            .or(self.det_score_mode_camel.as_deref())
+            .or(self.score_mode_snake.as_deref())
+            .or(self.det_score_mode_snake.as_deref())
+    }
+    fn max_candidates(&self) -> Option<i32> {
+        self.max_candidates_camel.or(self.max_candidates_snake)
+    }
+    fn text_score(&self) -> Option<f32> {
+        self.text_score_camel
+            .or(self.score_thresh_camel)
+            .or(self.score_thresh_snake)
+            .or(self.text_score_snake)
+    }
+    fn return_word_box(&self) -> Option<bool> {
+        self.return_word_box_camel.or(self.return_word_box_snake)
+    }
+    fn return_single_char_box(&self) -> Option<bool> {
+        self.return_single_char_box_camel.or(self.return_single_char_box_snake)
+    }
+    fn rec_batch_num(&self) -> Option<i32> {
+        self.rec_batch_num_camel
+            .or(self.batch_num_camel)
+            .or(self.rec_batch_num_snake)
+            .or(self.batch_num_snake)
+    }
+    fn use_det(&self) -> Option<bool> {
+        self.use_det_camel.or(self.use_det_snake)
+    }
+    fn use_rec(&self) -> Option<bool> {
+        self.use_rec_camel.or(self.use_rec_snake)
+    }
+    fn use_cls(&self) -> Option<bool> {
+        self.use_cls_camel.or(self.use_cls_snake)
+    }
+    fn use_orient(&self) -> Option<bool> {
+        self.use_orient_camel.or(self.use_orient_snake)
+    }
+    fn use_unwarp(&self) -> Option<bool> {
+        self.use_unwarp_camel.or(self.use_unwarp_snake)
+    }
+    fn use_layout(&self) -> Option<bool> {
+        self.use_layout_camel.or(self.use_layout_snake)
+    }
 }
 
 impl InitializeConfig {
@@ -374,42 +928,34 @@ impl InitializeConfig {
     }
 
     /// Parse configuration from a JSON string (supports direct structured and grouped JSON formats)
-    pub fn from_json(json_str: &str) -> Result<Self, serde_json::Error> {
-        // Try direct structured format first
-        if let Ok(config) = serde_json::from_str::<InitializeConfig>(json_str) {
-            return Ok(config);
-        }
+    pub fn from_json(json_str: &str) -> Result<Self, CoreError> {
+        let flat: FlatConfig = nanoserde::DeJson::deserialize_json(json_str)
+            .map_err(|e| CoreError::Config(format!("Failed to parse config JSON: {}", e)))?;
 
-        // Fall back to grouped format
-        let flat: FlatConfig = serde_json::from_str(json_str)?;
-
-        let cache_dir = models::get_cache_dir(flat.cache_dir.as_deref());
+        let cache_dir = models::get_cache_dir(flat.cache_dir().map(std::path::Path::new));
 
         let det_override = flat
-            .det_model_path
-            .as_deref()
-            .or_else(|| flat.detection.as_ref().and_then(|d| d.model_path.as_deref()));
+            .det_model_path()
+            .or_else(|| flat.detection.as_ref().and_then(|d| d.model_path()));
         let rec_override = flat
-            .rec_model_path
-            .as_deref()
-            .or_else(|| flat.recognition.as_ref().and_then(|r| r.model_path.as_deref()));
+            .rec_model_path()
+            .or_else(|| flat.recognition.as_ref().and_then(|r| r.model_path()));
         let dict_override = flat
-            .dict_path
-            .as_deref()
-            .or_else(|| flat.recognition.as_ref().and_then(|r| r.dict_path.as_deref()));
+            .dict_path()
+            .or_else(|| flat.recognition.as_ref().and_then(|r| r.dict_path()));
 
-        let effective_model = flat.model.as_deref().or(flat.template.as_deref());
+        let effective_model = flat.model();
 
-        let effective_dir = flat.model_path.as_deref().or_else(|| {
+        let effective_dir = flat.model_path().or_else(|| {
             effective_model.and_then(|m| {
                 let p = std::path::Path::new(m);
                 if p.exists() {
-                    Some(p)
+                    Some(m)
                 } else {
                     None
                 }
             })
-        });
+        }).map(std::path::Path::new);
 
         let (det_path, rec_path, dict_path) = {
             let canonical_model = models::normalize_model_name(effective_model);
@@ -424,7 +970,7 @@ impl InitializeConfig {
                     "det",
                     base_assets.det_filename,
                     &cache_dir,
-                ).map_err(|e| serde::de::Error::custom(e.to_string()))?
+                )?
             };
 
             let (default_rec, default_dict) = if let Some(l) = flat.lang.as_deref() {
@@ -446,7 +992,7 @@ impl InitializeConfig {
                     "rec",
                     default_rec,
                     &cache_dir,
-                ).map_err(|e| serde::de::Error::custom(e.to_string()))?
+                )?
             };
 
             let dict = if let Some(p) = dict_override {
@@ -458,7 +1004,7 @@ impl InitializeConfig {
                     "dict",
                     default_dict,
                     &cache_dir,
-                ).map_err(|e| serde::de::Error::custom(e.to_string()))?
+                )?
             };
 
             (det, rec, dict)
@@ -486,12 +1032,11 @@ impl InitializeConfig {
         let mut config = Self::from_preset(preset, det_path, rec_path, dict_path);
 
         let orient_override = flat
-            .orient_model_path
-            .as_deref()
-            .or_else(|| flat.orientation.as_ref().and_then(|o| o.model_path.as_deref()));
+            .orient_model_path()
+            .or_else(|| flat.orientation.as_ref().and_then(|o| o.model_path()));
         let orient_enabled = flat
-            .use_orient
-            .or_else(|| flat.orientation.as_ref().and_then(|o| o.enabled))
+            .use_orient()
+            .or_else(|| flat.orientation.as_ref().and_then(|o| o.enabled()))
             .unwrap_or(orient_override.is_some());
         if orient_enabled {
             let orient_path = if let Some(p) = orient_override {
@@ -503,10 +1048,9 @@ impl InitializeConfig {
                 } else {
                     "ppocr_orient.rten"
                 };
-                models::resolve_asset_local(None, effective_dir, "orient", orient_file, &cache_dir)
-                    .map_err(|e| serde::de::Error::custom(e.to_string()))?
+                models::resolve_asset_local(None, effective_dir, "orient", orient_file, &cache_dir)?
             };
-            if let Some(thresh) = flat.orientation.as_ref().and_then(|o| o.threshold) {
+            if let Some(thresh) = flat.orientation.as_ref().and_then(|o| o.threshold()) {
                 config = config.with_orientation_threshold(orient_path, thresh);
             } else {
                 config = config.with_orientation(orient_path);
@@ -514,21 +1058,19 @@ impl InitializeConfig {
         }
 
         let cls_override = flat
-            .cls_model_path
-            .as_deref()
-            .or_else(|| flat.classification.as_ref().and_then(|c| c.model_path.as_deref()));
+            .cls_model_path()
+            .or_else(|| flat.classification.as_ref().and_then(|c| c.model_path()));
         let cls_enabled = flat
-            .use_cls
-            .or_else(|| flat.classification.as_ref().and_then(|c| c.enabled))
+            .use_cls()
+            .or_else(|| flat.classification.as_ref().and_then(|c| c.enabled()))
             .unwrap_or(cls_override.is_some());
         if cls_enabled {
             let cls_path = if let Some(p) = cls_override {
                 PathBuf::from(p)
             } else {
-                models::resolve_asset_local(None, effective_dir, "cls", "ppocr_cls.rten", &cache_dir)
-                    .map_err(|e| serde::de::Error::custom(e.to_string()))?
+                models::resolve_asset_local(None, effective_dir, "cls", "ppocr_cls.rten", &cache_dir)?
             };
-            if let Some(thresh) = flat.classification.as_ref().and_then(|c| c.threshold) {
+            if let Some(thresh) = flat.classification.as_ref().and_then(|c| c.threshold()) {
                 config = config.with_cls_threshold(cls_path, thresh);
             } else {
                 config = config.with_cls(cls_path);
@@ -536,120 +1078,115 @@ impl InitializeConfig {
         }
 
         let unwarp_override = flat
-            .unwarp_model_path
-            .as_deref()
-            .or_else(|| flat.unwarp.as_ref().and_then(|u| u.model_path.as_deref()));
+            .unwarp_model_path()
+            .or_else(|| flat.unwarp.as_ref().and_then(|u| u.model_path()));
         let unwarp_enabled = flat
-            .use_unwarp
-            .or_else(|| flat.unwarp.as_ref().and_then(|u| u.enabled))
+            .use_unwarp()
+            .or_else(|| flat.unwarp.as_ref().and_then(|u| u.enabled()))
             .unwrap_or(unwarp_override.is_some());
         if unwarp_enabled {
             let unwarp_path = if let Some(p) = unwarp_override {
                 PathBuf::from(p)
             } else {
-                models::resolve_asset_local(None, effective_dir, "unwarp", "uvdoc.rten", &cache_dir)
-                    .map_err(|e| serde::de::Error::custom(e.to_string()))?
+                models::resolve_asset_local(None, effective_dir, "unwarp", "uvdoc.rten", &cache_dir)?
             };
             config = config.with_unwarp(unwarp_path);
         }
 
         let layout_override = flat
-            .layout_model_path
-            .as_deref()
-            .or_else(|| flat.layout.as_ref().and_then(|l| l.model_path.as_deref()));
+            .layout_model_path()
+            .or_else(|| flat.layout.as_ref().and_then(|l| l.model_path()));
         let layout_enabled = flat
-            .use_layout
-            .or_else(|| flat.layout.as_ref().and_then(|l| l.enabled))
-            .unwrap_or(layout_override.is_some() || flat.layout_variant.is_some());
+            .use_layout()
+            .or_else(|| flat.layout.as_ref().and_then(|l| l.enabled()))
+            .unwrap_or(layout_override.is_some() || flat.layout_variant().is_some());
         if layout_enabled {
             let layout_path = if let Some(p) = layout_override {
                 PathBuf::from(p)
             } else {
-                let layout_file = if flat.layout_variant.as_deref() == Some("publaynet") { "layout_publaynet.rten" } else { "layout_cdla.rten" };
-                models::resolve_asset_local(None, effective_dir, "layout", layout_file, &cache_dir)
-                    .map_err(|e| serde::de::Error::custom(e.to_string()))?
+                let layout_file = if flat.layout_variant() == Some("publaynet") { "layout_publaynet.rten" } else { "layout_cdla.rten" };
+                models::resolve_asset_local(None, effective_dir, "layout", layout_file, &cache_dir)?
             };
             let mut l_cfg = LayoutConfig::default(layout_path);
-            if let Some(conf) = flat.layout.as_ref().and_then(|l| l.conf_thresh) {
+            if let Some(conf) = flat.layout.as_ref().and_then(|l| l.conf_thresh()) {
                 l_cfg.conf_thresh = conf;
             }
-            if let Some(target_size) = flat.layout.as_ref().and_then(|l| l.target_size) {
+            if let Some(target_size) = flat.layout.as_ref().and_then(|l| l.target_size()) {
                 l_cfg.target_size = target_size;
             }
-            if let Some(target_height) = flat.layout.as_ref().and_then(|l| l.target_height) {
+            if let Some(target_height) = flat.layout.as_ref().and_then(|l| l.target_height()) {
                 l_cfg.target_height = Some(target_height);
             }
-            if let Some(target_width) = flat.layout.as_ref().and_then(|l| l.target_width) {
+            if let Some(target_width) = flat.layout.as_ref().and_then(|l| l.target_width()) {
                 l_cfg.target_width = Some(target_width);
             }
             config = config.with_layout_config(l_cfg);
         }
 
-        if flat.enable_reading_order.unwrap_or(false) {
-            let order_path = models::resolve_asset_local(None, effective_dir, "order", "indra_order.rten", &cache_dir)
-                .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+        if flat.enable_reading_order().unwrap_or(false) {
+            let order_path = models::resolve_asset_local(None, effective_dir, "order", "indra_order.rten", &cache_dir)?;
             config.global.reading_order = true;
             config.global.reading_order_model = Some(order_path);
         }
 
-        if let Some(score) = flat.text_score.or_else(|| flat.recognition.as_ref().and_then(|r| r.score_thresh)) {
+        if let Some(score) = flat.text_score().or_else(|| flat.recognition.as_ref().and_then(|r| r.score_thresh())) {
             config.global.text_score = score;
         }
-        if let Some(thresh) = flat.det_thresh.or_else(|| flat.detection.as_ref().and_then(|d| d.thresh)) {
+        if let Some(thresh) = flat.det_thresh().or_else(|| flat.detection.as_ref().and_then(|d| d.thresh())) {
             config.det.thresh = thresh;
         }
-        if let Some(box_thresh) = flat.box_thresh.or_else(|| flat.detection.as_ref().and_then(|d| d.box_thresh)) {
+        if let Some(box_thresh) = flat.box_thresh().or_else(|| flat.detection.as_ref().and_then(|d| d.box_thresh())) {
             config.det.box_thresh = box_thresh;
         }
-        if let Some(side_len) = flat.limit_side_len.or_else(|| flat.detection.as_ref().and_then(|d| d.limit_side_len)) {
+        if let Some(side_len) = flat.limit_side_len().or_else(|| flat.detection.as_ref().and_then(|d| d.limit_side_len())) {
             config.det.limit_side_len = side_len;
         }
-        if let Some(limit_type) = flat.limit_type.or_else(|| flat.detection.as_ref().and_then(|d| d.limit_type.clone())) {
-            config.det.limit_type = limit_type;
+        if let Some(limit_type) = flat.limit_type().or_else(|| flat.detection.as_ref().and_then(|d| d.limit_type())) {
+            config.det.limit_type = limit_type.to_string();
         }
-        if let Some(unclip) = flat.unclip_ratio.or_else(|| flat.detection.as_ref().and_then(|d| d.unclip_ratio)) {
+        if let Some(unclip) = flat.unclip_ratio().or_else(|| flat.detection.as_ref().and_then(|d| d.unclip_ratio())) {
             config.det.unclip_ratio = unclip;
         }
-        if let Some(max_cand) = flat.max_candidates {
+        if let Some(max_cand) = flat.max_candidates() {
             config.det.max_candidates = max_cand;
         }
-        if let Some(dilation) = flat.use_dilation.or_else(|| flat.detection.as_ref().and_then(|d| d.use_dilation)) {
+        if let Some(dilation) = flat.use_dilation().or_else(|| flat.detection.as_ref().and_then(|d| d.use_dilation())) {
             config.det.use_dilation = dilation;
         }
-        if let Some(score_mode) = flat.score_mode.or_else(|| flat.detection.as_ref().and_then(|d| d.score_mode.clone())) {
-            config.det.score_mode = score_mode;
+        if let Some(score_mode) = flat.score_mode().or_else(|| flat.detection.as_ref().and_then(|d| d.score_mode())) {
+            config.det.score_mode = score_mode.to_string();
         }
-        if let Some(use_det) = flat.use_det.or_else(|| flat.detection.as_ref().and_then(|d| d.enabled)) {
+        if let Some(use_det) = flat.use_det().or_else(|| flat.detection.as_ref().and_then(|d| d.enabled())) {
             config.global.use_det = use_det;
         }
-        if let Some(use_rec) = flat.use_rec.or_else(|| flat.recognition.as_ref().and_then(|r| r.enabled)) {
+        if let Some(use_rec) = flat.use_rec().or_else(|| flat.recognition.as_ref().and_then(|r| r.enabled())) {
             config.global.use_rec = use_rec;
         }
-        if let Some(use_cls) = flat.use_cls.or_else(|| flat.classification.as_ref().and_then(|c| c.enabled)) {
+        if let Some(use_cls) = flat.use_cls().or_else(|| flat.classification.as_ref().and_then(|c| c.enabled())) {
             config.global.use_cls = use_cls;
         }
-        if let Some(use_orient) = flat.use_orient.or_else(|| flat.orientation.as_ref().and_then(|o| o.enabled)) {
+        if let Some(use_orient) = flat.use_orient().or_else(|| flat.orientation.as_ref().and_then(|o| o.enabled())) {
             config.global.use_orient = use_orient;
         }
-        if let Some(use_unwarp) = flat.use_unwarp.or_else(|| flat.unwarp.as_ref().and_then(|u| u.enabled)) {
+        if let Some(use_unwarp) = flat.use_unwarp().or_else(|| flat.unwarp.as_ref().and_then(|u| u.enabled())) {
             config.global.use_unwarp = use_unwarp;
         }
-        if let Some(use_layout) = flat.use_layout.or_else(|| flat.layout.as_ref().and_then(|l| l.enabled)) {
+        if let Some(use_layout) = flat.use_layout().or_else(|| flat.layout.as_ref().and_then(|l| l.enabled())) {
             config.global.use_layout = use_layout;
         }
-        if let Some(word_box) = flat.return_word_box.or_else(|| flat.recognition.as_ref().and_then(|r| r.return_word_box)) {
+        if let Some(word_box) = flat.return_word_box().or_else(|| flat.recognition.as_ref().and_then(|r| r.return_word_box())) {
             config.global.return_word_box = word_box;
         }
-        if let Some(char_box) = flat.return_single_char_box.or_else(|| flat.recognition.as_ref().and_then(|r| r.return_single_char_box)) {
+        if let Some(char_box) = flat.return_single_char_box().or_else(|| flat.recognition.as_ref().and_then(|r| r.return_single_char_box())) {
             config.global.return_single_char_box = char_box;
         }
-        if let Some(batch_num) = flat.rec_batch_num.or_else(|| flat.recognition.as_ref().and_then(|r| r.rec_batch_num)) {
+        if let Some(batch_num) = flat.rec_batch_num().or_else(|| flat.recognition.as_ref().and_then(|r| r.rec_batch_num())) {
             config.rec.rec_batch_num = batch_num;
         }
-        if let Some(y_mult) = flat.layout.as_ref().and_then(|l| l.y_threshold_multiplier) {
+        if let Some(y_mult) = flat.layout.as_ref().and_then(|l| l.y_threshold_multiplier()) {
             config.global.y_threshold_multiplier = Some(y_mult);
         }
-        if let Some(x_mult) = flat.layout.as_ref().and_then(|l| l.x_threshold_multiplier) {
+        if let Some(x_mult) = flat.layout.as_ref().and_then(|l| l.x_threshold_multiplier()) {
             config.global.x_threshold_multiplier = Some(x_mult);
         }
 
@@ -657,8 +1194,30 @@ impl InitializeConfig {
     }
 
     /// Serialize configuration to a JSON string
-    pub fn to_json(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string(self)
+    pub fn to_json(&self) -> Result<String, CoreError> {
+        let template = if self.det.thresh == INDRA_MODEL_CONFIG.det_thresh && self.rec.rec_batch_num == 1 {
+            "indra"
+        } else {
+            "ppv6"
+        };
+        let mut flat = FlatConfig::default();
+        flat.template = Some(template.to_string());
+        flat.det_model_path_snake = Some(self.det.model_path.to_string_lossy().to_string());
+        flat.rec_model_path_snake = Some(self.rec.model_path.to_string_lossy().to_string());
+        if let Some(ref d) = self.rec.rec_keys_path {
+            flat.dict_path_snake = Some(d.to_string_lossy().to_string());
+        }
+        flat.det_thresh_snake = Some(self.det.thresh);
+        flat.box_thresh_snake = Some(self.det.box_thresh);
+        flat.unclip_ratio_snake = Some(self.det.unclip_ratio);
+        flat.text_score_snake = Some(self.global.text_score);
+        flat.use_det_snake = Some(self.global.use_det);
+        flat.use_rec_snake = Some(self.global.use_rec);
+        flat.use_cls_snake = Some(self.global.use_cls);
+        flat.use_orient_snake = Some(self.global.use_orient);
+        flat.use_unwarp_snake = Some(self.global.use_unwarp);
+        flat.use_layout_snake = Some(self.global.use_layout);
+        Ok(nanoserde::SerJson::serialize_json(&flat))
     }
 
     /// Set detection model path

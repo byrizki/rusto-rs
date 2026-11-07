@@ -1,4 +1,4 @@
-use ndarray::Array4;
+use rusto_core::tensor::Array4;
 use rusto::{DetectionRunOptions, OcrRunOptions, PostDetectionOptions, PostprocessRunOptions};
 use rusto_core::postprocess::DBPostProcess;
 

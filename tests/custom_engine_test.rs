@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use ndarray::ArrayD;
+use rusto::ArrayD;
 use rusto::{
     CoreError, DetectTextResult, EngineSession, ImageSource, InferenceSession,
     InitializeConfig, OcrRunOptions, RustO, TextDetector, TextRecognizer,

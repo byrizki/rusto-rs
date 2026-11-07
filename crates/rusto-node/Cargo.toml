@@ -10,8 +10,7 @@ crate-type = ["cdylib"]
 napi = { version = "2.16", default-features = false, features = ["napi4"] }
 napi-derive = "2.16"
 rusto-rs = { package = "rusto-rs", path = "../..", default-features = false, features = ["rten"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+nanoserde = { version = "0.2.1", default-features = false, features = ["std", "json"] }
 
 [build-dependencies]
 napi-build = "2.1"

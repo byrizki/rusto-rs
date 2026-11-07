@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use ndarray::Array4;
+use crate::tensor::Array4;
 
 use crate::engine::InferenceSession;
 use crate::error::CoreError;

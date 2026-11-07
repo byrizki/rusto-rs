@@ -1,4 +1,4 @@
-use ndarray::{Array3, Axis};
+use crate::tensor::Array3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WordType {
@@ -38,35 +38,40 @@ impl CtcDecoder {
     }
 
     pub fn from_string(content: &str) -> Self {
+        #[derive(nanoserde::DeJson, Default)]
+        struct MetaFile {
+            vocab: Option<String>,
+            chars: Option<Vec<String>>,
+        }
+        #[derive(nanoserde::DeJson, Default)]
+        struct VocabFile {
+            chars: Option<Vec<String>>,
+        }
+
         let trimmed = content.trim_start();
         if trimmed.starts_with('{') {
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(content) {
-                let chars_val = if let Some(c) = val.get("chars") {
-                    Some(c.clone())
-                } else if let Some(v) = val.get("vocab") {
-                    if let Some(s) = v.as_str() {
-                        serde_json::from_str::<serde_json::Value>(s)
-                            .ok()
-                            .and_then(|pv| pv.get("chars").cloned())
-                    } else {
-                        v.get("chars").cloned()
-                    }
+            if let Ok(meta) = <MetaFile as nanoserde::DeJson>::deserialize_json(content) {
+                let chars_opt = if let Some(c) = meta.chars {
+                    Some(c)
+                } else if let Some(v_str) = meta.vocab {
+                    <VocabFile as nanoserde::DeJson>::deserialize_json(&v_str)
+                        .ok()
+                        .and_then(|v| v.chars)
                 } else {
                     None
                 };
-                if let Some(chars) = chars_val.and_then(|c| c.as_array().cloned()) {
+
+                if let Some(chars) = chars_opt {
                     let mut list = Vec::with_capacity(chars.len() + 1);
                     list.push("blank".to_string());
                     for c in chars {
-                        if let Some(s) = c.as_str() {
-                            list.push(s.to_string());
-                        }
+                        list.push(c);
                     }
                     return Self { chars: list };
                 }
             }
         } else if trimmed.starts_with('[') {
-            if let Ok(tokens) = serde_json::from_str::<Vec<String>>(content) {
+            if let Ok(tokens) = <Vec<String> as nanoserde::DeJson>::deserialize_json(content) {
                 return Self::from_chars(tokens);
             }
         }
@@ -148,39 +153,27 @@ impl CtcDecoder {
         let (n, t, c) = preds.dim();
         let mut line_results = Vec::with_capacity(n);
         let mut word_infos = Vec::with_capacity(if return_word_box { n } else { 0 });
+        let preds_slice = preds.as_slice();
 
         for b in 0..n {
             let mut token_indices = Vec::with_capacity(t);
             let mut token_probs = Vec::with_capacity(t);
+            let b_offset = b * t * c;
 
-            let batch_view = preds.index_axis(Axis(0), b);
             for ti in 0..t {
-                let row_view = batch_view.index_axis(Axis(0), ti);
-                let (best_idx, best_val) = if let Some(row_slice) = row_view.as_slice() {
-                    let mut b_idx = 0usize;
-                    let mut b_val = f32::MIN;
-                    for (ci, &v) in row_slice.iter().enumerate() {
-                        if v > b_val {
-                            b_val = v;
-                            b_idx = ci;
-                        }
+                let row_start = b_offset + ti * c;
+                let row_slice = &preds_slice[row_start..row_start + c];
+                let mut b_idx = 0usize;
+                let mut b_val = f32::MIN;
+                for (ci, &v) in row_slice.iter().enumerate() {
+                    if v > b_val {
+                        b_val = v;
+                        b_idx = ci;
                     }
-                    (b_idx, b_val)
-                } else {
-                    let mut b_idx = 0usize;
-                    let mut b_val = f32::MIN;
-                    for ci in 0..c {
-                        let v = row_view[ci];
-                        if v > b_val {
-                            b_val = v;
-                            b_idx = ci;
-                        }
-                    }
-                    (b_idx, b_val)
-                };
+                }
 
-                token_indices.push(best_idx);
-                token_probs.push(best_val);
+                token_indices.push(b_idx);
+                token_probs.push(b_val);
             }
 
             let ignored = self.get_ignored_tokens();

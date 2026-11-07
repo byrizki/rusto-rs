@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use ndarray::{Array3, Ix3};
+use crate::tensor::Array3;
 
 pub use crate::ctc::{scatter_linenet_results, scatter_rec_results, CtcDecoder, WordInfo, WordType};
 use crate::engine::InferenceSession;
@@ -109,7 +109,7 @@ impl<S: InferenceSession> TextRecognizer<S> {
 
                 let preds_dyn = self.session.run(batch.into_dyn())?;
                 let preds: Array3<f32> = preds_dyn
-                    .into_dimensionality::<Ix3>()
+                    .into_dimensionality()
                     .map_err(|_| CoreError::InvalidShape("recognition output must be 3D".into()))?;
 
                 let (line_results, batch_word_infos) =

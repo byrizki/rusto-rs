@@ -181,9 +181,9 @@ fn test_batched_recognition_parity() {
                 .expect("detect_text batchSize=12");
 
             let single_res: Vec<rusto_core::types::TextResult> =
-                serde_json::from_str(&single_json).expect("parse single");
+                nanoserde::DeJson::deserialize_json(&single_json).expect("parse single");
             let batched_res: Vec<rusto_core::types::TextResult> =
-                serde_json::from_str(&batched_json).expect("parse batched");
+                nanoserde::DeJson::deserialize_json(&batched_json).expect("parse batched");
 
             assert_eq!(
                 single_res.len(),

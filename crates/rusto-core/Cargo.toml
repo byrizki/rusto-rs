@@ -7,13 +7,10 @@ license = "MIT"
 repository = "https://github.com/byrizki/rusto-rs"
 
 [dependencies]
-ndarray = "0.16"
 thiserror = "1.0"
-clipper2-rust = "1.2.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 rusto-nn = { path = "../rusto-nn", version = "0.4.0", default-features = false, features = ["std"] }
+nanoserde = { version = "0.2.1", default-features = false, features = ["std", "json"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 dirs = "5.0"

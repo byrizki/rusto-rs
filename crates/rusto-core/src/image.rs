@@ -4,7 +4,7 @@ use crate::error::CoreError;
 
 pub type Result<T> = std::result::Result<T, CoreError>;
 
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, nanoserde::DeJson, nanoserde::SerJson)]
 pub struct Point2f {
     pub x: f32,
     pub y: f32,
@@ -22,7 +22,7 @@ impl Point2f {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, nanoserde::DeJson, nanoserde::SerJson)]
 pub struct Size {
     pub width: i32,
     pub height: i32,
@@ -34,7 +34,7 @@ impl Size {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, nanoserde::DeJson, nanoserde::SerJson)]
 pub struct Rect {
     pub x: i32,
     pub y: i32,

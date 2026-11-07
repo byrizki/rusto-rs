@@ -1,5 +1,4 @@
-use ndarray::Array4;
-use clipper2_rust::{inflate_paths_d, EndType, JoinType, PathD, PointD};
+use crate::tensor::Array4;
 use crate::error::CoreError;
 use crate::image::{self, Mat, Point2f};
 use crate::contours;
@@ -208,9 +207,7 @@ impl DBPostProcess {
             return Ok((Vec::new(), Vec::new()));
         }
 
-        let pred_arr = ndarray::ArrayView4::from_shape((1, 1, h, w), pred_slice)
-            .map_err(|e| CoreError::InvalidShape(e.to_string()))?
-            .to_owned();
+        let pred_arr = crate::tensor::Tensor::from_slice([1, 1, h, w], pred_slice);
 
         self.process(&pred_arr, ori_h, ori_w)
     }
@@ -256,42 +253,7 @@ impl DBPostProcess {
     }
 
     fn unclip_pure(&self, box_pts: &[Point2f; 4]) -> Result<Vec<Point2f>, CoreError> {
-        let mut area = 0.0f64;
-        let mut length = 0.0f64;
-        for i in 0..4 {
-            let j = (i + 1) % 4;
-            let dx = (box_pts[j].x - box_pts[i].x) as f64;
-            let dy = (box_pts[j].y - box_pts[i].y) as f64;
-            area += box_pts[i].x as f64 * box_pts[j].y as f64 - box_pts[j].x as f64 * box_pts[i].y as f64;
-            length += (dx * dx + dy * dy).sqrt();
-        }
-        area = area.abs() / 2.0;
-
-        let distance = area * self.unclip_ratio / length.max(1e-6);
-
-        let poly: PathD = box_pts
-            .iter()
-            .map(|p| PointD::new(p.x as f64, p.y as f64))
-            .collect();
-
-        let paths = vec![poly];
-        let expanded = inflate_paths_d(&paths, distance, JoinType::Miter, EndType::Polygon, 2.0, 2, 0.25);
-
-        let mut result = Vec::new();
-        if let Some(first_path) = expanded.first() {
-            for pt in first_path {
-                result.push(Point2f::new(pt.x as f32, pt.y as f32));
-            }
-            if let Some(last) = result.last() {
-                if let Some(first) = result.first() {
-                    if (last.x - first.x).abs() < 0.1 && (last.y - first.y).abs() < 0.1 {
-                        result.pop();
-                    }
-                }
-            }
-        }
-
-        Ok(result)
+        Ok(unclip_polygon_analytic(box_pts, self.unclip_ratio))
     }
 
     fn order_points_clockwise_pure(&self, pts: [Point2f; 4]) -> [Point2f; 4] {
@@ -717,5 +679,77 @@ pub fn decode_det_predictions(
             &params.score_mode,
         );
         db.process(preds, ori_h, ori_w)
+    }
+}
+
+pub fn unclip_polygon_analytic(box_pts: &[Point2f; 4], unclip_ratio: f64) -> Vec<Point2f> {
+    let mut signed_area = 0.0f64;
+    let mut length = 0.0f64;
+    for i in 0..4 {
+        let j = (i + 1) % 4;
+        let dx = (box_pts[j].x - box_pts[i].x) as f64;
+        let dy = (box_pts[j].y - box_pts[i].y) as f64;
+        signed_area += (box_pts[i].x as f64) * (box_pts[j].y as f64) - (box_pts[j].x as f64) * (box_pts[i].y as f64);
+        length += (dx * dx + dy * dy).sqrt();
+    }
+    let area = signed_area.abs() / 2.0;
+    let distance = area * unclip_ratio / length.max(1e-6);
+
+    let sign = if signed_area >= 0.0 { 1.0 } else { -1.0 };
+
+    let mut normals = [(0.0f64, 0.0f64); 4];
+    for i in 0..4 {
+        let j = (i + 1) % 4;
+        let dx = (box_pts[j].x - box_pts[i].x) as f64;
+        let dy = (box_pts[j].y - box_pts[i].y) as f64;
+        let edge_len = (dx * dx + dy * dy).sqrt().max(1e-6);
+        normals[i] = (sign * dy / edge_len, -sign * dx / edge_len);
+    }
+
+    let mut result = Vec::with_capacity(4);
+    for i in 0..4 {
+        let prev = (i + 3) % 4;
+        let n_prev = normals[prev];
+        let n_curr = normals[i];
+        let dot = n_prev.0 * n_curr.0 + n_prev.1 * n_curr.1;
+        let denom = (1.0 + dot).max(1e-4);
+        let mx = (n_prev.0 + n_curr.0) / denom;
+        let my = (n_prev.1 + n_curr.1) / denom;
+
+        result.push(Point2f::new(
+            (box_pts[i].x as f64 + distance * mx) as f32,
+            (box_pts[i].y as f64 + distance * my) as f32,
+        ));
+    }
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::image::{box_points, min_area_rect, Size};
+
+    #[test]
+    fn test_unclip_analytic_geometry() {
+        for angle in [0.0, 15.0, 30.0, 45.0, 60.0, 90.0, 135.0, 180.0, 270.0] {
+            for (w, h) in [(50, 20), (120, 35), (200, 10), (80, 80)] {
+                let center = Point2f::new(200.0, 200.0);
+                let size = Size::new(w, h);
+                let pts = box_points(center, size, angle);
+
+                let unclipped = unclip_polygon_analytic(&pts, 1.5);
+                assert_eq!(unclipped.len(), 4, "Analytic unclip should produce 4 vertices");
+
+                let (c, s, _a) = min_area_rect(&unclipped).expect("rect");
+                assert!((c.x - center.x).abs() < 0.5, "Center X mismatch at angle {}: {} vs {}", angle, c.x, center.x);
+                assert!((c.y - center.y).abs() < 0.5, "Center Y mismatch at angle {}: {} vs {}", angle, c.y, center.y);
+                let max_orig = w.max(h);
+                let min_orig = w.min(h);
+                let max_exp = s.width.max(s.height);
+                let min_exp = s.width.min(s.height);
+                assert!(max_exp >= max_orig, "Expanded max side should be >= original: {} vs {}", max_exp, max_orig);
+                assert!(min_exp >= min_orig, "Expanded min side should be >= original: {} vs {}", min_exp, min_orig);
+            }
+        }
     }
 }

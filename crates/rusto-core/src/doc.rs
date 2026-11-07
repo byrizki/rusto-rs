@@ -9,14 +9,16 @@ use crate::pipeline::OcrPipeline;
 use crate::table::{TableDetector, TableDetectorConfig, TableStructureConfig, TableStructureRecognizer};
 use crate::types::{LayoutConfig, OcrRunOptions};
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+use nanoserde::{DeJson, SerJson};
+
+#[derive(Debug, Clone, SerJson, DeJson)]
 pub struct DocBlock {
     pub region: LayoutRegion,
     pub text: Option<String>,
     pub html: Option<String>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, SerJson, DeJson)]
 pub struct DocResult {
     pub blocks: Vec<DocBlock>,
 }

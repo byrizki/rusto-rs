@@ -488,7 +488,7 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.format {
         OutputFormat::Json => {
-            println!("{}", serde_json::to_string_pretty(&effective_results)?);
+            println!("{}", nanoserde::SerJson::serialize_json(&effective_results));
         }
         OutputFormat::Text | OutputFormat::TextOrdered => {
             for result in &effective_results {

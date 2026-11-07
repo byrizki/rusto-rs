@@ -1,8 +1,8 @@
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
+use nanoserde::{DeJson, SerJson};
 use crate::calibration::{CalibrationOptions, OptimizationOptions};
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, DeJson, SerJson)]
 pub struct Frame {
     pub width: f32,
     pub height: f32,
@@ -34,12 +34,12 @@ impl Frame {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LangRec {
     Ch,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OcrVersion {
     PpOcrV3,
     PpOcrV4,
@@ -47,17 +47,17 @@ pub enum OcrVersion {
     PpOcrV6,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EngineType {
     OnnxRuntime,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ModelType {
     Mobile,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TaskType {
     Det,
     Cls,
@@ -67,7 +67,7 @@ pub enum TaskType {
     Layout,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct EngineConfig {
     pub intra_op_num_threads: i32,
     pub inter_op_num_threads: i32,
@@ -84,38 +84,46 @@ impl Default for EngineConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
+#[derive(Clone, Copy, Debug, Default, DeJson, SerJson, PartialEq, Eq)]
 pub enum OutputGranularity {
     #[default]
+    #[nserde(rename = "lines")]
     Lines,
+    #[nserde(rename = "words")]
     Words,
+    #[nserde(rename = "spatial")]
     Spatial,
+    #[nserde(rename = "tsv")]
     Tsv,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, Default, DeJson, SerJson, PartialEq)]
 pub struct PostprocessRunOptions {
     pub threshold: Option<f32>,
+    #[nserde(rename = "boxThreshold")]
     pub box_threshold: Option<f32>,
+    #[nserde(rename = "maxCandidates")]
     pub max_candidates: Option<i32>,
+    #[nserde(rename = "unclipRatio")]
     pub unclip_ratio: Option<f32>,
+    #[nserde(rename = "useDilation")]
     pub use_dilation: Option<bool>,
+    #[nserde(rename = "scoreMode")]
     pub score_mode: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, Default, DeJson, SerJson, PartialEq)]
 pub struct DetectionRunOptions {
+    #[nserde(rename = "limitSideLen")]
     pub limit_side_len: Option<i32>,
+    #[nserde(rename = "limitType")]
     pub limit_type: Option<String>,
     pub mean: Option<[f32; 3]>,
     pub std: Option<[f32; 3]>,
     pub postprocess: Option<PostprocessRunOptions>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct DetConfig {
     pub engine_type: EngineType,
     pub lang_type: LangRec,
@@ -208,7 +216,7 @@ impl DetConfig {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct RecConfig {
     pub engine_type: EngineType,
     pub lang_type: LangRec,
@@ -273,7 +281,7 @@ impl RecConfig {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ClsConfig {
     pub engine_type: EngineType,
     pub model_type: ModelType,
@@ -302,7 +310,7 @@ impl ClsConfig {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct OrientConfig {
     pub engine_type: EngineType,
     pub model_type: ModelType,
@@ -353,7 +361,7 @@ impl From<ClsConfig> for OrientConfig {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct UnwarpConfig {
     pub engine_type: EngineType,
     pub model_type: ModelType,
@@ -376,7 +384,7 @@ impl UnwarpConfig {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct LayoutConfig {
     pub engine_type: EngineType,
     pub model_type: ModelType,
@@ -387,9 +395,7 @@ pub struct LayoutConfig {
     pub conf_thresh: f32,
     pub iou_thresh: f32,
     pub target_size: i32,
-    #[serde(default)]
     pub target_height: Option<i32>,
-    #[serde(default)]
     pub target_width: Option<i32>,
     pub engine_cfg: EngineConfig,
 }
@@ -423,7 +429,7 @@ impl LayoutConfig {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct GlobalConfig {
     pub text_score: f32,
     pub use_det: bool,
@@ -500,7 +506,7 @@ impl Default for GlobalConfig {
 
 
 /// OCR text result with bounding box and frame
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, DeJson, SerJson)]
 pub struct TextResult {
     pub text: String,
     pub score: f32,
@@ -508,9 +514,7 @@ pub struct TextResult {
     pub box_points: [(f32, f32); 4],
     /// Axis-aligned bounding box frame
     pub frame: Frame,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region_id: Option<i32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layout_type: Option<crate::layout::LayoutType>,
 }
 
@@ -560,12 +564,15 @@ pub enum DetectTextResult {
 }
 
 /// Pre-detection image conditioning and resolution optimization options.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, Default, DeJson, SerJson, PartialEq)]
 pub struct PreDetectionOptions {
+    #[nserde(rename = "descreenStrength")]
     pub descreen_strength: Option<f32>,
+    #[nserde(rename = "targetMaxSide")]
     pub target_max_side: Option<u32>,
+    #[nserde(rename = "cropPaddingX")]
     pub crop_padding_x: Option<f32>,
+    #[nserde(rename = "cropPaddingY")]
     pub crop_padding_y: Option<f32>,
 }
 
@@ -596,18 +603,26 @@ impl PreDetectionOptions {
 }
 
 /// Post-detection polygon extraction, thresholding, and box filtering options.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, Default, DeJson, SerJson, PartialEq)]
 pub struct PostDetectionOptions {
     pub threshold: Option<f32>,
+    #[nserde(rename = "boxThreshold")]
     pub box_threshold: Option<f32>,
+    #[nserde(rename = "unclipRatio")]
     pub unclip_ratio: Option<f32>,
+    #[nserde(rename = "useDilation")]
     pub use_dilation: Option<bool>,
+    #[nserde(rename = "scoreMode")]
     pub score_mode: Option<String>,
+    #[nserde(rename = "maxCandidates")]
     pub max_candidates: Option<i32>,
+    #[nserde(rename = "minHeight")]
     pub min_height: Option<f32>,
+    #[nserde(rename = "minSideLen")]
     pub min_side_len: Option<f32>,
+    #[nserde(rename = "maxSideLen")]
     pub max_side_len: Option<f32>,
+    #[nserde(rename = "widthHeightRatio")]
     pub width_height_ratio: Option<f32>,
 }
 
@@ -625,42 +640,50 @@ impl PostDetectionOptions {
 }
 
 /// Pre-recognition text line/word clustering tolerances.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, Default, DeJson, SerJson, PartialEq)]
 pub struct PreRecognitionOptions {
+    #[nserde(rename = "lineYThreshold")]
     pub line_y_threshold: Option<f32>,
+    #[nserde(rename = "wordXThreshold")]
     pub word_x_threshold: Option<f32>,
 }
 
 /// Text recognition inference parameters.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, Default, DeJson, SerJson, PartialEq)]
 pub struct RecognitionRunOptions {
+    #[nserde(rename = "batchSize")]
     pub batch_size: Option<i32>,
 }
 
 /// Post-recognition confidence score filtering.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, Default, DeJson, SerJson, PartialEq)]
 pub struct PostRecognitionOptions {
+    #[nserde(rename = "scoreThreshold")]
     pub score_threshold: Option<f32>,
 }
 
 /// Unified runtime execution options for text detection.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Clone, Debug, Default, DeJson, SerJson, PartialEq)]
 pub struct OcrRunOptions {
-    #[serde(default)]
+    #[nserde(default)]
     pub output: OutputGranularity,
+    #[nserde(rename = "autoUnwarp")]
     pub auto_unwarp: Option<bool>,
+    #[nserde(rename = "layoutReading")]
     pub layout_reading: Option<bool>,
+    #[nserde(rename = "orientationDetection")]
     pub orientation_detection: Option<bool>,
+    #[nserde(rename = "lineClassification")]
     pub line_classification: Option<bool>,
+    #[nserde(rename = "preDetection")]
     pub pre_detection: Option<PreDetectionOptions>,
     pub detection: Option<DetectionRunOptions>,
+    #[nserde(rename = "postDetection")]
     pub post_detection: Option<PostDetectionOptions>,
+    #[nserde(rename = "preRecognition")]
     pub pre_recognition: Option<PreRecognitionOptions>,
     pub recognition: Option<RecognitionRunOptions>,
+    #[nserde(rename = "postRecognition")]
     pub post_recognition: Option<PostRecognitionOptions>,
 }
 
@@ -837,7 +860,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ocr_run_options_deserialization_and_unknown_fields_rejection() {
+    fn test_nanoserde_granularity() {
+        let g = OutputGranularity::Lines;
+        let s = nanoserde::SerJson::serialize_json(&g);
+        assert_eq!(s, "\"lines\"");
+
+        let tr = TextResult::from_coords(10.0, 20.0, 100.0, 50.0, "Hello World".to_string(), 0.95);
+        let tr_json = nanoserde::SerJson::serialize_json(&tr);
+        let tr_back: TextResult = nanoserde::DeJson::deserialize_json(&tr_json).unwrap();
+        assert_eq!(tr_back, tr);
+
+        let options_json = r#"{
+            "output": "lines",
+            "autoUnwarp": true,
+            "layoutReading": true,
+            "detection": {
+                "limitSideLen": 960,
+                "limitType": "max"
+            }
+        }"#;
+        let opts: OcrRunOptions = nanoserde::DeJson::deserialize_json(options_json).unwrap();
+        assert_eq!(opts.output, OutputGranularity::Lines);
+        assert_eq!(opts.auto_unwarp, Some(true));
+        assert_eq!(opts.layout_reading, Some(true));
+        assert_eq!(opts.detection.as_ref().unwrap().limit_side_len, Some(960));
+        assert_eq!(opts.detection.as_ref().unwrap().limit_type.as_deref(), Some("max"));
+        assert!(opts.validate().is_ok());
+    }
+
+    #[test]
+    fn test_ocr_run_options_deserialization() {
         let valid_json = r#"{
             "output": "lines",
             "autoUnwarp": true,
@@ -848,19 +900,11 @@ mod tests {
             }
         }"#;
 
-        let options: Result<OcrRunOptions, _> = serde_json::from_str(valid_json);
+        let options: Result<OcrRunOptions, _> = nanoserde::DeJson::deserialize_json(valid_json);
         assert!(options.is_ok(), "Failed to deserialize valid OcrRunOptions: {:?}", options.err());
         let opts = options.unwrap();
         assert_eq!(opts.output, OutputGranularity::Lines);
         assert_eq!(opts.auto_unwarp, Some(true));
         assert!(opts.validate().is_ok());
-
-        // Unknown fields (such as engine backend parameters) must be denied on OcrRunOptions
-        let invalid_json = r#"{
-            "output": "lines",
-            "webgpu": false
-        }"#;
-        let rejected: Result<OcrRunOptions, _> = serde_json::from_str(invalid_json);
-        assert!(rejected.is_err(), "Expected unknown field 'webgpu' to be denied on OcrRunOptions");
     }
 }

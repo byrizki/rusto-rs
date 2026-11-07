@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use nanoserde::{DeJson, SerJson};
 use crate::engine::InferenceSession;
 use crate::error::CoreError;
 use crate::image::Mat;
@@ -6,7 +7,7 @@ use crate::layout::BBox;
 pub use crate::layout::{preprocess_rtdetr, preprocess_slanet};
 
 /// Table cell information
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, DeJson, SerJson)]
 pub struct TableCell {
     pub bbox: BBox,
     pub row: usize,
@@ -27,13 +28,13 @@ impl TableCell {
 }
 
 /// Table row
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, DeJson, SerJson)]
 pub struct TableRow {
     pub cells: Vec<TableCell>,
 }
 
 /// Complete table structure
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, DeJson, SerJson)]
 pub struct TableStructure {
     pub rows: Vec<TableRow>,
     pub num_rows: usize,
@@ -123,13 +124,13 @@ impl TableStructure {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, DeJson, SerJson)]
 pub enum TableModelType {
     Wireless,
     Wired,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
 pub struct TableDetectorConfig {
     pub model_path: std::path::PathBuf,
     pub conf_threshold: f32,
@@ -148,7 +149,7 @@ impl Default for TableDetectorConfig {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
 pub struct TableStructureConfig {
     pub model_path: std::path::PathBuf,
     pub model_type: TableModelType,
@@ -164,7 +165,7 @@ impl Default for TableStructureConfig {
 }
 
 pub fn postprocess_rtdetr(
-    outputs: &std::collections::HashMap<String, ndarray::ArrayD<f32>>,
+    outputs: &std::collections::HashMap<String, crate::tensor::ArrayD<f32>>,
     scale_x: f32,
     scale_y: f32,
     orig_w: i32,
@@ -179,7 +180,7 @@ pub fn postprocess_rtdetr(
 }
 
 pub fn postprocess_slanet(
-    _outputs: &std::collections::HashMap<String, ndarray::ArrayD<f32>>,
+    _outputs: &std::collections::HashMap<String, crate::tensor::ArrayD<f32>>,
 ) -> Result<TableStructure, crate::error::CoreError> {
     let cell = TableCell {
         bbox: BBox { x_min: 0, y_min: 0, x_max: 100, y_max: 100 },

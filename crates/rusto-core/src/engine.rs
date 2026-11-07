@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use ndarray::ArrayD;
+use crate::tensor::{Array4, ArrayD, Tensor};
 
 use crate::config::InitializeConfig;
 pub use crate::doc::DocPipelineConfig;
@@ -41,11 +41,12 @@ pub enum EngineError {
     Preprocess(String),
 
     #[error("Shape error: {0}")]
-    ShapeError(#[from] ndarray::ShapeError),
+    ShapeError(String),
 
     #[error("Output error: {0}")]
     OutputError(String),
 }
+
 
 impl From<Box<dyn std::error::Error>> for EngineError {
     fn from(err: Box<dyn std::error::Error>) -> Self {
@@ -61,6 +62,7 @@ impl From<CoreError> for EngineError {
             CoreError::InvalidShape(_) => EngineError::InvalidInputShape,
             CoreError::Image(s) => EngineError::ImageError(s),
             CoreError::Model(s) => EngineError::Engine(s),
+            CoreError::Config(s) => EngineError::Engine(s),
             CoreError::Io(e) => EngineError::Preprocess(e.to_string()),
         }
     }
@@ -110,7 +112,7 @@ pub trait InferenceSession: Send {
     /// Run multi-input LineNet recognition (ink tensor + sequence widths).
     fn run_linenet_rec(
         &mut self,
-        _x: ndarray::Array4<f32>,
+        _x: Array4<f32>,
         _widths: Vec<i32>,
     ) -> Result<LineNetRecOutput, CoreError> {
         Err(CoreError::Model(
@@ -149,7 +151,7 @@ impl InferenceSession for Box<dyn InferenceSession> {
 
     fn run_linenet_rec(
         &mut self,
-        x: ndarray::Array4<f32>,
+        x: Array4<f32>,
         widths: Vec<i32>,
     ) -> Result<LineNetRecOutput, CoreError> {
         (**self).run_linenet_rec(x, widths)
@@ -186,7 +188,7 @@ impl<T: InferenceSession + ?Sized> InferenceSession for &mut T {
 
     fn run_linenet_rec(
         &mut self,
-        x: ndarray::Array4<f32>,
+        x: Array4<f32>,
         widths: Vec<i32>,
     ) -> Result<LineNetRecOutput, CoreError> {
         (**self).run_linenet_rec(x, widths)
@@ -443,7 +445,7 @@ impl EngineSession {
 
     pub fn run_linenet_rec(
         &mut self,
-        x: ndarray::Array4<f32>,
+        x: Array4<f32>,
         widths: Vec<i32>,
     ) -> Result<LineNetRecOutput, EngineError> {
         match self {
@@ -483,7 +485,7 @@ impl InferenceSession for EngineSession {
 
     fn run_linenet_rec(
         &mut self,
-        x: ndarray::Array4<f32>,
+        x: Array4<f32>,
         widths: Vec<i32>,
     ) -> Result<LineNetRecOutput, CoreError> {
         self.run_linenet_rec(x, widths).map_err(Into::into)
@@ -542,7 +544,7 @@ impl MnnSession {
 
         let out_shape = out_tensor.shape().to_vec();
         let out_data = out_tensor.into_f32_vec();
-        ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), out_data).map_err(EngineError::ShapeError)
+        Ok(Tensor::from_data(&out_shape, out_data))
     }
 
     pub fn run_all(
@@ -571,8 +573,7 @@ impl MnnSession {
         let mut results = HashMap::with_capacity(outputs.len());
         for (name, out_tensor) in outputs {
             let out_shape = out_tensor.shape().to_vec();
-            let array = ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), out_tensor.into_f32_vec())
-                .map_err(EngineError::ShapeError)?;
+            let array = Tensor::from_data(&out_shape, out_tensor.into_f32_vec());
             results.insert(name, array);
         }
         Ok(results)
@@ -585,11 +586,7 @@ impl MnnSession {
         let mut mnn_tensors = Vec::with_capacity(inputs_map.len());
         for (name, arr) in &inputs_map {
             let shape = arr.shape().to_vec();
-            let data: Vec<f32> = if let Some(slice) = arr.as_slice() {
-                slice.to_vec()
-            } else {
-                arr.iter().copied().collect()
-            };
+            let data = arr.as_slice().to_vec();
             mnn_tensors.push((
                 name.clone(),
                 rusto_nn::Tensor::from_floats(&shape, data, rusto_nn::TensorLayout::NCHW),
@@ -610,13 +607,11 @@ impl MnnSession {
         for (name, out_tensor) in outputs {
             let out_shape = out_tensor.shape().to_vec();
             if let Some(floats) = out_tensor.as_floats() {
-                let array = ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), floats.to_vec())
-                    .map_err(EngineError::ShapeError)?;
+                let array = Tensor::from_data(&out_shape, floats.to_vec());
                 results.insert(name, array);
             } else if let Some(ints) = out_tensor.as_ints() {
                 let floats: Vec<f32> = ints.iter().map(|&x| x as f32).collect();
-                let array = ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), floats)
-                    .map_err(EngineError::ShapeError)?;
+                let array = Tensor::from_data(&out_shape, floats);
                 results.insert(name, array);
             }
         }
@@ -625,15 +620,11 @@ impl MnnSession {
 
     pub fn run_linenet_rec(
         &mut self,
-        x: ndarray::Array4<f32>,
+        x: Array4<f32>,
         widths: Vec<i32>,
     ) -> Result<LineNetRecOutput, EngineError> {
         let x_shape = x.shape().to_vec();
-        let x_data: Vec<f32> = if let Some(slice) = x.as_slice() {
-            slice.to_vec()
-        } else {
-            x.iter().copied().collect()
-        };
+        let x_data = x.into_raw_vec();
         let x_tensor = rusto_nn::Tensor::from_floats(&x_shape, x_data, rusto_nn::TensorLayout::NCHW);
         let widths_tensor = rusto_nn::Tensor::from_ints(&[widths.len()], widths);
 

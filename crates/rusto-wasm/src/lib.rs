@@ -480,7 +480,7 @@ impl RtenOcrPipeline {
 
         let results = self.recognize_boxes_batched(&processed_rgba, orig_w, orig_h, &raw_boxes, 12)?;
 
-        serde_json::to_string(&results).map_err(|e| format!("Serialization error: {:?}", e))
+        Ok(nanoserde::SerJson::serialize_json(&results))
     }
 
     /// Run full OCR pipeline directly in WebAssembly accepting RGBA or RGB buffers with runtime options.
@@ -500,7 +500,7 @@ impl RtenOcrPipeline {
 
         let options: OcrRunOptions = match &options_json {
             Some(json) if !json.trim().is_empty() => {
-                serde_json::from_str(json).map_err(|e| format!("Invalid options JSON: {e}"))?
+                nanoserde::DeJson::deserialize_json(json).map_err(|e| format!("Invalid options JSON: {e}"))?
             }
             _ => OcrRunOptions::default(),
         };
@@ -637,8 +637,7 @@ impl RtenOcrPipeline {
                     .collect();
                 let texts: Vec<String> = recognized.iter().map(|c| c.text.clone()).collect();
                 let spatial_text = to_spatial_text(&boxes, &texts, line_y, word_x);
-                serde_json::to_string(&spatial_text)
-                    .map_err(|e| format!("Serialization error: {:?}", e))
+                Ok(nanoserde::SerJson::serialize_json(&spatial_text))
             }
             OutputGranularity::Tsv => {
                 let boxes: Vec<[Point2f; 4]> = recognized
@@ -654,8 +653,7 @@ impl RtenOcrPipeline {
                     .collect();
                 let texts: Vec<String> = recognized.iter().map(|c| c.text.clone()).collect();
                 let tsv_text = to_tsv(&boxes, &texts);
-                serde_json::to_string(&tsv_text)
-                    .map_err(|e| format!("Serialization error: {:?}", e))
+                Ok(nanoserde::SerJson::serialize_json(&tsv_text))
             }
             OutputGranularity::Words => {
                 let mut words: Vec<TextResult> = Vec::new();
@@ -689,7 +687,7 @@ impl RtenOcrPipeline {
                 if options.layout_reading.unwrap_or(false) {
                     sort_lines_reading_order(&mut words);
                 }
-                serde_json::to_string(&words).map_err(|e| format!("Serialization error: {:?}", e))
+                Ok(nanoserde::SerJson::serialize_json(&words))
             }
             OutputGranularity::Lines => {
                 let mut segments = cluster_text_results_into_lines(
@@ -700,7 +698,7 @@ impl RtenOcrPipeline {
                 if options.layout_reading.unwrap_or(false) {
                     sort_lines_reading_order(&mut segments);
                 }
-                serde_json::to_string(&segments).map_err(|e| format!("Serialization error: {:?}", e))
+                Ok(nanoserde::SerJson::serialize_json(&segments))
             }
         }
     }

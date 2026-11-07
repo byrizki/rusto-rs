@@ -74,6 +74,7 @@ pub use rusto_core::types::{
     PostDetectionOptions, PostRecognitionOptions, PostprocessRunOptions, PreDetectionOptions,
     PreRecognitionOptions, RecConfig, RecognitionRunOptions, TextResult, UnwarpConfig,
 };
+pub use rusto_core::tensor::{Array2, Array3, Array4, ArrayD, Axis, Tensor};
 
 enum BuilderInput<'a> {
     Source(ImageSource),

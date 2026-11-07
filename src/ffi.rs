@@ -15,7 +15,7 @@ unsafe fn parse_run_options(options_json: *const c_char) -> Result<OcrRunOptions
     let options = CStr::from_ptr(options_json)
         .to_str()
         .ok()
-        .and_then(|json| serde_json::from_str::<OcrRunOptions>(json).ok())
+        .and_then(|json| <OcrRunOptions as nanoserde::DeJson>::deserialize_json(json).ok())
         .ok_or(ROCR_INVALID_OPTIONS)?;
     options.validate().map_err(|_| ROCR_INVALID_OPTIONS)?;
     Ok(options)
@@ -533,7 +533,7 @@ pub unsafe extern "C" fn rocr_download_model(
                 .into_iter()
                 .map(|p| p.to_string_lossy().to_string())
                 .collect();
-            let json = serde_json::to_string(&str_paths).unwrap_or_else(|_| "[]".to_string());
+            let json = nanoserde::SerJson::serialize_json(&str_paths);
             CString::new(json).unwrap_or_default().into_raw()
         }
         Err(_) => std::ptr::null_mut(),
