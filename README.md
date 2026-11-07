@@ -30,7 +30,7 @@
 ## 🎯 Key Features
 
 - **Pure Rust MNN Engine (`rusto-nn`)** — Zero C++ or OpenCV runtime dependencies. SIMD vectorization (AVX-512, AVX2, NEON, WASM SIMD128) with pluggable RTen, ONNX, and hardware backends (WebGPU, CUDA). Build directly with `cargo build`.
-- **Flagship Indra OCR + PP-OCRv6** — DataLab Indra OCR (~5.4 MB, **45.98%** OmniDocBench accuracy) by default alongside PP-OCRv6 (50+ languages unified), PP-OCRv5, and PP-OCRv4 (FP32 & INT8).
+- **Flagship Indra OCR + PP-OCRv6** — DataLab Indra OCR (~5.4 MB, **45.97%** OmniDocBench accuracy) by default alongside PP-OCRv6 (50+ languages unified), PP-OCRv5, and PP-OCRv4 (FP32 & INT8).
 - **End-to-End Document Pipeline** — Built-in 3D UVDoc unwarping, orientation detection, PicoDet layout region classification (`regionId` / `layoutType`), and neural graph reading order (`indra_order.rten`).
 - **Unified Fluent Builder API** — Consistent `.withAutoUnwarp()`, `.withLayoutReading()`, `.asLines()` / `.asWords()` / `.asSpatial()` / `.asTsv()`, and single `.run()` terminal execution across every SDK.
 - **12 Cross-Platform SDKs + CLI** — First-class libraries for Rust, Node.js, Python, Go, Java, .NET, Dart, Flutter, Web (WASM), React, React Native, iOS, Android, and C FFI, plus the `rusto` CLI.
@@ -468,16 +468,16 @@ Empirically evaluated against official PaddleOCR and RapidOCR (C++ ONNX Runtime)
 
 | Capability / Metric | RustO! (Pure Rust Core) | OpenCV / C++ Stacks (RapidOCR / PaddleOCR) | Benchmark Reference |
 |---|:---:|:---:|---|
-| **CLI Binary Size (Self-Contained)** | ✅ **8.3 MB** | ❌ ~55 MB+ (libopencv + onnxruntime) | Production Linux x86-64 release |
+| **CLI Binary Size (Self-Contained)** | ✅ **8.2 MB** | ❌ ~55 MB+ (libopencv + onnxruntime) | Production Linux x86-64 release |
 | **C FFI Shared Library (`librusto.so`)** | ✅ **304 KB** | ❌ ~15–30 MB | Stripped release `.so` |
 | **Android Native Size (Per-ABI)** | ✅ **~1.8 MB** | ❌ ~20 MB+ (`libopencv.so` + ONNX) | Android release AAR |
-| **WebAssembly (WASM) Bundle** | ✅ **517 KB** (gzipped) | ❌ 3.78 MB (gzipped ONNX Runtime WASM) | Web client bundle size |
+| **WebAssembly (WASM) Bundle** | ✅ **238 KB** (gzipped `rusto-nn` WASM) | ❌ 3.78 MB (gzipped ONNX Runtime WASM) | Web client bundle size |
 | **Zero External C++ Dependencies** | ✅ Pure Rust (`cargo build`) | ❌ Requires CMake, OpenCV & NDK | Toolchain build dependencies |
-| **Peak Memory (OmniDocBench)** | ✅ **177.8 MB - 252.8 MB** | ❌ 392.5 MB (RapidOCR) / 659.3 MB (PaddleOCR) | OmniDocBench full dataset peak RSS |
+| **Peak Memory (OmniDocBench)** | ✅ **178.0 MB - 253.1 MB** | ❌ 392.5 MB (RapidOCR) / 659.3 MB (PaddleOCR) | OmniDocBench full dataset peak RSS |
 | **Document Pipeline (1600×993 px)** | ⚡ **678.08 ms** (Det: 312 ms, Rec: 169 ms, 27 lines) | ⚡ 447.83 ms (C++ ONNX Runtime) | Base pipeline end-to-end benchmark |
-| **OmniDocBench Mean Latency** | ⚡ **1,166.8 ms** (Indra) / **1,172.5 ms** (Tiny) | ⚡ 605.3 ms (PaddleOCR) / 1,011.5 ms (RapidOCR) | OmniDocBench full evaluation |
+| **OmniDocBench Mean Latency** | ⚡ **976.0 ms** (Tiny) / **1,054.7 ms** (Indra) | ⚡ 605.3 ms (PaddleOCR) / 1,011.5 ms (RapidOCR) | OmniDocBench full evaluation |
 | **Transcription Parity (High-Res Scan)** | 🎯 **100% token identical** across all 27 lines | 🎯 Baseline reference | Character-for-character comparison |
-| **OmniDocBench Baseline Accuracy (1 - NED)** | 🎯 **45.40%** (Tiny) / **45.98%** (Indra) | 🎯 45.33% (PaddleOCR Tiny) / 44.84% (RapidOCR) | Standard 1D reading order |
+| **OmniDocBench Baseline Accuracy (1 - NED)** | 🎯 **45.41%** (Tiny) / **45.97%** (Indra) | 🎯 45.33% (PaddleOCR Tiny) / 44.84% (RapidOCR) | Standard 1D reading order |
 | **Full Pipeline Accuracy (Reading Order)** | 🎯 **63.75%** (RustO Indra Full) | 🎯 63.76% (Indra Official) / 57.18% (Paddle Structure)| Graph neural reading order |
 | **Memory & Thread Safety** | ✅ Guaranteed by Rust borrow checker | ❌ Manual pointers & thread locks | Data-race free concurrency |
 
@@ -493,7 +493,7 @@ rusto-rs/
 │   ├── rusto-rten/             # RTen (.rten) session backend
 │   ├── rusto-mnn/              # Optional MNN C++ session backend
 │   ├── rusto-node/             # Native Node.js N-API addon crate
-│   └── rten-wasm/              # Browser WebAssembly OCR & layout runtime
+│   └── rusto-wasm/             # Browser WebAssembly OCR & layout runtime
 ├── src/                        # Workspace root crate, UniFFI/C FFI bridges & `rusto` CLI
 ├── include/                    # Canonical C header (`rusto.h`)
 ├── packages/
