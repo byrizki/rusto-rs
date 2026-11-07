@@ -19,16 +19,6 @@ extension RustO {
         rustoVersion()
     }
 
-    /// Checks if the engine is ready for inference.
-    public func isReady() -> Bool {
-        return true
-    }
-
-    /// Returns the engine library version string.
-    public func version() -> String {
-        return rustoVersion()
-    }
-
     /// Downloads model assets for a specific OCR pipeline ahead of time.
     public static func downloadModel(model: String? = nil, lang: String? = nil, cacheDir: String? = nil) throws -> [String] {
         try globalDownloadModel(model, lang, cacheDir)
