@@ -58,7 +58,7 @@ jobs:
       - name: Install Standalone ocrs Binary
         run: |
           mkdir -p benchmarks/omnidocbench/ocrs_bin
-          cargo install --root benchmarks/omnidocbench/ocrs_bin ocrs
+          cargo install --root benchmarks/omnidocbench/ocrs_bin ocrs-cli
 
       - name: Upload Release Binaries
         uses: actions/upload-artifact@v4
