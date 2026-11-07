@@ -46,22 +46,40 @@ MODELS_DIR = REPO_ROOT / "models"
 PRED_DIR = OMNIDOC_DIR / "predictions"
 RESULTS_DIR = OMNIDOC_DIR / "results"
 REPORT_PATH = OMNIDOC_DIR / "OMNIDOCBENCH_EVALUATION_REPORT.md"
-RUSTO_BIN = REPO_ROOT / "target" / "release" / "rusto"
-if not RUSTO_BIN.exists():
-    RUSTO_BIN = REPO_ROOT / "target" / "release" / "rusto-rs"
-RUSTO_RTEN_BIN = REPO_ROOT / "target" / "release" / "rusto-rten"
-if not RUSTO_RTEN_BIN.exists():
-    RUSTO_RTEN_BIN = RUSTO_BIN
-RUSTO_MNN_BIN = REPO_ROOT / "target" / "release" / "rusto-mnn"
-if not RUSTO_MNN_BIN.exists():
-    RUSTO_MNN_BIN = RUSTO_BIN
-RTEN_DIRECT_BIN = REPO_ROOT / "target" / "release" / "rten-direct"
-if not RTEN_DIRECT_BIN.exists():
-    RTEN_DIRECT_BIN = RUSTO_RTEN_BIN
-MNN_DIRECT_BIN = REPO_ROOT / "target" / "release" / "mnn-direct"
-if not MNN_DIRECT_BIN.exists():
-    MNN_DIRECT_BIN = RUSTO_MNN_BIN
-OCRS_BIN = OMNIDOC_DIR / "ocrs_bin" / "bin" / "ocrs"
+def resolve_bin(name, fallback_candidates=()):
+    candidates = [
+        REPO_ROOT / "target" / "release" / name,
+        REPO_ROOT / "target" / "release" / "target" / "release" / name,
+        REPO_ROOT / "target" / "debug" / name,
+    ]
+    for alt in fallback_candidates:
+        candidates.extend([
+            REPO_ROOT / "target" / "release" / alt,
+            REPO_ROOT / "target" / "release" / "target" / "release" / alt,
+            REPO_ROOT / "target" / "debug" / alt,
+        ])
+    for c in candidates:
+        if c.exists():
+            return c
+    return REPO_ROOT / "target" / "release" / name
+
+def resolve_ocrs():
+    for c in [
+        OMNIDOC_DIR / "ocrs_bin" / "bin" / "ocrs",
+        REPO_ROOT / "target" / "release" / "ocrs",
+        REPO_ROOT / "target" / "release" / "benchmarks" / "omnidocbench" / "ocrs_bin" / "bin" / "ocrs",
+        REPO_ROOT / "target" / "release" / "target" / "release" / "ocrs",
+    ]:
+        if c.exists():
+            return c
+    return OMNIDOC_DIR / "ocrs_bin" / "bin" / "ocrs"
+
+RUSTO_BIN = resolve_bin("rusto", ["rusto-rs"])
+RUSTO_RTEN_BIN = resolve_bin("rusto-rten", ["rusto", "rusto-rs"])
+RUSTO_MNN_BIN = resolve_bin("rusto-mnn", ["rusto", "rusto-rs"])
+RTEN_DIRECT_BIN = resolve_bin("rten-direct", ["rusto-rten", "rusto"])
+MNN_DIRECT_BIN = resolve_bin("mnn-direct", ["rusto-mnn", "rusto"])
+OCRS_BIN = resolve_ocrs()
 VENV_BIN = OMNIDOC_DIR / ".venv" / "bin"
 PYTHON_BIN = str(VENV_BIN / "python") if (VENV_BIN / "python").exists() else sys.executable
 
@@ -187,6 +205,20 @@ class BenchmarkRunner:
 
         # 1. Warmup
         warmup_cmd = make_cmd(str(IMAGES_DIR / warmup_img))
+        bin_path = Path(warmup_cmd[0])
+        resolved_bin = bin_path
+        if not bin_path.exists():
+            candidate = resolve_bin(bin_path.name, ["rusto", "rusto-rs"])
+            if candidate.exists():
+                resolved_bin = candidate
+            else:
+                rel_dir = REPO_ROOT / "target" / "release"
+                existing = [p.name for p in rel_dir.glob("*")] if rel_dir.exists() else []
+                raise FileNotFoundError(
+                    f"Binary '{bin_path}' does not exist (looked at {bin_path.resolve()}). "
+                    f"Files in target/release: {existing}"
+                )
+        warmup_cmd[0] = str(resolved_bin)
         subprocess.run(warmup_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
         # 2. Measure Peak RSS on sample image
@@ -204,6 +236,7 @@ class BenchmarkRunner:
             pred_file = pred_dir / f"{stem}.txt"
 
             cmd = make_cmd(str(img_path))
+            cmd[0] = str(resolved_bin)
             t0 = time.perf_counter()
             res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -288,25 +321,65 @@ class BenchmarkRunner:
         pred_dir.mkdir(parents=True, exist_ok=True)
 
         model_dir = MODELS_DIR / f"PPOCR_v6_{tier}"
-        ocr = PaddleOCR(
-            use_onnx=True,
-            det_model_dir=str(model_dir / "det.onnx"),
-            rec_model_dir=str(model_dir / "rec.onnx"),
-            rec_char_dict_path=str(model_dir / "dict.txt"),
-            use_angle_cls=False,
-            show_log=False,
-        )
+
+        ocr = None
+        test_script = None
+
+        # Tier 1: PaddleOCR 2.x with use_onnx=True
+        try:
+            ocr = PaddleOCR(
+                use_onnx=True,
+                det_model_dir=str(model_dir / "det.onnx"),
+                rec_model_dir=str(model_dir / "rec.onnx"),
+                rec_char_dict_path=str(model_dir / "dict.txt"),
+                use_angle_cls=False,
+                show_log=False,
+            )
+            test_script = (
+                f"from paddleocr import PaddleOCR; "
+                f"o = PaddleOCR(use_onnx=True, det_model_dir='{model_dir}/det.onnx', rec_model_dir='{model_dir}/rec.onnx', rec_char_dict_path='{model_dir}/dict.txt', use_angle_cls=False, show_log=False); "
+                f"o.ocr('{IMAGES_DIR / warmup_img}', cls=False)"
+            )
+        except (ValueError, TypeError, Exception):
+            ocr = None
+
+        # Tier 2: PaddleOCR 3.x parameter names
+        if ocr is None:
+            try:
+                ocr = PaddleOCR(
+                    text_detection_model_dir=str(model_dir / "det.onnx"),
+                    text_recognition_model_dir=str(model_dir / "rec.onnx"),
+                    rec_char_dict_path=str(model_dir / "dict.txt"),
+                    use_textline_orientation=False,
+                )
+                test_script = (
+                    f"from paddleocr import PaddleOCR; "
+                    f"o = PaddleOCR(text_detection_model_dir='{model_dir}/det.onnx', text_recognition_model_dir='{model_dir}/rec.onnx', rec_char_dict_path='{model_dir}/dict.txt', use_textline_orientation=False); "
+                    f"o.ocr('{IMAGES_DIR / warmup_img}')"
+                )
+            except (ValueError, TypeError, Exception):
+                ocr = None
+
+        # Tier 3: Standard default PaddleOCR instance
+        if ocr is None:
+            ocr = PaddleOCR(use_angle_cls=False)
+            test_script = (
+                f"from paddleocr import PaddleOCR; "
+                f"o = PaddleOCR(use_angle_cls=False); "
+                f"o.ocr('{IMAGES_DIR / warmup_img}')"
+            )
 
         # Warmup
-        ocr.ocr(str(IMAGES_DIR / warmup_img), cls=False)
+        try:
+            ocr.ocr(str(IMAGES_DIR / warmup_img), cls=False)
+        except (TypeError, Exception):
+            try:
+                ocr.ocr(str(IMAGES_DIR / warmup_img))
+            except Exception as e:
+                print(f"Warning: paddleocr warmup failed: {e}")
 
         # Peak RSS
         python_bin = PYTHON_BIN
-        test_script = (
-            f"from paddleocr import PaddleOCR; "
-            f"o = PaddleOCR(use_onnx=True, det_model_dir='{model_dir}/det.onnx', rec_model_dir='{model_dir}/rec.onnx', rec_char_dict_path='{model_dir}/dict.txt', use_angle_cls=False, show_log=False); "
-            f"o.ocr('{IMAGES_DIR / warmup_img}', cls=False)"
-        )
         peak_rss = measure_peak_rss_mb([python_bin, "-c", test_script])
 
         timings = []
@@ -321,11 +394,35 @@ class BenchmarkRunner:
             pred_file = pred_dir / f"{stem}.txt"
 
             t0 = time.perf_counter()
-            res = ocr.ocr(str(img_path), cls=False)
+            try:
+                res = ocr.ocr(str(img_path), cls=False)
+            except (TypeError, Exception):
+                res = ocr.ocr(str(img_path))
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             timings.append(elapsed_ms)
 
-            lines = [r[1][0] for r in res[0]] if res and res[0] else []
+            lines = []
+            if res:
+                first = res[0] if isinstance(res, list) and len(res) > 0 else res
+                if isinstance(first, list):
+                    for r in first:
+                        if isinstance(r, (list, tuple)) and len(r) > 1:
+                            val = r[1]
+                            if isinstance(val, (list, tuple)) and len(val) > 0:
+                                lines.append(str(val[0]))
+                            elif isinstance(val, str):
+                                lines.append(val)
+                        elif isinstance(r, dict) and "text" in r:
+                            lines.append(str(r["text"]))
+                elif isinstance(first, dict) and "text" in first:
+                    for r in res:
+                        if isinstance(r, dict) and "text" in r:
+                            lines.append(str(r["text"]))
+                elif isinstance(res, list):
+                    for r in res:
+                        if isinstance(r, (list, tuple)) and len(r) > 1 and isinstance(r[1], (list, tuple)):
+                            lines.append(str(r[1][0]))
+
             pred_text = "\n".join(lines)
             with open(pred_file, "w", encoding="utf-8") as f:
                 f.write(pred_text)
@@ -344,7 +441,13 @@ class BenchmarkRunner:
         return timings, neds, peak_rss, page_neds
 
     def run_indra_inprocess(self, pipeline_key, mode, warmup_img):
-        from indra_ocr.pipeline import OrtOCR
+        try:
+            from indra_ocr.pipeline import OrtOCR
+        except ImportError:
+            indra_path = REPO_ROOT / "vendor" / "indra-ocr"
+            if indra_path.exists():
+                sys.path.insert(0, str(indra_path))
+            from indra_ocr.pipeline import OrtOCR
         pred_dir = PRED_DIR / pipeline_key
         pred_dir.mkdir(parents=True, exist_ok=True)
 
@@ -850,6 +953,14 @@ def main():
     print("=" * 70)
     print("       OMNIDOCBENCH COMPREHENSIVE BENCHMARK EVALUATION")
     print("=" * 70)
+
+    global RUSTO_BIN, RUSTO_RTEN_BIN, RUSTO_MNN_BIN, RTEN_DIRECT_BIN, MNN_DIRECT_BIN, OCRS_BIN
+    RUSTO_BIN = resolve_bin("rusto", ["rusto-rs"])
+    RUSTO_RTEN_BIN = resolve_bin("rusto-rten", ["rusto", "rusto-rs"])
+    RUSTO_MNN_BIN = resolve_bin("rusto-mnn", ["rusto", "rusto-rs"])
+    RTEN_DIRECT_BIN = resolve_bin("rten-direct", ["rusto-rten", "rusto"])
+    MNN_DIRECT_BIN = resolve_bin("mnn-direct", ["rusto-mnn", "rusto"])
+    OCRS_BIN = resolve_ocrs()
 
     gt_data = load_ground_truth()
     samples = select_stratified_sample(gt_data, sample_size=args.sample_size, language=args.language)

@@ -54,11 +54,14 @@ jobs:
             --bin rten-direct \
             --bin mnn-direct \
             --features rten,mnn-cpp
+          cp target/release/rusto target/release/rusto-rs
 
       - name: Install Standalone ocrs Binary
         run: |
           mkdir -p benchmarks/omnidocbench/ocrs_bin
           cargo install --root benchmarks/omnidocbench/ocrs_bin ocrs-cli
+          mkdir -p target/release
+          cp benchmarks/omnidocbench/ocrs_bin/bin/ocrs target/release/ocrs
 
       - name: Upload Release Binaries
         uses: actions/upload-artifact@v4
@@ -66,10 +69,12 @@ jobs:
           name: benchmark-binaries
           path: |
             target/release/rusto
+            target/release/rusto-rs
             target/release/rusto-rten
             target/release/rusto-mnn
             target/release/rten-direct
             target/release/mnn-direct
+            target/release/ocrs
             benchmarks/omnidocbench/ocrs_bin/bin/ocrs
           retention-days: 7
 
@@ -151,16 +156,42 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: benchmark-binaries
-          path: target/release/
+          path: .
 
       - name: Make Binaries Executable
         run: |
-          chmod +x target/release/*
+          # If download-artifact placed files under target/release/target/release, flatten it
+          if [ -d target/release/target/release ]; then
+            cp -r target/release/target/release/* target/release/
+          fi
+          # Ensure ocrs is placed in expected benchmarks location and target/release
+          if [ -f target/release/benchmarks/omnidocbench/ocrs_bin/bin/ocrs ]; then
+            mkdir -p benchmarks/omnidocbench/ocrs_bin/bin
+            cp target/release/benchmarks/omnidocbench/ocrs_bin/bin/ocrs benchmarks/omnidocbench/ocrs_bin/bin/ocrs
+            cp target/release/benchmarks/omnidocbench/ocrs_bin/bin/ocrs target/release/ocrs
+          fi
           if [ -f target/release/ocrs ]; then
             mkdir -p benchmarks/omnidocbench/ocrs_bin/bin
             cp target/release/ocrs benchmarks/omnidocbench/ocrs_bin/bin/ocrs
+          elif [ -f benchmarks/omnidocbench/ocrs_bin/bin/ocrs ]; then
+            mkdir -p target/release
+            cp benchmarks/omnidocbench/ocrs_bin/bin/ocrs target/release/ocrs
+          fi
+          # Create alias if missing
+          if [ -f target/release/rusto ] && [ ! -f target/release/rusto-rs ]; then
+            cp target/release/rusto target/release/rusto-rs
+          elif [ -f target/release/rusto-rs ] && [ ! -f target/release/rusto ]; then
+            cp target/release/rusto-rs target/release/rusto
+          fi
+          chmod +x target/release/* 2>/dev/null || true
+          if [ -d target/release/target/release ]; then
+            chmod +x target/release/target/release/* 2>/dev/null || true
+          fi
+          if [ -f benchmarks/omnidocbench/ocrs_bin/bin/ocrs ]; then
             chmod +x benchmarks/omnidocbench/ocrs_bin/bin/ocrs
           fi
+          echo "=== target/release contents ==="
+          ls -la target/release/
 
       - name: Install Base Python Benchmark Tools
         run: pip install Levenshtein numpy pillow
@@ -168,11 +199,15 @@ jobs:
       - name: Install Target-Specific Dependencies
         run: |
           if [ "${{ matrix.target }}" = "paddleocr_tiny" ]; then
-            pip install paddleocr paddlepaddle
+            pip install "paddleocr<3.0.0" paddlepaddle || pip install paddleocr paddlepaddle
           elif [ "${{ matrix.target }}" = "rapidocr_tiny" ]; then
             pip install rapidocr-onnxruntime
           elif [ "${{ matrix.target }}" = "indra_ocr" ]; then
             pip install onnxruntime
+            if [ ! -d vendor/indra-ocr ]; then
+              mkdir -p vendor
+              git clone --depth 1 https://github.com/datalab-to/indra.git vendor/indra-ocr
+            fi
             pip install -e vendor/indra-ocr
           fi
 
