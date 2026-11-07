@@ -46,7 +46,9 @@ MODELS_DIR = REPO_ROOT / "models"
 PRED_DIR = OMNIDOC_DIR / "predictions"
 RESULTS_DIR = OMNIDOC_DIR / "results"
 REPORT_PATH = OMNIDOC_DIR / "OMNIDOCBENCH_EVALUATION_REPORT.md"
-RUSTO_BIN = REPO_ROOT / "target" / "release" / "rusto-rs"
+RUSTO_BIN = REPO_ROOT / "target" / "release" / "rusto"
+if not RUSTO_BIN.exists():
+    RUSTO_BIN = REPO_ROOT / "target" / "release" / "rusto-rs"
 OCRS_BIN = OMNIDOC_DIR / "ocrs_bin" / "bin" / "ocrs"
 VENV_BIN = OMNIDOC_DIR / ".venv" / "bin"
 

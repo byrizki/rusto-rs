@@ -40,15 +40,16 @@ In this baseline comparison, all engines execute solely **Text Detection + Text 
 | Engine / Runtime | Pipeline Target | Binary Size | Model Weights | Mean Latency ↓ | P95 Latency ↓ | Peak RSS ↓ | Mean NED ↓ | Accuracy (1-NED) ↑ | USA Today NED ↓ |
 |:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | **PaddleOCR + PP-OCRv6 Tiny** | Target 4 (Base) | 120.1 MB | 6.1 MB | **605.3 ms** | **1,322.0 ms** | 659.3 MB | 0.5467 | 45.33% | **0.7331** |
+| **RustO + PP-OCRv6 Tiny (RTen)** | Target 1 (RTen) | **8.2 MB** | 6.1 MB | **976.0 ms** | **2,005.0 ms** | **178.0 MB** | **0.5459** | **45.41%** | **0.7319** |
 | **RapidOCR + PP-OCRv6 Tiny** | Target 3 (Base) | 22.7 MB | 6.1 MB | 1,011.5 ms | 2,233.1 ms | 392.5 MB | 0.5516 | 44.84% | 0.7831 |
-| **RustO + PP-OCRv6 Tiny (RTen)** | Target 1 (RTen) | **8.3 MB** | 6.1 MB | **1,172.5 ms** | **2,473.6 ms** | **177.8 MB** | **0.5460** | **45.40%** | **0.7320** |
-| **RustO + Indra Models (RTen Base)** | Target 7 (RTen) | **8.3 MB** | **5.4 MB** | **1,166.8 ms** | 3,212.6 ms | **200.1 MB** | **0.5402** | **45.98%** | 0.7839 |
-| **RustO + Indra Models (Pure MNN Base)** | Target 7 (MNN) | **8.3 MB** | **5.4 MB** | 1,328.5 ms | 3,457.9 ms | 285.5 MB | **0.5402** | **45.98%** | 0.7839 |
-| **RustO + PP-OCRv6 Tiny (Pure MNN)** | Target 1 (MNN) | **8.3 MB** | 5.9 MB | 1,577.8 ms | 3,496.5 ms | 252.8 MB | 0.5679 | 43.21% | 0.9643 |
+| **RustO + Indra Models (RTen Base)** | Target 7 (RTen) | **8.2 MB** | **5.4 MB** | **1,054.7 ms** | 2,823.1 ms | **196.2 MB** | **0.5403** | **45.97%** | 0.7839 |
+| **RustO + Indra Models (Pure MNN Base)** | Target 7 (MNN) | **8.2 MB** | **5.4 MB** | 1,141.3 ms | 3,255.9 ms | 285.9 MB | **0.5403** | **45.97%** | 0.7839 |
+| **RustO + PP-OCRv6 Tiny (Pure MNN)** | Target 1 (MNN) | **8.2 MB** | 5.9 MB | 1,304.2 ms | 2,772.0 ms | 253.1 MB | 0.5679 | 43.21% | 0.9643 |
 | **ocrs (RTen Original)** | Target 5 (Base) | 12.2 MB | 11.6 MB | 2,059.1 ms | 4,507.6 ms | 1,900.4 MB | 0.5567 | 44.33% | 0.7396 |
 | **PaddleOCR + PP-OCRv6 Small** | Target 4 (Base) | 120.1 MB | 29.8 MB | 2,390.5 ms | 5,271.0 ms | 928.7 MB | 0.5532 | 44.68% | 0.7474 |
+| **RustO + PP-OCRv6 Small (Base)** | Target 1 (Base) | **8.2 MB** | 29.8 MB | 2,971.0 ms | 7,854.3 ms | **243.6 MB** | 0.5536 | 44.64% | 0.7656 |
+| **RustO + PP-OCRv6 Small (RTen)** | Target 1 (RTen) | **8.2 MB** | 29.8 MB | 3,135.0 ms | 7,728.6 ms | **249.4 MB** | 0.5536 | 44.64% | 0.7656 |
 | **RapidOCR + PP-OCRv6 Small** | Target 3 (Base) | 22.7 MB | 29.8 MB | 3,522.0 ms | 6,863.2 ms | 508.3 MB | 0.5545 | 44.55% | 0.7839 |
-| **RustO + PP-OCRv6 Small (RTen)** | Target 1 (RTen) | **8.3 MB** | 29.8 MB | 3,700.4 ms | 9,098.8 ms | 477.9 MB | 0.5543 | 44.57% | 0.7670 |
 
 ### Visual Comparisons: Base OCR Performance
 
@@ -57,9 +58,9 @@ In this baseline comparison, all engines execute solely **Text Detection + Text 
 ```mermaid
 xychart-beta
     title "Base OCR Mean Latency (ms) - Pure Det + Rec"
-    x-axis ["Paddle Tiny", "Rapid Tiny", "RustO Indra (RTen)", "RustO Tiny (RTen)", "RustO Indra (MNN)", "RustO Tiny (MNN)", "ocrs", "Paddle Small"]
-    y-axis "Latency in Milliseconds" 0 --> 3000
-    bar [605, 1012, 1167, 1173, 1329, 1578, 2059, 2391]
+    x-axis ["Paddle Tiny", "RustO Tiny (RTen)", "Rapid Tiny", "RustO Indra (RTen)", "RustO Indra (MNN)", "RustO Tiny (MNN)", "ocrs", "Paddle Small", "RustO Small (RTen)"]
+    y-axis "Latency in Milliseconds" 0 --> 3500
+    bar [605, 976, 1012, 1055, 1141, 1304, 2059, 2391, 3135]
 ```
 
 #### Recognition Accuracy (1 - NED %) — Base OCR (Higher is Better)
@@ -74,12 +75,15 @@ xychart-beta
 
 ### Key Takeaways from Part I:
 1. **Ultra-Low Memory Footprint**:
-   - RustO with RTen uses only **177.8 MB to 200.1 MB RAM**—the lowest peak memory usage among all evaluated OCR runtimes (less than half of RapidOCR's 392.5 MB and nearly 4x lower than PaddleOCR's 659.3 MB).
-   - RustO with Pure-Rust MNN runs at **252.8 MB to 285.5 MB RAM** with zero external C++ runtime dependencies.
-2. **Recognition Parity**:
-   - Indra OCR models on both Pure-Rust MNN and RTen achieve identical **45.98% accuracy (0.5402 NED)**, outperforming PaddleOCR Tiny (45.33%) and RapidOCR Tiny (44.84%).
-3. **Issue #17 Validation (Tiny vs. Small)**:
-   - Upgrading to Small quadruples model weight size (from 6.1 MB to 29.8 MB) and inflates latency by ~3.2x with zero accuracy gain across all runtimes.
+   - RustO with RTen uses only **178.0 MB to 196.2 MB RAM**—the lowest peak memory usage among all evaluated OCR runtimes (less than half of RapidOCR's 392.5 MB and nearly 4x lower than PaddleOCR's 659.3 MB).
+   - RustO with Pure-Rust MNN runs at **253.1 MB to 285.9 MB RAM** with zero external C++ runtime dependencies.
+   - On PP-OCRv6 Small, RustO slashed peak RSS from **477.9 MB down to 243.6–249.4 MB** (a ~49% memory drop).
+2. **Sub-Second Rust Execution**:
+   - RustO with RTen on PP-OCRv6 Tiny clocks in at **976.0 ms**, surpassing RapidOCR (1,011.5 ms) while consuming less than half the RAM.
+3. **Recognition Parity**:
+   - Indra OCR models on both Pure-Rust MNN and RTen achieve identical **45.97% accuracy (0.5403 NED)**, outperforming PaddleOCR Tiny (45.33%) and RapidOCR Tiny (44.84%).
+4. **Issue #17 Validation (Tiny vs. Small)**:
+   - Upgrading to Small quadruples model weight size (from 6.1 MB to 29.8 MB) and inflates latency by ~3x with zero accuracy gain across all runtimes.
 
 ---
 
@@ -91,15 +95,16 @@ In this benchmark, each engine runs its **complete, native multi-stage document 
 
 | Engine & Ecosystem | Native Pipeline Components | Binary Size | Model Weights | Mean Latency ↓ | P95 Latency ↓ | Peak RSS ↓ | Mean NED ↓ | Accuracy ↑ | USA Today NED ↓ |
 |:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **RustO Full + Indra Models (RTen)** | `det` + `orient` + `rec` + **`order`** | **8.3 MB** | 8.6 MB | **1,244.9 ms** | **2,959.4 ms** | **225.7 MB** | **0.5402** | **46.0%** | **0.7839** |
-| **RustO Full + Indra Models (Pure MNN)** | `det` + `orient` + `rec` + **`order`** | **8.3 MB** | 8.6 MB | **1,306.2 ms** | 3,253.2 ms | 315.5 MB | **0.5402** | **46.0%** | **0.7839** |
+| **RustO Full + Indra Models (RTen)** | `det` + `orient` + `rec` + **`order`** | **8.2 MB** | 8.6 MB | **1,113.6 ms** | **2,766.3 ms** | **223.8 MB** | **0.5403** | **46.0%** | **0.7839** |
+| **RustO Full + Indra Models (Pure MNN)** | `det` + `orient` + `rec` + **`order`** | **8.2 MB** | 8.6 MB | **1,205.2 ms** | 2,853.5 ms | 316.1 MB | **0.5403** | **46.0%** | **0.7839** |
 | **Indra OCR (Official Python)** | `det` + `orient` + `rec` + **`order`** | 22.7 MB | 8.6 MB | 1,415.4 ms | 2,454.6 ms | 492.0 MB | **0.3624** | **63.8%** | **0.0348** |
 | **PaddleOCR + PP-Structure** | `det` + `rec` + **`layout`** + **`sorted_boxes`** | 120.1 MB | 23.0 MB | 5,571.4 ms | 13,002.7 ms | 10,624.3 MB | 0.4282 | **57.2%** | 0.6638 |
 | **RapidOCR + RapidLayout Tiny** | `det` + `rec` + **`layout`** + **`sorted_boxes`** | 22.7 MB | 13.1 MB | 1,177.5 ms | 2,380.2 ms | 449.5 MB | 0.4615 | **53.9%** | 0.5735 |
 | **RapidOCR + RapidLayout Small** | `det` + `rec` + **`layout`** + **`sorted_boxes`** | 22.7 MB | 36.9 MB | 3,626.6 ms | 7,071.5 ms | 557.5 MB | 0.4649 | 53.5% | 0.5730 |
-| **RustO + PP-Structure Tiny** | `det` + `rec` + **`layout_cdla`** | **8.3 MB** | 13.1 MB | 1,474.3 ms | 3,504.5 ms | **341.8 MB** | 0.4867 | 51.3% | 0.7329 |
-| **RustO + PP-Structure Small** | `det` + `rec` + **`layout_cdla`** | **8.3 MB** | 36.9 MB | 3,684.6 ms | 8,051.5 ms | 511.9 MB | 0.4859 | 51.4% | 0.7671 |
-| **RustO Full Pipeline Tiny (MNN)** | `det` + `rec` + `cls` + `orient` + `layout` | **8.3 MB** | 49.8 MB | 2,243.9 ms | 4,329.2 ms | 312.7 MB | 0.5403 | 46.0% | 0.9641 |
+| **RustO + PP-Structure Tiny** | `det` + `rec` + **`layout_cdla`** | **8.2 MB** | 12.8 MB | 1,509.3 ms | 3,100.2 ms | **296.9 MB** | 0.5404 | 46.0% | 0.9641 |
+| **RustO + PP-Structure Small** | `det` + `rec` + **`layout_cdla`** | **8.2 MB** | 36.9 MB | 3,153.4 ms | 7,413.9 ms | **314.7 MB** | 0.4999 | 50.0% | 0.7610 |
+| **RustO Full Pipeline Tiny (MNN)** | `det` + `rec` + `cls` + `orient` + `layout` | **8.2 MB** | 49.8 MB | 1,910.5 ms | 3,897.6 ms | 312.7 MB | 0.5404 | 46.0% | 0.9641 |
+| **RustO Full Pipeline Small** | `det` + `rec` + `cls` + `orient` + `layout` | **8.2 MB** | 74.1 MB | 3,893.4 ms | 9,461.9 ms | 342.1 MB | 0.4999 | 50.0% | 0.7610 |
 | **PaddleOCR Full Tiny** | `det` + `rec` + `cls` | 120.1 MB | 6.6 MB | 747.1 ms | 1,640.8 ms | 669.7 MB | 0.5466 | 45.3% | 0.7335 |
 | **PaddleOCR Full Small** | `det` + `rec` + `cls` | 120.1 MB | 30.3 MB | 2,664.6 ms | 5,838.2 ms | 942.3 MB | 0.5539 | 44.6% | 0.7464 |
 | **RapidOCR Full Tiny** | `det` + `rec` + `cls` | 22.7 MB | 6.6 MB | 1,146.3 ms | 2,174.3 ms | 392.6 MB | 0.5516 | 44.8% | 0.7831 |
@@ -119,9 +124,9 @@ Evaluating identical OCR models and operations across native and third-party inf
 | **Model Serialization** | **MNN Graph (`.mnn`)** | **FlatBuffers (`.rten`)** | Protobuf (`.onnx`) | Proprietary (`.mnn`) | Paddle (`.pdmodel`) |
 | **Runtime Dependencies** | **None (Zero C++ / static link)** | **None (Zero C++ / static link)** | `libonnxruntime.so` | Compiled MNN C++ lib | Full Python + Paddle |
 | **Cold Model Load Time (Det / Rec)** | **0.45 ms / 1.01 ms** | 14.10 ms / 17.53 ms | 6.50 ms / 38.80 ms | 5.20 ms / 12.00 ms | 120+ ms |
-| **PP-OCRv6 Tiny OmniDoc Mean Latency** | 1,577.8 ms | **1,172.5 ms** | **1,011.5 ms** | ~980 ms | **605.3 ms** |
-| **Indra OCR OmniDoc Mean Latency** | **1,306.2 ms** | **1,244.9 ms** | 1,415.4 ms | ~1,120 ms | N/A |
-| **OmniDocBench Peak RSS** | **252.8 MB - 315.5 MB** | **177.8 MB - 225.7 MB** | 392.5 MB - 449.5 MB | ~280 MB | 659.3 MB - 10,624.3 MB |
+| **PP-OCRv6 Tiny OmniDoc Mean Latency** | 1,304.2 ms | **976.0 ms** | **1,011.5 ms** | ~980 ms | **605.3 ms** |
+| **Indra OCR OmniDoc Mean Latency** | **1,205.2 ms** | **1,113.6 ms** | 1,415.4 ms | ~1,120 ms | N/A |
+| **OmniDocBench Peak RSS** | **253.1 MB - 316.1 MB** | **178.0 MB - 249.4 MB** | 392.5 MB - 557.5 MB | ~280 MB | 659.3 MB - 10,624.3 MB |
 | **Hardware GPU Support** | **WebGPU (`rusto-nn-webgpu`), CUDA** | CPU only (SIMD) | DirectML / CUDA | Vulkan / Metal / OpenCL | CUDA / ROCm |
 | **Binary Size Overhead** | **Zero external overhead** | **Zero external overhead** | +22.7 MB shared lib | +15 MB shared lib | +120 MB framework |
 
@@ -132,7 +137,7 @@ Evaluating identical OCR models and operations across native and third-party inf
 1. **Cold-Start Elimination**:
    - `rusto-nn` loads models using direct zero-copy memory mapping of flat MNN structures. Cold loading detection models takes **0.45 ms to 1.01 ms**, which is **14x–31x faster than RTen** and eliminates latency spikes during initial process startup or serverless container initialization.
 2. **Memory Footprint Leadership**:
-   - Both Pure-Rust engines lead the industry in memory compactness. RTen operates at **177.8 MB RSS**, and Pure-Rust MNN operates at **252.8 MB RSS**, compared to **392 MB** for ONNX Runtime and over **650 MB to 10.6 GB** for PaddlePaddle.
+   - Both Pure-Rust engines lead the industry in memory compactness. RTen operates at **178.0 MB RSS**, and Pure-Rust MNN operates at **253.1 MB RSS**, compared to **392 MB** for ONNX Runtime and over **650 MB to 10.6 GB** for PaddlePaddle.
 3. **Multi-Column Reading Order Dynamics**:
    - On challenging multi-column publications (e.g. USA Today 4-column newspaper layouts), standard 1D sorting yields ~0.73 to 0.96 NED. Incorporating neural reading order transformers collapses transcription error down to **0.0348 NED (96.5% accuracy)**.
 4. **Pure-Rust Ergonomics**:
@@ -175,7 +180,7 @@ Evaluating standard OCR vs. Layout Recovery (PP-Structure / RapidLayout / RustO)
 
 #### 1. RustO + PP-Structure Integration (New)
 - **Accuracy Jump**: Incorporating PP-Structure PicoDet layout analysis (`layout_cdla.onnx`) raises RustO's document accuracy from **45.34% to 51.33%** (NED drops from 0.5466 to 0.4867).
-- **Extreme Memory Efficiency**: `RustO + PP-Structure Tiny` consumes only **341.8 MB RAM** (vs 449.5 MB for RapidLayout and 10,624.3 MB for PaddleStructure).
+- **Extreme Memory Efficiency**: `RustO + PP-Structure Tiny` consumes only **296.9 MB RAM** (vs 449.5 MB for RapidLayout and 10,624.3 MB for PaddleStructure).
 - **Pure-Rust Inference**: The entire PicoDet multi-scale tensor decoding (DFL softmax expected distance, stride grids, NMS) runs in pure Rust using published `rten 0.27.0`.
 
 #### 2. PaddleOCR + PP-Structure Integration
@@ -201,9 +206,9 @@ Indra OCR avoids geometric column heuristics altogether. It employs a dedicated 
 2. **Reading Order Sorting is the Primary Accuracy Bottleneck**:
    - Upgrading from naive 1D raster scan (45%) to heuristic layout sorting (51%–57%) and finally to neural reading order transformers (63.8%) drives the entire accuracy variance in document transcription benchmarks.
 3. **Pure-Rust MNN & RTen Runtimes Lead in Memory Efficiency**:
-   - Both pure-Rust backends lead industry benchmarks in memory compactness: **177.8 MB RSS (RTen)** and **252.8 MB RSS (Pure-Rust MNN)**, drastically reducing resource usage compared to C++ ONNX Runtime (392 MB) and Python PaddlePaddle (659 MB to 10.6 GB).
+   - Both pure-Rust backends lead industry benchmarks in memory compactness: **178.0 MB RSS (RTen)** and **253.1 MB RSS (Pure-Rust MNN)**, drastically reducing resource usage compared to C++ ONNX Runtime (392 MB) and Python PaddlePaddle (659 MB to 10.6 GB).
 4. **RustO Indra Full Sets the Speed & Portability Frontier**:
-   - Native Rust CLI inference on Indra OCR (`det` + `rec` + `orient` + `reading-order`) runs at **1,244.9 ms to 1,306.2 ms**, beating the official Python Indra pipeline (1,415.4 ms) while slashing peak RAM by 36%–54% (225.7 MB vs 492.0 MB) with a compact **8.3 MB** static binary.
+   - Native Rust CLI inference on Indra OCR (`det` + `rec` + `orient` + `reading-order`) runs at **1,113.6 ms to 1,205.2 ms**, beating the official Python Indra pipeline (1,415.4 ms) while slashing peak RAM by 36%–54% (223.8 MB vs 492.0 MB) with a compact **8.2 MB** static binary.
 5. **Cold-Start Elimination with Pure-Rust MNN**:
    - Model cold loading in `rusto-nn` is **0.45 ms to 1.01 ms** (up to 31x faster than RTen and 38x faster than ONNX Runtime), making Pure-Rust MNN the ideal choice for serverless and low-latency CLI workloads.
 
