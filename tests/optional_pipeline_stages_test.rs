@@ -476,6 +476,77 @@ fn test_multi_column_heuristic_reading_order() {
 }
 
 #[test]
+fn test_column_aware_line_clustering_preserves_columns_and_merges_words() {
+    use rusto_core::layout::cluster_and_sort_reading_order;
+    use rusto::{Frame, TextResult};
+
+    // Multi-column layout with intra-row word fragments:
+    // Column 0 (x ~ 50..300):
+    //   Row 0: "col0_w1" (50..150), "col0_w2" (160..280)
+    //   Row 1: "col0_line2" (50..300)
+    // Column 1 (x ~ 500..750):
+    //   Row 0: "col1_header" (500..750)
+    //   Row 1: "col1_w1" (500..600), "col1_w2" (610..750)
+    let fragments = vec![
+        TextResult {
+            text: "col0_w1".into(),
+            score: 0.99,
+            box_points: [(50.0, 100.0), (150.0, 100.0), (150.0, 120.0), (50.0, 120.0)],
+            frame: Frame::new(100.0, 20.0, 100.0, 50.0),
+            region_id: None,
+            layout_type: None,
+        },
+        TextResult {
+            text: "col1_header".into(),
+            score: 0.98,
+            box_points: [(500.0, 100.0), (750.0, 100.0), (750.0, 120.0), (500.0, 120.0)],
+            frame: Frame::new(250.0, 20.0, 100.0, 500.0),
+            region_id: None,
+            layout_type: None,
+        },
+        TextResult {
+            text: "col0_w2".into(),
+            score: 0.97,
+            box_points: [(160.0, 100.0), (280.0, 100.0), (280.0, 120.0), (160.0, 120.0)],
+            frame: Frame::new(120.0, 20.0, 100.0, 160.0),
+            region_id: None,
+            layout_type: None,
+        },
+        TextResult {
+            text: "col0_line2".into(),
+            score: 0.96,
+            box_points: [(50.0, 200.0), (300.0, 200.0), (300.0, 220.0), (50.0, 220.0)],
+            frame: Frame::new(250.0, 20.0, 200.0, 50.0),
+            region_id: None,
+            layout_type: None,
+        },
+        TextResult {
+            text: "col1_w1".into(),
+            score: 0.95,
+            box_points: [(500.0, 200.0), (600.0, 200.0), (600.0, 220.0), (500.0, 220.0)],
+            frame: Frame::new(100.0, 20.0, 200.0, 500.0),
+            region_id: None,
+            layout_type: None,
+        },
+        TextResult {
+            text: "col1_w2".into(),
+            score: 0.94,
+            box_points: [(610.0, 200.0), (750.0, 200.0), (750.0, 220.0), (610.0, 220.0)],
+            frame: Frame::new(140.0, 20.0, 200.0, 610.0),
+            region_id: None,
+            layout_type: None,
+        },
+    ];
+
+    let clustered = cluster_and_sort_reading_order(fragments, Some(0.5), Some(0.8));
+    assert_eq!(clustered.len(), 4);
+    assert_eq!(clustered[0].text, "col0_w1 col0_w2");
+    assert_eq!(clustered[1].text, "col0_line2");
+    assert_eq!(clustered[2].text, "col1_header");
+    assert_eq!(clustered[3].text, "col1_w1 col1_w2");
+}
+
+#[test]
 fn test_issue25_multi_column_reading_order_and_region_ids() {
     use rusto_core::layout::{order_text_results_by_layout, BBox, LayoutRegion, LayoutType};
     use rusto::{Frame, TextResult};
@@ -700,5 +771,90 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
 
         rocr_free_results(c_results, c_count);
         rocr_free(handle);
+    }
+}
+
+#[test]
+fn test_newspaper_page_column_clustering_prevents_merging_and_explosion() {
+    let det_path = "models/PPOCR_v6_tiny/det.rten";
+    let rec_path = "models/PPOCR_v6_tiny/rec.rten";
+    let dict_path = "models/PPOCR_v6_tiny/dict.txt";
+    let img_path = "tests/fixtures/chronam-ad-page.png";
+
+    if !std::path::Path::new(det_path).exists()
+        || !std::path::Path::new(rec_path).exists()
+        || !std::path::Path::new(dict_path).exists()
+        || !std::path::Path::new(img_path).exists()
+    {
+        return;
+    }
+
+    let config = InitializeConfig::ppv6(det_path, rec_path, dict_path);
+    let mut ocr = RustO::initialize(config).expect("Init PP-OCRv6");
+
+    let options = OcrRunOptions {
+        layout_reading: Some(true),
+        ..Default::default()
+    };
+
+    let res = ocr.detect_text(&ImageSource::Path(img_path.into()), &options)
+        .expect("detect_text with layout reading");
+    let DetectTextResult::Structured(lines) = res else {
+        panic!("Expected structured text results");
+    };
+
+    println!("Detected lines count: {}", lines.len());
+    for (i, l) in lines.iter().enumerate() {
+        if l.text.contains("Special Values") || l.text.contains("Extraordinary") || l.text.contains("Big Sale of") {
+            println!("Line {}: '{}'", i, l.text);
+        }
+    }
+
+    // 1. Line count should be in the ~150-250 range, NOT ~530 word-level fragments
+    assert!(lines.len() >= 120 && lines.len() <= 300, "Lines count should be 120-300, got {}", lines.len());
+
+    // 2. Cross-column headers MUST NOT be merged together
+    for line in &lines {
+        let has_special_values = line.text.contains("Special Values");
+        let has_extraordinary = line.text.contains("Extraordinary");
+        let has_big_sale = line.text.contains("Big Sale of Corsets") || line.text.contains("Big Sale");
+        
+        let header_count = (has_special_values as u8) + (has_extraordinary as u8) + (has_big_sale as u8);
+        assert!(header_count <= 1, "Cross-column headers were merged into a single line: '{}'", line.text);
+    }
+
+    // Now test with Indra OCR
+    let indra_det = "models/indra/det.rten";
+    let indra_rec = "models/indra/rec.rten";
+    let indra_meta = "models/indra/meta.json";
+
+    if std::path::Path::new(indra_det).exists()
+        && std::path::Path::new(indra_rec).exists()
+        && std::path::Path::new(indra_meta).exists()
+    {
+        let indra_cfg = InitializeConfig::indra(indra_det, indra_rec, indra_meta);
+        let mut indra_ocr = RustO::initialize(indra_cfg).expect("Init Indra OCR");
+
+        let indra_res = indra_ocr.detect_text(&ImageSource::Path(img_path.into()), &options)
+            .expect("detect_text with indra OCR");
+        let DetectTextResult::Structured(indra_lines) = indra_res else {
+            panic!("Expected structured text results for Indra");
+        };
+
+        println!("Indra detected lines count: {}", indra_lines.len());
+        for (i, l) in indra_lines.iter().enumerate() {
+            if l.text.contains("most fashionable") || l.text.contains("Floor") {
+                println!("Indra Line {}: '{}'", i, l.text);
+            }
+        }
+
+        // Verify Indra OCR does not merge "most fashionable" with "Floor"
+        for line in &indra_lines {
+            assert!(
+                !(line.text.contains("most fashionable") && line.text.contains("Floor")),
+                "Indra merged middle paragraph with right column 'Floor': '{}'",
+                line.text
+            );
+        }
     }
 }

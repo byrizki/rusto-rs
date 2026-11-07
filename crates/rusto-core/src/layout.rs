@@ -453,6 +453,238 @@ pub fn sort_lines_reading_order(lines: &mut [crate::types::TextResult]) {
     lines.clone_from_slice(&ordered_results);
 }
 
+/// Cluster and sort text results in natural reading order across multi-column documents.
+/// Groups words belonging to the same line within each column while strictly preserving column
+/// boundaries to avoid cross-column merging.
+pub fn cluster_and_sort_reading_order(
+    lines: Vec<crate::types::TextResult>,
+    line_y_threshold: Option<f32>,
+    word_x_threshold: Option<f32>,
+) -> Vec<crate::types::TextResult> {
+    if lines.len() <= 1 {
+        return lines;
+    }
+
+    let doc_w = lines
+        .iter()
+        .map(|l| l.frame.left + l.frame.width)
+        .fold(0.0f32, f32::max)
+        .max(1.0);
+
+    let mut heights: Vec<f32> = lines.iter().map(|l| l.frame.height).collect();
+    heights.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let median_h = heights[heights.len() / 2].max(1.0);
+    let y_tolerance = median_h * line_y_threshold.unwrap_or(0.5);
+    let word_x = word_x_threshold.unwrap_or(0.4);
+
+    // 1. Sort lines primarily by top (y), then left (x)
+    let mut sorted = lines;
+    sorted.sort_by(|a, b| {
+        a.frame
+            .top
+            .partial_cmp(&b.frame.top)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                a.frame
+                    .left
+                    .partial_cmp(&b.frame.left)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+    });
+
+    // 2. Partition into vertical sections divided by spanning lines (width > 0.65 * doc_w)
+    let mut sections: Vec<Vec<crate::types::TextResult>> = Vec::new();
+    let mut current_section: Vec<crate::types::TextResult> = Vec::new();
+    let mut section_max_y = f32::NEG_INFINITY;
+
+    for item in sorted {
+        let is_spanning = item.frame.width > 0.65 * doc_w;
+        let item_bottom = item.frame.top + item.frame.height;
+
+        if current_section.is_empty() {
+            section_max_y = item_bottom;
+            current_section.push(item);
+        } else {
+            let prev_was_spanning = current_section.last().unwrap().frame.width > 0.65 * doc_w;
+            if is_spanning || prev_was_spanning {
+                sections.push(current_section);
+                section_max_y = item_bottom;
+                current_section = vec![item];
+            } else {
+                section_max_y = section_max_y.max(item_bottom);
+                current_section.push(item);
+            }
+        }
+    }
+    if !current_section.is_empty() {
+        sections.push(current_section);
+    }
+
+    // 3. For each section, partition lines into columns based on horizontal overlap
+    let mut ordered_results: Vec<crate::types::TextResult> = Vec::with_capacity(section_max_y as usize);
+
+    for section in sections {
+        if section.len() <= 1 {
+            ordered_results.extend(section);
+            continue;
+        }
+
+        let mut columns: Vec<Vec<crate::types::TextResult>> = Vec::new();
+
+        for item in section {
+            let item_x1 = item.frame.left;
+            let item_x2 = item.frame.left + item.frame.width;
+            let item_w = item.frame.width.max(1.0);
+
+            let mut best_col: Option<usize> = None;
+            let mut best_overlap = 0.0f32;
+
+            for (col_idx, col) in columns.iter().enumerate() {
+                let col_x1 = col.iter().map(|l| l.frame.left).fold(f32::INFINITY, f32::min);
+                let col_x2 = col
+                    .iter()
+                    .map(|l| l.frame.left + l.frame.width)
+                    .fold(f32::NEG_INFINITY, f32::max);
+                let col_w = (col_x2 - col_x1).max(1.0);
+
+                let overlap_x1 = item_x1.max(col_x1);
+                let overlap_x2 = item_x2.min(col_x2);
+                let overlap = (overlap_x2 - overlap_x1).max(0.0);
+
+                let overlap_ratio = overlap / item_w.min(col_w);
+                if overlap_ratio > 0.35 && overlap_ratio > best_overlap {
+                    best_overlap = overlap_ratio;
+                    best_col = Some(col_idx);
+                }
+            }
+
+            if let Some(col_idx) = best_col {
+                columns[col_idx].push(item);
+            } else {
+                columns.push(vec![item]);
+            }
+        }
+
+        // Merge columns that have significant horizontal overlap
+        let mut merged = true;
+        while merged {
+            merged = false;
+            'outer: for i in 0..columns.len() {
+                for j in (i + 1)..columns.len() {
+                    let a_x1 = columns[i].iter().map(|l| l.frame.left).fold(f32::INFINITY, f32::min);
+                    let a_x2 = columns[i]
+                        .iter()
+                        .map(|l| l.frame.left + l.frame.width)
+                        .fold(f32::NEG_INFINITY, f32::max);
+                    let b_x1 = columns[j].iter().map(|l| l.frame.left).fold(f32::INFINITY, f32::min);
+                    let b_x2 = columns[j]
+                        .iter()
+                        .map(|l| l.frame.left + l.frame.width)
+                        .fold(f32::NEG_INFINITY, f32::max);
+                    let a_w = (a_x2 - a_x1).max(1.0);
+                    let b_w = (b_x2 - b_x1).max(1.0);
+
+                    let ov_x1 = a_x1.max(b_x1);
+                    let ov_x2 = a_x2.min(b_x2);
+                    let ov = (ov_x2 - ov_x1).max(0.0);
+                    if ov / a_w.min(b_w) > 0.35 {
+                        let to_merge = columns.remove(j);
+                        columns[i].extend(to_merge);
+                        merged = true;
+                        break 'outer;
+                    }
+                }
+            }
+        }
+
+        // Sort columns left-to-right by their min X
+        columns.sort_by(|col_a, col_b| {
+            let a_x1 = col_a.iter().map(|l| l.frame.left).fold(f32::INFINITY, f32::min);
+            let b_x1 = col_b.iter().map(|l| l.frame.left).fold(f32::INFINITY, f32::min);
+            a_x1.partial_cmp(&b_x1).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // 4. Within each column, sort lines top-to-bottom, left-to-right using y_tolerance
+        for mut col in columns {
+            col.sort_by(|a, b| {
+                a.frame
+                    .top
+                    .partial_cmp(&b.frame.top)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| {
+                        a.frame
+                            .left
+                            .partial_cmp(&b.frame.left)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+            });
+
+            let mut col_rows: Vec<Vec<crate::types::TextResult>> = Vec::new();
+            let mut current_row: Vec<crate::types::TextResult> = Vec::new();
+            let mut current_row_y_center = 0.0f32;
+
+            for item in col {
+                let item_y_center = item.frame.top + item.frame.height / 2.0;
+                if current_row.is_empty() {
+                    current_row.push(item);
+                    current_row_y_center = item_y_center;
+                } else {
+                    let avg_y = current_row_y_center / current_row.len() as f32;
+                    if (item_y_center - avg_y).abs() <= y_tolerance {
+                        current_row_y_center += item_y_center;
+                        current_row.push(item);
+                    } else {
+                        col_rows.push(current_row);
+                        current_row = vec![item];
+                        current_row_y_center = item_y_center;
+                    }
+                }
+            }
+            if !current_row.is_empty() {
+                col_rows.push(current_row);
+            }
+
+            for mut row in col_rows {
+                row.sort_by(|a, b| {
+                    a.frame
+                        .left
+                        .partial_cmp(&b.frame.left)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+
+                let mut merged_row: Vec<crate::types::TextResult> = Vec::new();
+                for item in row {
+                    if let Some(prev) = merged_row.last_mut() {
+                        let prev_right = prev.frame.left + prev.frame.width;
+                        let gap = item.frame.left - prev_right;
+                        let avg_height = (prev.frame.height + item.frame.height) / 2.0;
+                        let max_gap = (avg_height * word_x).max(1.0);
+                        if gap >= 0.0 && gap <= max_gap {
+                            prev.text.push(' ');
+                            prev.text.push_str(&item.text);
+                            prev.score = prev.score.min(item.score);
+                            let left = prev.frame.left.min(item.frame.left);
+                            let top = prev.frame.top.min(item.frame.top);
+                            let right = prev_right.max(item.frame.left + item.frame.width);
+                            let bottom = (prev.frame.top + prev.frame.height)
+                                .max(item.frame.top + item.frame.height);
+                            let box_points = [(left, top), (right, top), (right, bottom), (left, bottom)];
+                            prev.box_points = box_points;
+                            prev.frame = crate::types::Frame::from_points(&box_points);
+                            continue;
+                        }
+                    }
+                    merged_row.push(item);
+                }
+
+                ordered_results.extend(merged_row);
+            }
+        }
+    }
+
+    ordered_results
+}
+
 /// Orders layout regions into natural reading order across arbitrary column layouts (1 to N columns).
 pub fn order_layout_regions(regions: &[LayoutRegion], img_w: f32) -> Vec<IndexedRegion> {
     if regions.len() <= 1 {

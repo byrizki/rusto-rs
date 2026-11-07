@@ -78,15 +78,18 @@ impl PipelineOutput {
             }
             grouped
         } else {
-            let mut entries = self.to_text_results();
+            let entries = self.to_text_results();
             if let Some(regions) = &self.layout_regions {
                 if !regions.is_empty() {
                     return order_text_results_by_layout(&entries, regions, self.img_w);
                 }
             }
             if options.layout_reading.unwrap_or(false) {
-                crate::layout::sort_lines_reading_order(&mut entries);
-                return entries;
+                return crate::layout::cluster_and_sort_reading_order(
+                    entries,
+                    Some(line_y),
+                    Some(word_x),
+                );
             }
             crate::spatial::cluster_text_results_into_lines(
                 entries,

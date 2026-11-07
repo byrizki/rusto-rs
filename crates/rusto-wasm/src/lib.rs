@@ -6,7 +6,7 @@ use rusto_core::{
     calibration::descreen_background_rgba,
     ctc::{composite_ocr_score, CtcDecoder},
     image::Point2f,
-    layout::sort_lines_reading_order,
+    layout::{cluster_and_sort_reading_order, sort_lines_reading_order},
     postprocess::{decode_dbnet_boxes_fast, decode_linenet_det_boxes_slice},
     preprocess::{
         compute_linenet_rec_crop_dims, compute_ppocr_rec_crop_dims, plan_linenet_rec_batches,
@@ -801,7 +801,11 @@ impl RtenOcrPipeline {
                 let is_reading_order_active = layout_reading && layout_mode != Some("none");
 
                 let mut segments = if is_reading_order_active {
-                    recognized
+                    cluster_and_sort_reading_order(
+                        recognized,
+                        line_y,
+                        word_x,
+                    )
                 } else {
                     cluster_text_results_into_lines(
                         recognized,
@@ -809,7 +813,9 @@ impl RtenOcrPipeline {
                         word_x.unwrap_or(0.4),
                     )
                 };
-                self.apply_reading_order(&mut segments, layout_mode, layout_reading, orig_w, orig_h);
+                if is_reading_order_active && layout_mode.is_some() && layout_mode != Some("heuristic") && layout_mode != Some("none") {
+                    self.apply_reading_order(&mut segments, layout_mode, layout_reading, orig_w, orig_h);
+                }
                 Ok(nanoserde::SerJson::serialize_json(&segments))
             }
         }
