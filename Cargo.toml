@@ -5,10 +5,10 @@ members = [".", "crates/rusto-core", "crates/rusto-cpp", "crates/rusto-nn", "cra
 name = "rusto-rs"
 version = "0.4.0"
 edition = "2021"
-description = "RustO! - Pure Rust OCR library based on RapidOCR with PaddleOCR engine"
+description = "RustO! - Pure Rust OCR library based on RapidOCR with pure-Rust MNN (rusto-nn) and PaddleOCR engine"
 license = "MIT"
 repository = "https://github.com/byrizki/rusto-rs"
-keywords = ["ocr", "paddle", "rten", "computer-vision", "text-recognition"]
+keywords = ["ocr", "paddle", "mnn", "rusto-nn", "rten", "computer-vision", "text-recognition"]
 categories = ["computer-vision", "text-processing"]
 include = [
     "/src/**",

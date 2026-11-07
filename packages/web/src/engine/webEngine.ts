@@ -266,9 +266,9 @@ export class WebOcrEngine {
    */
   public async downloadModel(model = 'indraocr', _lang?: string, _cacheDir?: string): Promise<string[]> {
     return [
-      `https://huggingface.co/byrizki/rusto-models/resolve/main/${model}/det.rten`,
-      `https://huggingface.co/byrizki/rusto-models/resolve/main/${model}/rec.rten`,
-      `https://huggingface.co/byrizki/rusto-models/resolve/main/${model}/meta.json`,
+      `https://huggingface.co/byrizki/rten-models/resolve/main/${model}/det.rten`,
+      `https://huggingface.co/byrizki/rten-models/resolve/main/${model}/rec.rten`,
+      `https://huggingface.co/byrizki/rten-models/resolve/main/${model}/meta.json`,
     ];
   }
 

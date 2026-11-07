@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description      = <<-DESC
     RustO! is a high-performance OCR (Optical Character Recognition) library
     written in pure Rust, powered by Indra OCR and PaddleOCR models with
-    pure-Rust RTen inference. This pod provides Swift bindings for iOS.
+    pure-Rust MNN (rusto-nn) inference. This pod provides Swift bindings for iOS.
   DESC
 
   s.homepage         = 'https://github.com/byrizki/rusto-rs'

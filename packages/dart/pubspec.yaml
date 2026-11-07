@@ -1,5 +1,5 @@
 name: rusto
-description: Pure Rust OCR library bindings for Dart and Flutter based on RapidOCR and PaddleOCR.
+description: Pure Rust OCR library bindings for Dart and Flutter based on RapidOCR, Indra OCR, and pure-Rust MNN (rusto-nn).
 version: 0.4.0
 homepage: https://github.com/byrizki/rusto-rs
 

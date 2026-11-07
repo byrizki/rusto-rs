@@ -714,15 +714,19 @@ namespace RustODotnet
             }
             else
             {
-                var bundledDet = ResolveModelPath("det.rten");
-                var bundledRec = ResolveModelPath("rec.rten");
+                var bundledDet = ResolveModelPath("det.mnn");
+                if (!File.Exists(bundledDet)) bundledDet = ResolveModelPath("det.rten");
+                var bundledRec = ResolveModelPath("rec.mnn");
+                if (!File.Exists(bundledRec)) bundledRec = ResolveModelPath("rec.rten");
                 if (File.Exists(bundledDet) && File.Exists(bundledRec))
                 {
                     config.Detection = new DetectionConfig { ModelPath = bundledDet };
+                    var dictPath = ResolveModelPath("dict.txt");
+                    if (!File.Exists(dictPath)) dictPath = ResolveModelPath("meta.json");
                     config.Recognition = new RecognitionConfig
                     {
                         ModelPath = bundledRec,
-                        DictPath = ResolveModelPath("dict.txt")
+                        DictPath = dictPath
                     };
                 }
             }

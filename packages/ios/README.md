@@ -1,13 +1,13 @@
 # RustO! iOS SDK (`RustO`)
 
-Official Swift / iOS XCFramework SDK for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
+Official Swift / iOS XCFramework SDK for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and pure-Rust MNN (`rusto-nn`) inference runtime.
 
 ## Features
 
-- **Zero-Config Indra OCR**: `try RustO.initialize()` uses bundled `det.rten` / `rec.rten` / `dict.txt` resources when present in your app bundle, or automatically downloads and caches the default `indraocr` `.rten` pipeline in `Library/Caches/rusto/models`.
+- **Zero-Config Indra OCR**: `try RustO.initialize()` uses bundled `det.mnn` (or `det.rten`) / `rec.mnn` (or `rec.rten`) / `dict.txt` resources when present in your app bundle, or automatically downloads and caches the default `indraocr` pipeline from Hugging Face Hub in `Library/Caches/rusto/models`.
 - **Universal XCFramework**: Native `arm64` iOS device and `arm64` / `x86_64` iOS Simulator slices targeting iOS 13.0+.
 - **Document Intelligence**: UVDoc document unwarping (`withAutoUnwarp()`), 4-way orientation detection (`withOrientationDetection()`), semantic layout analysis, and neural reading-order recovery (`withLayoutReading()`).
-- **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, or `.withOutput(...)` into a single `try ...run()` call returning Swift's `DetectTextResult` enum.
+- **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, `.asTsv()`, or `.withOutput(...)` into a single `try ...run()` call returning Swift's `DetectTextResult` enum.
 - **Flexible Image Inputs**: File paths / `file://` URLs, `UIImage` / `Data` (`pngData()` / `jpegData()`), `ImageSource`, and raw 24-bit RGB pixel buffers from `CGImage` via `.rgb(...)`.
 
 ## Installation
@@ -45,7 +45,7 @@ Run `pod install` in your `ios/` directory.
 import RustO
 
 func recognizeInvoice(at imagePath: String) throws {
-    // Uses bundled models if present, otherwise auto-downloads Indra OCR into Caches/rusto/models
+    // Uses bundled models if present, otherwise auto-downloads Indra OCR from Hugging Face Hub into Caches/rusto/models
     let ocr = try RustO.initialize()
 
     // 1. Structured line-level recognition with unwarping & layout reading order
@@ -76,9 +76,9 @@ func recognizeInvoice(at imagePath: String) throws {
 }
 ```
 
-## Bundled Offline `.rten` Models & Presets
+## Bundled Offline Models (.mnn / .rten) & Presets
 
-Add your `.rten` and dictionary files (into the main app target's **Copy Bundle Resources** or inside `RustoModels.bundle`) and initialize with `RustO.initializeWithBundledModels(config:)`:
+Add your model and dictionary files (into the main app target's **Copy Bundle Resources** or inside `RustoModels.bundle`) and initialize with `RustO.initializeWithBundledModels(config:)`:
 
 ```swift
 import RustO
@@ -86,11 +86,11 @@ import RustO
 // 1. Default Indra OCR preset (resolves bundled files or auto-downloads)
 let indraOcr = try RustO.initializeWithBundledModels(config: .indra())
 
-// 2. Explicit bundled .rten filenames in Bundle.main or RustoModels.bundle
+// 2. Explicit bundled filenames in Bundle.main or RustoModels.bundle
 let bundledPpv6 = try RustO.initializeWithBundledModels(
     config: .ppv6(
-        detModelPath: "ppocrv6_tiny_det.rten",
-        recModelPath: "ppocrv6_tiny_rec.rten",
+        detModelPath: "ppocrv6_tiny_det.mnn",
+        recModelPath: "ppocrv6_tiny_rec.mnn",
         dictPath: "ppocrv6_dict.txt"
     )
 )

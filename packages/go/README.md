@@ -1,13 +1,13 @@
 # RustO! Go SDK (`rusto`)
 
-Official Go bindings (via Cgo) for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
+Official Go bindings (via Cgo) for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the pure-Rust MNN (`rusto-nn`) inference runtime.
 
 ## Features
 
-- **Zero-Config Indra OCR**: `rusto.Initialize()` automatically downloads and caches the default `indraocr` `.rten` models on first run.
+- **Zero-Config Indra OCR**: `rusto.Initialize()` automatically downloads and caches the default `indraocr` models on first run from Hugging Face Hub.
 - **Thread-Safe Native Handle**: Concurrent-safe `rusto.Engine` (`rusto.RustO`) synchronized with `sync.RWMutex` and deterministic `Close()`.
 - **Document Intelligence**: Enable UVDoc unwarping (`WithAutoUnwarp(true)`), 4-way orientation detection (`WithOrientationDetection(true)`), and neural reading-order recovery (`WithLayoutReading(true)`).
-- **Fluent Builder API**: Select `.AsLines()`, `.AsWords()`, `.AsSpatial()`, or `.WithOutput(...)` and execute with a single `.Run()` terminal call.
+- **Fluent Builder API**: Select `.AsLines()`, `.AsWords()`, `.AsSpatial()`, `.AsTsv()`, or `.WithOutput(...)` and execute with a single `.Run()` terminal call.
 - **Multiple Input Modes**: File paths, in-memory PNG/JPEG `[]byte` slices, or raw 24-bit interleaved RGB buffers via `.RGB(...)`.
 
 ## Prerequisites & Installation
@@ -39,7 +39,7 @@ import (
 )
 
 func main() {
-	// Zero-config: initializes Indra OCR and auto-downloads .rten models if missing
+	// Zero-config: initializes Indra OCR and auto-downloads models from Hugging Face Hub if missing
 	engine, err := rusto.Initialize()
 	if err != nil {
 		log.Fatalf("failed to initialize RustO: %v", err)
@@ -78,7 +78,7 @@ func main() {
 
 ## Custom Configuration (`rusto.New` / `rusto.Initialize`)
 
-Pass a JSON configuration string to `rusto.New(configJSON)` or `rusto.Initialize(configJSON)` to use specific presets (`"indra"`, `"ppv6"`, `"ppv5"`, `"ppv4"`) or offline `.rten` files:
+Pass a JSON configuration string to `rusto.New(configJSON)` or `rusto.Initialize(configJSON)` to use specific presets (`"indra"`, `"ppv6"`, `"ppv5"`, `"ppv4"`) or offline `.mnn` / `.rten` files:
 
 ```go
 configJSON := `{
@@ -86,20 +86,20 @@ configJSON := `{
   "enableReadingOrder": true,
   "detection": {
     "enabled": true,
-    "modelPath": "./models/indra_det.rten"
+    "modelPath": "./models/indra_det.mnn"
   },
   "recognition": {
     "enabled": true,
-    "modelPath": "./models/indra_rec.rten",
+    "modelPath": "./models/indra_rec.mnn",
     "dictPath": "./models/indra_meta.json"
   },
   "unwarp": {
     "enabled": true,
-    "modelPath": "./models/uvdoc.rten"
+    "modelPath": "./models/uvdoc.mnn"
   },
   "layout": {
     "enabled": true,
-    "modelPath": "./models/layout_cdla.rten"
+    "modelPath": "./models/layout_cdla.mnn"
   }
 }`
 

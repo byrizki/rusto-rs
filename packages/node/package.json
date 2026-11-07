@@ -1,7 +1,7 @@
 {
   "name": "@rustors/node",
   "version": "0.4.0",
-  "description": "Node.js N-API bindings for RustO! OCR library",
+  "description": "Node.js N-API bindings for RustO! OCR library powered by pure-Rust MNN (rusto-nn)",
   "main": "index.js",
   "types": "index.d.ts",
   "scripts": {
@@ -19,6 +19,9 @@
     "n-api",
     "napi-rs",
     "rust",
+    "mnn",
+    "rusto-nn",
+    "rten",
     "paddleocr"
   ],
   "author": "RustO Contributors",

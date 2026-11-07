@@ -1,13 +1,13 @@
 # rusto (Python SDK)
 
-Official Python bindings for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime via UniFFI.
+Official Python bindings for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the pure-Rust MNN (`rusto-nn`) inference runtime via UniFFI.
 
 ## Features
 
-- **Zero-Config Indra OCR**: `RustO.initialize()` automatically downloads and caches the default `indraocr` `.rten` models on first run.
+- **Zero-Config Indra OCR**: `RustO.initialize()` automatically downloads and caches the default `indraocr` models on first run from Hugging Face Hub.
 - **Context Manager Support**: Deterministic native resource cleanup with `with RustO.initialize() as engine:` or `engine.close()`.
 - **Full Document Pipeline**: Neural document unwarping (`with_auto_unwarp()`), page orientation detection (`with_orientation_detection()`), semantic layout analysis, and reading-order recovery (`with_layout_reading()`).
-- **Fluent Builder API**: Chain `.as_lines()`, `.as_words()`, `.as_spatial()`, or `.with_output(...)` into a single `.run()` terminal method.
+- **Fluent Builder API**: Chain `.as_lines()`, `.as_words()`, `.as_spatial()`, `.as_tsv()`, or `.with_output(...)` into a single `.run()` terminal method.
 - **Zero-Copy Raw RGB Support**: Feed NumPy / OpenCV / Pillow RGB8 buffers directly via `.rgb(pixels, width, height, stride)`.
 
 ## Installation
@@ -21,7 +21,7 @@ pip install rusto
 ```python
 from rusto import RustO
 
-# Zero-config initialization (auto-downloads Indra OCR .rten models if not cached)
+# Zero-config initialization (auto-downloads Indra OCR models from Hugging Face Hub if not cached)
 with RustO.initialize() as engine:
     result = (
         engine.detect_text("invoice.png")
@@ -58,9 +58,9 @@ finally:
     engine.close()
 ```
 
-## Custom Configuration & Offline `.rten` Models
+## Custom Configuration & Offline Models (.mnn / .rten)
 
-Select canonical model tiers (`"indraocr"`, `"ppocrv6-tiny"`, `"ppocrv6-small"`, `"ppocrv5-mobile"`, `"ppocrv4-mobile"`), languages, or local `.rten` model paths:
+Select canonical model tiers (`"indraocr"`, `"ppocrv6-tiny"`, `"ppocrv6-small"`, `"ppocrv5-mobile"`, `"ppocrv4-mobile"`), languages, or local model paths:
 
 ```python
 from rusto import (
@@ -77,18 +77,18 @@ cfg = InitializeConfig.for_model("ppocrv6-tiny", lang="latin")
 engine = RustO.initialize(cfg)
 engine.close()
 
-# Explicit local .rten assets for offline environments
+# Explicit local assets for offline environments
 offline_cfg = InitializeConfig(
     template="indra",
     enable_reading_order=True,
-    detection=DetectionConfig(enabled=True, model_path="./models/indra_det.rten"),
+    detection=DetectionConfig(enabled=True, model_path="./models/indra_det.mnn"),
     recognition=RecognitionConfig(
         enabled=True,
-        model_path="./models/indra_rec.rten",
+        model_path="./models/indra_rec.mnn",
         dict_path="./models/indra_meta.json",
     ),
-    unwarp=UnwarpConfig(enabled=True, model_path="./models/uvdoc.rten"),
-    layout=LayoutConfig(enabled=True, model_path="./models/layout_cdla.rten"),
+    unwarp=UnwarpConfig(enabled=True, model_path="./models/uvdoc.mnn"),
+    layout=LayoutConfig(enabled=True, model_path="./models/layout_cdla.mnn"),
 )
 with RustO.initialize(offline_cfg) as offline_engine:
     res = offline_engine.detect_text("scan.png").with_auto_unwarp().as_lines().run()

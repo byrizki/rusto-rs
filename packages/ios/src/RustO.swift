@@ -49,21 +49,21 @@ extension RustO {
         }
 
         let hasModelDir = config.modelPath != nil || config.model != nil
-        let bundledDet = resolveModelPath("det.rten")
-        let bundledRec = resolveModelPath("rec.rten")
+        let bundledDet = resolveModelPath("det.mnn") ?? resolveModelPath("det.rten")
+        let bundledRec = resolveModelPath("rec.mnn") ?? resolveModelPath("rec.rten")
         let hasBundledDefaultModels = !hasModelDir && config.detection == nil && config.recognition == nil && bundledDet != nil && bundledRec != nil
 
         if config.detection != nil || hasBundledDefaultModels {
             var det = config.detection ?? DetectionConfig()
-            let detName = det.modelPath ?? "det.rten"
+            let detName = det.modelPath ?? (resolveModelPath("det.mnn") != nil ? "det.mnn" : "det.rten")
             det.modelPath = resolveModelPath(detName) ?? detName
             resolvedConfig.detection = det
         }
 
         if config.recognition != nil || hasBundledDefaultModels {
             var rec = config.recognition ?? RecognitionConfig()
-            let recName = rec.modelPath ?? "rec.rten"
-            let dictName = rec.dictPath ?? "dict.txt"
+            let recName = rec.modelPath ?? (resolveModelPath("rec.mnn") != nil ? "rec.mnn" : "rec.rten")
+            let dictName = rec.dictPath ?? (resolveModelPath("meta.json") != nil ? "meta.json" : "dict.txt")
             rec.modelPath = resolveModelPath(recName) ?? recName
             rec.dictPath = resolveModelPath(dictName) ?? dictName
             resolvedConfig.recognition = rec

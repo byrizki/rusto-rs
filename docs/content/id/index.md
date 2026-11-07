@@ -1,7 +1,7 @@
 ---
 seo:
   title: RustO! - Mesin OCR Berkinerja Tinggi & Multi-Platform Berbasis Rust Murni
-  description: RustO! adalah mesin OCR berkinerja tinggi dan toolkit lintas-platform berbasis Rust murni, ditenagai oleh model Indra OCR, PaddleOCR, dan inferensi RTen.
+  description: RustO! adalah mesin OCR berkinerja tinggi dan toolkit lintas-platform berbasis Rust murni, ditenagai oleh model Indra OCR, PaddleOCR, serta inferensi MNN Rust murni (rusto-nn) dan RTen.
 ---
 
 ::u-page-hero
@@ -9,7 +9,7 @@ seo:
 Mesin OCR Berperforma Tinggi Berbasis Rust Murni
 
 #description
-RustO! adalah mesin Optical Character Recognition (OCR) dan toolkit multi-platform yang ditulis dalam bahasa Rust murni. Ditenagai oleh model DataLab Indra OCR, PaddleOCR (PP-OCRv6/v5/v4), dan mesin inferensi RTen berbasis Rust murni dengan kecepatan sub-detik tanpa ketergantungan pada OpenCV.
+RustO! adalah mesin Optical Character Recognition (OCR) dan toolkit multi-platform yang ditulis dalam bahasa Rust murni. Ditenagai oleh model DataLab Indra OCR, PaddleOCR (PP-OCRv6/v5/v4), serta mesin inferensi MNN berbasis Rust murni (rusto-nn) dan RTen dengan kecepatan sub-detik tanpa ketergantungan pada OpenCV.
 
 #links
 :::u-button

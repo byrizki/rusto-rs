@@ -680,9 +680,9 @@ RCT_EXPORT_METHOD(initialize:(nullable NSDictionary *)configDict
     NSString *dictPath = resolveModel(@"dictionary");
 
     if (detModel == nil && recModel == nil && config[@"model"] == nil && config[@"modelPath"] == nil) {
-        NSString *bundledDet = [self getResourcePath:@"det.rten"];
-        NSString *bundledRec = [self getResourcePath:@"rec.rten"];
-        NSString *bundledDict = [self getResourcePath:@"dict.txt"];
+        NSString *bundledDet = [self getResourcePath:@"det.mnn"] ?: [self getResourcePath:@"det.rten"];
+        NSString *bundledRec = [self getResourcePath:@"rec.mnn"] ?: [self getResourcePath:@"rec.rten"];
+        NSString *bundledDict = [self getResourcePath:@"meta.json"] ?: [self getResourcePath:@"dict.txt"];
         if (bundledDet != nil && bundledRec != nil && bundledDict != nil) {
             detModel = bundledDet;
             recModel = bundledRec;

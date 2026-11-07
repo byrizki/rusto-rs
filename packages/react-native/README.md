@@ -6,14 +6,14 @@
 
 > **Full Documentation & Guides**: [byrizki.com/rusto-rs](https://byrizki.com/rusto-rs/)
 
-Official React Native SDK (iOS & Android, Legacy & New Architecture) for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
+Official React Native SDK (iOS & Android, Legacy & New Architecture) for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the pure-Rust MNN runtime (`rusto-nn`).
 
 ## Quick Overview
 
 ```ts
 import { close, detectText, initialize } from '@rustors/react-native';
 
-await initialize(); // Zero-config: auto-downloads Indra OCR .rten models on first run
+await initialize(); // Zero-config: auto-downloads Indra OCR models from Hugging Face on first run
 
 const lines = await detectText({ uri })
   .withAutoUnwarp()
@@ -60,8 +60,8 @@ cd ios && pod install
 
 ## Model Provisioning: Zero-Config vs. Offline Bundling
 
-1. **Zero-Config Auto-Download (Default)**: Calling `await initialize()` with no arguments (or `await initialize({ model: 'ppocrv6-tiny', lang: 'latin' })`) automatically downloads the required `.rten` models and dictionary on first launch and caches them in the app's local cache directory (`cacheDir/rusto/models` on Android, `Caches/rusto/models` on iOS). No separate npm model packages, CocoaPods model specs, or Gradle model artifacts are required.
-2. **Offline Bundled `.rten` Assets**: For 100% air-gapped mobile apps, bundle `.rten` and `dict.txt` (or `indra_meta.json`) files inside Android `assets/models/` and iOS Xcode Bundle Resources, then reference them via `initialize({ models: { ... } })`. See [**BUNDLING.md**](./BUNDLING.md) for step-by-step instructions.
+1. **Zero-Config Auto-Download (Default)**: Calling `await initialize()` with no arguments (or `await initialize({ model: 'ppocrv6-tiny', lang: 'latin' })`) automatically downloads the required `.mnn` models (or `.rten`) and dictionary from Hugging Face Hub (`byrizki/rten-models`) on first launch and caches them in the app's local cache directory (`cacheDir/rusto/models` on Android, `Caches/rusto/models` on iOS). No separate npm model packages, CocoaPods model specs, or Gradle model artifacts are required.
+2. **Offline Bundled Assets**: For 100% air-gapped mobile apps, bundle `.mnn` (or `.rten`) and `dict.txt` (or `indra_meta.json`) files inside Android `assets/models/` and iOS Xcode Bundle Resources, then reference them via `initialize({ models: { ... } })`. See [**BUNDLING.md**](./BUNDLING.md) for step-by-step instructions.
 
 ## Complete Example
 
@@ -113,19 +113,19 @@ export async function scanInvoice(uri: string): Promise<{
 Initializes or replaces the native OCR session.
 
 ```ts
-// Zero-config Indra OCR default (auto-downloads .rten assets on first run)
+// Zero-config Indra OCR default (auto-downloads models from Hugging Face on first run)
 await initialize();
 
-// Offline bundled .rten assets (Android assets/models/* & iOS bundle resources)
+// Offline bundled .mnn / .rten assets (Android assets/models/* & iOS bundle resources)
 await initialize({
   preset: 'ppv6',
   models: {
-    detection: 'models/ppocrv6_tiny_det.rten',
-    recognition: 'models/ppocrv6_tiny_rec.rten',
+    detection: 'models/ppocrv6_tiny_det.mnn',
+    recognition: 'models/ppocrv6_tiny_rec.mnn',
     dictionary: 'models/ppocrv6_dict.txt',
-    unwarp: 'models/uvdoc.rten',
-    orientation: 'models/ppocr_orient.rten',
-    layout: 'models/layout_cdla.rten',
+    unwarp: 'models/uvdoc.mnn',
+    orientation: 'models/ppocr_orient.mnn',
+    layout: 'models/layout_cdla.mnn',
   },
 });
 ```
@@ -139,7 +139,7 @@ await initialize({
 | `enableReadingOrder` | `boolean` | Load neural reading-order transformer |
 | `layoutVariant` | `'cdla'` \| `'publaynet'` | Document layout model taxonomy |
 | `recBatchNum` | integer `>= 1` | Recognition batch size override |
-| `models` | `{ detection, recognition, dictionary, classification, orientation, unwarp, layout }` | Explicit bundled or local `.rten` / `.txt` asset paths |
+| `models` | `{ detection, recognition, dictionary, classification, orientation, unwarp, layout }` | Explicit bundled or local `.mnn` / `.rten` / `.txt` asset paths |
 
 ### `detectText(source)` -> `DetectTextBuilder`
 

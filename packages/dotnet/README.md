@@ -1,13 +1,13 @@
 # RustODotnet (.NET SDK)
 
-Official C# / .NET bindings for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
+Official C# / .NET bindings for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and pure-Rust MNN (`rusto-nn`) inference runtime.
 
 ## Features
 
-- **Zero-Config Indra OCR**: `using var ocr = RustO.Initialize();` automatically downloads and caches the default `indraocr` `.rten` models on first run — no separate NuGet model packages required.
-- **Standalone `.rten` Model Support**: Load local `.rten` models directly for offline or air-gapped deployments, or pre-warm caches via `RustO.DownloadModel(...)`.
+- **Zero-Config Indra OCR**: `using var ocr = RustO.Initialize();` automatically downloads and caches the default `indraocr` models on first run from Hugging Face Hub — no separate NuGet model packages required.
+- **Standalone Model Support**: Load local `.mnn` or `.rten` models directly for offline or air-gapped deployments, or pre-warm caches via `RustO.DownloadModel(...)`.
 - **Document Intelligence**: Built-in UVDoc document unwarping (`WithAutoUnwarp()`), 4-way page orientation detection (`WithOrientationDetection()`), and neural reading-order recovery (`WithLayoutReading()`).
-- **Fluent Builder API**: Chain `.AsLines()`, `.AsWords()`, `.AsSpatial()`, or `.WithOutput(...)` into a single `.Run()` terminal method.
+- **Fluent Builder API**: Chain `.AsLines()`, `.AsWords()`, `.AsSpatial()`, `.AsTsv()`, or `.WithOutput(...)` into a single `.Run()` terminal method.
 - **Universal Image Inputs**: File paths, `byte[]` encoded images, `ImageSource`, or raw 24-bit interleaved RGB buffers via `.Rgb(...)`.
 
 ## Installation
@@ -18,7 +18,7 @@ dotnet add package RustODotnet
 
 ## Quick Start (Zero-Config)
 
-`RustO.Initialize()` uses the **Indra OCR** pipeline by default and automatically downloads `.rten` assets into your user cache (`~/.cache/rusto/models` or `RUSTO_CACHE_DIR`) on first use:
+`RustO.Initialize()` uses the **Indra OCR** pipeline by default and automatically downloads assets from Hugging Face Hub into your user cache (`~/.cache/rusto/models` or `RUSTO_CACHE_DIR`) on first use:
 
 ```csharp
 using System;
@@ -54,40 +54,40 @@ if (spatialResult is SpatialDetectTextResult spatial)
 }
 ```
 
-## Presets & Standalone `.rten` Models
+## Presets & Standalone Models (.mnn / .rten)
 
-Configure model presets (`InitializeConfig.Indra()`, `InitializeConfig.Ppv6()`, `InitializeConfig.ForModel(...)`) or point to local `.rten` model files for offline environments:
+Configure model presets (`InitializeConfig.Indra()`, `InitializeConfig.Ppv6()`, `InitializeConfig.ForModel(...)`) or point to local `.mnn` / `.rten` model files for offline environments:
 
 ```csharp
 using RustODotnet;
 
-// 1. Canonical model & language preset (auto-downloads .rten files if missing)
+// 1. Canonical model & language preset (auto-downloads files if missing)
 using var indraOcr = RustO.Initialize(InitializeConfig.Indra());
 using var tinyOcr = RustO.Initialize(InitializeConfig.ForModel("ppocrv6-tiny", lang: "latin"));
 
-// 2. Offline standalone .rten models (e.g. placed in ./models/ next to your executable)
+// 2. Offline standalone models (e.g. placed in ./models/ next to your executable)
 var offlineConfig = new InitializeConfig
 {
     Template = "indra",
     EnableReadingOrder = true,
-    Detection = new DetectionConfig { ModelPath = "models/indra_det.rten" },
+    Detection = new DetectionConfig { ModelPath = "models/indra_det.mnn" },
     Recognition = new RecognitionConfig
     {
-        ModelPath = "models/indra_rec.rten",
+        ModelPath = "models/indra_rec.mnn",
         DictPath = "models/indra_meta.json"
     },
-    Unwarp = new UnwarpConfig { ModelPath = "models/uvdoc.rten" },
-    Layout = new LayoutConfig { ModelPath = "models/layout_cdla.rten" }
+    Unwarp = new UnwarpConfig { ModelPath = "models/uvdoc.mnn" },
+    Layout = new LayoutConfig { ModelPath = "models/layout_cdla.mnn" }
 };
 
 using var offlineOcr = RustO.Initialize(offlineConfig);
 ```
 
-> If `det.rten`, `rec.rten`, and `dict.txt` exist in your application base directory (or `models/` subdirectory), `RustO.Initialize()` automatically resolves and uses those bundled files offline.
+> If `det.mnn` (or `det.rten`), `rec.mnn` (or `rec.rten`), and `dict.txt` (or `meta.json`) exist in your application base directory (or `models/` subdirectory), `RustO.Initialize()` automatically resolves and uses those bundled files offline.
 
 ### Pre-Downloading Models
 
-For container builds or CI environments, download `.rten` assets ahead of time:
+For container builds or CI environments, download model assets ahead of time:
 
 ```csharp
 string[] cachedFiles = RustO.DownloadModel(model: "indraocr", lang: "latin", cacheDir: "./models-cache");

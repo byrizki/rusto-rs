@@ -137,11 +137,11 @@ data class InitializeConfig(
 
         val hasModelDir = model != null || modelPath != null
         val hasBundledDefaults = !hasModelDir && detection == null && recognition == null &&
-            (hasAsset(context, "det.rten") || hasAsset(context, "det.onnx"))
+            (hasAsset(context, "det.mnn") || hasAsset(context, "det.rten") || hasAsset(context, "det.onnx"))
 
         if (detection != null || hasBundledDefaults) {
             val detObj = JSONObject()
-            val detPath = detection?.modelPath ?: "det.rten"
+            val detPath = detection?.modelPath ?: if (hasAsset(context, "det.mnn")) "det.mnn" else "det.rten"
             detObj.put("modelPath", resolveModel(context, detPath))
             detection?.enabled?.let { detObj.put("enabled", it) }
             detection?.thresh?.let { detObj.put("thresh", it.toDouble()) }
@@ -156,8 +156,8 @@ data class InitializeConfig(
 
         if (recognition != null || hasBundledDefaults) {
             val recObj = JSONObject()
-            val recPath = recognition?.modelPath ?: "rec.rten"
-            val dictPath = recognition?.dictPath ?: "dict.txt"
+            val recPath = recognition?.modelPath ?: if (hasAsset(context, "rec.mnn")) "rec.mnn" else "rec.rten"
+            val dictPath = recognition?.dictPath ?: if (hasAsset(context, "meta.json")) "meta.json" else "dict.txt"
             recObj.put("modelPath", resolveModel(context, recPath))
             recObj.put("dictPath", resolveModel(context, dictPath))
             recognition?.enabled?.let { recObj.put("enabled", it) }
@@ -467,9 +467,14 @@ class RustO private constructor(
             cacheFile.parentFile?.mkdirs()
             val tmpFile = File(cacheFile.parent, "${cacheFile.name}.tmp")
             val candidates = mutableListOf(assetName)
-            if (assetName.endsWith(".rten")) {
+            if (assetName.endsWith(".mnn")) {
+                candidates.add(assetName.removeSuffix(".mnn") + ".rten")
+                candidates.add(assetName.removeSuffix(".mnn") + ".onnx")
+            } else if (assetName.endsWith(".rten")) {
+                candidates.add(assetName.removeSuffix(".rten") + ".mnn")
                 candidates.add(assetName.removeSuffix(".rten") + ".onnx")
             } else if (assetName.endsWith(".onnx")) {
+                candidates.add(assetName.removeSuffix(".onnx") + ".mnn")
                 candidates.add(assetName.removeSuffix(".onnx") + ".rten")
             }
             var lastEx: Exception? = null

@@ -12,9 +12,9 @@ tags:
 - paddleocr
 ---
 
-# RustO Pre-trained RTen OCR Models
+# RustO Pre-trained OCR Models
 
-Standalone pre-trained OCR models in pure-Rust [RTen](https://github.com/robertknight/rten) format, optimized for [RustO! (`rusto-rs`)](https://github.com/byrizki/rusto-rs).
+Standalone pre-trained OCR models in pure-Rust Alibaba MNN (`rusto-nn`) and RTen formats, optimized for [RustO! (`rusto-rs`)](https://github.com/byrizki/rusto-rs).
 
 These models enable zero-dependency, high-speed neural OCR inference across Rust, Python, Node.js, WebAssembly (WASM), Android, iOS, React Native, C# .NET, Go, and Flutter.
 

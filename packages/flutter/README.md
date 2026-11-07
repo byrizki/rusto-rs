@@ -1,13 +1,13 @@
 # rusto_flutter
 
-Official Flutter FFI plugin for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
+Official Flutter FFI plugin for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and pure-Rust MNN (`rusto-nn`) inference runtime.
 
 `package:rusto_flutter/rusto_flutter.dart` bundles native library packaging for Flutter targets and directly re-exports the `RustO` API from `package:rusto/rusto.dart`.
 
 ## Features
 
-- **Zero-Config or Offline `.rten` Models**: Auto-download the default **Indra OCR** `.rten` pipeline into your app cache directory, or extract bundled `.rten` assets from Flutter `rootBundle` for 100% offline mobile execution.
-- **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, or `.withOutput(...)` into a single `.run()` call on `RustO`.
+- **Zero-Config or Offline Models**: Auto-download the default **Indra OCR** pipeline from Hugging Face Hub into your app cache directory, or extract bundled `.mnn` / `.rten` assets from Flutter `rootBundle` for 100% offline mobile execution.
+- **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, `.asTsv()`, or `.withOutput(...)` into a single `.run()` call on `RustO`.
 - **Document Intelligence**: UVDoc document unwarping (`withAutoUnwarp()`), 4-way orientation detection (`withOrientationDetection()`), and neural layout reading-order recovery (`withLayoutReading()`).
 - **UI-Smooth Isolate Execution**: Run synchronous FFI inference inside `Isolate.run(...)` to keep Flutter animations at 60/120 FPS.
 
@@ -22,7 +22,7 @@ dependencies:
 
 ## Quick Start (Zero-Config with `Isolate.run`)
 
-On mobile platforms, pass your writable cache directory (`getTemporaryDirectory()`) so `RustO.initialize(...)` can cache downloaded `.rten` models, and run inference inside `Isolate.run` to avoid blocking the UI thread:
+On mobile platforms, pass your writable cache directory (`getTemporaryDirectory()`) so `RustO.initialize(...)` can cache downloaded models from Hugging Face Hub, and run inference inside `Isolate.run` to avoid blocking the UI thread:
 
 ```dart
 import 'dart:convert';

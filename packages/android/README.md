@@ -1,13 +1,13 @@
 # RustO! Android SDK (`rusto-android`)
 
-Official Kotlin / Android AAR bindings for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
+Official Kotlin / Android AAR bindings for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and pure-Rust MNN (`rusto-nn`) inference runtime.
 
 ## Features
 
-- **Zero-Config Indra OCR**: `RustO.initialize(context)` automatically downloads and caches the default `indraocr` `.rten` pipeline in `context.cacheDir/rusto/models` — or extracts bundled `det.rten` / `rec.rten` / `dict.txt` from APK `assets/` when present.
+- **Zero-Config Indra OCR**: `RustO.initialize(context)` automatically downloads and caches the default `indraocr` pipeline from Hugging Face Hub in `context.cacheDir/rusto/models` — or extracts bundled `det.mnn` (or `det.rten`) / `rec.mnn` (or `rec.rten`) / `dict.txt` from APK `assets/` when present.
 - **Native Prebuilt JNI Slices**: Ships precompiled `librusto.so` binaries inside the AAR (`arm64-v8a`, `armeabi-v7a`, `x86_64`) for Android API 21+.
 - **Document Intelligence**: UVDoc 3D unwarping (`withAutoUnwarp()`), 4-way page orientation correction (`withOrientationDetection()`), semantic layout analysis, and neural reading-order recovery (`withLayoutReading()`).
-- **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, or `.withOutput(...)` into a single `.run()` call returning a sealed `DetectTextResult`.
+- **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, `.asTsv()`, or `.withOutput(...)` into a single `.run()` call returning a sealed `DetectTextResult`.
 - **Android-Native Inputs**: Accepts file paths, `file://` URIs, `content://` `Uri` streams via `ContentResolver`, encoded `ByteArray` / `Bitmap` payloads, and raw 24-bit RGB buffers via `.rgb(...)`.
 - **`AutoCloseable` Lifecycle**: Idiomatic Kotlin `RustO.initialize(context).use { ocr -> ... }` or explicit `ocr.close()`.
 
@@ -102,16 +102,16 @@ val tinyOcr = RustO.initialize(
 val customPpv6 = RustO.initialize(
     context,
     InitializeConfig.ppv6(
-        detModelPath = "models/ppocrv6_tiny_det.rten",
-        recModelPath = "models/ppocrv6_tiny_rec.rten",
+        detModelPath = "models/ppocrv6_tiny_det.mnn",
+        recModelPath = "models/ppocrv6_tiny_rec.mnn",
         dictPath = "models/ppocrv6_dict.txt",
     )
 )
 ```
 
-### Offline Bundled `.rten` Models in `assets/`
+### Offline Bundled `.mnn` / `.rten` Models in `assets/`
 
-1. Place `det.rten`, `rec.rten`, and `dict.txt` directly in `app/src/main/assets/` for automatic offline discovery via `RustO.initialize(context)`, **or** place named models in `app/src/main/assets/models/` and pass their relative asset paths in `InitializeConfig` (`DetectionConfig`, `RecognitionConfig`, `UnwarpConfig`, `LayoutConfig`).
+1. Place `det.mnn` (or `det.rten`), `rec.mnn` (or `rec.rten`), and `dict.txt` (or `meta.json`) directly in `app/src/main/assets/` for automatic offline discovery via `RustO.initialize(context)`, **or** place named models in `app/src/main/assets/models/` and pass their relative asset paths in `InitializeConfig` (`DetectionConfig`, `RecognitionConfig`, `UnwarpConfig`, `LayoutConfig`).
 2. `RustO.initialize(...)` transparently extracts bundled APK assets to `context.cacheDir` on first use.
 
 You can also pre-download models ahead of time:

@@ -1,13 +1,13 @@
 //! # RustO! - Pure Rust OCR Library
 //!
 //! RustO! is a high-performance OCR library written in pure Rust,
-//! powered by PaddleOCR models with RTen inference engine.
+//! powered by Indra OCR and PaddleOCR models with a pure-Rust MNN inference engine (`rusto-nn`).
 //!
 //! ## Features
 //!
 //! - **Pure Rust**: Zero OpenCV or C++ dependencies (optional OpenCV backend available)
 //! - **High Accuracy**: 99.3% parity with OpenCV-based implementations
-//! - **Fast Performance**: Optimized with LTO and aggressive compilation settings
+//! - **Fast Performance**: Optimized with SIMD (AVX-512, AVX2, NEON, WASM SIMD128) and aggressive LTO
 //! - **Cross-Platform**: Linux, macOS, Windows, Android, iOS, WASM support
 //! - **Memory Safe**: Leverages Rust's safety guarantees
 //!
@@ -16,9 +16,7 @@
 //! ```rust,no_run
 //! use rusto::{DetectTextResult, ImageSource, OcrRunOptions, RustO, InitializeConfig};
 //!
-//! let mut ocr = RustO::initialize(InitializeConfig::ppv5(
-//!     "models/det.rten", "models/rec.rten", "models/dict.txt",
-//! ))?;
+//! let mut ocr = RustO::initialize(InitializeConfig::default())?;
 //! let result = ocr.detect_text(
 //!     &ImageSource::Path("image.jpg".into()),
 //!     &OcrRunOptions::default(),

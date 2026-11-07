@@ -1,15 +1,15 @@
 # rusto (Dart SDK)
 
-Official Dart FFI bindings for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
+Official Dart FFI bindings for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and pure-Rust MNN (`rusto-nn`) inference runtime.
 
 > Building a Flutter mobile or desktop application? Use [`rusto_flutter`](../flutter/README.md), which bundles native mobile library packaging and re-exports `package:rusto/rusto.dart`.
 
 ## Features
 
-- **Zero-Config Indra OCR**: `RustO.initialize()` automatically downloads and caches the default `indraocr` `.rten` models on first run.
+- **Zero-Config Indra OCR**: `RustO.initialize()` automatically downloads and caches the default `indraocr` models on first run from Hugging Face Hub.
 - **Pure-Rust FFI**: Low-overhead synchronous UniFFI bindings with automatic `librusto` discovery and `RUSTO_LIB_PATH` override support.
 - **Document Intelligence**: UVDoc document unwarping (`withAutoUnwarp()`), 4-way page orientation correction (`withOrientationDetection()`), and neural layout reading-order recovery (`withLayoutReading()`).
-- **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, or `.withOutput(...)` into a single `.run()` terminal call.
+- **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, `.asTsv()`, or `.withOutput(...)` into a single `.run()` terminal call.
 - **Flexible Image Sources**: File paths, `Uint8List` encoded bytes, `ImageSource`, or raw 24-bit interleaved RGB buffers via `.rgb(...)`.
 
 ## Installation
@@ -29,7 +29,7 @@ Build or install the native `librusto` library (`librusto.so`, `librusto.dylib`,
 import 'package:rusto/rusto.dart';
 
 void main() {
-  // Initializes Indra OCR and auto-downloads .rten models if not cached
+  // Initializes Indra OCR and auto-downloads models from Hugging Face Hub if not cached
   final engine = RustO.initialize();
 
   try {
@@ -61,7 +61,7 @@ void main() {
 }
 ```
 
-## Custom Presets & Offline `.rten` Models
+## Custom Presets & Offline Models (.mnn / .rten)
 
 Pass a structured `InitializeConfig` helper or JSON configuration string to `RustO.initialize(...)`:
 
@@ -69,31 +69,31 @@ Pass a structured `InitializeConfig` helper or JSON configuration string to `Rus
 import 'dart:convert';
 import 'package:rusto/rusto.dart';
 
-// 1. Canonical model + language (auto-downloads .rten files if missing)
+// 1. Canonical model + language (auto-downloads files if missing)
 final tinyCfg = createInitializeConfigForModel('ppocrv6-tiny', 'latin', null);
 final tinyEngine = RustO.initialize(tinyCfg);
 tinyEngine.close();
 
-// 2. Explicit local .rten assets
+// 2. Explicit local assets
 final offlineJson = jsonEncode({
   'template': 'indra',
   'enableReadingOrder': true,
   'detection': {
     'enabled': true,
-    'modelPath': './models/indra_det.rten',
+    'modelPath': './models/indra_det.mnn',
   },
   'recognition': {
     'enabled': true,
-    'modelPath': './models/indra_rec.rten',
+    'modelPath': './models/indra_rec.mnn',
     'dictPath': './models/indra_meta.json',
   },
   'unwarp': {
     'enabled': true,
-    'modelPath': './models/uvdoc.rten',
+    'modelPath': './models/uvdoc.mnn',
   },
   'layout': {
     'enabled': true,
-    'modelPath': './models/layout_cdla.rten',
+    'modelPath': './models/layout_cdla.mnn',
   },
 });
 
@@ -101,7 +101,7 @@ final offlineEngine = RustO.initialize(offlineJson);
 offlineEngine.close();
 ```
 
-Pre-download `.rten` models ahead of time:
+Pre-download models ahead of time:
 
 ```dart
 final cachedPaths = RustO.downloadModel(

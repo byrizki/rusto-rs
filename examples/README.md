@@ -1,32 +1,32 @@
 # RustO! Examples
 
-This directory (alongside SDK `example/` apps under `packages/`) showcases **RustO! v0.4.0** across Rust, .NET, React Native, Flutter, and Dart using standalone **`.rten`** models and zero-config **Indra OCR** auto-downloading.
+This directory (alongside SDK `example/` apps under `packages/`) showcases **RustO! v0.4.0** across Rust, .NET, React Native, Flutter, and Dart using standalone models and zero-config **Indra OCR** auto-downloading from Hugging Face Hub.
 
 ## Overview of Example Projects
 
 | Example | Location | Description |
 | :--- | :--- | :--- |
 | **Rust Core Examples** | `examples/*.rs` | Direct `rusto` Rust crate examples (calibration/optimization, spatial layout, document layout + table pipeline, performance benchmarks) |
-| **.NET Console & Smoke Suite** | [`examples/dotnet`](./dotnet/README.md) | C# / .NET consumer app demonstrating `RustO.Initialize()`, fluent `.AsLines().Run()` / `.AsSpatial().Run()`, and offline `.rten` models |
+| **.NET Console & Smoke Suite** | [`examples/dotnet`](./dotnet/README.md) | C# / .NET consumer app demonstrating `RustO.Initialize()`, fluent `.AsLines().Run()` / `.AsSpatial().Run()`, and offline models |
 | **React Native (New Architecture)** | [`examples/react-native-new-arch`](./react-native-new-arch/README.md) | React Native TurboModule / Fabric verification app using `@rustors/react-native` |
 | **React Native (Legacy Bridge)** | [`examples/react-native-legacy`](./react-native-legacy/README.md) | React Native Classic Architecture verification app using `@rustors/react-native` |
 | **React Native Bare / Expo Dev Build** | `packages/react-native/example` | Interactive bare React Native showcase (also compatible with Expo Development Builds via `npx expo prebuild`) |
-| **Flutter Mobile & Desktop App** | [`packages/flutter/example`](../packages/flutter/example) | Full Flutter verification app demonstrating `rusto_flutter`, bundled `.rten` assets, structured detection, and 2D spatial layout |
+| **Flutter Mobile & Desktop App** | [`packages/flutter/example`](../packages/flutter/example) | Full Flutter verification app demonstrating `rusto_flutter`, bundled assets, structured detection, and 2D spatial layout |
 | **Dart CLI Example** | [`packages/dart/example`](../packages/dart/example) | Standalone Dart FFI command-line example using `RustO.initialize()` and fluent `.asLines().run()` / `.asSpatial().run()` |
 
 ---
 
-## Model Assets (`.rten` & Zero-Config Auto-Download)
+## Model Assets (Zero-Config Auto-Download via Hugging Face)
 
-In **RustO! v0.4.0**, all high-level SDKs default to the **Indra OCR** (`indraocr`) `.rten` pipeline and automatically download missing `.rten` models into your local cache directory (`~/.cache/rusto/models` or `$RUSTO_CACHE_DIR`) on first run.
+In **RustO! v0.4.0**, all high-level SDKs default to the **Indra OCR** (`indraocr`) pipeline and automatically download missing models into your local cache directory (`~/.cache/rusto/models` or `$RUSTO_CACHE_DIR`) on first run from Hugging Face Hub.
 
-To pre-download standalone `.rten` models locally for offline examples or Rust CLI demos:
+To pre-download standalone models locally for offline examples or Rust CLI demos:
 
 ```bash
 bash docs/scripts/download-models.sh
 ```
 
-Or download specific `.rten` files from [Hugging Face (`byrizki/rten-models`)](https://huggingface.co/byrizki/rten-models) or the [`models-rten-v0.4.0` GitHub Release](https://github.com/byrizki/rusto-rs/releases/tag/models-rten-v0.4.0).
+Or download specific model files directly from [Hugging Face (`byrizki/rten-models`)](https://huggingface.co/byrizki/rten-models).
 
 ---
 

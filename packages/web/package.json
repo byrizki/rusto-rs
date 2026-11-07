@@ -1,13 +1,15 @@
 {
   "name": "@rustors/web",
   "version": "0.4.0",
-  "description": "High-performance Web and Browser OCR engine for RustO! powered by PaddleOCR models",
+  "description": "High-performance Web and Browser OCR engine for RustO! powered by Indra OCR and PaddleOCR models via pure-Rust rusto-nn WebAssembly",
   "keywords": [
     "ocr",
     "rusto",
     "web",
     "browser",
     "paddleocr",
+    "mnn",
+    "rusto-nn",
     "rten",
     "text-recognition",
     "webassembly",

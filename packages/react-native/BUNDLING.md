@@ -36,40 +36,40 @@ await close();
 
 ---
 
-## Strategy 2: Offline Bundling (`.rten` + Dictionary Assets)
+## Strategy 2: Offline Bundling (`.mnn` / `.rten` + Dictionary Assets)
 
-If your app must work completely offline from the very first launch (field inspection, point-of-sale, medical/government scanning), bundle standalone `.rten` files directly in your native Android and iOS projects.
+If your app must work completely offline from the very first launch (field inspection, point-of-sale, medical/government scanning), bundle standalone `.mnn` or `.rten` files directly in your native Android and iOS projects.
 
-### 1. Download Standalone `.rten` Assets
+### 1. Download Standalone Assets
 
-Download the `.rten` models and dictionary for your chosen pipeline from [Hugging Face (`byrizki/rten-models`)](https://huggingface.co/byrizki/rten-models) or the [`models-rten-v0.4.0` GitHub Release](https://github.com/byrizki/rusto-rs/releases/tag/models-rten-v0.4.0):
+Download the `.mnn` (default, pure-Rust MNN runtime) or `.rten` models and dictionary for your chosen pipeline from [Hugging Face (`byrizki/rten-models`)](https://huggingface.co/byrizki/rten-models):
 
 | Pipeline | Required Files | Optional Auxiliary Files |
 | :--- | :--- | :--- |
-| **Indra OCR (`preset: 'indra'`)** | `indra_det.rten`, `indra_rec.rten`, `indra_meta.json` | `uvdoc.rten`, `indra_orient.rten`, `layout_cdla.rten`, `indra_order.rten` |
-| **PP-OCRv6 Tiny (`preset: 'ppv6'`)** | `ppocrv6_tiny_det.rten`, `ppocrv6_tiny_rec.rten`, `ppocrv6_dict.txt` | `uvdoc.rten`, `ppocr_orient.rten`, `ppocr_cls.rten`, `layout_cdla.rten` |
+| **Indra OCR (`preset: 'indra'`)** | `indra_det.mnn` (or `.rten`), `indra_rec.mnn` (or `.rten`), `indra_meta.json` | `uvdoc.mnn`, `indra_orient.mnn`, `layout_cdla.mnn`, `indra_order.mnn` |
+| **PP-OCRv6 Tiny (`preset: 'ppv6'`)** | `ppocrv6_tiny_det.mnn` (or `.rten`), `ppocrv6_tiny_rec.mnn` (or `.rten`), `ppocrv6_dict.txt` | `uvdoc.mnn`, `ppocr_orient.mnn`, `ppocr_cls.mnn`, `layout_cdla.mnn` |
 
-> **Tip (Convention-Based Zero-Config Offline)**: If you rename the three core files to `det.rten`, `rec.rten`, and `dict.txt` and place them at the root of Android `assets/` and iOS Bundle Resources, calling `await initialize()` automatically detects and uses them offline without extra configuration!
+> **Tip (Convention-Based Zero-Config Offline)**: If you rename the three core files to `det.mnn` (or `det.rten`), `rec.mnn` (or `rec.rten`), and `dict.txt` (or `indra_meta.json`) and place them at the root of Android `assets/` and iOS Bundle Resources, calling `await initialize()` automatically detects and uses them offline without extra configuration!
 
 ### 2. Android Asset Placement (`assets/models/`)
 
-Place your `.rten` and dictionary files under `android/app/src/main/assets/models/`:
+Place your model and dictionary files under `android/app/src/main/assets/models/`:
 
 ```text
 android/app/src/main/assets/
 └── models/
-    ├── ppocrv6_tiny_det.rten
-    ├── ppocrv6_tiny_rec.rten
+    ├── ppocrv6_tiny_det.mnn
+    ├── ppocrv6_tiny_rec.mnn
     ├── ppocrv6_dict.txt
-    └── uvdoc.rten
+    └── uvdoc.mnn
 ```
 
-Optionally prevent Gradle from re-compressing `.rten` binaries in `android/app/build.gradle`:
+Optionally prevent Gradle from re-compressing `.mnn` and `.rten` binaries in `android/app/build.gradle`:
 
 ```groovy
 android {
     androidResources {
-        noCompress += ["rten"]
+        noCompress += ["mnn", "rten"]
     }
 }
 ```
@@ -78,10 +78,10 @@ At runtime, `rusto-android` automatically extracts referenced APK assets into `c
 
 ### 3. iOS Bundle Resource Placement
 
-Add the `.rten` and dictionary files to your iOS target in Xcode:
+Add the model and dictionary files to your iOS target in Xcode:
 
 1. Open `ios/<YourApp>.xcworkspace` in Xcode.
-2. Drag your `.rten` and `.txt` / `.json` files (or a `RustoModels.bundle` folder) into the project navigator.
+2. Drag your `.mnn` / `.rten` and `.txt` / `.json` files (or a `RustoModels.bundle` folder) into the project navigator.
 3. Ensure **"Add to targets: `<YourApp>`"** is checked so they appear under **Build Phases -> Copy Bundle Resources**.
 
 > Note: `RustO.resolveModelPath` on iOS resolves files placed in the main app bundle (`Bundle.main`), inside `RustoModels.bundle` / `RustOModels.bundle`, or in the app's `Documents` directory by filename.
@@ -99,10 +99,10 @@ const assetPrefix = Platform.OS === 'android' ? 'models/' : '';
 await initialize({
   preset: 'ppv6',
   models: {
-    detection: `${assetPrefix}ppocrv6_tiny_det.rten`,
-    recognition: `${assetPrefix}ppocrv6_tiny_rec.rten`,
+    detection: `${assetPrefix}ppocrv6_tiny_det.mnn`,
+    recognition: `${assetPrefix}ppocrv6_tiny_rec.mnn`,
     dictionary: `${assetPrefix}ppocrv6_dict.txt`,
-    unwarp: `${assetPrefix}uvdoc.rten`,
+    unwarp: `${assetPrefix}uvdoc.mnn`,
   },
 });
 
@@ -120,21 +120,22 @@ const spatialLayout = await detectText({ uri: imageUri })
 await close();
 ```
 
-*(If you place the files directly at the root of `android/app/src/main/assets/` on Android and Copy Bundle Resources on iOS, you can omit `assetPrefix` and pass identical filenames such as `'ppocrv6_tiny_det.rten'` on both platforms.)*
+*(If you place the files directly at the root of `android/app/src/main/assets/` on Android and Copy Bundle Resources on iOS, you can omit `assetPrefix` and pass identical filenames such as `'ppocrv6_tiny_det.mnn'` on both platforms.)*
 
 ---
 
 ## Strategy 3: Custom App-Managed Download Directory
 
-If your app downloads `.rten` models from your own authenticated backend (e.g., via `react-native-blob-util` or `expo-file-system`), pass absolute filesystem paths in `models` or `modelPath`:
+If your app downloads `.mnn` or `.rten` models from your own authenticated backend (e.g., via `react-native-blob-util` or `expo-file-system`), pass absolute filesystem paths in `models` or `modelPath`:
 
 ```ts
 await initialize({
   preset: 'indra',
   models: {
-    detection: `${appSupportDir}/indra_det.rten`,
-    recognition: `${appSupportDir}/indra_rec.rten`,
+    detection: `${appSupportDir}/indra_det.mnn`,
+    recognition: `${appSupportDir}/indra_rec.mnn`,
     dictionary: `${appSupportDir}/indra_meta.json`,
   },
 });
+```
 ```

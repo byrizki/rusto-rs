@@ -1,13 +1,13 @@
 # @rustors/node
 
-Official Node.js N-API native bindings for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
+Official Node.js N-API native bindings for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and pure-Rust MNN (`rusto-nn`) inference.
 
 ## Features
 
-- **Zero-Config Indra OCR Default**: Initialize with `RustO.initialize()` — automatically downloads and caches the default `indraocr` `.rten` pipeline on first run.
+- **Zero-Config Indra OCR Default**: Initialize with `RustO.initialize()` — automatically downloads and caches the default `indraocr` pipeline on first run from Hugging Face Hub.
 - **Pure-Rust Native Addon**: Zero C++ or Python runtime dependencies; prebuilt N-API binaries for Linux, macOS, and Windows (`x64` & `arm64`).
 - **Document Intelligence Pipeline**: Built-in UVDoc document unwarping (`withAutoUnwarp()`), 4-way page orientation correction (`withOrientationDetection()`), layout analysis, and neural reading-order recovery (`withLayoutReading()`).
-- **Fluent Builder API**: Configure the 6-phase OCR pipeline and select `.asLines()`, `.asWords()`, or `.asSpatial()` before calling `.run()`.
+- **Fluent Builder API**: Configure the 6-phase OCR pipeline and select `.asLines()`, `.asWords()`, `.asSpatial()`, or `.asTsv()` before calling `.run()`.
 - **Flexible Image Inputs**: Pass file paths, `Buffer` / `Uint8Array`, `{ path }`, `{ uri }`, `{ bytes }`, or raw interleaved RGB8 buffers via `.rgb(...)`.
 
 ## Installation
@@ -20,7 +20,7 @@ pnpm add @rustors/node
 
 ## Quick Start (Zero-Config)
 
-Calling `RustO.initialize()` with no arguments initializes the default **Indra OCR** pipeline and automatically downloads missing `.rten` model assets into your user cache directory (`~/.cache/rusto/models` or `$RUSTO_CACHE_DIR`).
+Calling `RustO.initialize()` with no arguments initializes the default **Indra OCR** pipeline and automatically downloads missing model assets from Hugging Face Hub into your user cache directory (`~/.cache/rusto/models` or `$RUSTO_CACHE_DIR`).
 
 ```ts
 import { RustO } from '@rustors/node';
@@ -56,7 +56,7 @@ try {
 
 ## Custom Initialization & Presets
 
-You can pass an `InitializeConfig` object (or JSON string) to `RustO.initialize(config)` or `new RustO(config)` to select a model family, target language, or local `.rten` files:
+You can pass an `InitializeConfig` object (or JSON string) to `RustO.initialize(config)` or `new RustO(config)` to select a model family, target language, or local `.mnn` / `.rten` files:
 
 ```ts
 import { RustO, type InitializeConfig } from '@rustors/node';
@@ -68,24 +68,24 @@ const fastEngine = RustO.initialize({
   enableReadingOrder: true,
 });
 
-// Option B: Explicit offline .rten model paths via constructor or initialize()
+// Option B: Explicit offline model paths via constructor or initialize()
 const offlineConfig: InitializeConfig = {
   preset: 'indra',
   enableReadingOrder: true,
   detection: {
-    modelPath: './models/indra_det.rten',
+    modelPath: './models/indra_det.mnn',
   },
   recognition: {
-    modelPath: './models/indra_rec.rten',
+    modelPath: './models/indra_rec.mnn',
     dictPath: './models/indra_meta.json',
   },
   unwarp: {
     enabled: true,
-    modelPath: './models/uvdoc.rten',
+    modelPath: './models/uvdoc.mnn',
   },
   layout: {
     enabled: true,
-    modelPath: './models/layout_cdla.rten',
+    modelPath: './models/layout_cdla.mnn',
   },
 };
 

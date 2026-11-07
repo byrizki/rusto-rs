@@ -1,10 +1,13 @@
 {
   "name": "@rustors/react-native",
   "version": "0.4.0",
-  "description": "React Native bindings for RustO! OCR library",
+  "description": "React Native bindings for RustO! OCR library powered by pure-Rust MNN (rusto-nn)",
   "keywords": [
     "android",
     "ios",
+    "ocr",
+    "mnn",
+    "rusto-nn",
     "react-native"
   ],
   "homepage": "https://github.com/byrizki/rusto-rs#readme",

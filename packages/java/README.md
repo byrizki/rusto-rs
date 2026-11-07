@@ -1,15 +1,15 @@
 # RustO! Java SDK (`rusto-java`)
 
-Pure Java / JVM bindings (via JNA) for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the RTen inference runtime.
+Pure Java / JVM bindings (via JNA) for **RustO!** — a high-performance, pure-Rust OCR engine powered by Indra OCR, PaddleOCR, and the pure-Rust MNN (`rusto-nn`) inference runtime.
 
 > Looking for the Android AAR with `Context` asset resolution? See [`packages/android`](../android/README.md) (`rusto-android`).
 
 ## Features
 
-- **Zero-Config Indra OCR**: `RustO.initialize()` automatically downloads and caches the default `indraocr` `.rten` models on first run.
+- **Zero-Config Indra OCR**: `RustO.initialize()` automatically downloads and caches the default `indraocr` models on first run from Hugging Face Hub.
 - **`AutoCloseable` Lifecycle**: Safe, deterministic native handle cleanup with Java `try-with-resources`.
 - **Document Intelligence**: Enable UVDoc unwarping (`withAutoUnwarp()`), 4-way page orientation correction (`withOrientationDetection()`), and neural layout reading order (`withLayoutReading()`).
-- **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, or `.withOutput(...)` into a single `.run()` terminal method returning `RustO.DetectTextResult`.
+- **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, `.asTsv()`, or `.withOutput(...)` into a single `.run()` terminal method returning `RustO.DetectTextResult`.
 - **Flexible Inputs**: File paths, `byte[]` encoded images, or raw 24-bit RGB pixel buffers via `.rgb(...)`.
 
 ## Installation (JitPack)
@@ -89,9 +89,9 @@ public class Example {
 }
 ```
 
-## Custom Initialization & Offline `.rten` Models
+## Custom Initialization & Offline Models (.mnn / .rten)
 
-Pass a JSON configuration string to `RustO.initialize(configJson)` to select another preset (`"ppocrv6-tiny"`, `"ppocrv5-mobile"`, etc.) or local `.rten` files:
+Pass a JSON configuration string to `RustO.initialize(configJson)` to select another preset (`"ppocrv6-tiny"`, `"ppocrv5-mobile"`, etc.) or local `.mnn` / `.rten` files:
 
 ```java
 String offlineConfig = """
@@ -100,20 +100,20 @@ String offlineConfig = """
       "enableReadingOrder": true,
       "detection": {
         "enabled": true,
-        "modelPath": "./models/indra_det.rten"
+        "modelPath": "./models/indra_det.mnn"
       },
       "recognition": {
         "enabled": true,
-        "modelPath": "./models/indra_rec.rten",
+        "modelPath": "./models/indra_rec.mnn",
         "dictPath": "./models/indra_meta.json"
       },
       "unwarp": {
         "enabled": true,
-        "modelPath": "./models/uvdoc.rten"
+        "modelPath": "./models/uvdoc.mnn"
       },
       "layout": {
         "enabled": true,
-        "modelPath": "./models/layout_cdla.rten"
+        "modelPath": "./models/layout_cdla.mnn"
       }
     }
     """;
