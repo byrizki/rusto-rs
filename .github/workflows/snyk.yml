@@ -3,8 +3,22 @@ name: Snyk Security Scan
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'benchmarks/**'
+      - '.github/workflows/benchmark.yml'
+      - '.github/workflows/docs-ci.yml'
+      - '.github/workflows/deploy-docs.yml'
+      - '.github/workflows/publish-models.yml'
+      - '.github/workflows/publish.yml'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'benchmarks/**'
+      - '.github/workflows/benchmark.yml'
+      - '.github/workflows/docs-ci.yml'
+      - '.github/workflows/deploy-docs.yml'
+      - '.github/workflows/publish-models.yml'
+      - '.github/workflows/publish.yml'
   schedule:
     # Run weekly automated scan on Mondays at 06:00 UTC
     - cron: '0 6 * * 1'

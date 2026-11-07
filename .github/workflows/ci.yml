@@ -6,15 +6,25 @@ on:
       - main
     paths-ignore:
       - 'docs/**'
+      - 'benchmarks/**'
+      - '.github/workflows/benchmark.yml'
       - '.github/workflows/docs-ci.yml'
       - '.github/workflows/deploy-docs.yml'
+      - '.github/workflows/publish-models.yml'
+      - '.github/workflows/publish.yml'
+      - '.github/workflows/snyk.yml'
   pull_request:
     branches:
       - main
     paths-ignore:
       - 'docs/**'
+      - 'benchmarks/**'
+      - '.github/workflows/benchmark.yml'
       - '.github/workflows/docs-ci.yml'
       - '.github/workflows/deploy-docs.yml'
+      - '.github/workflows/publish-models.yml'
+      - '.github/workflows/publish.yml'
+      - '.github/workflows/snyk.yml'
   workflow_dispatch:
     inputs:
       tag_name:

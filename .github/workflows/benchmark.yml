@@ -25,6 +25,8 @@ jobs:
   build-binaries:
     name: Build Benchmark Binaries (Release)
     runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.resolve-matrix.outputs.matrix }}
 
     steps:
       - uses: actions/checkout@v4
@@ -62,40 +64,53 @@ jobs:
             benchmarks/omnidocbench/ocrs_bin/bin/ocrs
           retention-days: 7
 
+      - name: Resolve Benchmark Target Matrix
+        id: resolve-matrix
+        env:
+          TARGETS_INPUT: ${{ inputs.targets || 'all' }}
+        run: |
+          python3 -c "
+          import json, os
+          all_targets = [
+              {'target': 'paddleocr_tiny', 'name': '(a) Python PaddleOCR + PP-OCRv6 Tiny'},
+              {'target': 'rapidocr_tiny', 'name': '(b) Python RapidOCR + PP-OCRv6 Tiny'},
+              {'target': 'indra_ocr', 'name': '(c) Python Indra OCR'},
+              {'target': 'mnn_ocr_tiny', 'name': '(d) MNN OCR Standalone (Direct) + PP-OCRv6'},
+              {'target': 'rten_ocr_direct', 'name': '(e) RTen OCR Direct + PP-OCRv6'},
+              {'target': 'ocrs', 'name': '(f) RTen + ocrs'},
+              {'target': 'rusto_rten_tiny', 'name': '(g) RTen OCR (Rusto Binding) + PP-OCRv6'},
+              {'target': 'rusto_mnn_tiny', 'name': '(h) MNN OCR (Rusto Binding) + PP-OCRv6'},
+              {'target': 'rusto_rten_indra', 'name': '(i) RTen OCR (Rusto Binding) + Indra OCR'},
+              {'target': 'rusto_mnn_indra', 'name': '(j) MNN OCR (Rusto Binding) + Indra OCR'},
+              {'target': 'rusto_nn_ppocr', 'name': '(k) Rusto NN OCR (Pure-Rust MNN) + PP-OCRv6'},
+              {'target': 'rusto_nn_indra', 'name': '(l) Rusto NN OCR (Pure-Rust MNN) + Indra OCR'}
+          ]
+          aliases = {
+              'a': 'paddleocr_tiny', 'b': 'rapidocr_tiny', 'c': 'indra_ocr',
+              'd': 'mnn_ocr_tiny', 'e': 'rten_ocr_direct', 'f': 'ocrs',
+              'g': 'rusto_rten_tiny', 'h': 'rusto_mnn_tiny', 'i': 'rusto_rten_indra',
+              'j': 'rusto_mnn_indra', 'k': 'rusto_nn_ppocr', 'l': 'rusto_nn_indra'
+          }
+          req_input = os.environ.get('TARGETS_INPUT', 'all').strip()
+          if not req_input or req_input.lower() == 'all':
+              selected = all_targets
+          else:
+              raw = [t.strip().lower() for t in req_input.split(',') if t.strip()]
+              canonical = {aliases.get(t, t) for t in raw}
+              selected = [t for t in all_targets if t['target'].lower() in canonical or any(c in t['target'].lower() for c in canonical)]
+              if not selected:
+                  selected = all_targets
+          print('matrix=' + json.dumps({'include': selected}))
+          " >> "$GITHUB_OUTPUT"
+
   benchmark:
     name: ${{ matrix.name }}
     needs: [build-binaries]
     runs-on: ubuntu-22.04
-    if: ${{ inputs.targets == 'all' || inputs.targets == '' || contains(inputs.targets, matrix.target) }}
 
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - target: paddleocr_tiny
-            name: "(a) Python PaddleOCR + PP-OCRv6 Tiny"
-          - target: rapidocr_tiny
-            name: "(b) Python RapidOCR + PP-OCRv6 Tiny"
-          - target: indra_ocr
-            name: "(c) Python Indra OCR"
-          - target: mnn_ocr_tiny
-            name: "(d) MNN OCR Standalone (Direct) + PP-OCRv6"
-          - target: rten_ocr_direct
-            name: "(e) RTen OCR Direct + PP-OCRv6"
-          - target: ocrs
-            name: "(f) RTen + ocrs"
-          - target: rusto_rten_tiny
-            name: "(g) RTen OCR (Rusto Binding) + PP-OCRv6"
-          - target: rusto_mnn_tiny
-            name: "(h) MNN OCR (Rusto Binding) + PP-OCRv6"
-          - target: rusto_rten_indra
-            name: "(i) RTen OCR (Rusto Binding) + Indra OCR"
-          - target: rusto_mnn_indra
-            name: "(j) MNN OCR (Rusto Binding) + Indra OCR"
-          - target: rusto_nn_ppocr
-            name: "(k) Rusto NN OCR (Pure-Rust MNN) + PP-OCRv6"
-          - target: rusto_nn_indra
-            name: "(l) Rusto NN OCR (Pure-Rust MNN) + Indra OCR"
+      matrix: ${{ fromJson(needs.build-binaries.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -163,9 +178,9 @@ jobs:
 
   aggregate-results:
     name: Merge Parallel Results & Generate Report
-    needs: [benchmark]
+    needs: [build-binaries, benchmark]
     runs-on: ubuntu-22.04
-    if: always()
+    if: ${{ !cancelled() && needs.build-binaries.result == 'success' }}
 
     steps:
       - uses: actions/checkout@v4
