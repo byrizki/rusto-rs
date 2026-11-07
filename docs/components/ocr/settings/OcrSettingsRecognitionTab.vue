@@ -39,8 +39,10 @@ const preRecognitionActiveCount = computed<number>(() => {
   let count = 0;
   if (props.config.layoutModel !== 'none' && props.config.layoutModel !== 'heuristic') count++;
   if (props.config.lineClassification) count++;
-  if (props.config.lineYThreshold !== 0.5) count++;
-  if (props.config.wordXThreshold !== 0.4) count++;
+  if (props.config.layoutModel === 'heuristic') {
+    if (props.config.lineYThreshold !== 0.5) count++;
+    if (props.config.wordXThreshold !== 0.4) count++;
+  }
   return count;
 });
 
@@ -107,7 +109,11 @@ function handleLayoutChange() {
           </optgroup>
         </select>
 
-        <div class="grid grid-cols-2 gap-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+        <!-- Heuristic Fine-Tuning Controls (Active when heuristic flow is selected) -->
+        <div
+          v-if="config.layoutModel === 'heuristic'"
+          class="grid grid-cols-2 gap-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800"
+        >
           <div class="space-y-1">
             <div class="flex justify-between text-[11px]">
               <div class="flex items-center gap-1">
@@ -150,6 +156,24 @@ function handleLayoutChange() {
               class="w-full accent-primary cursor-pointer"
             />
           </div>
+        </div>
+
+        <!-- Neural Layout Active Notice -->
+        <div
+          v-else-if="config.layoutModel !== 'none'"
+          class="flex items-center gap-2 p-2 rounded-md bg-primary/5 dark:bg-primary/10 border border-primary/20 text-zinc-600 dark:text-zinc-300 text-[11px]"
+        >
+          <span class="text-primary font-medium shrink-0">Neural Layout Active:</span>
+          <span>Automatic sequence prediction directly via deep layout geometry.</span>
+        </div>
+
+        <!-- Raster Scan Notice -->
+        <div
+          v-else
+          class="flex items-center gap-2 p-2 rounded-md bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-[11px]"
+        >
+          <span class="font-medium shrink-0">Raster Scan:</span>
+          <span>Natural top-to-bottom scan without layout or column reordering.</span>
         </div>
       </div>
 

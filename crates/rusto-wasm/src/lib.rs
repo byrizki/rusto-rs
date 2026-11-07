@@ -163,6 +163,7 @@ pub struct RtenOcrPipeline {
     det_model: WasmBackendModel,
     rec_model: WasmBackendModel,
     decoder: CtcDecoder,
+    layout_model: Option<WasmBackendModel>,
 }
 
 pub type RustoOcrPipeline = RtenOcrPipeline;
@@ -184,7 +185,39 @@ impl RtenOcrPipeline {
             det_model,
             rec_model,
             decoder,
+            layout_model: None,
         })
+    }
+
+    #[wasm_bindgen(js_name = newWithModels)]
+    pub fn new_with_models(
+        det_data: Vec<u8>,
+        rec_data: Vec<u8>,
+        dict_text: &str,
+        layout_data: Option<Vec<u8>>,
+    ) -> Result<RtenOcrPipeline, String> {
+        console_error_panic_hook::set_once();
+        let det_model = WasmBackendModel::from_bytes(det_data)?;
+        let rec_model = WasmBackendModel::from_bytes(rec_data)?;
+        let decoder = CtcDecoder::from_string(dict_text);
+        let layout_model = match layout_data {
+            Some(d) if !d.is_empty() => Some(WasmBackendModel::from_bytes(d)?),
+            _ => None,
+        };
+
+        Ok(RtenOcrPipeline {
+            det_model,
+            rec_model,
+            decoder,
+            layout_model,
+        })
+    }
+
+    #[wasm_bindgen(js_name = setLayoutModel)]
+    pub fn set_layout_model(&mut self, layout_data: Vec<u8>) -> Result<(), String> {
+        let model = WasmBackendModel::from_bytes(layout_data)?;
+        self.layout_model = Some(model);
+        Ok(())
     }
 
     /// Returns the engine library version string.
@@ -441,6 +474,79 @@ impl RtenOcrPipeline {
         Ok(slot_results.into_iter().flatten().collect())
     }
 
+    fn apply_reading_order(
+        &self,
+        items: &mut Vec<TextResult>,
+        layout_mode: Option<&str>,
+        layout_reading: bool,
+        orig_w: usize,
+        orig_h: usize,
+    ) {
+        if items.len() <= 1 {
+            return;
+        }
+
+        let mode = layout_mode.unwrap_or("heuristic");
+
+        // If explicitly disabled or none, maintain raw raster scan order
+        if !layout_reading || mode == "none" {
+            items.sort_by(|a, b| {
+                a.frame
+                    .top
+                    .partial_cmp(&b.frame.top)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| {
+                        a.frame
+                            .left
+                            .partial_cmp(&b.frame.left)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+            });
+            return;
+        }
+
+        // Neural reading layout direction model (e.g. Indra or Paddle layout models)
+        if mode != "heuristic" {
+            if let Some(layout_model) = &self.layout_model {
+                let boxes: Vec<[f32; 4]> = items
+                    .iter()
+                    .map(|it| {
+                        [
+                            it.frame.left,
+                            it.frame.top,
+                            it.frame.left + it.frame.width,
+                            it.frame.top + it.frame.height,
+                        ]
+                    })
+                    .collect();
+                let texts: Vec<String> = items.iter().map(|it| it.text.clone()).collect();
+                let feats = rusto_core::order::compute_line_features(
+                    &boxes,
+                    orig_w as f32,
+                    orig_h as f32,
+                    &texts,
+                );
+
+                if let Ok((_sh, out_data)) = layout_model.run_order(items.len(), feats) {
+                    let order_indices =
+                        rusto_core::order::decode_order_logits(&out_data, items.len(), 4);
+                    if order_indices.len() == items.len() {
+                        let original = items.clone();
+                        for (new_idx, &orig_idx) in order_indices.iter().enumerate() {
+                            if orig_idx < original.len() {
+                                items[new_idx] = original[orig_idx].clone();
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Default / heuristic column flow
+        sort_lines_reading_order(items);
+    }
+
     /// Run full OCR pipeline directly in WebAssembly with calibrated image optimization
     #[wasm_bindgen(js_name = detectAndRecognize)]
     pub fn detect_and_recognize(
@@ -684,9 +790,9 @@ impl RtenOcrPipeline {
                         }
                     }
                 }
-                if options.layout_reading.unwrap_or(false) {
-                    sort_lines_reading_order(&mut words);
-                }
+                let layout_mode = options.layout_model.as_deref();
+                let layout_reading = options.layout_reading.unwrap_or(true);
+                self.apply_reading_order(&mut words, layout_mode, layout_reading, orig_w, orig_h);
                 Ok(nanoserde::SerJson::serialize_json(&words))
             }
             OutputGranularity::Lines => {
@@ -695,9 +801,9 @@ impl RtenOcrPipeline {
                     line_y.unwrap_or(0.5),
                     word_x.unwrap_or(0.4),
                 );
-                if options.layout_reading.unwrap_or(false) {
-                    sort_lines_reading_order(&mut segments);
-                }
+                let layout_mode = options.layout_model.as_deref();
+                let layout_reading = options.layout_reading.unwrap_or(true);
+                self.apply_reading_order(&mut segments, layout_mode, layout_reading, orig_w, orig_h);
                 Ok(nanoserde::SerJson::serialize_json(&segments))
             }
         }

@@ -73,6 +73,12 @@ export class DetectTextBuilder<TResult = TextResult[]> {
     return this;
   }
 
+  /** Specify document layout / reading order architecture or model identifier ('indra', 'cdla', 'publaynet', 'heuristic', 'none'). */
+  withLayoutModel(model?: string): this {
+    this._options.layoutModel = model;
+    return this;
+  }
+
   /** Enable or disable document orientation detection. */
   withOrientationDetection(enabled = true): this {
     this._options.orientationDetection = enabled;
@@ -216,7 +222,8 @@ export class WebOcrEngine {
       this.pipeline = new RtenOcrPipeline(
         this.loadedModels.detection,
         this.loadedModels.recognition,
-        this.loadedModels.dictionary
+        this.loadedModels.dictionary,
+        this.loadedModels.layout
       );
     }
 

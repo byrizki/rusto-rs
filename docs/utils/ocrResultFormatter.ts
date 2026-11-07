@@ -162,6 +162,7 @@ export function formatActiveConfigJson(
 function appendBuilderStages(lines: string[], options: DetectTextOptions): void {
   if (options.autoUnwarp) lines.push(`  .withAutoUnwarp()`);
   if (options.layoutReading) lines.push(`  .withLayoutReading()`);
+  if (options.layoutModel) lines.push(`  .withLayoutModel('${options.layoutModel}')`);
   if (options.orientationDetection) lines.push(`  .withOrientationDetection()`);
   if (options.lineClassification) lines.push(`  .withLineClassification()`);
   if (options.preDetection && Object.keys(options.preDetection).length > 0) {

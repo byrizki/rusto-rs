@@ -426,6 +426,56 @@ fn test_issue26_dense_page_total_order_does_not_panic() {
 }
 
 #[test]
+fn test_multi_column_heuristic_reading_order() {
+    use rusto_core::layout::sort_lines_reading_order;
+    use rusto::{Frame, TextResult};
+
+    // 2 columns of text:
+    // Column 0: x in [50, 300], rows at y = 100, 200
+    // Column 1: x in [500, 750], rows at y = 100, 200
+    // Interleaved input simulating horizontal raster order:
+    // col0_row0, col1_row0, col0_row1, col1_row1
+    let mut lines = vec![
+        TextResult {
+            text: "col0_row0".into(),
+            score: 0.99,
+            box_points: [(50.0, 100.0), (300.0, 100.0), (300.0, 120.0), (50.0, 120.0)],
+            frame: Frame::new(250.0, 20.0, 100.0, 50.0),
+            region_id: None,
+            layout_type: None,
+        },
+        TextResult {
+            text: "col1_row0".into(),
+            score: 0.99,
+            box_points: [(500.0, 100.0), (750.0, 100.0), (750.0, 120.0), (500.0, 120.0)],
+            frame: Frame::new(250.0, 20.0, 100.0, 500.0),
+            region_id: None,
+            layout_type: None,
+        },
+        TextResult {
+            text: "col0_row1".into(),
+            score: 0.99,
+            box_points: [(50.0, 200.0), (300.0, 200.0), (300.0, 220.0), (50.0, 220.0)],
+            frame: Frame::new(250.0, 20.0, 200.0, 50.0),
+            region_id: None,
+            layout_type: None,
+        },
+        TextResult {
+            text: "col1_row1".into(),
+            score: 0.99,
+            box_points: [(500.0, 200.0), (750.0, 200.0), (750.0, 220.0), (500.0, 220.0)],
+            frame: Frame::new(250.0, 20.0, 200.0, 500.0),
+            region_id: None,
+            layout_type: None,
+        },
+    ];
+
+    sort_lines_reading_order(&mut lines);
+    let texts: Vec<String> = lines.into_iter().map(|l| l.text).collect();
+    assert_eq!(texts, vec!["col0_row0", "col0_row1", "col1_row0", "col1_row1"]);
+}
+
+#[test]
 fn test_issue25_multi_column_reading_order_and_region_ids() {
     use rusto_core::layout::{order_text_results_by_layout, BBox, LayoutRegion, LayoutType};
     use rusto::{Frame, TextResult};

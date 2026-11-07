@@ -136,6 +136,8 @@ export interface OcrRunOptions {
   autoUnwarp?: boolean;
   /** Enable document layout reading order analysis. */
   layoutReading?: boolean;
+  /** Layout / reading order architecture variant or model identifier (e.g. 'indra', 'cdla', 'publaynet', 'heuristic', 'none'). */
+  layoutModel?: string;
   /** Enable 0°/90°/180°/270° document orientation detection and rotation. */
   orientationDetection?: boolean;
   /** Enable 180° text line orientation classification. */

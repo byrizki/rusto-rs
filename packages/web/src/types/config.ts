@@ -14,6 +14,8 @@ export interface ModelSourceConfig {
   classification?: string | Uint8Array | ArrayBuffer;
   /** Optional document orientation angle classifier model URL or buffer. */
   orientation?: string | Uint8Array | ArrayBuffer;
+  /** Optional document layout / reading order model URL or buffer (e.g. Indra or Paddle Layout). */
+  layout?: string | Uint8Array | ArrayBuffer;
   [key: string]: string | Uint8Array | ArrayBuffer | undefined;
 }
 

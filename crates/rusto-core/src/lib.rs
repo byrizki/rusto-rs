@@ -22,6 +22,7 @@ pub mod doc;
 pub mod tensor;
 pub mod engine;
 pub mod pipeline;
+pub mod order;
 pub use pipeline as pipelines;
 
 pub use error::CoreError;
@@ -47,6 +48,7 @@ pub use table::{
 pub use unwarp::UnwarpOutput;
 pub use tensor::{Array2, Array3, Array4, ArrayD, Axis, Tensor};
 pub use engine::*;
+pub use order::*;
 
 /// Returns the engine library version string.
 pub fn version() -> &'static str {

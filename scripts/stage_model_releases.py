@@ -71,15 +71,23 @@ def resolve_source(models_dir: Path, rel_path: str) -> Path | None:
     return None
 
 
+def copy_or_link(src: Path, dst: Path) -> None:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if dst.is_file():
+        if dst.resolve() == src.resolve():
+            return
+        dst.unlink()
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copyfile(src, dst)
+
+
 def stage_asset(src: Path, hf_target: Path | None, flat_target: Path | None) -> None:
     if hf_target:
-        hf_target.parent.mkdir(parents=True, exist_ok=True)
-        if not hf_target.is_file() or hf_target.resolve() != src.resolve():
-            shutil.copyfile(src, hf_target)
+        copy_or_link(src, hf_target)
     if flat_target:
-        flat_target.parent.mkdir(parents=True, exist_ok=True)
-        if not flat_target.is_file() or flat_target.resolve() != src.resolve():
-            shutil.copyfile(src, flat_target)
+        copy_or_link(src, flat_target)
 
 
 def stage_tier(models_dir: Path, hf_dir: Path, flat_dir: Path, tiers: list, v_dict: str) -> None:

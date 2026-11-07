@@ -167,6 +167,7 @@ export function buildDetectTextOptions(
     output: (isSpatial ? 'lines' : outputMode) as OutputGranularity,
     autoUnwarp: Boolean(config.autoUnwarp),
     layoutReading: isReadingOrderActive,
+    layoutModel: config.layoutModel,
     orientationDetection: Boolean(config.orientationDetection ?? config.orientation),
     lineClassification: Boolean(config.lineClassification ?? config.classification),
     preDetection: buildPreDetectionConfig(config),

@@ -12,7 +12,7 @@ export interface LoadedModelAssets extends ModelSourceConfig {
   detection: Uint8Array;
   recognition: Uint8Array;
   dictionary: string;
-  order?: Uint8Array;
+  layout?: Uint8Array;
   [key: string]: string | Uint8Array | ArrayBuffer | undefined;
 }
 
@@ -141,10 +141,10 @@ function downloadLayoutAsset(
   progressRange: [number, number] = [0, 100]
 ): Promise<Uint8Array | undefined> {
   const layoutUrls = getLayoutModelCandidateUrls(layoutModelId, baseURL);
-  if (layoutUrls.length === 0) return undefined;
+  if (layoutUrls.length === 0) return Promise.resolve();
   const label =
     layoutModelId === 'indra'
-      ? 'Indra Neural Reading Order (order.onnx)'
+      ? 'Indra Neural Reading Layout'
       : `${layoutModelId} (layout.mnn)`;
   return downloadBinaryWithProgress(layoutUrls, label, 3, totalSteps, onProgress, progressRange);
 }
@@ -178,7 +178,7 @@ export async function fetchModelAssets(
     progressRange
   );
   const dictText = await downloadTextAsset(candidates.dictionary);
-  const orderBuffer = isLayoutNeeded
+  const layoutBuffer = isLayoutNeeded
     ? await downloadLayoutAsset(layoutModelId, baseURL, totalSteps, onProgress, progressRange)
     : undefined;
 
@@ -187,7 +187,7 @@ export async function fetchModelAssets(
     recognition: recBuffer,
     dictionary: dictText,
   };
-  if (orderBuffer) assets.order = orderBuffer;
+  if (layoutBuffer) assets.layout = layoutBuffer;
   return assets;
 }
 

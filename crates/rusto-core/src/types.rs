@@ -671,6 +671,8 @@ pub struct OcrRunOptions {
     pub auto_unwarp: Option<bool>,
     #[nserde(rename = "layoutReading")]
     pub layout_reading: Option<bool>,
+    #[nserde(rename = "layoutModel")]
+    pub layout_model: Option<String>,
     #[nserde(rename = "orientationDetection")]
     pub orientation_detection: Option<bool>,
     #[nserde(rename = "lineClassification")]
@@ -699,6 +701,11 @@ impl OcrRunOptions {
 
     pub fn with_layout_reading(mut self, enabled: bool) -> Self {
         self.layout_reading = Some(enabled);
+        self
+    }
+
+    pub fn with_layout_model(mut self, model: String) -> Self {
+        self.layout_model = Some(model);
         self
     }
 

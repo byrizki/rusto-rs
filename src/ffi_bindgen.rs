@@ -188,6 +188,8 @@ pub struct OcrRunOptions {
     pub auto_unwarp: Option<bool>,
     /// Enable document layout analysis and reading order stage.
     pub layout_reading: Option<bool>,
+    /// Document layout or reading direction model identifier.
+    pub layout_model: Option<String>,
     /// Enable document orientation angle correction stage.
     pub orientation_detection: Option<bool>,
     /// Enable text line orientation classifier stage.
@@ -588,6 +590,7 @@ fn convert_options(opts: &OcrRunOptions) -> Result<rusto_core::types::OcrRunOpti
         output,
         auto_unwarp: opts.auto_unwarp,
         layout_reading: opts.layout_reading,
+        layout_model: opts.layout_model.clone(),
         orientation_detection: opts.orientation_detection,
         line_classification: opts.line_classification,
         pre_detection,

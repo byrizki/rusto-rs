@@ -28,7 +28,6 @@ export interface LoadedModels {
   dictionary?: string;
   classification?: Uint8Array;
   orientation?: Uint8Array;
-  order?: Uint8Array;
   layout?: Uint8Array;
 }
 
@@ -128,11 +127,34 @@ export function getActiveEngineBackend(): string {
 export class RtenOcrPipeline {
   private _inner: any;
 
-  constructor(detection: Uint8Array, recognition: Uint8Array, dictionary: string) {
+  constructor(
+    detection: Uint8Array,
+    recognition: Uint8Array,
+    dictionary: string,
+    layout?: Uint8Array
+  ) {
     if (!activePipelineClass) {
       throw new Error('WebAssembly runtime not initialized. Call initialize() first.');
     }
-    this._inner = new activePipelineClass(detection, recognition, dictionary);
+    if (typeof activePipelineClass.newWithModels === 'function' && layout) {
+      this._inner = activePipelineClass.newWithModels(
+        detection,
+        recognition,
+        dictionary,
+        layout
+      );
+    } else {
+      this._inner = new activePipelineClass(detection, recognition, dictionary);
+      if (layout && typeof this._inner.setLayoutModel === 'function') {
+        this._inner.setLayoutModel(layout);
+      }
+    }
+  }
+
+  setLayoutModel(layout_data: Uint8Array): void {
+    if (this._inner && typeof this._inner.setLayoutModel === 'function') {
+      this._inner.setLayoutModel(layout_data);
+    }
   }
 
   detectText(
@@ -324,13 +346,12 @@ export async function loadModelAssets(modelsConfig?: ModelSourceConfig): Promise
     return {};
   }
 
-  const [det, rec, dict, cls, orient, order, layout] = await Promise.all([
+  const [det, rec, dict, cls, orient, layout] = await Promise.all([
     resolveBinaryBuffer(modelsConfig.detection, 'detection'),
     resolveBinaryBuffer(modelsConfig.recognition, 'recognition'),
     resolveTextContent(modelsConfig.dictionary, 'dictionary'),
     resolveBinaryBuffer(modelsConfig.classification, 'classification'),
     resolveBinaryBuffer(modelsConfig.orientation, 'orientation'),
-    resolveBinaryBuffer(modelsConfig.order, 'order'),
     resolveBinaryBuffer(modelsConfig.layout, 'layout'),
   ]);
 
@@ -340,7 +361,6 @@ export async function loadModelAssets(modelsConfig?: ModelSourceConfig): Promise
     dictionary: dict,
     classification: cls,
     orientation: orient,
-    order,
     layout,
   };
 }

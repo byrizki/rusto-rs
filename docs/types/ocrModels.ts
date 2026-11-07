@@ -73,14 +73,14 @@ export const availableLayoutModels: LayoutModelOption[] = [
   },
   {
     id: 'indra',
-    name: 'Indra Neural Reading Order (Transformer)',
+    name: 'Indra Neural Reading Layout (Transformer)',
     category: 'Indra OCR',
     description:
       'Sequences multi-column text lines into natural human reading flow using coordinate transformer.',
     size: '2.9 MB',
-    assetFile: 'indraocr/indra_order.onnx',
+    assetFile: 'indraocr/order.rten',
     downloadUrl:
-      'https://huggingface.co/byrizki/rusto-models/resolve/main/indraocr/indra_order.onnx',
+      'https://huggingface.co/byrizki/rusto-models/resolve/main/indraocr/order.rten',
   },
   {
     id: 'cdla',

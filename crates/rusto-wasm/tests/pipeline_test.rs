@@ -110,21 +110,54 @@ fn test_indra_inference_pipeline() {
 }
 
 #[test]
-fn test_indra_order_model() {
-    let order_file = if cfg!(feature = "rusto-rten") {
-        Path::new("../../models/indra/indra_order.rten")
-    } else {
-        Path::new("../../models/indra/indra_order.mnn")
+fn test_indra_layout_model() {
+    let candidates = [
+        Path::new("../../models/indra/order.rten"),
+        Path::new("../../models/indra/indra_order.rten"),
+        Path::new("../../models/indra/order.onnx"),
+        Path::new("../../models/indra/indra_order.onnx"),
+    ];
+    let layout_file = match candidates.iter().find(|p| p.exists()) {
+        Some(p) => p,
+        None => return,
     };
-    if !order_file.exists() {
-        return;
-    }
-    let order_data = fs::read(&order_file).expect("read order model");
-    let model = RtenModel::new(order_data).expect("load order model");
+    let layout_data = fs::read(layout_file).expect("read layout model");
+    let model = RtenModel::new(layout_data.clone()).expect("load layout model");
     let feats = vec![0.0f32; 32];
     let out = model.run_order(2, feats).expect("run_order");
     assert_eq!(out.shape(), vec![1, 2, 2]);
     assert_eq!(out.data().len(), 4);
+
+    let indra_dir = Path::new("../../models/indra");
+    let (det_name, rec_name) = get_model_filenames();
+    let det_file = indra_dir.join(det_name);
+    let rec_file = indra_dir.join(rec_name);
+    let meta_file = indra_dir.join("meta.json");
+    if det_file.exists() && rec_file.exists() && meta_file.exists() {
+        let det_data = fs::read(&det_file).expect("read det");
+        let rec_data = fs::read(&rec_file).expect("read rec");
+        let meta_text = fs::read_to_string(&meta_file).expect("read meta.json");
+
+        let pipeline = RtenOcrPipeline::new_with_models(
+            det_data,
+            rec_data,
+            &meta_text,
+            Some(layout_data),
+        )
+        .expect("init pipeline with layout model");
+
+        let img_path = Path::new("../../models/test_images/idcard.jpg");
+        if img_path.exists() {
+            let img = image::open(img_path).expect("open idcard.jpg");
+            let (w, h) = img.dimensions();
+            let rgba = img.to_rgba8().into_raw();
+            let opt = r#"{"output":"lines","layoutReading":true,"layoutModel":"indra"}"#;
+            let res = pipeline
+                .detect_text(&rgba, w, h, 4, None, Some(opt.to_string()))
+                .expect("detect_text with layoutReading");
+            assert!(res.contains("PASSPORT") || res.contains("PASSEPORT") || res.contains("UNITED KINGDOM"));
+        }
+    }
 }
 
 #[test]

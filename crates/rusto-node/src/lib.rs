@@ -11,7 +11,7 @@ pub struct JsRustO {
 impl JsRustO {
     #[napi(factory)]
     pub fn initialize(config_json: String) -> Result<Self> {
-        rusto_rs::ensure_rten_registered();
+        rusto_rs::init();
         let config = rusto_rs::download::parse_config_with_auto_download(&config_json)
             .map_err(|e| Error::new(Status::InvalidArg, format!("{e}")))?;
 
