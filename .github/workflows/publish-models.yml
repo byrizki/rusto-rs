@@ -17,7 +17,7 @@ on:
         type: string
         default: ''
       upload_to_huggingface:
-        description: 'Publish models to Hugging Face Hub (byrizki/rten-models)'
+        description: 'Publish models to Hugging Face Hub (byrizki/rusto-models)'
         type: boolean
         required: false
         default: true
@@ -143,11 +143,11 @@ jobs:
           curl -LsSf https://hf.co/cli/install.sh | bash
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Upload models to Hugging Face Hub (byrizki/rten-models)
+      - name: Upload models to Hugging Face Hub (byrizki/rusto-models)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          hf upload byrizki/rten-models model-releases-hf/ . \
+          hf upload byrizki/rusto-models model-releases-hf/ . \
             --delete "*" \
             --commit-message "Release RustO OCR models ${{ needs.build-and-package-models.outputs.tag }}" \
             --commit-description "Automated model release from rusto-rs CI (${{ github.sha }})"
@@ -180,7 +180,7 @@ jobs:
             ## RustO! Pre-trained OCR Models ${{ needs.build-and-package-models.outputs.tag }}
 
             Standalone pre-trained models converted to pure-Rust RTen format.
-            Also available on Hugging Face Hub: [byrizki/rten-models](https://huggingface.co/byrizki/rten-models) with native CORS support.
+            Also available on Hugging Face Hub: [byrizki/rusto-models](https://huggingface.co/byrizki/rusto-models) with native CORS support.
 
             ### Base OCR Pipelines (Detection + Recognition + Dictionary)
             - **Indra OCR (Default Flagship)**: `indra_det.rten`, `indra_rec.rten`, `indra_meta.json`

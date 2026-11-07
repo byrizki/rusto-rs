@@ -5,7 +5,7 @@ Official Browser & WebAssembly SDK for **RustO!** — client-side, privacy-prese
 ## Features
 
 - **100% Client-Side WebAssembly**: Runs in a dedicated Web Worker by default so your main UI thread stays responsive and images never leave the browser.
-- **Standalone Model Assets**: Load lightweight models directly from Hugging Face Hub (`byrizki/rten-models`), your CDN, or local `/models/` static assets — no npm model wrapper packages required.
+- **Standalone Model Assets**: Load lightweight models directly from Hugging Face Hub (`byrizki/rusto-models`), your CDN, or local `/models/` static assets — no npm model wrapper packages required.
 - **Indra OCR & PP-OCRv6 Presets**: First-class support for `'indra'` (high-accuracy document OCR) alongside `'ppv6'`, `'ppv5'`, `'ppv4'`, and `'ppv3'`.
 - **Document Intelligence**: Configure optional `unwarp`, `orientation`, `layout`, and `order` `.rten` models and enable them per call with `.withAutoUnwarp()` and `.withLayoutReading()`.
 - **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, or `.withOutput(...)` into a single `await ...run()` call.
@@ -22,7 +22,7 @@ pnpm add @rustors/web
 
 ## Hosting or Fetching Models
 
-`@rustors/web` loads standalone model files via URL (from your `public/models/` directory, your CDN, or Hugging Face Hub `https://huggingface.co/byrizki/rten-models/resolve/main/` with CORS enabled) or directly as `Uint8Array` / `ArrayBuffer`.
+`@rustors/web` loads standalone model files via URL (from your `public/models/` directory, your CDN, or Hugging Face Hub `https://huggingface.co/byrizki/rusto-models/resolve/main/` with CORS enabled) or directly as `Uint8Array` / `ArrayBuffer`.
 
 | Pipeline / Stage | Canonical Asset Filenames |
 | :--- | :--- |
@@ -35,7 +35,7 @@ pnpm add @rustors/web
 ```ts
 import { initialize, detectText, close } from '@rustors/web';
 
-const HF_BASE = 'https://huggingface.co/byrizki/rten-models/resolve/main';
+const HF_BASE = 'https://huggingface.co/byrizki/rusto-models/resolve/main';
 
 // 1. Initialize once (runs inside a dedicated Web Worker by default)
 await initialize({

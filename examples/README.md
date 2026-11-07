@@ -26,7 +26,7 @@ To pre-download standalone models locally for offline examples or Rust CLI demos
 bash docs/scripts/download-models.sh
 ```
 
-Or download specific model files directly from [Hugging Face (`byrizki/rten-models`)](https://huggingface.co/byrizki/rten-models).
+Or download specific model files directly from [Hugging Face (`byrizki/rusto-models`)](https://huggingface.co/byrizki/rusto-models).
 
 ---
 

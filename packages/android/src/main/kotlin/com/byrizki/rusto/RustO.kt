@@ -269,7 +269,7 @@ class RustOException(message: String) : Exception(message)
  * - SPATIAL: Return a formatted 2D text layout preserving spatial arrangement.
  */
 enum class OutputGranularity(val wireValue: String) {
-    LINES("lines"), WORDS("words"), SPATIAL("spatial");
+    LINES("lines"), WORDS("words"), SPATIAL("spatial"), TSV("tsv");
 }
 
 /**
@@ -612,6 +612,7 @@ class RustO private constructor(
                 OutputGranularity.LINES -> uniffi.rusto.OutputGranularity.LINES
                 OutputGranularity.WORDS -> uniffi.rusto.OutputGranularity.WORDS
                 OutputGranularity.SPATIAL -> uniffi.rusto.OutputGranularity.SPATIAL
+                OutputGranularity.TSV -> uniffi.rusto.OutputGranularity.TSV
             },
             autoUnwarp = options.autoUnwarp,
             layoutReading = options.layoutReading,

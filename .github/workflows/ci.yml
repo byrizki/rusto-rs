@@ -52,8 +52,7 @@ jobs:
       - name: Prepare test model fixtures
         run: |
           chmod +x scripts/download_models.sh
-          python3 -m pip install --upgrade rten-convert --break-system-packages || python3 -m pip install rten-convert || true
-          bash scripts/download_models.sh --model ppocrv6 --tier tiny --convert-rten
+          bash scripts/download_models.sh --ci
 
       - name: Run Cargo Tests (Workspace)
         run: cargo test --workspace

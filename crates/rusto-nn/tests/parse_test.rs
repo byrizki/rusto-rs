@@ -6,10 +6,7 @@ use rusto_nn::schema::OpType;
 fn test_parse_ppocrv6_det_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/det.mnn");
-    if !model_path.exists() {
-        eprintln!("Skipping test_parse_ppocrv6_det_mnn: {} not found", model_path.display());
-        return;
-    }
+    assert!(model_path.exists(), "det.mnn exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Failed to parse PP-OCRv6 det.mnn");
     assert_eq!(model.input_names(), &["x"]);
@@ -32,10 +29,7 @@ fn test_parse_ppocrv6_det_mnn() {
 fn test_parse_ppocrv6_rec_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/rec.mnn");
-    if !model_path.exists() {
-        eprintln!("Skipping test_parse_ppocrv6_rec_mnn: {} not found", model_path.display());
-        return;
-    }
+    assert!(model_path.exists(), "rec.mnn exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Failed to parse PP-OCRv6 rec.mnn");
     assert_eq!(model.input_names(), &["x"]);
@@ -58,10 +52,7 @@ fn test_parse_ppocrv6_rec_mnn() {
 fn test_parse_indra_det_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/indra/det.mnn");
-    if !model_path.exists() {
-        eprintln!("Skipping test_parse_indra_det_mnn: {} not found", model_path.display());
-        return;
-    }
+    assert!(model_path.exists(), "indra det.mnn exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Failed to parse Indra det.mnn");
     assert_eq!(model.input_names(), &["x"]);
@@ -73,10 +64,7 @@ fn test_parse_indra_det_mnn() {
 fn test_parse_indra_rec_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/indra/rec.mnn");
-    if !model_path.exists() {
-        eprintln!("Skipping test_parse_indra_rec_mnn: {} not found", model_path.display());
-        return;
-    }
+    assert!(model_path.exists(), "indra rec.mnn exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Failed to parse Indra rec.mnn");
     assert_eq!(model.input_names(), &["x", "widths"]);

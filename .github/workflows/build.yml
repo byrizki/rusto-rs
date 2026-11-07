@@ -461,8 +461,7 @@ jobs:
 
       - name: Build rten-wasm
         run: |
-          wasm-pack build crates/rten-wasm --target web --out-dir ../../packages/web/src/wasm
-          rm -f packages/web/src/wasm/.gitignore
+          bash docs/scripts/prepare-wasm.sh
           mkdir -p artifacts/wasm
           tar czf artifacts/wasm/rusto-wasm.tar.gz -C packages/web/src/wasm --exclude='.gitignore' .
           cp artifacts/wasm/rusto-wasm.tar.gz artifacts/wasm/rusto-wasm.tgz

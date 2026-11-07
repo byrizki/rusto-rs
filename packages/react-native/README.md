@@ -60,7 +60,7 @@ cd ios && pod install
 
 ## Model Provisioning: Zero-Config vs. Offline Bundling
 
-1. **Zero-Config Auto-Download (Default)**: Calling `await initialize()` with no arguments (or `await initialize({ model: 'ppocrv6-tiny', lang: 'latin' })`) automatically downloads the required `.mnn` models (or `.rten`) and dictionary from Hugging Face Hub (`byrizki/rten-models`) on first launch and caches them in the app's local cache directory (`cacheDir/rusto/models` on Android, `Caches/rusto/models` on iOS). No separate npm model packages, CocoaPods model specs, or Gradle model artifacts are required.
+1. **Zero-Config Auto-Download (Default)**: Calling `await initialize()` with no arguments (or `await initialize({ model: 'ppocrv6-tiny', lang: 'latin' })`) automatically downloads the required `.mnn` models (or `.rten`) and dictionary from Hugging Face Hub (`byrizki/rusto-models`) on first launch and caches them in the app's local cache directory (`cacheDir/rusto/models` on Android, `Caches/rusto/models` on iOS). No separate npm model packages, CocoaPods model specs, or Gradle model artifacts are required.
 2. **Offline Bundled Assets**: For 100% air-gapped mobile apps, bundle `.mnn` (or `.rten`) and `dict.txt` (or `indra_meta.json`) files inside Android `assets/models/` and iOS Xcode Bundle Resources, then reference them via `initialize({ models: { ... } })`. See [**BUNDLING.md**](./BUNDLING.md) for step-by-step instructions.
 
 ## Complete Example

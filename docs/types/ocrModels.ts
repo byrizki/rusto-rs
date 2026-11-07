@@ -80,7 +80,7 @@ export const availableLayoutModels: LayoutModelOption[] = [
     size: '2.9 MB',
     assetFile: 'indraocr/indra_order.rten',
     downloadUrl:
-      'https://huggingface.co/byrizki/rten-models/resolve/main/indraocr/indra_order.rten',
+      'https://huggingface.co/byrizki/rusto-models/resolve/main/indraocr/indra_order.rten',
   },
   {
     id: 'cdla',
@@ -90,7 +90,7 @@ export const availableLayoutModels: LayoutModelOption[] = [
       'General document layout analysis detecting text, titles, figures, captions, tables, and headers.',
     size: '8.4 MB',
     assetFile: 'modules/layout_cdla.rten',
-    downloadUrl: 'https://huggingface.co/byrizki/rten-models/resolve/main/modules/layout_cdla.rten',
+    downloadUrl: 'https://huggingface.co/byrizki/rusto-models/resolve/main/modules/layout_cdla.rten',
   },
   {
     id: 'publaynet',
@@ -101,7 +101,7 @@ export const availableLayoutModels: LayoutModelOption[] = [
     size: '8.4 MB',
     assetFile: 'modules/layout_publaynet.rten',
     downloadUrl:
-      'https://huggingface.co/byrizki/rten-models/resolve/main/modules/layout_publaynet.rten',
+      'https://huggingface.co/byrizki/rusto-models/resolve/main/modules/layout_publaynet.rten',
   },
   {
     id: 'none',

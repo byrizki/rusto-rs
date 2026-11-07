@@ -34,10 +34,11 @@ fn test_ppocr_v6_tiny_rten_vs_mnn_comparison() {
     let mnn_rec = root.join("models/PPOCR_v6_tiny/rec.mnn");
     let dict = root.join("models/PPOCR_v6_tiny/dict.txt");
 
-    if !rten_det.exists() || !rten_rec.exists() || !mnn_det.exists() || !mnn_rec.exists() || !dict.exists() {
-        eprintln!("PP-OCR models for pipeline_engine_comparison_test not found, skipping");
-        return;
-    }
+    assert!(rten_det.exists(), "det.rten exists: {}", rten_det.display());
+    assert!(rten_rec.exists(), "rec.rten exists: {}", rten_rec.display());
+    assert!(mnn_det.exists(), "det.mnn exists: {}", mnn_det.display());
+    assert!(mnn_rec.exists(), "rec.mnn exists: {}", mnn_rec.display());
+    assert!(dict.exists(), "dict.txt exists: {}", dict.display());
 
     let test_images = [
         ("example1.png", root.join("models/test_images/example1.png")),
@@ -248,10 +249,11 @@ fn test_indra_ocr_rten_vs_mnn_comparison() {
     let mnn_rec = root.join("models/indra/rec.mnn");
     let meta = root.join("models/indra/meta.json");
 
-    if !rten_det.exists() || !rten_rec.exists() || !mnn_det.exists() || !mnn_rec.exists() || !meta.exists() {
-        eprintln!("Indra models for pipeline_engine_comparison_test not found, skipping");
-        return;
-    }
+    assert!(rten_det.exists(), "indra det.rten exists: {}", rten_det.display());
+    assert!(rten_rec.exists(), "indra rec.rten exists: {}", rten_rec.display());
+    assert!(mnn_det.exists(), "indra det.mnn exists: {}", mnn_det.display());
+    assert!(mnn_rec.exists(), "indra rec.mnn exists: {}", mnn_rec.display());
+    assert!(meta.exists(), "indra meta.json exists: {}", meta.display());
 
     let test_images = [
         ("idcard.jpg", root.join("models/test_images/idcard.jpg")),
@@ -454,10 +456,10 @@ fn test_spatial_layout_mnn_verification() {
     let dict = root.join("models/PPOCR_v6_tiny/dict.txt");
     let img_path = root.join("models/test_images/example1.png");
 
-    if !mnn_det.exists() || !mnn_rec.exists() || !dict.exists() || !img_path.exists() {
-        eprintln!("Models for test_spatial_layout_mnn_verification not found, skipping");
-        return;
-    }
+    assert!(mnn_det.exists(), "det.mnn exists: {}", mnn_det.display());
+    assert!(mnn_rec.exists(), "rec.mnn exists: {}", mnn_rec.display());
+    assert!(dict.exists(), "dict.txt exists: {}", dict.display());
+    assert!(img_path.exists(), "example1.png exists: {}", img_path.display());
 
     let mnn_cfg = InitializeConfig::ppv6(
         mnn_det.to_str().unwrap(),
@@ -487,10 +489,7 @@ fn test_spatial_layout_mnn_verification() {
 fn test_debug_compare_rten_vs_rusto_nn() {
     let root = get_repo_root();
     let rten_path = root.join("models/indra/rec.rten");
-    if !rten_path.exists() {
-        eprintln!("Models for test_debug_compare_rten_vs_rusto_nn not found, skipping");
-        return;
-    }
+    assert!(rten_path.exists(), "indra rec.rten exists: {}", rten_path.display());
 
     let mut official_rten = rusto_rten::RtenSession::from_file(&rten_path, 1).expect("load official rten");
     let rusto_nn_model = rusto_nn::Model::from_file(&rten_path).expect("load rusto_nn model");

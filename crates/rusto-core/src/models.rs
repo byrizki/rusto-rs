@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::error::CoreError;
 
-pub const DEFAULT_HF_BASE_URL: &str = "https://huggingface.co/byrizki/rten-models/resolve/main";
+pub const DEFAULT_HF_BASE_URL: &str = "https://huggingface.co/byrizki/rusto-models/resolve/main";
 pub const DEFAULT_BASE_URL: &str = DEFAULT_HF_BASE_URL;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

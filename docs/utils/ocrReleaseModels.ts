@@ -10,9 +10,9 @@ export interface HfModelAssetInfo {
   downloadUrl: string;
 }
 
-export const HUGGINGFACE_REPO = 'byrizki/rten-models';
-export const HUGGINGFACE_BASE = 'https://huggingface.co/byrizki/rten-models/resolve/main';
-export const HUGGINGFACE_API_BASE = 'https://huggingface.co/api/models/byrizki/rten-models';
+export const HUGGINGFACE_REPO = 'byrizki/rusto-models';
+export const HUGGINGFACE_BASE = 'https://huggingface.co/byrizki/rusto-models/resolve/main';
+export const HUGGINGFACE_API_BASE = 'https://huggingface.co/api/models/byrizki/rusto-models';
 export const JSDELIVR_CDN_BASE = 'https://cdn.jsdelivr.net/npm';
 
 function dedupeStrings(items: (string | undefined)[]): string[] {

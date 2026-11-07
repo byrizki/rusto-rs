@@ -6,7 +6,7 @@ DOCS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$DOCS_DIR/.." && pwd)"
 TARGET_DIR="${1:-$DOCS_DIR/public/models}"
 
-HF_BASE="${HF_BASE:-https://huggingface.co/byrizki/rten-models/resolve/main}"
+HF_BASE="${HF_BASE:-https://huggingface.co/byrizki/rusto-models/resolve/main}"
 
 mkdir -p "$TARGET_DIR"
 

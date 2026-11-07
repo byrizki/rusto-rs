@@ -42,7 +42,7 @@ If your app must work completely offline from the very first launch (field inspe
 
 ### 1. Download Standalone Assets
 
-Download the `.mnn` (default, pure-Rust MNN runtime) or `.rten` models and dictionary for your chosen pipeline from [Hugging Face (`byrizki/rten-models`)](https://huggingface.co/byrizki/rten-models):
+Download the `.mnn` (default, pure-Rust MNN runtime) or `.rten` models and dictionary for your chosen pipeline from [Hugging Face (`byrizki/rusto-models`)](https://huggingface.co/byrizki/rusto-models):
 
 | Pipeline | Required Files | Optional Auxiliary Files |
 | :--- | :--- | :--- |

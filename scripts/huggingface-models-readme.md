@@ -32,7 +32,7 @@ These models enable zero-dependency, high-speed neural OCR inference across Rust
 All model weights and dictionary files are globally accessible with native CORS headers:
 
 ```text
-https://huggingface.co/byrizki/rten-models/resolve/main/<folder>/<filename>
+https://huggingface.co/byrizki/rusto-models/resolve/main/<folder>/<filename>
 ```
 
 ---

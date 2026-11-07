@@ -405,7 +405,7 @@ RustO! supports DataLab Indra OCR as its default flagship engine alongside PP-OC
 | **PP-OCRv6 Medium** | ~134 MB | **~75.7 MB** | Server-grade accuracy workloads |
 | **PP-OCRv5 / v4** | ~23–28 MB (Mobile) | — | Legacy pipelines & single-language packs |
 
-Pre-trained models are distributed as standalone assets on [Hugging Face Hub (`byrizki/rten-models`)](https://huggingface.co/byrizki/rten-models) with native CORS support and downloaded automatically on first run by the CLI and native SDKs.
+Pre-trained models are distributed as standalone assets on [Hugging Face Hub (`byrizki/rusto-models`)](https://huggingface.co/byrizki/rusto-models) with native CORS support and downloaded automatically on first run by the CLI and native SDKs.
 
 👉 **[View Complete Multilingual OCR Guide & Model Matrix](https://byrizki.com/rusto-rs/en/advance-guide/multilingual-ocr)**
 

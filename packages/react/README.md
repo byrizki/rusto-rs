@@ -5,7 +5,7 @@ Official React hooks, context provider, and UI components for **RustO!** — cli
 ## Features
 
 - **Zero-Backend Privacy**: Runs OCR in the browser via WebAssembly + Web Workers (`@rustors/web`).
-- **Standalone Model URLs**: Load model files directly from `public/models/`, your CDN, or Hugging Face Hub (`byrizki/rten-models`) — no npm model wrapper packages required.
+- **Standalone Model URLs**: Load model files directly from `public/models/`, your CDN, or Hugging Face Hub (`byrizki/rusto-models`) — no npm model wrapper packages required.
 - **Indra OCR & PP-OCRv6 Presets**: Supports `'indra'` alongside `'ppv6'`, `'ppv5'`, `'ppv4'`, and `'ppv3'`, plus optional `unwarp`, `orientation`, `layout`, and `order` models.
 - **Hooks & Ready-Made Components**: `<RustoProvider>`, `useOcr()`, `useRusto()`, `<OcrDropzone>`, `<OcrOverlay>`, and direct fluent `DetectTextBuilder` access (`.asLines().run()`, `.asWords().run()`, `.asSpatial().run()`).
 
@@ -19,12 +19,12 @@ pnpm add @rustors/react @rustors/web
 
 ## Configuring Models with `<RustoProvider>`
 
-Point `models` to standalone model URLs hosted in your app's `public/models/` folder, a CDN, or Hugging Face Hub (`https://huggingface.co/byrizki/rten-models/resolve/main` with CORS enabled):
+Point `models` to standalone model URLs hosted in your app's `public/models/` folder, a CDN, or Hugging Face Hub (`https://huggingface.co/byrizki/rusto-models/resolve/main` with CORS enabled):
 
 ```tsx
 import { RustoProvider } from '@rustors/react';
 
-const HF_BASE = 'https://huggingface.co/byrizki/rten-models/resolve/main';
+const HF_BASE = 'https://huggingface.co/byrizki/rusto-models/resolve/main';
 
 export function App() {
   return (

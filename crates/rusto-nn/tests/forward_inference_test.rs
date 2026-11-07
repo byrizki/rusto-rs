@@ -5,10 +5,7 @@ use rusto_nn::{Model, Session, Tensor, TensorLayout};
 fn test_forward_ppocrv6_det_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/det.mnn");
-    if !model_path.exists() {
-        eprintln!("Skipping test_forward_ppocrv6_det_mnn: {} not found", model_path.display());
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load det.mnn");
     let session = Session::new(&model).expect("Create session for det.mnn");
@@ -35,10 +32,7 @@ fn test_forward_ppocrv6_det_mnn() {
 fn test_forward_ppocrv6_det_onnx() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/det.onnx");
-    if !model_path.exists() {
-        eprintln!("Skipping test_forward_ppocrv6_det_onnx: {} not found", model_path.display());
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load det.onnx");
     let session = Session::new(&model).expect("Create session for det.onnx");
@@ -64,10 +58,7 @@ fn test_forward_ppocrv6_det_onnx() {
 fn test_forward_ppocrv6_det_rten() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/det.rten");
-    if !model_path.exists() {
-        eprintln!("Skipping test_forward_ppocrv6_det_rten: {} not found", model_path.display());
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load det.rten");
     let session = Session::new(&model).expect("Create session for det.rten");
@@ -98,9 +89,7 @@ fn test_ppocrv6_det_rten_node_parity() {
 
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/det.rten");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model_data = fs::read(&model_path).expect("read det.rten");
     let rten_model = ModelOptions::with_all_ops().load(model_data).expect("rten load");
@@ -181,10 +170,7 @@ fn test_ppocrv6_det_rten_node_parity() {
 fn test_forward_ppocrv6_rec_rten() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/rec.rten");
-    if !model_path.exists() {
-        eprintln!("Skipping test_forward_ppocrv6_rec_rten: {} not found", model_path.display());
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load rec.rten");
     let session = Session::new(&model).expect("Create session for rec.rten");
@@ -207,10 +193,7 @@ fn test_forward_ppocrv6_rec_rten() {
 fn test_forward_ppocrv6_rec_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/rec.mnn");
-    if !model_path.exists() {
-        eprintln!("Skipping test_forward_ppocrv6_rec_mnn: {} not found", model_path.display());
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load rec.mnn");
     let session = Session::new(&model).expect("Create session for rec.mnn");
@@ -238,10 +221,7 @@ fn test_forward_ppocrv6_rec_mnn() {
 fn test_forward_ppocrv6_rec_onnx() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/rec.onnx");
-    if !model_path.exists() {
-        eprintln!("Skipping test_forward_ppocrv6_rec_onnx: {} not found", model_path.display());
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load rec.onnx");
     let session = Session::new(&model).expect("Create session for rec.onnx");
@@ -264,10 +244,7 @@ fn test_forward_ppocrv6_rec_onnx() {
 fn test_forward_indra_det_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/indra/det.mnn");
-    if !model_path.exists() {
-        eprintln!("Skipping test_forward_indra_det_mnn: {} not found", model_path.display());
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load indra det.mnn");
     println!("indra det.mnn input_channels: {}", model.input_channels());
@@ -295,9 +272,7 @@ fn test_forward_indra_det_mnn() {
 fn test_forward_indra_det_rten() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/indra/det.rten");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load indra det.rten");
     let session = Session::new(&model).expect("Create session for indra det.rten");
@@ -323,9 +298,7 @@ fn test_forward_indra_det_rten() {
 fn test_forward_indra_det_onnx() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/indra/det.onnx");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load indra det.onnx");
     println!("indra det.onnx outputs: {:?}", model.output_names());
@@ -352,10 +325,8 @@ fn test_forward_indra_rec_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/indra/rec.mnn");
     let onnx_path = repo_root.join("models/indra/rec.onnx");
-    if !model_path.exists() || !onnx_path.exists() {
-        eprintln!("Skipping test_forward_indra_rec_mnn: models not found");
-        return;
-    }
+    assert!(model_path.exists(), "indra rec.mnn exists");
+    assert!(onnx_path.exists(), "indra rec.onnx exists");
 
     let model_onnx = Model::from_file(&onnx_path).expect("Load indra rec.onnx");
     for inp in model_onnx.input_names() {
@@ -466,9 +437,7 @@ fn test_forward_indra_rec_mnn() {
 fn test_forward_indra_rec_rten() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/indra/rec.rten");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
     let model = Model::from_file(&model_path).expect("Load indra rec.rten");
     for (i, node) in model.graph().nodes.iter().enumerate() {
         if node.op.kind_name() == "ArgMax" {
@@ -486,9 +455,7 @@ fn test_forward_indra_rec_rten() {
 fn test_forward_indra_rec_onnx() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/indra/rec.onnx");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load indra rec.onnx");
     let session = Session::new(&model).expect("Create session for indra rec.onnx");
@@ -511,9 +478,7 @@ fn test_forward_indra_rec_onnx() {
 fn test_forward_ppocrv6_cls_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/cls.mnn");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load cls.mnn");
     let session = Session::new(&model).expect("Create session for cls.mnn");
@@ -534,9 +499,7 @@ fn test_forward_ppocrv6_cls_mnn() {
 fn test_forward_ppocrv6_cls_onnx() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/cls.onnx");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load cls.onnx");
     let session = Session::new(&model).expect("Create session for cls.onnx");
@@ -557,9 +520,7 @@ fn test_forward_ppocrv6_cls_onnx() {
 fn test_forward_ppocrv6_orient_onnx() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/orient.onnx");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load orient.onnx");
     let session = Session::new(&model).expect("Create session for orient.onnx");
@@ -579,9 +540,7 @@ fn test_forward_ppocrv6_orient_onnx() {
 fn test_forward_ppocrv6_orient_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/orient.mnn");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load orient.mnn");
     let session = Session::new(&model).expect("Create session for orient.mnn");
@@ -601,9 +560,7 @@ fn test_forward_ppocrv6_orient_mnn() {
 fn test_forward_uvdoc_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/uvdoc.mnn");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load uvdoc.mnn");
     let session = Session::new(&model).expect("Create session for uvdoc.mnn");
@@ -623,9 +580,7 @@ fn test_forward_uvdoc_mnn() {
 fn test_forward_layout_cdla_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/layout_cdla.mnn");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load layout_cdla.mnn");
     let session = Session::new(&model).expect("Create session for layout_cdla.mnn");
@@ -645,9 +600,7 @@ fn test_forward_layout_cdla_mnn() {
 fn test_forward_layout_publaynet_mnn() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/layout_publaynet.mnn");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load layout_publaynet.mnn");
     let session = Session::new(&model).expect("Create session for layout_publaynet.mnn");
@@ -668,9 +621,7 @@ fn test_forward_layout_publaynet_mnn() {
 fn test_forward_uvdoc_onnx() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/uvdoc.onnx");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load uvdoc.onnx");
     let session = Session::new(&model).expect("Create session for uvdoc.onnx");
@@ -691,9 +642,7 @@ fn test_forward_uvdoc_onnx() {
 fn test_forward_layout_cdla_onnx() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/layout_cdla.onnx");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load layout_cdla.onnx");
     let session = Session::new(&model).expect("Create session for layout_cdla.onnx");
@@ -710,9 +659,7 @@ fn test_forward_layout_cdla_onnx() {
 fn test_forward_layout_publaynet_onnx() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/layout_publaynet.onnx");
-    if !model_path.exists() {
-        return;
-    }
+    assert!(model_path.exists(), "Model exists: {}", model_path.display());
 
     let model = Model::from_file(&model_path).expect("Load layout_publaynet.onnx");
     let session = Session::new(&model).expect("Create session for layout_publaynet.onnx");

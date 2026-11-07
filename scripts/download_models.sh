@@ -1,6 +1,6 @@
 #!/bin/bash
-# Script to download OCR models directly from ModelScope
-# Source: https://www.modelscope.cn/models/RapidAI/RapidOCR
+# Script to download OCR models directly from Hugging Face Hub (byrizki/rusto-models)
+# Source: https://huggingface.co/byrizki/rusto-models
 
 set -e
 
@@ -12,24 +12,28 @@ TIER="tiny"
 LANG=""
 OUTPUT_DIR=""
 DOWNLOAD_ALL=false
+PREPARE_CI=false
 CONVERT_RTEN=false
-KEEP_ONNX=false
+KEEP_ONNX=true
 WITH_CLS=false
 WITH_ORIENT=false
 WITH_UNWARP=false
 WITH_LAYOUT=false
+WITH_MODULES=false
 WITH_INDRA=false
 
 # Parse optional arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --all) DOWNLOAD_ALL=true ;;
-        --convert-rten) CONVERT_RTEN=true ;;
+        --ci|--test-fixtures) PREPARE_CI=true ;;
+        --convert-rten) CONVERT_RTEN=true ;; # Kept for backward-compatibility, no-op since .rten is fetched directly
         --keep-onnx) KEEP_ONNX=true ;;
         --with-cls) WITH_CLS=true ;;
         --with-orient) WITH_ORIENT=true ;;
         --with-unwarp) WITH_UNWARP=true ;;
         --with-layout) WITH_LAYOUT=true ;;
+        --with-modules) WITH_MODULES=true ;;
         --with-indra|--indra) WITH_INDRA=true ;;
         --model) MODEL_TYPE="$2"; shift ;;
         --tier) TIER="$2"; shift ;;
@@ -40,25 +44,10 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-MODELSCOPE_BASE="https://www.modelscope.cn/api/v1/models/RapidAI/RapidOCR/repo?Revision=master&FilePath="
-# ModelScope can close large transfers on hosted macOS runners. Downloads use
-# resumable partial files, bounded retry/backoff, and lower group concurrency.
-MODEL_DOWNLOAD_RETRIES="${MODEL_DOWNLOAD_RETRIES:-6}"
-MODEL_DOWNLOAD_CONNECT_TIMEOUT="${MODEL_DOWNLOAD_CONNECT_TIMEOUT:-30}"
-MAX_PARALLEL_MODEL_GROUPS="${MAX_PARALLEL_MODEL_GROUPS:-3}"
-
-if ! [[ "$MODEL_DOWNLOAD_RETRIES" =~ ^[1-9][0-9]*$ ]]; then
-    echo "MODEL_DOWNLOAD_RETRIES must be a positive integer" >&2
-    exit 2
-fi
-if ! [[ "$MODEL_DOWNLOAD_CONNECT_TIMEOUT" =~ ^[1-9][0-9]*$ ]]; then
-    echo "MODEL_DOWNLOAD_CONNECT_TIMEOUT must be a positive integer" >&2
-    exit 2
-fi
-if ! [[ "$MAX_PARALLEL_MODEL_GROUPS" =~ ^[1-9][0-9]*$ ]]; then
-    echo "MAX_PARALLEL_MODEL_GROUPS must be a positive integer" >&2
-    exit 2
-fi
+HF_BASE="${HF_BASE:-https://huggingface.co/byrizki/rusto-models/resolve/main}"
+MODEL_DOWNLOAD_RETRIES="${MODEL_DOWNLOAD_RETRIES:-5}"
+MODEL_DOWNLOAD_CONNECT_TIMEOUT="${MODEL_DOWNLOAD_CONNECT_TIMEOUT:-20}"
+MAX_PARALLEL_DOWNLOADS="${MAX_PARALLEL_DOWNLOADS:-6}"
 
 # Wait for a list of PIDs; returns 1 if any failed
 wait_jobs() {
@@ -72,7 +61,7 @@ wait_jobs() {
 download_file_to() {
     local dest_dir="$1"
     local filename="$2"
-    local ms_path="$3"
+    local hf_rel_path="$3"
     local dest="$dest_dir/$filename"
     local partial="$dest.part"
     local attempt=1
@@ -84,22 +73,19 @@ download_file_to() {
         return 0
     fi
 
-    # Never write a transfer directly to its final path. Failed partial content
-    # must not be mistaken for a completed model by later script invocations.
+    local url=""
+    if [[ "$hf_rel_path" =~ ^https?:// ]]; then
+        url="$hf_rel_path"
+    else
+        url="$HF_BASE/$hf_rel_path"
+    fi
+
     while [ "$attempt" -le "$MODEL_DOWNLOAD_RETRIES" ]; do
-        echo "Downloading $filename from ModelScope (attempt $attempt/$MODEL_DOWNLOAD_RETRIES)..."
+        echo "Downloading $filename from Hugging Face (attempt $attempt/$MODEL_DOWNLOAD_RETRIES)..."
 
         local resume_args=()
         if [ -s "$partial" ]; then
             resume_args=(--continue-at -)
-            echo "  Resuming partial transfer ($(du -h "$partial" | cut -f1))"
-        fi
-
-        local url=""
-        if [[ "$ms_path" =~ ^https?:// ]]; then
-            url="$ms_path"
-        else
-            url="$MODELSCOPE_BASE$ms_path"
         fi
 
         if curl --fail --location --silent --show-error \
@@ -113,38 +99,34 @@ download_file_to() {
         fi
 
         if [ "$attempt" -lt "$MODEL_DOWNLOAD_RETRIES" ]; then
-            # 2, 4, 6, 8, 10 second bounded backoff. Jitter prevents all
-            # concurrent model groups reconnecting together.
-            local delay=$((attempt * 2 + RANDOM % 3))
+            local delay=$((attempt * 2))
             echo "  Transfer failed; retrying in ${delay}s..." >&2
             sleep "$delay"
         fi
         attempt=$((attempt + 1))
     done
 
-    echo "❌ Failed to download $filename after $MODEL_DOWNLOAD_RETRIES attempts (partial retained at: $partial)" >&2
+    echo "❌ Failed to download $filename after $MODEL_DOWNLOAD_RETRIES attempts" >&2
     return 1
 }
 
 download_ppocrv6() {
-    local tier="$1"
+    local tier="${1:-tiny}"
     local dir="$2"
     echo "=== Downloading PP-OCRv6 ($tier tier) models ==="
     echo "Destination: $dir"
 
     local pids=()
+    local folder="ppocrv6-$tier"
 
-    download_file_to "$dir" "det.onnx" "onnx%2FPP-OCRv6%2Fdet%2FPP-OCRv6_det_${tier}.onnx" &
-    pids+=($!)
+    for ext in mnn onnx rten; do
+        download_file_to "$dir" "det.$ext" "$folder/det.$ext" &
+        pids+=($!)
+        download_file_to "$dir" "rec.$ext" "$folder/rec.$ext" &
+        pids+=($!)
+    done
 
-    download_file_to "$dir" "rec.onnx" "onnx%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_${tier}.onnx" &
-    pids+=($!)
-
-    if [ "$tier" = "tiny" ]; then
-        download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_tiny%2Fppocrv6_tiny_dict.txt" &
-    else
-        download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_small%2Fppocrv6_dict.txt" &
-    fi
+    download_file_to "$dir" "dict.txt" "$folder/dict.txt" &
     pids+=($!)
 
     wait_jobs "${pids[@]}"
@@ -157,40 +139,16 @@ download_ppocrv5() {
     echo "Destination: $dir"
 
     local pids=()
+    local folder="ppocrv5-$tier"
 
-    download_file_to "$dir" "det.onnx" "onnx%2FPP-OCRv5%2Fdet%2Fch_PP-OCRv5_det_${tier}.onnx" &
-    pids+=($!)
-
-    download_file_to "$dir" "rec.onnx" "onnx%2FPP-OCRv5%2Frec%2Fch_PP-OCRv5_rec_${tier}.onnx" &
-    pids+=($!)
-
-    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv5%2Frec%2Fch_PP-OCRv5_rec_${tier}%2Fppocrv5_dict.txt" &
-    pids+=($!)
-
-    # English rec model is only available for the mobile tier
-    if [ "$tier" = "mobile" ]; then
-        download_file_to "$dir" "rec_en.onnx" "onnx%2FPP-OCRv5%2Frec%2Fen_PP-OCRv5_rec_${tier}.onnx" &
+    for ext in onnx rten; do
+        download_file_to "$dir" "det.$ext" "$folder/det.$ext" &
         pids+=($!)
-
-        download_file_to "$dir" "dict_en.txt" "paddle%2FPP-OCRv5%2Frec%2Fen_PP-OCRv5_rec_${tier}%2Fppocrv5_en_dict.txt" &
+        download_file_to "$dir" "rec.$ext" "$folder/rec.$ext" &
         pids+=($!)
-    fi
+    done
 
-    wait_jobs "${pids[@]}"
-}
-
-download_ppocrv5_lang() {
-    local lang="$1"
-    local dir="$2"
-    echo "=== Downloading PP-OCRv5 ($lang) model ==="
-    echo "Destination: $dir"
-
-    local pids=()
-
-    download_file_to "$dir" "rec.onnx" "onnx%2FPP-OCRv5%2Frec%2F${lang}_PP-OCRv5_rec_mobile.onnx" &
-    pids+=($!)
-
-    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv5%2Frec%2F${lang}_PP-OCRv5_rec_mobile%2Fppocrv5_${lang}_dict.txt" &
+    download_file_to "$dir" "dict.txt" "$folder/dict.txt" &
     pids+=($!)
 
     wait_jobs "${pids[@]}"
@@ -203,204 +161,158 @@ download_ppocrv4() {
     echo "Destination: $dir"
 
     local pids=()
+    local folder="ppocrv4-$tier"
 
-    download_file_to "$dir" "det.onnx" "onnx%2FPP-OCRv4%2Fdet%2Fch_PP-OCRv4_det_${tier}.onnx" &
-    pids+=($!)
-
-    download_file_to "$dir" "rec.onnx" "onnx%2FPP-OCRv4%2Frec%2Fch_PP-OCRv4_rec_${tier}.onnx" &
-    pids+=($!)
-
-    # dict.txt only exists in the mobile rec directory on ModelScope; shared by both tiers
-    download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fch_PP-OCRv4_rec_mobile%2Fppocr_keys_v1.txt" &
-    pids+=($!)
-
-    # English rec model and cls are only available for the mobile tier
-    if [ "$tier" = "mobile" ]; then
-        download_file_to "$dir" "rec_en.onnx" "onnx%2FPP-OCRv4%2Frec%2Fen_PP-OCRv4_rec_${tier}.onnx" &
+    for ext in onnx rten; do
+        download_file_to "$dir" "det.$ext" "$folder/det.$ext" &
         pids+=($!)
-
-        download_file_to "$dir" "dict_en.txt" "paddle%2FPP-OCRv4%2Frec%2Fen_PP-OCRv4_rec_${tier}%2Fen_dict.txt" &
+        download_file_to "$dir" "rec.$ext" "$folder/rec.$ext" &
         pids+=($!)
+    done
 
-        download_file_to "$dir" "cls.onnx" "onnx%2FPP-OCRv4%2Fcls%2Fch_ppocr_mobile_v2.0_cls_${tier}.onnx" &
-        pids+=($!)
-    fi
+    download_file_to "$dir" "dict.txt" "$folder/dict.txt" &
+    pids+=($!)
 
     wait_jobs "${pids[@]}"
 }
 
-download_ppocrv4_lang() {
-    local lang="$1"
-    local dir="$2"
-    echo "=== Downloading PP-OCRv4 ($lang) model ==="
-    echo "Destination: $dir"
-
+download_modules() {
+    local dir="$1"
+    echo "=== Downloading Pipeline Modules (cls, orient, uvdoc, layout) ==="
     local pids=()
 
-    case "$lang" in
-        japan)
-            download_file_to "$dir" "rec.onnx" "onnx%2FPP-OCRv4%2Frec%2Fjapan_PP-OCRv4_rec_mobile.onnx" &
-            pids+=($!)
-            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fjapan_PP-OCRv4_rec_mobile%2Fjapan_dict.txt" &
-            pids+=($!)
-            ;;
-        chinese_cht|chinese-cht)
-            download_file_to "$dir" "rec.onnx" "onnx%2FPP-OCRv4%2Frec%2Fchinese_cht_PP-OCRv3_rec_mobile.onnx" &
-            pids+=($!)
-            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fchinese_cht_PP-OCRv3_rec_mobile%2Fchinese_cht_dict.txt" &
-            pids+=($!)
-            ;;
-        kannada|ka)
-            download_file_to "$dir" "rec.onnx" "onnx%2FPP-OCRv4%2Frec%2Fka_PP-OCRv4_rec_mobile.onnx" &
-            pids+=($!)
-            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2Fkannada_PP-OCRv4_rec_mobile%2Fka_dict.txt" &
-            pids+=($!)
-            ;;
-        *)
-            download_file_to "$dir" "rec.onnx" "onnx%2FPP-OCRv4%2Frec%2F${lang}_PP-OCRv4_rec_mobile.onnx" &
-            pids+=($!)
-            download_file_to "$dir" "dict.txt" "paddle%2FPP-OCRv4%2Frec%2F${lang}_PP-OCRv4_rec_mobile%2F${lang}_dict.txt" &
-            pids+=($!)
-            ;;
-    esac
+    # Classification
+    download_file_to "$dir" "cls.mnn" "modules/cls.mnn" &
+    pids+=($!)
+    download_file_to "$dir" "cls.onnx" "modules/cls.onnx" &
+    pids+=($!)
+    download_file_to "$dir" "cls.rten" "modules/cls.rten" &
+    pids+=($!)
+
+    # Orientation
+    download_file_to "$dir" "orient.mnn" "modules/orient.mnn" &
+    pids+=($!)
+    download_file_to "$dir" "orient.onnx" "modules/orient.onnx" &
+    pids+=($!)
+    download_file_to "$dir" "orient.rten" "modules/orient.rten" &
+    pids+=($!)
+
+    # UVDoc Unwarp
+    download_file_to "$dir" "uvdoc.mnn" "modules/uvdoc.mnn" &
+    pids+=($!)
+    download_file_to "$dir" "uvdoc.onnx" "modules/uvdoc.onnx" &
+    pids+=($!)
+    download_file_to "$dir" "uvdoc.rten" "modules/uvdoc.rten" &
+    pids+=($!)
+
+    # Layout CDLA & PubLayNet
+    download_file_to "$dir" "layout_cdla.mnn" "modules/layout_cdla.mnn" &
+    pids+=($!)
+    download_file_to "$dir" "layout_cdla.onnx" "modules/layout_cdla.onnx" &
+    pids+=($!)
+    download_file_to "$dir" "layout_cdla.rten" "modules/layout_cdla.rten" &
+    pids+=($!)
+    download_file_to "$dir" "layout_publaynet.mnn" "modules/layout_publaynet.mnn" &
+    pids+=($!)
+    download_file_to "$dir" "layout_publaynet.onnx" "modules/layout_publaynet.onnx" &
+    pids+=($!)
+    download_file_to "$dir" "layout_publaynet.rten" "modules/layout_publaynet.rten" &
+    pids+=($!)
 
     wait_jobs "${pids[@]}"
-}
-
-download_cls() {
-    local dir="$1"
-    echo "=== Downloading Text-Line Classifier (cls.onnx) ==="
-    download_file_to "$dir" "cls.onnx" "onnx%2FPP-OCRv4%2Fcls%2Fch_ppocr_mobile_v2.0_cls_mobile.onnx"
-}
-
-download_orient() {
-    local dir="$1"
-    echo "=== Downloading Document Orientation Classifier (orient.onnx) ==="
-    download_file_to "$dir" "orient.onnx" "https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/main/correction/PP-LCNet_x1_0_doc_ori.onnx"
-}
-
-download_unwarp() {
-    local dir="$1"
-    echo "=== Downloading Document Unwarp Model (uvdoc.onnx) ==="
-    download_file_to "$dir" "uvdoc.onnx" "https://huggingface.co/PaddlePaddle/UVDoc_onnx/resolve/main/inference.onnx"
-}
-
-download_layout_cdla() {
-    local dir="$1"
-    echo "=== Downloading Document Layout Model CDLA 10-Class (layout_cdla.onnx) ==="
-    download_file_to "$dir" "layout_cdla.onnx" "https://www.modelscope.cn/models/RapidAI/RapidLayout/resolve/v1.2.0/onnx/pp_layout/layout_cdla.onnx"
-}
-
-download_layout_publaynet() {
-    local dir="$1"
-    echo "=== Downloading Document Layout Model PubLayNet 5-Class (layout_publaynet.onnx) ==="
-    download_file_to "$dir" "layout_publaynet.onnx" "https://www.modelscope.cn/models/RapidAI/RapidLayout/resolve/v1.2.0/onnx/pp_layout/layout_publaynet.onnx"
-}
-
-download_layout() {
-    local dir="$1"
-    local variant="${2:-cdla}"
-    if [ "$variant" = "publaynet" ]; then
-        download_layout_publaynet "$dir"
-    else
-        download_layout_cdla "$dir"
-    fi
 }
 
 download_indra() {
     local dir="$1"
     echo "=== Downloading Indra OCR Models (Hugging Face) ==="
-    local base_url="https://huggingface.co/datalab-to/indra-ocr/resolve/main"
     mkdir -p "$dir"
-    download_file_to "$dir" "det.onnx" "$base_url/det.onnx"
-    download_file_to "$dir" "rec.onnx" "$base_url/rec.onnx"
-    download_file_to "$dir" "orient.onnx" "$base_url/orient.onnx"
-    download_file_to "$dir" "order.onnx" "$base_url/order.onnx"
-    download_file_to "$dir" "meta.json" "$base_url/meta.json"
-    download_file_to "$dir" "rec_cjk.onnx" "$base_url/rec_cjk.onnx"
-    download_file_to "$dir" "rec_rtl.onnx" "$base_url/rec_rtl.onnx"
-    download_file_to "$dir" "rec_world.onnx" "$base_url/rec_world.onnx"
-    download_file_to "$dir" "script.onnx" "$base_url/script.onnx"
-    download_file_to "$dir" "mathcls.onnx" "$base_url/mathcls.onnx"
-    download_file_to "$dir" "math_enc.onnx" "$base_url/math_enc.onnx"
-    download_file_to "$dir" "math_dec_init.onnx" "$base_url/math_dec_init.onnx"
-    download_file_to "$dir" "math_dec_step.onnx" "$base_url/math_dec_step.onnx"
-    download_file_to "$dir" "math_meta.json" "$base_url/math_meta.json"
+    local pids=()
+
+    # Core Detection & Recognition
+    for ext in mnn onnx rten; do
+        download_file_to "$dir" "det.$ext" "indraocr/det.$ext" &
+        pids+=($!)
+        download_file_to "$dir" "rec.$ext" "indraocr/rec.$ext" &
+        pids+=($!)
+    done
+
+    download_file_to "$dir" "meta.json" "indraocr/meta.json" &
+    pids+=($!)
+
+    # Reading Order & Orientation
+    for ext in onnx rten; do
+        download_file_to "$dir" "order.$ext" "indraocr/order.$ext" &
+        pids+=($!)
+        download_file_to "$dir" "indra_order.$ext" "indraocr/indra_order.$ext" &
+        pids+=($!)
+        download_file_to "$dir" "orient.$ext" "indraocr/orient.$ext" &
+        pids+=($!)
+    done
+
+    # Multi-Script Recognition
+    for variant in rec_cjk rec_rtl rec_world script mathcls; do
+        for ext in onnx rten; do
+            download_file_to "$dir" "${variant}.$ext" "indraocr/${variant}.$ext" &
+            pids+=($!)
+        done
+    done
+
+    # LaTeX Math Recognition
+    for part in math_enc math_dec_init math_dec_step; do
+        for ext in onnx rten; do
+            download_file_to "$dir" "${part}.$ext" "indraocr/${part}.$ext" &
+            pids+=($!)
+        done
+    done
+    download_file_to "$dir" "math_meta.json" "indraocr/math_meta.json" &
+    pids+=($!)
+
+    wait_jobs "${pids[@]}"
 }
 
-V5_LANGS=("arabic" "cyrillic" "devanagari" "el" "eslav" "korean" "latin" "ta" "te" "th")
-V4_LANGS=("japan" "chinese_cht" "kannada")
+download_ci_fixtures() {
+    echo "=== Preparing All Test Model Fixtures for CI ==="
+    local ppocr_dir="$REPO_ROOT/models/PPOCR_v6_tiny"
+    local indra_dir="$REPO_ROOT/models/indra"
+    local modules_dir="$REPO_ROOT/models"
 
-if [ "$DOWNLOAD_ALL" = true ]; then
-    tier_pids=()
-    tier_failed=0
+    download_ppocrv6 "tiny" "$ppocr_dir"
+    download_modules "$ppocr_dir"
+    download_indra "$indra_dir"
 
-    # Each group launches its own model-file downloads. Limit active groups so
-    # `--all` cannot create dozens of simultaneous large ModelScope transfers.
-    start_model_group() {
-        "$@" &
-        tier_pids+=("$!")
-        if [ "${#tier_pids[@]}" -ge "$MAX_PARALLEL_MODEL_GROUPS" ]; then
-            if ! wait "${tier_pids[0]}"; then
-                tier_failed=1
+    # Also symlink / copy module fixtures to models/ if referenced without subpath
+    for mod in cls orient uvdoc layout_cdla layout_publaynet; do
+        for ext in mnn onnx rten; do
+            if [ -f "$ppocr_dir/$mod.$ext" ] && [ ! -f "$modules_dir/$mod.$ext" ]; then
+                cp -p "$ppocr_dir/$mod.$ext" "$modules_dir/$mod.$ext" 2>/dev/null || true
             fi
-            tier_pids=("${tier_pids[@]:1}")
-        fi
-    }
-
-    start_model_group download_ppocrv6 "tiny"   "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_tiny}"
-    start_model_group download_ppocrv6 "small"  "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_small}"
-    start_model_group download_ppocrv6 "medium" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_medium}"
-    start_model_group download_ppocrv5 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_mobile}"
-    start_model_group download_ppocrv5 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_server}"
-    start_model_group download_ppocrv4 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_mobile}"
-    start_model_group download_ppocrv4 "server" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_server}"
-
-    for lang in "${V5_LANGS[@]}"; do
-        start_model_group download_ppocrv5_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$lang}"
+        done
     done
-    for lang in "${V4_LANGS[@]}"; do
-        start_model_group download_ppocrv4_lang "$lang" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$lang}"
-    done
+}
 
-    # Optional document pipeline models (both layout variants downloaded separately)
-    start_model_group download_cls      "${OUTPUT_DIR:-$REPO_ROOT/models}"
-    start_model_group download_orient   "${OUTPUT_DIR:-$REPO_ROOT/models}"
-    start_model_group download_unwarp   "${OUTPUT_DIR:-$REPO_ROOT/models}"
-    start_model_group download_layout_cdla       "${OUTPUT_DIR:-$REPO_ROOT/models}"
-    start_model_group download_layout_publaynet  "${OUTPUT_DIR:-$REPO_ROOT/models}"
-    start_model_group download_indra             "${OUTPUT_DIR:-$REPO_ROOT/models/indra}"
-
-    if ! wait_jobs "${tier_pids[@]}"; then
-        tier_failed=1
-    fi
-    if [ "$tier_failed" -ne 0 ]; then
-        echo "❌ One or more model groups failed" >&2
-        exit 1
-    fi
+if [ "$PREPARE_CI" = true ]; then
+    download_ci_fixtures
+elif [ "$DOWNLOAD_ALL" = true ]; then
+    download_ppocrv6 "tiny" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_tiny}"
+    download_ppocrv6 "small" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_small}"
+    download_ppocrv6 "medium" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_medium}"
+    download_ppocrv5 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_mobile}"
+    download_ppocrv4 "mobile" "${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_mobile}"
+    download_modules "${OUTPUT_DIR:-$REPO_ROOT/models}"
+    download_indra "${OUTPUT_DIR:-$REPO_ROOT/models/indra}"
 else
-    TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6}"
+    TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_tiny}"
     case "$MODEL_TYPE" in
         ppocrv6)
             download_ppocrv6 "$TIER" "$TARGET_DIR"
             ;;
         ppocrv5)
-            if [ -n "$LANG" ]; then
-                TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$LANG}"
-                download_ppocrv5_lang "$LANG" "$TARGET_DIR"
-            else
-                TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5}"
-                download_ppocrv5 "$TIER" "$TARGET_DIR"
-            fi
+            TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v5_$TIER}"
+            download_ppocrv5 "$TIER" "$TARGET_DIR"
             ;;
         ppocrv4)
-            if [ -n "$LANG" ]; then
-                TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$LANG}"
-                download_ppocrv4_lang "$LANG" "$TARGET_DIR"
-            else
-                TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4}"
-                download_ppocrv4 "$TIER" "$TARGET_DIR"
-            fi
+            TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v4_$TIER}"
+            download_ppocrv4 "$TIER" "$TARGET_DIR"
             ;;
         indra)
             TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/indra}"
@@ -412,57 +324,14 @@ else
             ;;
     esac
 
-    # Download requested optional models into the target model directory
-    if [ "$WITH_CLS" = true ]; then
-        download_cls "$TARGET_DIR"
+    if [ "$WITH_MODULES" = true ] || [ "$WITH_CLS" = true ] || [ "$WITH_ORIENT" = true ] || [ "$WITH_UNWARP" = true ] || [ "$WITH_LAYOUT" = true ]; then
+        download_modules "$TARGET_DIR"
     fi
-    if [ "$WITH_ORIENT" = true ]; then
-        download_orient "$TARGET_DIR"
-    fi
-    if [ "$WITH_UNWARP" = true ]; then
-        download_unwarp "$TARGET_DIR"
-    fi
-    if [ "$WITH_LAYOUT" = true ]; then
-        download_layout_cdla "$TARGET_DIR"
-        download_layout_publaynet "$TARGET_DIR"
-    fi
+
     if [ "$WITH_INDRA" = true ]; then
         download_indra "${OUTPUT_DIR:-$REPO_ROOT/models/indra}"
     fi
 fi
 
 echo ""
-echo "✅ Download complete"
-
-if [ "$CONVERT_RTEN" = true ]; then
-    echo "=== Converting downloaded models to true .rten format and removing .onnx ==="
-    RTEN_CONVERT=""
-    if command -v rten-convert &>/dev/null; then
-        RTEN_CONVERT="rten-convert"
-    elif [ -f "$REPO_ROOT/benchmarks/omnidocbench/.venv/bin/rten-convert" ]; then
-        RTEN_CONVERT="$REPO_ROOT/benchmarks/omnidocbench/.venv/bin/rten-convert"
-    elif [ -f "/tmp/rten-env/bin/rten-convert" ]; then
-        RTEN_CONVERT="/tmp/rten-env/bin/rten-convert"
-    elif [ -f "$HOME/.local/bin/rten-convert" ]; then
-        RTEN_CONVERT="$HOME/.local/bin/rten-convert"
-    else
-        python3 -m pip install --upgrade rten-convert --break-system-packages 2>/dev/null || python3 -m pip install rten-convert 2>/dev/null || true
-        RTEN_CONVERT="$(command -v rten-convert || true)"
-    fi
-
-    if [ -n "$RTEN_CONVERT" ]; then
-        target_root="${OUTPUT_DIR:-$REPO_ROOT/models}"
-        find "$target_root" -name "*.onnx" | while read -r onnx_path; do
-            rten_path="${onnx_path%.onnx}.rten"
-            echo "Converting $onnx_path -> $rten_path..."
-            "$RTEN_CONVERT" "$onnx_path" "$rten_path"
-            if [ "$KEEP_ONNX" = false ]; then
-                rm -f "$onnx_path"
-            fi
-        done
-        echo "✓ All ONNX models converted to .rten"
-    else
-        echo "⚠️ rten-convert could not be found or installed, skipping conversion" >&2
-    fi
-fi
-
+echo "✅ Model download from Hugging Face complete."
