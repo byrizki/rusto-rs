@@ -13,13 +13,13 @@ if command -v wasm-pack >/dev/null 2>&1; then
   echo "Building pluggable WASM inference runtimes from source using wasm-pack..."
 
   echo "  1/3 Building rusto-nn (default pure-Rust inference engine)..."
-  (cd "$REPO_ROOT" && wasm-pack build crates/rten-wasm --target web --release --out-name rusto_nn --out-dir "$WASM_DIR")
+  (cd "$REPO_ROOT" && wasm-pack build crates/rusto-wasm --target web --release --out-name rusto_nn --out-dir "$WASM_DIR")
 
   echo "  2/3 Building rusto-rten (RTen inference engine)..."
-  (cd "$REPO_ROOT" && wasm-pack build crates/rten-wasm --target web --release --out-name rusto_rten --out-dir "$WASM_DIR" -- --no-default-features --features rusto-rten)
+  (cd "$REPO_ROOT" && wasm-pack build crates/rusto-wasm --target web --release --out-name rusto_rten --out-dir "$WASM_DIR" -- --no-default-features --features rusto-rten)
 
   echo "  3/3 Building rusto-webgpu (WebGPU hardware accelerator engine)..."
-  (cd "$REPO_ROOT" && wasm-pack build crates/rten-wasm --target web --release --out-name rusto_webgpu --out-dir "$WASM_DIR" -- --no-default-features --features rusto-webgpu)
+  (cd "$REPO_ROOT" && wasm-pack build crates/rusto-wasm --target web --release --out-name rusto_webgpu --out-dir "$WASM_DIR" -- --no-default-features --features rusto-webgpu)
 
   rm -f "$WASM_DIR/.gitignore"
 

@@ -314,13 +314,12 @@ pub fn prepare_linenet_det_input(
 }
 
 
-/// Crop and prepare LineNet recognition crop from raw RGBA buffer
-pub fn prepare_linenet_rec_crop_rgba(
-    rgba: &[u8],
+/// Computes target dimensions (rec_w, rec_h) for LineNet recognition crop without pixel allocation.
+pub fn compute_linenet_rec_crop_dims(
     orig_w: usize,
     orig_h: usize,
     box_coords: [f32; 4],
-) -> Option<(Vec<f32>, usize, usize)> {
+) -> Option<(usize, usize)> {
     let [x0, y0, x1, y1] = box_coords;
     let box_h = y1 - y0;
 
@@ -330,13 +329,66 @@ pub fn prepare_linenet_rec_crop_rgba(
     let exp_y1 = (y1 + 1.6 * box_h).min(orig_h as f32);
     let crop_w = exp_x1 - exp_x0;
     let crop_h = exp_y1 - exp_y0;
-    if crop_w < 4.0 || crop_h < 4.0 || orig_w == 0 || orig_h == 0 || rgba.len() < orig_w * orig_h * 4 {
+    if crop_w < 4.0 || crop_h < 4.0 || orig_w == 0 || orig_h == 0 {
         return None;
     }
 
     let rec_h = 96usize;
     let target_w = (96.0 * (crop_w / crop_h)).round() as usize;
     let rec_w = ((target_w + 7) / 8 * 8).clamp(8, 4096);
+    Some((rec_w, rec_h))
+}
+
+/// Computes target dimensions (rec_w, rec_h) for PP-OCR recognition crop without pixel allocation.
+pub fn compute_ppocr_rec_crop_dims(
+    orig_w: usize,
+    orig_h: usize,
+    box_coords: [f32; 4],
+) -> Option<(usize, usize)> {
+    let [x0, y0, x1, y1] = box_coords;
+    let box_w = x1 - x0;
+    let box_h = y1 - y0;
+
+    let pad_x_ratio = 0.035f32;
+    let pad_y_ratio = 0.045f32;
+
+    let exp_x0 = (x0 - box_w * pad_x_ratio).max(0.0);
+    let exp_x1 = (x1 + box_w * pad_x_ratio).min(orig_w as f32);
+    let exp_y0 = (y0 - box_h * pad_y_ratio).max(0.0);
+    let exp_y1 = (y1 + box_h * pad_y_ratio).min(orig_h as f32);
+
+    let crop_w = exp_x1 - exp_x0;
+    let crop_h = exp_y1 - exp_y0;
+    if crop_w < 4.0 || crop_h < 4.0 || orig_w == 0 || orig_h == 0 {
+        return None;
+    }
+
+    let rec_h = 48usize;
+    let target_w = (48.0 * (crop_w / crop_h)).ceil() as usize;
+    let rec_w = ((target_w as f32 / 32.0).ceil() as usize * 32).clamp(64, 960);
+    Some((rec_w, rec_h))
+}
+
+/// Crop and prepare LineNet recognition crop from raw RGBA buffer
+pub fn prepare_linenet_rec_crop_rgba(
+    rgba: &[u8],
+    orig_w: usize,
+    orig_h: usize,
+    box_coords: [f32; 4],
+) -> Option<(Vec<f32>, usize, usize)> {
+    let (rec_w, rec_h) = compute_linenet_rec_crop_dims(orig_w, orig_h, box_coords)?;
+    if rgba.len() < orig_w * orig_h * 4 {
+        return None;
+    }
+
+    let [x0, y0, x1, y1] = box_coords;
+    let box_h = y1 - y0;
+    let exp_x0 = (x0 - 0.5 * box_h).max(0.0);
+    let exp_x1 = (x1 + 0.5 * box_h).min(orig_w as f32);
+    let exp_y0 = (y0 - 1.6 * box_h).max(0.0);
+    let exp_y1 = (y1 + 1.6 * box_h).min(orig_h as f32);
+    let crop_w = exp_x1 - exp_x0;
+    let crop_h = exp_y1 - exp_y0;
 
     let x_tab = build_bilinear_table(rec_w, exp_x0, crop_w / rec_w as f32, orig_w, 4);
     let y_tab = build_bilinear_table(rec_h, exp_y0, crop_h / rec_h as f32, orig_h, orig_w * 4);
@@ -372,6 +424,11 @@ pub fn prepare_ppocr_rec_crop_rgba(
     orig_h: usize,
     box_coords: [f32; 4],
 ) -> Option<(Vec<f32>, usize, usize)> {
+    let (rec_w, rec_h) = compute_ppocr_rec_crop_dims(orig_w, orig_h, box_coords)?;
+    if rgba.len() < orig_w * orig_h * 4 {
+        return None;
+    }
+
     let [x0, y0, x1, y1] = box_coords;
     let box_w = x1 - x0;
     let box_h = y1 - y0;
@@ -386,13 +443,6 @@ pub fn prepare_ppocr_rec_crop_rgba(
 
     let crop_w = exp_x1 - exp_x0;
     let crop_h = exp_y1 - exp_y0;
-    if crop_w < 4.0 || crop_h < 4.0 || orig_w == 0 || orig_h == 0 || rgba.len() < orig_w * orig_h * 4 {
-        return None;
-    }
-
-    let rec_h = 48usize;
-    let target_w = (48.0 * (crop_w / crop_h)).ceil() as usize;
-    let rec_w = ((target_w as f32 / 32.0).ceil() as usize * 32).clamp(64, 960);
 
     let x_tab = build_bilinear_table(rec_w, exp_x0, crop_w / rec_w as f32, orig_w, 4);
     let y_tab = build_bilinear_table(rec_h, exp_y0, crop_h / rec_h as f32, orig_h, orig_w * 4);

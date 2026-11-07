@@ -657,7 +657,7 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         )
 
     # 2. Workspace crates Cargo.toml
-    for crate_dir in ["rusto-core", "rusto-cpp", "rten-wasm", "rusto-node", "rusto-nn", "rusto-rten", "rusto-nn-webgpu", "rusto-nn-cuda", "rusto-mnn"]:
+    for crate_dir in ["rusto-core", "rusto-cpp", "rusto-wasm", "rusto-node", "rusto-nn", "rusto-rten", "rusto-nn-webgpu", "rusto-nn-cuda", "rusto-mnn"]:
         crate_cargo = REPO_ROOT / "crates" / crate_dir / "Cargo.toml"
         if crate_cargo.exists():
             replace_in_file(

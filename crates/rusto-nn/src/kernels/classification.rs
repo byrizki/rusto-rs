@@ -251,46 +251,102 @@ pub unsafe fn softmax_row_wasm(in_row: &[f32], out_row: &mut [f32]) {
     use core::arch::wasm32::*;
 
     let len = in_row.len();
-    let chunks = len / 4;
     let in_ptr = in_row.as_ptr();
     let out_ptr = out_row.as_mut_ptr();
 
-    let mut max_vec = f32x4_splat(f32::NEG_INFINITY);
-    for i in 0..chunks {
-        max_vec = f32x4_pmax(max_vec, v128_load(in_ptr.add(i * 4) as *const v128));
+    let mut i = 0;
+    let mut max_v0 = f32x4_splat(f32::NEG_INFINITY);
+    let mut max_v1 = f32x4_splat(f32::NEG_INFINITY);
+    let mut max_v2 = f32x4_splat(f32::NEG_INFINITY);
+    let mut max_v3 = f32x4_splat(f32::NEG_INFINITY);
+
+    while i + 16 <= len {
+        max_v0 = f32x4_pmax(max_v0, v128_load(in_ptr.add(i) as *const v128));
+        max_v1 = f32x4_pmax(max_v1, v128_load(in_ptr.add(i + 4) as *const v128));
+        max_v2 = f32x4_pmax(max_v2, v128_load(in_ptr.add(i + 8) as *const v128));
+        max_v3 = f32x4_pmax(max_v3, v128_load(in_ptr.add(i + 12) as *const v128));
+        i += 16;
+    }
+    let mut max_vec = f32x4_pmax(f32x4_pmax(max_v0, max_v1), f32x4_pmax(max_v2, max_v3));
+    while i + 4 <= len {
+        max_vec = f32x4_pmax(max_vec, v128_load(in_ptr.add(i) as *const v128));
+        i += 4;
     }
     let mut max_val = f32x4_extract_lane::<0>(max_vec)
         .max(f32x4_extract_lane::<1>(max_vec))
         .max(f32x4_extract_lane::<2>(max_vec))
         .max(f32x4_extract_lane::<3>(max_vec));
-    for i in (chunks * 4)..len {
+    while i < len {
         max_val = max_val.max(*in_ptr.add(i));
+        i += 1;
     }
     let max_v = f32x4_splat(max_val);
 
-    let mut sum_vec = f32x4_splat(0.0);
-    for i in 0..chunks {
-        let v = v128_load(in_ptr.add(i * 4) as *const v128);
-        let e = exp_approx_wasm(f32x4_sub(v, max_v));
-        v128_store(out_ptr.add(i * 4) as *mut v128, e);
+    i = 0;
+    let mut sum_v0 = f32x4_splat(0.0);
+    let mut sum_v1 = f32x4_splat(0.0);
+    let mut sum_v2 = f32x4_splat(0.0);
+    let mut sum_v3 = f32x4_splat(0.0);
+
+    while i + 16 <= len {
+        let e0 = exp_approx_wasm(f32x4_sub(v128_load(in_ptr.add(i) as *const v128), max_v));
+        let e1 = exp_approx_wasm(f32x4_sub(v128_load(in_ptr.add(i + 4) as *const v128), max_v));
+        let e2 = exp_approx_wasm(f32x4_sub(v128_load(in_ptr.add(i + 8) as *const v128), max_v));
+        let e3 = exp_approx_wasm(f32x4_sub(v128_load(in_ptr.add(i + 12) as *const v128), max_v));
+
+        v128_store(out_ptr.add(i) as *mut v128, e0);
+        v128_store(out_ptr.add(i + 4) as *mut v128, e1);
+        v128_store(out_ptr.add(i + 8) as *mut v128, e2);
+        v128_store(out_ptr.add(i + 12) as *mut v128, e3);
+
+        sum_v0 = f32x4_add(sum_v0, e0);
+        sum_v1 = f32x4_add(sum_v1, e1);
+        sum_v2 = f32x4_add(sum_v2, e2);
+        sum_v3 = f32x4_add(sum_v3, e3);
+
+        i += 16;
+    }
+    let mut sum_vec = f32x4_add(f32x4_add(sum_v0, sum_v1), f32x4_add(sum_v2, sum_v3));
+    while i + 4 <= len {
+        let e = exp_approx_wasm(f32x4_sub(v128_load(in_ptr.add(i) as *const v128), max_v));
+        v128_store(out_ptr.add(i) as *mut v128, e);
         sum_vec = f32x4_add(sum_vec, e);
+        i += 4;
     }
     let mut sum_exp = (f32x4_extract_lane::<0>(sum_vec) + f32x4_extract_lane::<1>(sum_vec))
         + (f32x4_extract_lane::<2>(sum_vec) + f32x4_extract_lane::<3>(sum_vec));
-    for i in (chunks * 4)..len {
+    while i < len {
         let e = (*in_ptr.add(i) - max_val).exp();
         *out_ptr.add(i) = e;
         sum_exp += e;
+        i += 1;
     }
 
     let inv_sum = 1.0 / sum_exp.max(1e-12);
     let inv_v = f32x4_splat(inv_sum);
-    for i in 0..chunks {
-        let e = v128_load(out_ptr.add(i * 4) as *const v128);
-        v128_store(out_ptr.add(i * 4) as *mut v128, f32x4_mul(e, inv_v));
+
+    i = 0;
+    while i + 16 <= len {
+        let e0 = v128_load(out_ptr.add(i) as *const v128);
+        let e1 = v128_load(out_ptr.add(i + 4) as *const v128);
+        let e2 = v128_load(out_ptr.add(i + 8) as *const v128);
+        let e3 = v128_load(out_ptr.add(i + 12) as *const v128);
+
+        v128_store(out_ptr.add(i) as *mut v128, f32x4_mul(e0, inv_v));
+        v128_store(out_ptr.add(i + 4) as *mut v128, f32x4_mul(e1, inv_v));
+        v128_store(out_ptr.add(i + 8) as *mut v128, f32x4_mul(e2, inv_v));
+        v128_store(out_ptr.add(i + 12) as *mut v128, f32x4_mul(e3, inv_v));
+
+        i += 16;
     }
-    for i in (chunks * 4)..len {
+    while i + 4 <= len {
+        let e = v128_load(out_ptr.add(i) as *const v128);
+        v128_store(out_ptr.add(i) as *mut v128, f32x4_mul(e, inv_v));
+        i += 4;
+    }
+    while i < len {
         *out_ptr.add(i) *= inv_sum;
+        i += 1;
     }
 }
 

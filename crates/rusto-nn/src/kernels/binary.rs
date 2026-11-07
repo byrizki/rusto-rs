@@ -1440,12 +1440,12 @@ pub fn try_binary_op_inplace_lhs(
             BcastMode::Lhs => false,
         },
         2 => {
-            let (outer, inner) = (seg_len[0], seg_len[1]);
+            let (_outer, inner) = (seg_len[0], seg_len[1]);
             match (seg_mode[0], seg_mode[1]) {
                 (BcastMode::Rhs, BcastMode::Match) => {
                     let r_slice = &rhs_data[..inner];
                     #[cfg(feature = "rayon")]
-                    if outer >= 4 && out_len >= 8192 {
+                    if _outer >= 4 && out_len >= 8192 {
                         buf.par_chunks_exact_mut(inner)
                             .for_each(|sub| binary_inplace_slice(sub, r_slice, op_type, act));
                         return true;
@@ -1457,7 +1457,7 @@ pub fn try_binary_op_inplace_lhs(
                 }
                 (BcastMode::Match, BcastMode::Rhs) => {
                     #[cfg(feature = "rayon")]
-                    if outer >= 2 && out_len >= 4096 {
+                    if _outer >= 2 && out_len >= 4096 {
                         buf.par_chunks_exact_mut(inner)
                             .enumerate()
                             .for_each(|(o, sub)| {

@@ -1,6 +1,5 @@
 use std::path::Path;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Rgb, Rgba};
-use nalgebra::Matrix3;
 use crate::error::CoreError;
 
 pub type Result<T> = std::result::Result<T, CoreError>;
@@ -236,85 +235,108 @@ pub fn rotate_270(src: &Mat) -> Result<Mat> {
     Ok(Mat::new(src.image.rotate270()))
 }
 
-pub fn get_perspective_transform(src: &[Point2f; 4], dst: &[Point2f; 4]) -> Result<[[f64; 3]; 3]> {
-    use nalgebra::DMatrix;
-
-    let mut a = DMatrix::<f64>::zeros(8, 8);
-    let mut b = DMatrix::<f64>::zeros(8, 1);
-
-    for i in 0..4 {
-        let x = src[i].x as f64;
-        let y = src[i].y as f64;
-        let u = dst[i].x as f64;
-        let v = dst[i].y as f64;
-
-        a[(i, 0)] = x;
-        a[(i, 1)] = y;
-        a[(i, 2)] = 1.0;
-        a[(i, 6)] = -u * x;
-        a[(i, 7)] = -u * y;
-        b[(i, 0)] = u;
-
-        a[(i + 4, 3)] = x;
-        a[(i + 4, 4)] = y;
-        a[(i + 4, 5)] = 1.0;
-        a[(i + 4, 6)] = -v * x;
-        a[(i + 4, 7)] = -v * y;
-        b[(i + 4, 0)] = v;
-    }
-
-    if let Some(lu) = a.clone().lu().solve(&b) {
-        let residual = (&a * &lu - &b).norm();
-        if residual < 1e-8 {
-            return Ok([
-                [lu[(0, 0)], lu[(1, 0)], lu[(2, 0)]],
-                [lu[(3, 0)], lu[(4, 0)], lu[(5, 0)]],
-                [lu[(6, 0)], lu[(7, 0)], 1.0],
-            ]);
+/// Solve an 8x8 linear system A * x = b via Gaussian elimination with partial pivoting
+fn solve_8x8_system(mut a: [[f64; 8]; 8], mut b: [f64; 8]) -> Option<[f64; 8]> {
+    for i in 0..8 {
+        let mut pivot = i;
+        let mut max_val = a[i][i].abs();
+        for r in (i + 1)..8 {
+            let val = a[r][i].abs();
+            if val > max_val {
+                max_val = val;
+                pivot = r;
+            }
+        }
+        if max_val < 1e-12 {
+            return None;
+        }
+        if pivot != i {
+            a.swap(i, pivot);
+            b.swap(i, pivot);
+        }
+        let inv_diag = 1.0 / a[i][i];
+        for r in (i + 1)..8 {
+            let factor = a[r][i] * inv_diag;
+            for c in (i + 1)..8 {
+                a[r][c] -= factor * a[i][c];
+            }
+            b[r] -= factor * b[i];
         }
     }
+    let mut x = [0.0f64; 8];
+    for i in (0..8).rev() {
+        let mut sum = b[i];
+        for c in (i + 1)..8 {
+            sum -= a[i][c] * x[c];
+        }
+        x[i] = sum / a[i][i];
+    }
+    Some(x)
+}
 
-    let mut a9 = DMatrix::<f64>::zeros(8, 9);
+pub fn get_perspective_transform(src: &[Point2f; 4], dst: &[Point2f; 4]) -> Result<[[f64; 3]; 3]> {
+    let mut a = [[0.0f64; 8]; 8];
+    let mut b = [0.0f64; 8];
+
     for i in 0..4 {
         let x = src[i].x as f64;
         let y = src[i].y as f64;
         let u = dst[i].x as f64;
         let v = dst[i].y as f64;
 
-        a9[(i, 0)] = x;
-        a9[(i, 1)] = y;
-        a9[(i, 2)] = 1.0;
-        a9[(i, 6)] = -u * x;
-        a9[(i, 7)] = -u * y;
-        a9[(i, 8)] = -u;
+        a[i][0] = x;
+        a[i][1] = y;
+        a[i][2] = 1.0;
+        a[i][6] = -u * x;
+        a[i][7] = -u * y;
+        b[i] = u;
 
-        a9[(i + 4, 3)] = x;
-        a9[(i + 4, 4)] = y;
-        a9[(i + 4, 5)] = 1.0;
-        a9[(i + 4, 6)] = -v * x;
-        a9[(i + 4, 7)] = -v * y;
-        a9[(i + 4, 8)] = -v;
+        a[i + 4][3] = x;
+        a[i + 4][4] = y;
+        a[i + 4][5] = 1.0;
+        a[i + 4][6] = -v * x;
+        a[i + 4][7] = -v * y;
+        b[i + 4] = v;
     }
 
-    let ata = a9.transpose() * &a9;
-    let svd = ata.svd(true, false);
-    let v = svd.u.ok_or_else(|| CoreError::Image("SVD failed".into()))?;
-    let h = v.column(8);
-
-    Ok([[h[0], h[1], h[2]], [h[3], h[4], h[5]], [h[6], h[7], h[8]]])
+    if let Some(h) = solve_8x8_system(a, b) {
+        Ok([
+            [h[0], h[1], h[2]],
+            [h[3], h[4], h[5]],
+            [h[6], h[7], 1.0],
+        ])
+    } else {
+        Err(CoreError::Image("Collinear or degenerate perspective points".into()))
+    }
 }
 
 fn invert_matrix_3x3(m: &[[f64; 3]; 3]) -> Result<[[f64; 3]; 3]> {
-    let mat = Matrix3::new(
-        m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2], m[2][0], m[2][1], m[2][2],
-    );
+    let det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+        - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+        + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
 
-    let inv = mat.try_inverse().ok_or_else(|| CoreError::Image("Matrix is not invertible".into()))?;
+    if det.abs() < 1e-12 {
+        return Err(CoreError::Image("Matrix is not invertible".into()));
+    }
+
+    let inv_det = 1.0 / det;
 
     Ok([
-        [inv[(0, 0)], inv[(0, 1)], inv[(0, 2)]],
-        [inv[(1, 0)], inv[(1, 1)], inv[(1, 2)]],
-        [inv[(2, 0)], inv[(2, 1)], inv[(2, 2)]],
+        [
+            (m[1][1] * m[2][2] - m[1][2] * m[2][1]) * inv_det,
+            (m[0][2] * m[2][1] - m[0][1] * m[2][2]) * inv_det,
+            (m[0][1] * m[1][2] - m[0][2] * m[1][1]) * inv_det,
+        ],
+        [
+            (m[1][2] * m[2][0] - m[1][0] * m[2][2]) * inv_det,
+            (m[0][0] * m[2][2] - m[0][2] * m[2][0]) * inv_det,
+            (m[0][2] * m[1][0] - m[0][0] * m[1][2]) * inv_det,
+        ],
+        [
+            (m[1][0] * m[2][1] - m[1][1] * m[2][0]) * inv_det,
+            (m[0][1] * m[2][0] - m[0][0] * m[2][1]) * inv_det,
+            (m[0][0] * m[1][1] - m[0][1] * m[1][0]) * inv_det,
+        ],
     ])
 }
 
@@ -664,6 +686,49 @@ mod tests {
             (1, 2, isize::MAX as usize),
         ] {
             assert!(rgb_layout(w, h, stride).is_err());
+        }
+    }
+
+    #[test]
+    fn test_perspective_transform_and_inversion() {
+        let src = [
+            Point2f::new(0.0, 0.0),
+            Point2f::new(100.0, 0.0),
+            Point2f::new(100.0, 50.0),
+            Point2f::new(0.0, 50.0),
+        ];
+        let dst = [
+            Point2f::new(10.0, 20.0),
+            Point2f::new(110.0, 25.0),
+            Point2f::new(105.0, 75.0),
+            Point2f::new(5.0, 70.0),
+        ];
+
+        let m = get_perspective_transform(&src, &dst).expect("Valid perspective points");
+        for i in 0..4 {
+            let x = src[i].x as f64;
+            let y = src[i].y as f64;
+            let denom = m[2][0] * x + m[2][1] * y + m[2][2];
+            let u = (m[0][0] * x + m[0][1] * y + m[0][2]) / denom;
+            let v = (m[1][0] * x + m[1][1] * y + m[1][2]) / denom;
+            assert!((u - dst[i].x as f64).abs() < 1e-4);
+            assert!((v - dst[i].y as f64).abs() < 1e-4);
+        }
+
+        let inv = invert_matrix_3x3(&m).expect("Invertible matrix");
+        let mut id = [[0.0f64; 3]; 3];
+        for r in 0..3 {
+            for c in 0..3 {
+                for k in 0..3 {
+                    id[r][c] += m[r][k] * inv[k][c];
+                }
+            }
+        }
+        for r in 0..3 {
+            for c in 0..3 {
+                let exp = if r == c { 1.0 } else { 0.0 };
+                assert!((id[r][c] - exp).abs() < 1e-5);
+            }
         }
     }
 }

@@ -7,7 +7,7 @@ on:
     paths:
       - 'docs/**'
       - 'packages/web/**'
-      - 'crates/rten-wasm/**'
+      - 'crates/rusto-wasm/**'
       - '.github/workflows/docs-ci.yml'
       - '.github/workflows/deploy-docs.yml'
   pull_request:
@@ -16,7 +16,7 @@ on:
     paths:
       - 'docs/**'
       - 'packages/web/**'
-      - 'crates/rten-wasm/**'
+      - 'crates/rusto-wasm/**'
       - '.github/workflows/docs-ci.yml'
       - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:

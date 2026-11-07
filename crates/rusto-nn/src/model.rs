@@ -1,5 +1,7 @@
-use std::fs::File;
 use std::path::Path;
+#[cfg(not(target_arch = "wasm32"))]
+use std::fs::File;
+#[cfg(not(target_arch = "wasm32"))]
 use memmap2::Mmap;
 
 use crate::error::MnnError;
@@ -7,6 +9,7 @@ use crate::graph::{load_mnn, Graph};
 use crate::schema::{self, Net};
 
 enum Storage {
+    #[cfg(not(target_arch = "wasm32"))]
     Mmap(Mmap),
     Bytes(Vec<u8>),
 }
@@ -14,6 +17,7 @@ enum Storage {
 impl Storage {
     fn as_slice(&self) -> &[u8] {
         match self {
+            #[cfg(not(target_arch = "wasm32"))]
             Self::Mmap(m) => m.as_ref(),
             Self::Bytes(b) => b.as_slice(),
         }
@@ -28,18 +32,31 @@ pub struct Model {
 
 impl Model {
     /// Load model from file path using zero-copy memory mapping
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, MnnError> {
         let file = File::open(path)?;
         let mmap = unsafe { Mmap::map(&file)? };
-        Self::from_storage(Storage::Mmap(mmap))
+        Self::from_storage(Storage::Mmap(mmap), true)
     }
 
-    /// Load model from memory buffer
+    /// Load model from file path in WASM environment
+    #[cfg(target_arch = "wasm32")]
+    pub fn from_file(path: impl AsRef<Path>) -> Result<Self, MnnError> {
+        let bytes = std::fs::read(path)?;
+        Self::from_bytes(bytes)
+    }
+
+    /// Load model from memory buffer without retaining raw duplicate bytes after graph creation
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, MnnError> {
-        Self::from_storage(Storage::Bytes(bytes))
+        Self::from_storage(Storage::Bytes(bytes), false)
     }
 
-    fn from_storage(storage: Storage) -> Result<Self, MnnError> {
+    /// Load model from memory buffer while retaining raw bytes for inspectability (e.g. CLI dumpers)
+    pub fn from_bytes_retained(bytes: Vec<u8>) -> Result<Self, MnnError> {
+        Self::from_storage(Storage::Bytes(bytes), true)
+    }
+
+    fn from_storage(storage: Storage, retain_storage: bool) -> Result<Self, MnnError> {
         let slice = storage.as_slice();
         if slice.len() < 4 {
             return Err(MnnError::InvalidModel("Buffer too small for model header".into()));
@@ -72,8 +89,20 @@ impl Model {
             load_mnn(slice)?
         };
 
+        let storage_opt = match &storage {
+            #[cfg(not(target_arch = "wasm32"))]
+            Storage::Mmap(_) => Some(storage),
+            Storage::Bytes(_) => {
+                if retain_storage {
+                    Some(storage)
+                } else {
+                    None
+                }
+            }
+        };
+
         Ok(Self {
-            storage: Some(storage),
+            storage: storage_opt,
             graph,
         })
     }

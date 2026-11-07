@@ -101,6 +101,27 @@ impl Tensor {
         }
     }
 
+    /// Extract float vector avoiding clone if uniquely owned in planar NCHW layout
+    pub fn into_f32_vec(mut self) -> Vec<f32> {
+        if self.layout == TensorLayout::NCHW {
+            match std::mem::replace(&mut self.data, TensorData::Float(Vec::new())) {
+                TensorData::Float(v) => return v,
+                TensorData::FloatShared(arc) => {
+                    match Arc::try_unwrap(arc) {
+                        Ok(v) => return v,
+                        Err(arc) => {
+                            self.data = TensorData::FloatShared(arc);
+                        }
+                    }
+                }
+                other => {
+                    self.data = other;
+                }
+            }
+        }
+        self.to_nchw_floats()
+    }
+
     /// Convert owned buffer storage into Arc-backed shared storage for O(1) cloning
     pub fn into_shared(self) -> Self {
         let data = match self.data {

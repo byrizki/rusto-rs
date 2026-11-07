@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/rusto-core", "crates/rusto-cpp", "crates/rusto-nn", "crates/rusto-nn-webgpu", "crates/rusto-nn-cuda", "crates/rusto-rten", "crates/rusto-mnn", "crates/rten-wasm", "crates/rusto-node"]
+members = [".", "crates/rusto-core", "crates/rusto-cpp", "crates/rusto-nn", "crates/rusto-nn-webgpu", "crates/rusto-nn-cuda", "crates/rusto-rten", "crates/rusto-mnn", "crates/rusto-wasm", "crates/rusto-node"]
 
 [package]
 name = "rusto-rs"
@@ -35,7 +35,6 @@ rayon = "1.10"
 
 # Pure Rust image processing (default)
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-nalgebra = "0.33"
 
 # Optional OpenCV / C++ backend
 opencv = { version = "0.97.2", optional = true }

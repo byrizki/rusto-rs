@@ -105,6 +105,8 @@ fn compute_conv_padding(
 
 thread_local! {
     static TENSOR_BUFFER_POOL: core::cell::RefCell<Vec<Vec<f32>>> = core::cell::RefCell::new(Vec::with_capacity(64));
+    static MATMUL_SCRATCH_A: core::cell::RefCell<Vec<f32>> = const { core::cell::RefCell::new(Vec::new()) };
+    static MATMUL_SCRATCH_B: core::cell::RefCell<Vec<f32>> = const { core::cell::RefCell::new(Vec::new()) };
 }
 
 #[inline(always)]
@@ -2253,78 +2255,92 @@ pub fn execute_node_with_liveness(
             };
 
             if b_batches == 1 && !p.trans_a {
-                let b_transposed: Vec<f32>;
-                let b_buf: &[f32] = if p.trans_b {
-                    let mut trans = vec![0.0f32; k * n];
-                    for r in 0..k {
-                        for c in 0..n {
-                            trans[r * n + c] = b_floats[c * k + r];
+                MATMUL_SCRATCH_B.with(|scratch_cell| {
+                    let mut scratch = scratch_cell.borrow_mut();
+                    let b_buf: &[f32] = if p.trans_b {
+                        let kn = k * n;
+                        if scratch.len() < kn {
+                            scratch.resize(kn, 0.0);
                         }
-                    }
-                    b_transposed = trans;
-                    &b_transposed
-                } else {
-                    &b_floats[..k * n]
-                };
-
-                crate::kernels::gemm::gemm(
-                    batch_count * m,
-                    n,
-                    k,
-                    &a_floats[..batch_count * m * k],
-                    b_buf,
-                    &mut out_data,
-                    p.alpha,
-                    p.beta,
-                    None,
-                    FusedActivation::None,
-                );
-            } else {
-                let mut a_trans = if p.trans_a { vec![0.0f32; m * k] } else { Vec::new() };
-                let mut b_trans = if p.trans_b { vec![0.0f32; k * n] } else { Vec::new() };
-
-                for b_i in 0..batch_count {
-                    let a_bi = if a_batches == 1 { 0 } else { b_i % a_batches };
-                    let b_bi = if b_batches == 1 { 0 } else { b_i % b_batches };
-                    let a_raw = &a_floats[a_bi * m * k..(a_bi + 1) * m * k];
-                    let b_raw = &b_floats[b_bi * k * n..(b_bi + 1) * k * n];
-
-                    let a_slice: &[f32] = if p.trans_a {
-                        for r in 0..m {
-                            for c in 0..k {
-                                a_trans[r * k + c] = a_raw[c * m + r];
-                            }
-                        }
-                        &a_trans
-                    } else {
-                        a_raw
-                    };
-
-                    let b_slice: &[f32] = if p.trans_b {
                         for r in 0..k {
                             for c in 0..n {
-                                b_trans[r * n + c] = b_raw[c * k + r];
+                                scratch[r * n + c] = b_floats[c * k + r];
                             }
                         }
-                        &b_trans
+                        &scratch[..kn]
                     } else {
-                        b_raw
+                        &b_floats[..k * n]
                     };
 
-                    let out_slice = &mut out_data[b_i * m * n..(b_i + 1) * m * n];
                     crate::kernels::gemm::gemm(
-                        m,
+                        batch_count * m,
                         n,
                         k,
-                        a_slice,
-                        b_slice,
-                        out_slice,
+                        &a_floats[..batch_count * m * k],
+                        b_buf,
+                        &mut out_data,
                         p.alpha,
                         p.beta,
                         None,
                         FusedActivation::None,
                     );
-                }
+                });
+            } else {
+                MATMUL_SCRATCH_A.with(|a_scratch_cell| {
+                    MATMUL_SCRATCH_B.with(|b_scratch_cell| {
+                        let mut a_scratch = a_scratch_cell.borrow_mut();
+                        let mut b_scratch = b_scratch_cell.borrow_mut();
+                        if p.trans_a && a_scratch.len() < m * k {
+                            a_scratch.resize(m * k, 0.0);
+                        }
+                        if p.trans_b && b_scratch.len() < k * n {
+                            b_scratch.resize(k * n, 0.0);
+                        }
+
+                        for b_i in 0..batch_count {
+                            let a_bi = if a_batches == 1 { 0 } else { b_i % a_batches };
+                            let b_bi = if b_batches == 1 { 0 } else { b_i % b_batches };
+                            let a_raw = &a_floats[a_bi * m * k..(a_bi + 1) * m * k];
+                            let b_raw = &b_floats[b_bi * k * n..(b_bi + 1) * k * n];
+
+                            let a_slice: &[f32] = if p.trans_a {
+                                for r in 0..m {
+                                    for c in 0..k {
+                                        a_scratch[r * k + c] = a_raw[c * m + r];
+                                    }
+                                }
+                                &a_scratch[..m * k]
+                            } else {
+                                a_raw
+                            };
+
+                            let b_slice: &[f32] = if p.trans_b {
+                                for r in 0..k {
+                                    for c in 0..n {
+                                        b_scratch[r * n + c] = b_raw[c * k + r];
+                                    }
+                                }
+                                &b_scratch[..k * n]
+                            } else {
+                                b_raw
+                            };
+
+                            let out_slice = &mut out_data[b_i * m * n..(b_i + 1) * m * n];
+                            crate::kernels::gemm::gemm(
+                                m,
+                                n,
+                                k,
+                                a_slice,
+                                b_slice,
+                                out_slice,
+                                p.alpha,
+                                p.beta,
+                                None,
+                                FusedActivation::None,
+                            );
+                        }
+                    });
+                });
             }
 
             let out_tensor = Tensor::from_floats(&out_shape, out_data, TensorLayout::NCHW);

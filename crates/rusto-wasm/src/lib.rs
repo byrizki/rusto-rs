@@ -9,8 +9,9 @@ use rusto_core::{
     layout::sort_lines_reading_order,
     postprocess::{decode_dbnet_boxes_fast, decode_linenet_det_boxes_slice},
     preprocess::{
-        plan_linenet_rec_batches, prepare_linenet_rec_crop_rgba, prepare_ppocr_rec_crop_rgba,
-        preprocess_linenet_det_rgba, preprocess_rgba_raw,
+        compute_linenet_rec_crop_dims, compute_ppocr_rec_crop_dims, plan_linenet_rec_batches,
+        prepare_linenet_rec_crop_rgba, prepare_ppocr_rec_crop_rgba, preprocess_linenet_det_rgba,
+        preprocess_rgba_raw,
     },
     spatial::{cluster_text_results_into_lines, to_spatial_text, to_tsv},
     types::{Frame, OcrRunOptions, OutputGranularity, TextResult},
@@ -283,11 +284,10 @@ impl RtenOcrPipeline {
         let mut slot_results: Vec<Option<TextResult>> = vec![None; raw_boxes.len()];
         let rec_in_channels = self.rec_model.input_channels();
 
-        struct CropEntry {
+        struct CropMeta {
             orig_idx: usize,
             box_coords: [f32; 4],
             det_score: f32,
-            data: Option<Vec<f32>>,
             rec_w: usize,
             rec_h: usize,
         }
@@ -295,14 +295,13 @@ impl RtenOcrPipeline {
         if rec_in_channels == 1 {
             let mut crops = Vec::with_capacity(raw_boxes.len());
             for (orig_idx, &(box_coords, det_score)) in raw_boxes.iter().enumerate() {
-                if let Some((rec_input, rec_w, rec_h)) =
-                    prepare_linenet_rec_crop_rgba(processed_rgba, orig_w, orig_h, box_coords)
+                if let Some((rec_w, rec_h)) =
+                    compute_linenet_rec_crop_dims(orig_w, orig_h, box_coords)
                 {
-                    crops.push(CropEntry {
+                    crops.push(CropMeta {
                         orig_idx,
                         box_coords,
                         det_score,
-                        data: Some(rec_input),
                         rec_w,
                         rec_h,
                     });
@@ -320,19 +319,18 @@ impl RtenOcrPipeline {
                 let rec_h = crops[group[0]].rec_h;
                 let max_w = group.iter().map(|&ci| crops[ci].rec_w).max().unwrap_or(8);
                 let mut widths = Vec::with_capacity(b);
-                let batch_data = if b == 1 {
+                let mut batch_data = Vec::with_capacity(b * rec_h * max_w);
+
+                for &ci in &group {
                     widths.push(max_w as i32);
-                    crops[group[0]].data.take().unwrap_or_default()
-                } else {
-                    let mut buf = Vec::with_capacity(b * rec_h * max_w);
-                    for &ci in &group {
-                        widths.push(max_w as i32);
-                        if let Some(d) = crops[ci].data.take() {
-                            buf.extend_from_slice(&d);
-                        }
+                    if let Some((crop_input, _w, _h)) =
+                        prepare_linenet_rec_crop_rgba(processed_rgba, orig_w, orig_h, crops[ci].box_coords)
+                    {
+                        batch_data.extend_from_slice(&crop_input);
+                    } else {
+                        batch_data.resize(batch_data.len() + rec_h * max_w, 0.0);
                     }
-                    buf
-                };
+                }
 
                 let (ids_vec, conf_vec, lens_vec, max_len) = self.rec_model.run_linenet_rec(
                     b,
@@ -369,21 +367,20 @@ impl RtenOcrPipeline {
         } else {
             let mut crops = Vec::with_capacity(raw_boxes.len());
             for (orig_idx, &(box_coords, det_score)) in raw_boxes.iter().enumerate() {
-                if let Some((rec_input, rec_w, rec_h)) =
-                    prepare_ppocr_rec_crop_rgba(processed_rgba, orig_w, orig_h, box_coords)
+                if let Some((rec_w, rec_h)) =
+                    compute_ppocr_rec_crop_dims(orig_w, orig_h, box_coords)
                 {
-                    crops.push(CropEntry {
+                    crops.push(CropMeta {
                         orig_idx,
                         box_coords,
                         det_score,
-                        data: Some(rec_input),
                         rec_w,
                         rec_h,
                     });
                 }
             }
 
-            crops.sort_by_key(|c| (c.rec_h, c.rec_w, c.orig_idx));
+            crops.sort_by_key(|c| (c.rec_w, c.orig_idx));
 
             let mut i = 0;
             while i < crops.len() {
@@ -392,24 +389,23 @@ impl RtenOcrPipeline {
                 let mut end = i + 1;
                 while end < crops.len()
                     && end - i < batch_cap
-                    && crops[end].rec_h == rec_h
                     && crops[end].rec_w == rec_w
                 {
                     end += 1;
                 }
 
                 let b = end - i;
-                let batch_data = if b == 1 {
-                    crops[i].data.take().unwrap_or_default()
-                } else {
-                    let mut buf = Vec::with_capacity(b * 3 * rec_h * rec_w);
-                    for item in &mut crops[i..end] {
-                        if let Some(d) = item.data.take() {
-                            buf.extend_from_slice(&d);
-                        }
+                let mut batch_data = Vec::with_capacity(b * 3 * rec_h * rec_w);
+
+                for item in &crops[i..end] {
+                    if let Some((crop_data, _w, _h)) =
+                        prepare_ppocr_rec_crop_rgba(processed_rgba, orig_w, orig_h, item.box_coords)
+                    {
+                        batch_data.extend_from_slice(&crop_data);
+                    } else {
+                        batch_data.resize(batch_data.len() + 3 * rec_h * rec_w, 0.0);
                     }
-                    buf
-                };
+                }
 
                 let (sh, rec_data) = self
                     .rec_model
@@ -614,7 +610,7 @@ impl RtenOcrPipeline {
             .recognition
             .as_ref()
             .and_then(|r| r.batch_size)
-            .unwrap_or(1)
+            .unwrap_or(6)
             .max(1) as usize;
 
         let recognized: Vec<TextResult> = self

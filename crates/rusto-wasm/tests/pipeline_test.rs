@@ -1,15 +1,24 @@
 use std::fs;
 use std::path::Path;
 use image::GenericImageView;
-use rusto_rten_wasm::RtenOcrPipeline;
+use rusto_wasm::{RtenModel, RtenOcrPipeline};
+
+fn get_model_filenames() -> (&'static str, &'static str) {
+    if cfg!(feature = "rusto-rten") {
+        ("det.rten", "rec.rten")
+    } else {
+        ("det.mnn", "rec.mnn")
+    }
+}
 
 #[test]
 fn test_idcard_inference_pipeline() {
     let img_path = Path::new("../../models/test_images/idcard.jpg");
     let models_dir = Path::new("../../models/PPOCR_v6_tiny");
 
-    let det_file = models_dir.join("det.rten");
-    let rec_file = models_dir.join("rec.rten");
+    let (det_name, rec_name) = get_model_filenames();
+    let det_file = models_dir.join(det_name);
+    let rec_file = models_dir.join(rec_name);
     let dict_file = models_dir.join("dict.txt");
 
     if !img_path.exists() || !det_file.exists() || !rec_file.exists() || !dict_file.exists() {
@@ -17,8 +26,8 @@ fn test_idcard_inference_pipeline() {
         return;
     }
 
-    let det_data = fs::read(&det_file).expect("read det.rten");
-    let rec_data = fs::read(&rec_file).expect("read rec.rten");
+    let det_data = fs::read(&det_file).expect("read det model");
+    let rec_data = fs::read(&rec_file).expect("read rec model");
     let dict_text = fs::read_to_string(&dict_file).expect("read dict.txt");
 
     let pipeline = RtenOcrPipeline::new(det_data, rec_data, &dict_text)
@@ -42,16 +51,17 @@ fn test_idcard_inference_pipeline() {
 #[test]
 fn test_sample_images() {
     let models_dir = Path::new("../../docs/public/models/ppocrv6-small");
-    let det_file = models_dir.join("det.rten");
-    let rec_file = models_dir.join("rec.rten");
+    let (det_name, rec_name) = get_model_filenames();
+    let det_file = models_dir.join(det_name);
+    let rec_file = models_dir.join(rec_name);
     let dict_file = models_dir.join("dict.txt");
 
     if !det_file.exists() || !rec_file.exists() || !dict_file.exists() {
         println!("Skipping test: sample models not found");
         return;
     }
-    let det_data = fs::read(&det_file).expect("read det.rten");
-    let rec_data = fs::read(&rec_file).expect("read rec.rten");
+    let det_data = fs::read(&det_file).expect("read det");
+    let rec_data = fs::read(&rec_file).expect("read rec");
     let dict_text = fs::read_to_string(&dict_file).expect("read dict.txt");
 
     let pipeline = RtenOcrPipeline::new(det_data, rec_data, &dict_text).expect("pipeline init");
@@ -70,14 +80,15 @@ fn test_sample_images() {
 #[test]
 fn test_indra_inference_pipeline() {
     let indra_dir = Path::new("../../models/indra");
-    let det_file = indra_dir.join("det.rten");
-    let rec_file = indra_dir.join("rec.rten");
+    let (det_name, rec_name) = get_model_filenames();
+    let det_file = indra_dir.join(det_name);
+    let rec_file = indra_dir.join(rec_name);
     let meta_file = indra_dir.join("meta.json");
     if !det_file.exists() || !rec_file.exists() || !meta_file.exists() {
         return;
     }
-    let det_data = fs::read(&det_file).expect("read det.rten");
-    let rec_data = fs::read(&rec_file).expect("read rec.rten");
+    let det_data = fs::read(&det_file).expect("read det");
+    let rec_data = fs::read(&rec_file).expect("read rec");
     let meta_text = fs::read_to_string(&meta_file).expect("read meta.json");
 
     let pipeline = RtenOcrPipeline::new(det_data, rec_data, &meta_text).expect("init indra pipeline");
@@ -100,12 +111,16 @@ fn test_indra_inference_pipeline() {
 
 #[test]
 fn test_indra_order_model() {
-    let order_file = Path::new("../../models/indra/indra_order.rten");
+    let order_file = if cfg!(feature = "rusto-rten") {
+        Path::new("../../models/indra/indra_order.rten")
+    } else {
+        Path::new("../../models/indra/indra_order.mnn")
+    };
     if !order_file.exists() {
         return;
     }
-    let order_data = fs::read(&order_file).expect("read order.rten");
-    let model = rusto_rten_wasm::RtenModel::new(order_data).expect("load order.rten");
+    let order_data = fs::read(&order_file).expect("read order model");
+    let model = RtenModel::new(order_data).expect("load order model");
     let feats = vec![0.0f32; 32];
     let out = model.run_order(2, feats).expect("run_order");
     assert_eq!(out.shape(), vec![1, 2, 2]);
@@ -123,13 +138,14 @@ fn test_batched_recognition_parity() {
         let (w, h) = img.dimensions();
         let rgba = img.to_rgba8().into_raw();
 
+        let (det_name, rec_name) = get_model_filenames();
         for (dir, dict_name) in [
             ("../../docs/public/models/indraocr", "meta.json"),
             ("../../docs/public/models/ppocrv6-tiny", "dict.txt"),
         ] {
             let model_dir = Path::new(dir);
-            let det_file = model_dir.join("det.rten");
-            let rec_file = model_dir.join("rec.rten");
+            let det_file = model_dir.join(det_name);
+            let rec_file = model_dir.join(rec_name);
             let dict_file = model_dir.join(dict_name);
             if !det_file.exists() || !rec_file.exists() || !dict_file.exists() {
                 continue;

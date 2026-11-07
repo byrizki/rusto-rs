@@ -1,5 +1,5 @@
 [package]
-name = "rusto-rten-wasm"
+name = "rusto-wasm"
 version = "0.4.0"
 edition = "2021"
 
@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 rusto-core = { path = "../rusto-core" }
-rusto-nn = { path = "../rusto-nn", default-features = false, features = ["std", "rten", "onnx"], optional = true }
+rusto-nn = { path = "../rusto-nn", default-features = false, features = ["std"], optional = true }
 rusto-rten = { path = "../rusto-rten", optional = true }
 rusto-nn-webgpu = { path = "../rusto-nn-webgpu", optional = true }
 wasm-bindgen = "0.2"
@@ -22,9 +22,11 @@ default = ["rusto-nn"]
 rusto-nn = ["dep:rusto-nn"]
 rusto-rten = ["dep:rusto-rten"]
 rusto-webgpu = ["dep:rusto-nn", "dep:rusto-nn-webgpu"]
+onnx = ["rusto-nn/onnx"]
+rten-format = ["rusto-nn/rten"]
 
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-O", "--all-features"]
+wasm-opt = ["-Oz", "--all-features", "--strip-debug", "--strip-producers"]

@@ -277,8 +277,19 @@ impl OcrPipeline {
                     let input_tensor = preprocess_indra_orient_image(&working_img, 768)?;
                     orient_session.run(input_tensor.into_dyn())?
                 } else {
-                    let [_, h, w] = [3, 48, 192];
-                    let input_tensor = preprocess_orient_image(&working_img, w, h, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])?;
+                    let [_, h, w] = self
+                        .global
+                        .orient_config
+                        .as_ref()
+                        .map(|c| c.orient_image_shape)
+                        .unwrap_or([3, 224, 224]);
+                    let (mean, std) = self
+                        .global
+                        .orient_config
+                        .as_ref()
+                        .map(|c| (c.mean, c.std))
+                        .unwrap_or(([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]));
+                    let input_tensor = preprocess_orient_image(&working_img, w, h, mean, std)?;
                     orient_session.run(input_tensor.into_dyn())?
                 };
                 let (det_orientation, conf) = postprocess_orient_tensor(&output)?;

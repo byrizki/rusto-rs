@@ -503,10 +503,15 @@ impl MnnSession {
 
     pub fn run(&mut self, input: ArrayD<f32>) -> Result<ArrayD<f32>, EngineError> {
         let shape: Vec<usize> = input.shape().to_vec();
-        let data: Vec<f32> = if let Some(slice) = input.as_slice() {
-            slice.to_vec()
-        } else {
-            input.iter().copied().collect()
+        let expected_len = shape.iter().product::<usize>();
+        let (raw_vec, offset) = input.into_raw_vec_and_offset();
+        let data = match offset {
+            None => raw_vec,
+            Some(0) if raw_vec.len() == expected_len => raw_vec,
+            Some(off) if off + expected_len <= raw_vec.len() => {
+                raw_vec[off..off + expected_len].to_vec()
+            }
+            _ => raw_vec,
         };
         let mnn_tensor = rusto_nn::Tensor::from_floats(&shape, data, rusto_nn::TensorLayout::NCHW);
         let out_tensor = self
@@ -515,10 +520,7 @@ impl MnnSession {
             .map_err(|e| EngineError::Engine(e.to_string()))?;
 
         let out_shape = out_tensor.shape().to_vec();
-        let out_data = out_tensor
-            .as_floats()
-            .ok_or_else(|| EngineError::Engine("MNN output tensor is not float data".into()))?
-            .to_vec();
+        let out_data = out_tensor.into_f32_vec();
         ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), out_data).map_err(EngineError::ShapeError)
     }
 
@@ -527,10 +529,15 @@ impl MnnSession {
         input: ArrayD<f32>,
     ) -> Result<HashMap<String, ArrayD<f32>>, EngineError> {
         let shape: Vec<usize> = input.shape().to_vec();
-        let data: Vec<f32> = if let Some(slice) = input.as_slice() {
-            slice.to_vec()
-        } else {
-            input.iter().copied().collect()
+        let expected_len = shape.iter().product::<usize>();
+        let (raw_vec, offset) = input.into_raw_vec_and_offset();
+        let data = match offset {
+            None => raw_vec,
+            Some(0) if raw_vec.len() == expected_len => raw_vec,
+            Some(off) if off + expected_len <= raw_vec.len() => {
+                raw_vec[off..off + expected_len].to_vec()
+            }
+            _ => raw_vec,
         };
         let mnn_tensor = rusto_nn::Tensor::from_floats(&shape, data, rusto_nn::TensorLayout::NCHW);
         let input_names = self.session.model().input_names();
@@ -543,16 +550,9 @@ impl MnnSession {
         let mut results = HashMap::with_capacity(outputs.len());
         for (name, out_tensor) in outputs {
             let out_shape = out_tensor.shape().to_vec();
-            if let Some(floats) = out_tensor.as_floats() {
-                let array = ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), floats.to_vec())
-                    .map_err(EngineError::ShapeError)?;
-                results.insert(name, array);
-            } else if let Some(ints) = out_tensor.as_ints() {
-                let floats: Vec<f32> = ints.iter().map(|&x| x as f32).collect();
-                let array = ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), floats)
-                    .map_err(EngineError::ShapeError)?;
-                results.insert(name, array);
-            }
+            let array = ArrayD::from_shape_vec(ndarray::IxDyn(&out_shape), out_tensor.into_f32_vec())
+                .map_err(EngineError::ShapeError)?;
+            results.insert(name, array);
         }
         Ok(results)
     }

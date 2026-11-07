@@ -189,6 +189,7 @@ pub fn get_cache_dir(custom: Option<&Path>) -> PathBuf {
             }
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(cache) = dirs::cache_dir() {
             return cache.join("rusto").join("models");
         }
