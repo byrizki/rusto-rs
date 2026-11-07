@@ -81,9 +81,9 @@ done
 
 echo "=== Syncing WebAssembly runtime binary ==="
 mkdir -p "$DOCS_DIR/public/wasm"
-if [ -f "$REPO_ROOT/packages/web/src/wasm/rusto_rten_wasm_bg.wasm" ]; then
-  cp -f "$REPO_ROOT/packages/web/src/wasm/rusto_rten_wasm_bg.wasm" "$DOCS_DIR/public/wasm/"
-  echo "✓ Synced rusto_rten_wasm_bg.wasm to public/wasm/"
+if [ -f "$REPO_ROOT/packages/web/src/wasm/rusto_nn_bg.wasm" ]; then
+  cp -f "$REPO_ROOT/packages/web/src/wasm"/*.wasm "$DOCS_DIR/public/wasm/"
+  echo "✓ Synced WASM runtimes to public/wasm/"
 fi
 
 echo "✅ Models ready in $TARGET_DIR"

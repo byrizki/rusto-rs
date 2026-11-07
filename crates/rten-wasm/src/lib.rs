@@ -1,6 +1,7 @@
-use std::sync::Arc;
+mod backend;
+
 use wasm_bindgen::prelude::*;
-use rusto_nn::{Model, Session, Tensor, TensorLayout};
+use backend::WasmBackendModel;
 use rusto_core::{
     calibration::descreen_background_rgba,
     ctc::{composite_ocr_score, CtcDecoder},
@@ -89,8 +90,7 @@ impl InferenceOutput {
 
 #[wasm_bindgen]
 pub struct RtenModel {
-    model: Arc<Model>,
-    session: Session<'static>,
+    inner: WasmBackendModel,
 }
 
 pub type RustoModel = RtenModel;
@@ -100,28 +100,23 @@ impl RtenModel {
     #[wasm_bindgen(constructor)]
     pub fn new(model_data: Vec<u8>) -> Result<RtenModel, String> {
         console_error_panic_hook::set_once();
-        let model = Arc::new(Model::from_bytes(model_data).map_err(|e| e.to_string())?);
-        let session = Session::from_arc(Arc::clone(&model)).map_err(|e| e.to_string())?;
-        Ok(RtenModel { model, session })
+        let inner = WasmBackendModel::from_bytes(model_data)?;
+        Ok(RtenModel { inner })
     }
 
     #[wasm_bindgen(js_name = findNode)]
     pub fn find_node(&self, name: &str) -> Option<u32> {
-        self.model.tensor_names().iter().position(|n| n == name).map(|id| id as u32)
+        self.inner.find_node(name)
     }
 
     #[wasm_bindgen(js_name = inputIds)]
     pub fn input_ids(&self) -> Vec<u32> {
-        self.model.input_names().iter().filter_map(|name| {
-            self.model.tensor_names().iter().position(|n| n == name).map(|id| id as u32)
-        }).collect()
+        self.inner.input_ids()
     }
 
     #[wasm_bindgen(js_name = outputIds)]
     pub fn output_ids(&self) -> Vec<u32> {
-        self.model.output_names().iter().filter_map(|name| {
-            self.model.tensor_names().iter().position(|n| n == name).map(|id| id as u32)
-        }).collect()
+        self.inner.output_ids()
     }
 
     #[wasm_bindgen(js_name = run)]
@@ -130,12 +125,8 @@ impl RtenModel {
         input_shape: Vec<usize>,
         input_data: Vec<f32>,
     ) -> Result<InferenceOutput, String> {
-        let tensor = Tensor::from_floats(&input_shape, input_data, TensorLayout::NCHW);
-        let out = self.session.run_single(&tensor).map_err(|e| e.to_string())?;
-        Ok(InferenceOutput {
-            shape: out.shape().to_vec(),
-            data: out.to_f32_vec(),
-        })
+        let (shape, data) = self.inner.run_single(&input_shape, &input_data)?;
+        Ok(InferenceOutput { shape, data })
     }
 
     #[wasm_bindgen(js_name = runWithIds)]
@@ -146,24 +137,10 @@ impl RtenModel {
         input_data: Vec<f32>,
         output_id: u32,
     ) -> Result<InferenceOutput, String> {
-        let in_name = self.model.tensor_names().get(input_id as usize)
-            .cloned()
-            .or_else(|| self.model.input_names().first().cloned())
-            .ok_or_else(|| "Input tensor not found".to_string())?;
-        let out_name = self.model.tensor_names().get(output_id as usize)
-            .cloned()
-            .or_else(|| self.model.output_names().first().cloned())
-            .ok_or_else(|| "Output tensor not found".to_string())?;
-
-        let tensor = Tensor::from_floats(&input_shape, input_data, TensorLayout::NCHW);
-        let outputs = self.session.run(&[(&in_name, &tensor)]).map_err(|e| e.to_string())?;
-        let out = outputs.get(&out_name)
-            .or_else(|| outputs.values().next())
-            .ok_or_else(|| format!("Output tensor '{}' not produced", out_name))?;
-        Ok(InferenceOutput {
-            shape: out.shape().to_vec(),
-            data: out.to_f32_vec(),
-        })
+        let (shape, data) =
+            self.inner
+                .run_with_ids(input_id, &input_shape, &input_data, output_id)?;
+        Ok(InferenceOutput { shape, data })
     }
 
     #[wasm_bindgen(js_name = runOrder)]
@@ -172,35 +149,8 @@ impl RtenModel {
         num_items: usize,
         feats_data: Vec<f32>,
     ) -> Result<InferenceOutput, String> {
-        let in_names = self.model.input_names();
-        let feats_name = if in_names.iter().any(|n| n == "feats") {
-            "feats"
-        } else {
-            in_names.first().map(|s| s.as_str()).unwrap_or("feats")
-        };
-        let mask_name = if in_names.iter().any(|n| n == "mask") {
-            "mask"
-        } else {
-            in_names.get(1).map(|s| s.as_str()).unwrap_or("mask")
-        };
-
-        let feats_tensor = Tensor::from_floats(&[1, num_items, 16], feats_data, TensorLayout::NCHW);
-        let mask_tensor = Tensor::from_ints(&[1, num_items], vec![1i32; num_items]);
-
-        let results = self.session.run(&[
-            (feats_name, &feats_tensor),
-            (mask_name, &mask_tensor),
-        ]).map_err(|e| format!("Order model run error: {:?}", e))?;
-
-        let out = results.get("a")
-            .or_else(|| results.get("logits"))
-            .or_else(|| results.values().next())
-            .ok_or_else(|| "Expected float tensor output from order model".to_string())?;
-
-        Ok(InferenceOutput {
-            shape: out.shape().to_vec(),
-            data: out.to_f32_vec(),
-        })
+        let (shape, data) = self.inner.run_order(num_items, feats_data)?;
+        Ok(InferenceOutput { shape, data })
     }
 }
 
@@ -209,10 +159,8 @@ pub type FrameWasm = Frame;
 
 #[wasm_bindgen]
 pub struct RtenOcrPipeline {
-    det_model: Arc<Model>,
-    det_session: Session<'static>,
-    rec_model: Arc<Model>,
-    rec_session: Session<'static>,
+    det_model: WasmBackendModel,
+    rec_model: WasmBackendModel,
     decoder: CtcDecoder,
 }
 
@@ -227,19 +175,13 @@ impl RtenOcrPipeline {
         dict_text: &str,
     ) -> Result<RtenOcrPipeline, String> {
         console_error_panic_hook::set_once();
-        let det_model = Arc::new(Model::from_bytes(det_data).map_err(|e| format!("Det model load error: {:?}", e))?);
-        let det_session = Session::from_arc(Arc::clone(&det_model)).map_err(|e| format!("Det session error: {:?}", e))?;
-
-        let rec_model = Arc::new(Model::from_bytes(rec_data).map_err(|e| format!("Rec model load error: {:?}", e))?);
-        let rec_session = Session::from_arc(Arc::clone(&rec_model)).map_err(|e| format!("Rec session error: {:?}", e))?;
-
+        let det_model = WasmBackendModel::from_bytes(det_data)?;
+        let rec_model = WasmBackendModel::from_bytes(rec_data)?;
         let decoder = CtcDecoder::from_string(dict_text);
 
         Ok(RtenOcrPipeline {
             det_model,
-            det_session,
             rec_model,
-            rec_session,
             decoder,
         })
     }
@@ -275,13 +217,11 @@ impl RtenOcrPipeline {
             let (det_input, target_w, target_h, scale_w, scale_h) =
                 preprocess_linenet_det_rgba(processed_rgba, orig_w, orig_h, limit, "max");
 
-            let det_tensor = Tensor::from_floats(&[1, 1, target_h, target_w], det_input, TensorLayout::NCHW);
-            let det_outputs = self.det_session.run_single(&det_tensor)
-                .map_err(|e| format!("Det inference error: {:?}", e))?;
+            let (sh, det_slice) = self
+                .det_model
+                .run_single(&[1, 1, target_h, target_w], &det_input)?;
 
-            let sh = det_outputs.shape().to_vec();
             if sh.len() >= 4 && sh[1] >= 3 {
-                let det_slice = det_outputs.as_f32_cow();
                 Ok(decode_linenet_det_boxes_slice(
                     &det_slice,
                     sh[2],
@@ -308,11 +248,10 @@ impl RtenOcrPipeline {
                 [0.229, 0.224, 0.225],
             );
 
-            let det_tensor = Tensor::from_floats(&[1, 3, target_h, target_w], det_input, TensorLayout::NCHW);
-            let det_outputs = self.det_session.run_single(&det_tensor)
-                .map_err(|e| format!("Det inference error: {:?}", e))?;
+            let (_sh, heat_map) = self
+                .det_model
+                .run_single(&[1, 3, target_h, target_w], &det_input)?;
 
-            let heat_map = det_outputs.as_f32_cow();
             Ok(decode_dbnet_boxes_fast(
                 &heat_map,
                 target_w,
@@ -373,17 +312,6 @@ impl RtenOcrPipeline {
             let target_widths: Vec<usize> = crops.iter().map(|c| c.rec_w).collect();
             let batch_groups = plan_linenet_rec_batches(&target_widths, batch_cap);
 
-            let in_names = self.rec_model.input_names();
-            let in_name0 = in_names.first().map(|s| s.as_str()).unwrap_or("x");
-            let in_name1 = in_names.get(1).map(|s| s.as_str()).unwrap_or("widths");
-            let wanted_outputs: Vec<&str> = self
-                .rec_model
-                .output_names()
-                .iter()
-                .map(|s| s.as_str())
-                .filter(|&n| matches!(n, "ids" | "conf" | "len" | "lengths"))
-                .collect();
-
             for group in batch_groups {
                 if group.is_empty() {
                     continue;
@@ -406,68 +334,35 @@ impl RtenOcrPipeline {
                     buf
                 };
 
-                let x_tensor =
-                    Tensor::from_floats(&[b, 1, rec_h, max_w], batch_data, TensorLayout::NCHW);
-                let widths_tensor = Tensor::from_ints(&[b], widths);
+                let (ids_vec, conf_vec, lens_vec, max_len) = self.rec_model.run_linenet_rec(
+                    b,
+                    rec_h,
+                    max_w,
+                    batch_data,
+                    widths,
+                )?;
 
-                let rec_outputs = if wanted_outputs.len() >= 2 {
-                    self.rec_session
-                        .run_outputs(
-                            &[(in_name0, &x_tensor), (in_name1, &widths_tensor)],
-                            &wanted_outputs,
-                        )
-                        .map_err(|e| format!("Rec inference error: {:?}", e))?
-                } else {
-                    self.rec_session
-                        .run(&[(in_name0, &x_tensor), (in_name1, &widths_tensor)])
-                        .map_err(|e| format!("Rec inference error: {:?}", e))?
-                };
+                for (local_idx, &ci) in group.iter().enumerate() {
+                    let item = &crops[ci];
+                    let row_start = local_idx * max_len;
+                    let row_end = (row_start + max_len).min(ids_vec.len());
+                    if row_start >= row_end {
+                        continue;
+                    }
+                    let ids_row = &ids_vec[row_start..row_end];
+                    let conf_row = &conf_vec[row_start..row_end.min(conf_vec.len())];
+                    let valid_len = lens_vec
+                        .get(local_idx)
+                        .map(|&l| (l.max(0) as usize).min(ids_row.len()))
+                        .unwrap_or(ids_row.len());
 
-                let ids_tensor = rec_outputs
-                    .get("ids")
-                    .or_else(|| rec_outputs.values().next());
-                let conf_tensor = rec_outputs
-                    .get("conf")
-                    .or_else(|| rec_outputs.values().nth(1));
-                let len_tensor = rec_outputs
-                    .get("len")
-                    .or_else(|| rec_outputs.get("lengths"))
-                    .or_else(|| rec_outputs.values().nth(2));
-
-                if let (Some(ids_t), Some(conf_t)) = (ids_tensor, conf_tensor) {
-                    let ids_vec = ids_t.to_i32_vec();
-                    let conf_cow = conf_t.as_f32_cow();
-                    let lens_vec = len_tensor.map(|t| t.to_i32_vec()).unwrap_or_default();
-
-                    let ids_shape = ids_t.shape();
-                    let max_len = if ids_shape.len() >= 2 {
-                        ids_shape[1]
-                    } else {
-                        ids_vec.len() / b.max(1)
-                    };
-
-                    for (local_idx, &ci) in group.iter().enumerate() {
-                        let item = &crops[ci];
-                        let row_start = local_idx * max_len;
-                        let row_end = (row_start + max_len).min(ids_vec.len());
-                        if row_start >= row_end {
-                            continue;
-                        }
-                        let ids_row = &ids_vec[row_start..row_end];
-                        let conf_row = &conf_cow[row_start..row_end.min(conf_cow.len())];
-                        let valid_len = lens_vec
-                            .get(local_idx)
-                            .map(|&l| (l.max(0) as usize).min(ids_row.len()))
-                            .unwrap_or(ids_row.len());
-
-                        if let Some((trimmed, avg_conf)) =
-                            self.decoder.decode_linenet_tokens(ids_row, conf_row, valid_len)
-                        {
-                            let [x0, y0, x1, y1] = item.box_coords;
-                            let text_score = composite_ocr_score(item.det_score, avg_conf);
-                            slot_results[item.orig_idx] =
-                                Some(TextResult::from_coords(x0, y0, x1, y1, trimmed, text_score));
-                        }
+                    if let Some((trimmed, avg_conf)) =
+                        self.decoder.decode_linenet_tokens(ids_row, conf_row, valid_len)
+                    {
+                        let [x0, y0, x1, y1] = item.box_coords;
+                        let text_score = composite_ocr_score(item.det_score, avg_conf);
+                        slot_results[item.orig_idx] =
+                            Some(TextResult::from_coords(x0, y0, x1, y1, trimmed, text_score));
                     }
                 }
             }
@@ -516,18 +411,13 @@ impl RtenOcrPipeline {
                     buf
                 };
 
-                let rec_tensor =
-                    Tensor::from_floats(&[b, 3, rec_h, rec_w], batch_data, TensorLayout::NCHW);
-                let rec_outputs = self
-                    .rec_session
-                    .run_single(&rec_tensor)
-                    .map_err(|e| format!("Rec inference error: {:?}", e))?;
+                let (sh, rec_data) = self
+                    .rec_model
+                    .run_single(&[b, 3, rec_h, rec_w], &batch_data)?;
 
-                let sh = rec_outputs.shape();
                 if sh.len() >= 3 {
                     let (seq_len, num_classes) = (sh[1], sh[2]);
                     let stride = seq_len * num_classes;
-                    let rec_data = rec_outputs.as_f32_cow();
 
                     for (local_idx, item) in crops[i..end].iter().enumerate() {
                         let start = local_idx * stride;

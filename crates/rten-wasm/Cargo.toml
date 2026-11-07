@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 rusto-core = { path = "../rusto-core" }
-rusto-nn = { path = "../rusto-nn", default-features = false, features = ["std", "rten", "onnx"] }
+rusto-nn = { path = "../rusto-nn", default-features = false, features = ["std", "rten", "onnx"], optional = true }
 rusto-rten = { path = "../rusto-rten", optional = true }
 rusto-nn-webgpu = { path = "../rusto-nn-webgpu", optional = true }
 wasm-bindgen = "0.2"
@@ -19,9 +19,9 @@ console_error_panic_hook = "0.1.7"
 
 [features]
 default = ["rusto-nn"]
-rusto-nn = []
+rusto-nn = ["dep:rusto-nn"]
 rusto-rten = ["dep:rusto-rten"]
-rusto-webgpu = ["dep:rusto-nn-webgpu"]
+rusto-webgpu = ["dep:rusto-nn", "dep:rusto-nn-webgpu"]
 
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }

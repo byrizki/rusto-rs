@@ -81,6 +81,94 @@ fn test_forward_ppocrv6_det_rten() {
 
 #[cfg(feature = "rten")]
 #[test]
+fn test_ppocrv6_det_rten_node_parity() {
+    use rten::{ModelOptions, Value};
+    use rten_tensor::prelude::*;
+    use rten_tensor::Tensor as RtenTensor;
+    use std::fs;
+
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
+    let model_path = repo_root.join("models/PPOCR_v6_tiny/det.rten");
+    if !model_path.exists() {
+        return;
+    }
+
+    let model_data = fs::read(&model_path).expect("read det.rten");
+    let rten_model = ModelOptions::with_all_ops().load(model_data).expect("rten load");
+    let nn_model = Model::from_file(&model_path).expect("nn load");
+
+    let h = 672;
+    let w = 448;
+    let mut input_data = vec![0.0f32; 1 * 3 * h * w];
+    for (i, val) in input_data.iter_mut().enumerate() {
+        *val = ((i % 100) as f32 / 100.0) * 2.0 - 1.0;
+    }
+
+    let nn_input = Tensor::from_floats(&[1, 3, h, w], input_data.clone(), TensorLayout::NCHW);
+    let rten_input = RtenTensor::<f32>::from_data(&[1, 3, h, w], input_data);
+
+    let graph = nn_model.graph();
+    let tensor_names = &graph.tensor_names;
+    let mut ctx = rusto_nn::graph::GraphContext::new(tensor_names.len(), tensor_names);
+
+    // Bind input
+    let in_name = &nn_model.input_names()[0];
+    let in_idx = graph.tensor_names.iter().position(|n| n == in_name).unwrap();
+    ctx.set_tensor(in_idx, nn_input);
+
+    let rten_in_id = rten_model.input_ids()[0];
+
+    for (i, node) in graph.nodes.iter().enumerate() {
+        rusto_nn::graph::execute_node_with_liveness(node, i, &mut ctx, None)
+            .unwrap_or_else(|e| panic!("Op [{:>3}] {} ({}): {:?}", i, node.op.kind_name(), node.name, e));
+
+        for &out_idx in &node.out_indices {
+            let out_name = &graph.tensor_names[out_idx];
+            if let Some(rten_nid) = rten_model.find_node(out_name) {
+                // Try to evaluate this node in rten
+                if let Ok(outputs) = rten_model.run(vec![(rten_in_id, rten_input.view().into())], &[rten_nid], None) {
+                    if let Some(Value::FloatTensor(rten_t)) = outputs.into_iter().next() {
+                        let nn_t = ctx.get_tensor(out_idx).unwrap();
+                        let nn_shape = nn_t.shape();
+                        let rten_shape = rten_t.shape().to_vec();
+                        let nn_floats = nn_t.to_f32_vec();
+                        let rten_floats = rten_t.to_vec();
+
+                        let mut max_diff: f32 = 0.0;
+                        for (&a, &b) in nn_floats.iter().zip(rten_floats.iter()) {
+                            let diff: f32 = (a - b).abs();
+                            if diff > max_diff {
+                                max_diff = diff;
+                            }
+                        }
+
+                        if nn_shape != rten_shape || max_diff > 0.01 {
+                            println!(
+                                "DIVERGENCE at op [{:>3}] '{}' (op={}): nn_shape={:?}, rten_shape={:?}, max_diff={:.6}",
+                                i, node.name, node.op.kind_name(), nn_shape, rten_shape, max_diff
+                            );
+                            if let rusto_nn::graph::ir::OpKind::Interp(p) = &node.op {
+                                println!("InterpParams: {:?}", p);
+                            }
+                            println!("in_indices: {:?}", node.in_indices);
+                            for &in_idx in &node.in_indices {
+                                if let Ok(t) = ctx.get_tensor(in_idx) {
+                                    println!("Input tensor {}: shape={:?}, dtype={:?}, floats={:?}", in_idx, t.shape(), t.dtype(), t.as_floats());
+                                }
+                            }
+                            println!("NN first 10 floats: {:?}", &nn_floats[..10.min(nn_floats.len())]);
+                            println!("RTEN first 10 floats: {:?}", &rten_floats[..10.min(rten_floats.len())]);
+                            assert!(max_diff <= 0.01, "Diverged at node {}", node.name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(feature = "rten")]
+#[test]
 fn test_forward_ppocrv6_rec_rten() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
     let model_path = repo_root.join("models/PPOCR_v6_tiny/rec.rten");

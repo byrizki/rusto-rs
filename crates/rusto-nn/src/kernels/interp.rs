@@ -52,24 +52,36 @@ pub fn interp2d(
         ix_nearest: usize,
     }
 
+    let round_nearest = |coord: f32, in_len: usize| -> usize {
+        let clamped = coord.clamp(0.0, (in_len - 1) as f32);
+        let idx = if !config.half_pixel_centers {
+            clamped.floor() as usize
+        } else if (clamped.fract() - 0.5).abs() < 1e-5 {
+            clamped.floor() as usize
+        } else {
+            clamped.round() as usize
+        };
+        idx.min(in_len - 1)
+    };
+
     let x_coords: Vec<XCoord> = (0..out_w)
         .map(|ow| {
             let src_x = if config.half_pixel_centers {
-                ((ow as f32 + 0.5) * scale_x - 0.5).max(0.0)
+                ((ow as f32 + 0.5) * scale_x - 0.5).clamp(0.0, (in_w - 1) as f32)
             } else if config.align_corners {
                 if out_w > 1 {
-                    ow as f32 * (in_w - 1) as f32 / (out_w - 1) as f32
+                    (ow as f32 * (in_w - 1) as f32 / (out_w - 1) as f32).clamp(0.0, (in_w - 1) as f32)
                 } else {
                     0.0
                 }
             } else {
-                ow as f32 * scale_x
+                (ow as f32 * scale_x).clamp(0.0, (in_w - 1) as f32)
             };
 
-            let ix_nearest = (src_x.round() as usize).min(in_h - 1).min(in_w - 1);
+            let ix_nearest = round_nearest(src_x, in_w);
             let x0 = (src_x.floor() as usize).min(in_w - 1);
             let x1 = (x0 + 1).min(in_w - 1);
-            let wx = src_x - x0 as f32;
+            let wx = (src_x - x0 as f32).clamp(0.0, 1.0);
 
             XCoord {
                 ix0: x0,
@@ -93,21 +105,21 @@ pub fn interp2d(
     let y_coords: Vec<YCoord> = (0..out_h)
         .map(|oh| {
             let src_y = if config.half_pixel_centers {
-                ((oh as f32 + 0.5) * scale_y - 0.5).max(0.0)
+                ((oh as f32 + 0.5) * scale_y - 0.5).clamp(0.0, (in_h - 1) as f32)
             } else if config.align_corners {
                 if out_h > 1 {
-                    oh as f32 * (in_h - 1) as f32 / (out_h - 1) as f32
+                    (oh as f32 * (in_h - 1) as f32 / (out_h - 1) as f32).clamp(0.0, (in_h - 1) as f32)
                 } else {
                     0.0
                 }
             } else {
-                oh as f32 * scale_y
+                (oh as f32 * scale_y).clamp(0.0, (in_h - 1) as f32)
             };
 
-            let iy_nearest = (src_y.round() as usize).min(in_h - 1);
+            let iy_nearest = round_nearest(src_y, in_h);
             let y0 = (src_y.floor() as usize).min(in_h - 1);
             let y1 = (y0 + 1).min(in_h - 1);
-            let wy = src_y - y0 as f32;
+            let wy = (src_y - y0 as f32).clamp(0.0, 1.0);
 
             YCoord {
                 iy0: y0,

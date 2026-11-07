@@ -18,6 +18,10 @@ rayon = { version = "1.10", optional = true }
 rten-onnx = { version = "0.27.0", optional = true }
 rten-model-file = { version = "0.27.0", optional = true }
 
+[dev-dependencies]
+rten = { version = "0.27.0", features = ["rten_format"] }
+rten-tensor = "0.27.0"
+
 [features]
 default = ["std", "rayon", "rten", "onnx"]
 std = []

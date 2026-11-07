@@ -23,12 +23,6 @@ if command -v wasm-pack >/dev/null 2>&1; then
 
   rm -f "$WASM_DIR/.gitignore"
 
-  # Sync default rusto_nn to rusto_rten_wasm for backwards compatibility
-  cp -f "$WASM_DIR/rusto_nn.js" "$WASM_DIR/rusto_rten_wasm.js"
-  cp -f "$WASM_DIR/rusto_nn.d.ts" "$WASM_DIR/rusto_rten_wasm.d.ts"
-  cp -f "$WASM_DIR/rusto_nn_bg.wasm" "$WASM_DIR/rusto_rten_wasm_bg.wasm"
-  cp -f "$WASM_DIR/rusto_nn_bg.wasm.d.ts" "$WASM_DIR/rusto_rten_wasm_bg.wasm.d.ts"
-
   # Copy all WASM binaries to docs/public/wasm
   cp -f "$WASM_DIR"/*.wasm "$DOCS_DIR/public/wasm/"
   echo "✓ WASM runtimes (rusto-nn, rusto-rten, rusto-webgpu) successfully built in $WASM_DIR and $DOCS_DIR/public/wasm"
@@ -36,7 +30,7 @@ if command -v wasm-pack >/dev/null 2>&1; then
 fi
 
 # 2. Fallback: if local WASM runtimes already present, copy to public
-if [ -f "$WASM_DIR/rusto_nn_bg.wasm" ] || [ -f "$WASM_DIR/rusto_rten_wasm_bg.wasm" ]; then
+if [ -f "$WASM_DIR/rusto_nn_bg.wasm" ]; then
   echo "✓ Local WASM runtimes already present in $WASM_DIR"
   cp -f "$WASM_DIR"/*.wasm "$DOCS_DIR/public/wasm/" || true
   exit 0
