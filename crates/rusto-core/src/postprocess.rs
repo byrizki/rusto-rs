@@ -322,19 +322,17 @@ pub fn decode_linenet_det_boxes(
             queue.push_back((x, y));
             visited[idx] = true;
 
+            let ys0 = (y as f32 + 0.5) * 2.0;
+            let mut sum_top = ys0 - preds[[0, 1, y, x]];
+            let mut sum_bot = ys0 + preds[[0, 2, y, x]];
+            let mut sum_prob = prob[idx];
+            let mut count = 1usize;
             let mut min_x = x;
             let mut max_x = x;
-            let mut sum_top = 0.0f32;
-            let mut sum_bot = 0.0f32;
-            let mut sum_prob = 0.0f32;
-            let mut count = 0usize;
 
             while let Some((cx, cy)) = queue.pop_front() {
-                let ys = (cy as f32 + 0.5) * 2.0;
-                sum_top += ys - preds[[0, 1, cy, cx]];
-                sum_bot += ys + preds[[0, 2, cy, cx]];
-                sum_prob += prob[cy * out_w + cx];
-                count += 1;
+                let mean_y0 = sum_top / count as f32;
+                let mean_y1 = sum_bot / count as f32;
 
                 if cx < min_x { min_x = cx; }
                 if cx > max_x { max_x = cx; }
@@ -348,8 +346,22 @@ pub fn decode_linenet_det_boxes(
                     if nx < out_w && ny < out_h {
                         let nidx = ny * out_w + nx;
                         if !visited[nidx] && prob[nidx] >= det_thresh {
-                            visited[nidx] = true;
-                            queue.push_back((nx, ny));
+                            let nys = (ny as f32 + 0.5) * 2.0;
+                            let n_y0 = nys - preds[[0, 1, ny, nx]];
+                            let n_y1 = nys + preds[[0, 2, ny, nx]];
+
+                            let overlap = (mean_y1.min(n_y1) - mean_y0.max(n_y0)).max(0.0);
+                            let union_len = mean_y1.max(n_y1) - mean_y0.min(n_y0);
+                            let iou = overlap / union_len.max(1.0);
+
+                            if iou >= 0.50 {
+                                visited[nidx] = true;
+                                sum_top += n_y0;
+                                sum_bot += n_y1;
+                                sum_prob += prob[nidx];
+                                count += 1;
+                                queue.push_back((nx, ny));
+                            }
                         }
                     }
                 }
@@ -587,20 +599,17 @@ pub fn decode_linenet_det_boxes_slice(
             queue.push_back((x, y));
             visited[idx] = true;
 
+            let ys0 = (y as f32 + 0.5) * 2.0;
+            let mut sum_top = ys0 - det_data[plane + idx];
+            let mut sum_bot = ys0 + det_data[2 * plane + idx];
+            let mut sum_prob = prob_at(idx);
+            let mut count = 1usize;
             let mut min_x = x;
             let mut max_x = x;
-            let mut sum_top = 0.0f32;
-            let mut sum_bot = 0.0f32;
-            let mut sum_prob = 0.0f32;
-            let mut count = 0usize;
 
             while let Some((cx, cy)) = queue.pop_front() {
-                let cidx = cy * out_w + cx;
-                let ys = (cy as f32 + 0.5) * 2.0;
-                sum_top += ys - det_data[plane + cidx];
-                sum_bot += ys + det_data[2 * plane + cidx];
-                sum_prob += 1.0 / (1.0 + (-det_data[cidx]).exp());
-                count += 1;
+                let mean_y0 = sum_top / count as f32;
+                let mean_y1 = sum_bot / count as f32;
 
                 if cx < min_x { min_x = cx; }
                 if cx > max_x { max_x = cx; }
@@ -614,8 +623,22 @@ pub fn decode_linenet_det_boxes_slice(
                     if nx < out_w && ny < out_h {
                         let nidx = ny * out_w + nx;
                         if !visited[nidx] && prob_at(nidx) >= det_thresh {
-                            visited[nidx] = true;
-                            queue.push_back((nx, ny));
+                            let nys = (ny as f32 + 0.5) * 2.0;
+                            let n_y0 = nys - det_data[plane + nidx];
+                            let n_y1 = nys + det_data[2 * plane + nidx];
+
+                            let overlap = (mean_y1.min(n_y1) - mean_y0.max(n_y0)).max(0.0);
+                            let union_len = mean_y1.max(n_y1) - mean_y0.min(n_y0);
+                            let iou = overlap / union_len.max(1.0);
+
+                            if iou >= 0.50 {
+                                visited[nidx] = true;
+                                sum_top += n_y0;
+                                sum_bot += n_y1;
+                                sum_prob += prob_at(nidx);
+                                count += 1;
+                                queue.push_back((nx, ny));
+                            }
                         }
                     }
                 }
