@@ -662,7 +662,7 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
         panic!("Expected structured text results");
     };
 
-    assert_eq!(lines.len(), 153, "Dense chronicling america page must detect exactly 153 lines");
+    assert_eq!(lines.len(), 249, "Dense chronicling america page must detect exactly 249 lines");
     assert!(lines[0].text.starts_with("All Orders in"));
     assert!(lines[0].region_id.is_some(), "region_id should be populated when layout is enabled");
     assert!(lines[0].layout_type.is_some(), "layout_type should be populated when layout is enabled");
@@ -688,7 +688,7 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
         )
     };
     assert_eq!(ret, 0, "rocr_detect_text_file should succeed");
-    assert_eq!(c_count, 153, "C FFI must return exactly 153 lines");
+    assert_eq!(c_count, 249, "C FFI must return exactly 249 lines");
     assert!(!c_results.is_null());
 
     unsafe {

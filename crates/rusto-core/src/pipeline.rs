@@ -78,18 +78,21 @@ impl PipelineOutput {
             }
             grouped
         } else {
-            let entries = self.to_text_results();
-            let segments = crate::spatial::cluster_text_results_into_lines(
+            let mut entries = self.to_text_results();
+            if let Some(regions) = &self.layout_regions {
+                if !regions.is_empty() {
+                    return order_text_results_by_layout(&entries, regions, self.img_w);
+                }
+            }
+            if options.layout_reading.unwrap_or(false) {
+                crate::layout::sort_lines_reading_order(&mut entries);
+                return entries;
+            }
+            crate::spatial::cluster_text_results_into_lines(
                 entries,
                 line_y,
                 word_x,
-            );
-            if let Some(regions) = &self.layout_regions {
-                if !regions.is_empty() {
-                    return order_text_results_by_layout(&segments, regions, self.img_w);
-                }
-            }
-            segments
+            )
         }
     }
 

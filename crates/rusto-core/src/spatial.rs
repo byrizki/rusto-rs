@@ -652,6 +652,13 @@ pub fn cluster_text_results_into_lines(
             let mut segments: Vec<TextResult> = Vec::new();
             for entry in line {
                 if let Some(prev) = segments.last_mut() {
+                    if prev.region_id.is_some()
+                        && entry.region_id.is_some()
+                        && prev.region_id != entry.region_id
+                    {
+                        segments.push(entry);
+                        continue;
+                    }
                     let prev_right = prev.frame.left + prev.frame.width;
                     let gap = entry.frame.left - prev_right;
                     let avg_height = (prev.frame.height + entry.frame.height) / 2.0;

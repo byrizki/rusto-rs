@@ -796,13 +796,19 @@ impl RtenOcrPipeline {
                 Ok(nanoserde::SerJson::serialize_json(&words))
             }
             OutputGranularity::Lines => {
-                let mut segments = cluster_text_results_into_lines(
-                    recognized,
-                    line_y.unwrap_or(0.5),
-                    word_x.unwrap_or(0.4),
-                );
                 let layout_mode = options.layout_model.as_deref();
                 let layout_reading = options.layout_reading.unwrap_or(true);
+                let is_reading_order_active = layout_reading && layout_mode != Some("none");
+
+                let mut segments = if is_reading_order_active {
+                    recognized
+                } else {
+                    cluster_text_results_into_lines(
+                        recognized,
+                        line_y.unwrap_or(0.5),
+                        word_x.unwrap_or(0.4),
+                    )
+                };
                 self.apply_reading_order(&mut segments, layout_mode, layout_reading, orig_w, orig_h);
                 Ok(nanoserde::SerJson::serialize_json(&segments))
             }
