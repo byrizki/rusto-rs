@@ -14,10 +14,10 @@ fn test_mnn_ocr_on_example1_image() {
     let dict_path = repo_root.join("models/PPOCR_v6_tiny/dict.txt");
     let img_path = repo_root.join("models/test_images/example1.png");
 
-    assert!(det_path.exists(), "det.mnn exists");
-    assert!(rec_path.exists(), "rec.mnn exists");
-    assert!(dict_path.exists(), "dict.txt exists");
-    assert!(img_path.exists(), "example1.png exists");
+    if !det_path.exists() || !rec_path.exists() || !dict_path.exists() || !img_path.exists() {
+        eprintln!("Fixtures for test_mnn_ocr_on_example1_image not found, skipping");
+        return;
+    }
 
     // Initialize config pointing to MNN models and dict directly
     let config = InitializeConfig::ppv6(
@@ -83,8 +83,8 @@ fn test_mnn_ocr_on_ktp_image() {
     let dict_path = repo_root.join("models/PPOCR_v6_tiny/dict.txt");
     let img_path = repo_root.join("ktp.jpeg");
 
-    if !img_path.exists() {
-        eprintln!("ktp.jpeg does not exist, skipping");
+    if !img_path.exists() || !det_path.exists() || !rec_path.exists() || !dict_path.exists() {
+        eprintln!("ktp.jpeg or models do not exist, skipping");
         return;
     }
 
@@ -140,8 +140,8 @@ fn test_mnn_ocr_on_chronam_page() {
     let dict_path = repo_root.join("models/PPOCR_v6_tiny/dict.txt");
     let img_path = repo_root.join("tests/fixtures/chronam-ad-page.png");
 
-    if !img_path.exists() {
-        eprintln!("chronam-ad-page.png does not exist, skipping");
+    if !img_path.exists() || !det_path.exists() || !rec_path.exists() || !dict_path.exists() {
+        eprintln!("chronam-ad-page.png or models do not exist, skipping");
         return;
     }
 
