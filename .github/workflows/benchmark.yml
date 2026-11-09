@@ -1,4 +1,4 @@
-name: OmniDocBench Comprehensive Benchmark
+name: OmniDocBench Benchmark
 
 on:
   workflow_dispatch:
@@ -310,7 +310,7 @@ jobs:
           elif [ "${{ matrix.target }}" = "rapidocr_tiny" ]; then
             pip install rapidocr-onnxruntime
           elif [ "${{ matrix.target }}" = "rapid_structure_tiny" ]; then
-            pip install rapidocr-onnxruntime rapid_layout "paddleocr<3.0.0" || pip install rapidocr-onnxruntime rapid_layout
+            pip install rapidocr-onnxruntime rapid_layout
           elif [ "${{ matrix.target }}" = "indra_ocr" ]; then
             pip install onnxruntime
             if [ ! -d vendor/indra-ocr ]; then

@@ -194,6 +194,75 @@ def measure_peak_rss_mb(command: list[str]) -> float:
     return 0.0
 
 
+def sorted_layout_boxes(res, w):
+    """
+    Sort text / layout regions in order from top to bottom, left to right
+    across single-column and multi-column regions (pure-Python, zero external dependencies).
+    """
+    num_boxes = len(res)
+    if num_boxes <= 1:
+        if num_boxes == 1:
+            res[0]["layout"] = "single"
+        return res
+
+    sorted_boxes = sorted(res, key=lambda x: (x["bbox"][1], x["bbox"][0]))
+    _boxes = list(sorted_boxes)
+
+    new_res = []
+    res_left = []
+    res_right = []
+    i = 0
+
+    while True:
+        if i >= num_boxes:
+            break
+        if i == num_boxes - 1:
+            if (
+                _boxes[i]["bbox"][1] > _boxes[i - 1]["bbox"][3]
+                and _boxes[i]["bbox"][0] < w / 2
+                and _boxes[i]["bbox"][2] > w / 2
+            ):
+                new_res += res_left
+                new_res += res_right
+                _boxes[i]["layout"] = "single"
+                new_res.append(_boxes[i])
+            else:
+                if _boxes[i]["bbox"][2] > w / 2:
+                    _boxes[i]["layout"] = "double"
+                    res_right.append(_boxes[i])
+                    new_res += res_left
+                    new_res += res_right
+                elif _boxes[i]["bbox"][0] < w / 2:
+                    _boxes[i]["layout"] = "double"
+                    res_left.append(_boxes[i])
+                    new_res += res_left
+                    new_res += res_right
+            res_left = []
+            res_right = []
+            break
+        elif _boxes[i]["bbox"][0] < w / 4 and _boxes[i]["bbox"][2] < 3 * w / 4:
+            _boxes[i]["layout"] = "double"
+            res_left.append(_boxes[i])
+            i += 1
+        elif _boxes[i]["bbox"][0] > w / 4 and _boxes[i]["bbox"][2] > w / 2:
+            _boxes[i]["layout"] = "double"
+            res_right.append(_boxes[i])
+            i += 1
+        else:
+            new_res += res_left
+            new_res += res_right
+            _boxes[i]["layout"] = "single"
+            new_res.append(_boxes[i])
+            res_left = []
+            res_right = []
+            i += 1
+    if res_left:
+        new_res += res_left
+    if res_right:
+        new_res += res_right
+    return new_res
+
+
 class BenchmarkRunner:
     def __init__(self, samples):
         self.samples = samples
@@ -526,7 +595,6 @@ class BenchmarkRunner:
     def run_paddle_structure(self, pipeline_key, warmup_img):
         import cv2
         from paddleocr import PPStructure
-        from paddleocr.ppstructure.recovery.recovery_to_doc import sorted_layout_boxes
         pred_dir = PRED_DIR / pipeline_key
         pred_dir.mkdir(parents=True, exist_ok=True)
 
@@ -596,7 +664,6 @@ class BenchmarkRunner:
         import cv2
         from rapidocr_onnxruntime import RapidOCR
         from rapid_layout import RapidLayout
-        from paddleocr.ppstructure.recovery.recovery_to_doc import sorted_layout_boxes
         pred_dir = PRED_DIR / pipeline_key
         pred_dir.mkdir(parents=True, exist_ok=True)
 
