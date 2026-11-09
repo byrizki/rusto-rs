@@ -7,13 +7,14 @@ use crate::tensor::{Array3, Array4};
 
 use crate::cal_rec_boxes::CalRecBoxes;
 use crate::calibration::apply_calibration;
-use crate::ctc::{scatter_linenet_results, scatter_rec_results, CtcDecoder, WordInfo};
+use crate::ctc::{scatter_linenet_results_with_positions, scatter_rec_results, CtcDecoder, WordInfo};
 use crate::engine::InferenceSession;
 use crate::error::CoreError;
 use crate::geometry::{
-    apply_vertical_padding, calculate_crop_box, get_rotate_crop_image, map_boxes_to_original,
-    resize_image_within_bounds, OpRecord,
+    apply_vertical_padding, calculate_crop_box, crop_linenet_line_image, get_rotate_crop_image,
+    map_boxes_to_original, resize_image_within_bounds, OpRecord,
 };
+use crate::lines::{build_lines, order_lines, refine_lines, rect_to_quad};
 use crate::image::{Mat, Point2f};
 use crate::layout::{
     build_layout_model_inputs, order_text_results_by_layout, postprocess_direct_layout_boxes,
@@ -35,6 +36,11 @@ use crate::types::{
 };
 use crate::unwarp::{postprocess_unwarp, preprocess_unwarp};
 
+const ADAPTIVE_MIN_BOXES: usize = 8;
+const ADAPTIVE_MIN_H: f32 = 9.0;
+const ADAPTIVE_TARGET_H: f32 = 12.0;
+const ADAPTIVE_MAX_SIDE: f32 = 2048.0;
+
 #[derive(Clone, Debug)]
 pub struct PipelineOutput {
     pub boxes: Vec<[Point2f; 4]>,
@@ -53,6 +59,7 @@ pub struct PipelineOutput {
     pub x_threshold_multiplier: Option<f32>,
     pub img_w: f32,
     pub img_h: f32,
+    pub ordered_by_model: bool,
 }
 
 impl PipelineOutput {
@@ -66,6 +73,9 @@ impl PipelineOutput {
         });
         if options.output == OutputGranularity::Words {
             let word_lines = build_word_results(&self.word_results);
+            if self.ordered_by_model {
+                return word_lines.into_iter().flatten().collect();
+            }
             let grouped = group_words(
                 word_lines,
                 line_y,
@@ -86,6 +96,9 @@ impl PipelineOutput {
             grouped
         } else {
             let entries = self.to_text_results();
+            if self.ordered_by_model {
+                return entries;
+            }
             if let Some(regions) = &self.layout_regions {
                 if !regions.is_empty() {
                     return order_text_results_by_layout(&entries, regions, self.img_w);
@@ -137,6 +150,7 @@ pub struct OcrPipeline {
     pub rec: Box<dyn InferenceSession>,
     pub decoder: CtcDecoder,
     pub global: GlobalConfig,
+    pub det_config: DetConfig,
     pub rec_batch_num: usize,
     pub orient: Option<Box<dyn InferenceSession>>,
     pub cls: Option<Box<dyn InferenceSession>>,
@@ -144,6 +158,7 @@ pub struct OcrPipeline {
     pub layout: Option<Box<dyn InferenceSession>>,
     pub layout_config: Option<LayoutConfig>,
     pub cal_rec_boxes: CalRecBoxes,
+    pub order: Option<Box<dyn InferenceSession>>,
 }
 
 pub type RustO = OcrPipeline;
@@ -160,6 +175,7 @@ impl OcrPipeline {
             rec,
             decoder,
             global,
+            det_config: DetConfig::default(PathBuf::new()),
             rec_batch_num: 6,
             orient: None,
             cls: None,
@@ -167,7 +183,13 @@ impl OcrPipeline {
             layout: None,
             layout_config: None,
             cal_rec_boxes: CalRecBoxes::new(),
+            order: None,
         }
+    }
+
+    pub fn with_det_config(mut self, config: DetConfig) -> Self {
+        self.det_config = config;
+        self
     }
 
     pub fn with_orient(mut self, orient: Box<dyn InferenceSession>) -> Self {
@@ -195,6 +217,11 @@ impl OcrPipeline {
         self
     }
 
+    pub fn with_order(mut self, order: Box<dyn InferenceSession>) -> Self {
+        self.order = Some(order);
+        self
+    }
+
     pub fn run_with_options(
         &mut self,
         img: &Mat,
@@ -207,6 +234,7 @@ impl OcrPipeline {
         effective.use_orient = options.orientation_detection.unwrap_or(self.global.use_orient) && self.orient.is_some();
         effective.use_unwarp = options.auto_unwarp.unwrap_or(self.global.use_unwarp) && self.unwarp.is_some();
         effective.use_layout = options.layout_reading.unwrap_or(self.global.use_layout) && self.layout.is_some();
+        effective.reading_order = options.layout_reading.unwrap_or(self.global.reading_order) && self.order.is_some();
 
         if let Some(post_rec) = &options.post_recognition {
             if let Some(value) = post_rec.score_threshold {
@@ -339,6 +367,22 @@ impl OcrPipeline {
             }
         }
 
+        // Step 2.5: Pre-OCR Deskewing for Linenet
+        let mut active_skew = None;
+        let is_linenet_det = self.det.is_linenet();
+        if is_linenet_det && global.use_orient {
+            let skew = crate::preprocess::estimate_skew(&working_img);
+            if skew.abs() >= 0.3 && skew.abs() <= 10.0 {
+                if let Ok(rotated) = crate::preprocess::rotate_skew(&working_img, skew) {
+                    if global.debug_images {
+                        debug_oriented_image = Some(rotated.clone());
+                    }
+                    working_img = rotated;
+                    active_skew = Some(skew);
+                }
+            }
+        }
+
         // Step 3: Document layout detection (if configured)
         if global.use_layout && self.layout.is_some() {
             if let Some(layout_session) = &mut self.layout {
@@ -432,15 +476,14 @@ impl OcrPipeline {
         // Step 4: Text Detection
         let start_det = Instant::now();
         let (ori_h, ori_w) = (padded.rows(), padded.cols());
-        let params = resolve_det_params(
-            &DetConfig::default(PathBuf::new()),
+        let mut params = resolve_det_params(
+            &self.det_config,
             detection,
             postprocess,
             ori_w,
             ori_h,
         );
 
-        let is_linenet_det = self.det.is_linenet();
         let (input, scale_w, scale_h) =
             prepare_det_input(&padded, is_linenet_det, &params, ori_w, ori_h)?;
         let preds_dyn = self.det.run(input.into_dyn())?;
@@ -457,6 +500,54 @@ impl OcrPipeline {
             scale_h,
             &params,
         )?;
+        drop(preds);
+
+        if is_linenet_det && boxes.len() >= ADAPTIVE_MIN_BOXES {
+            let mut heights: Vec<f32> = boxes
+                .iter()
+                .map(|b| {
+                    let h1 = (b[3].y - b[0].y).hypot(b[3].x - b[0].x);
+                    let h2 = (b[2].y - b[1].y).hypot(b[2].x - b[1].x);
+                    h1.max(h2)
+                })
+                .collect();
+            heights.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let n = heights.len();
+            let median = if n % 2 == 1 {
+                heights[n / 2]
+            } else {
+                0.5 * (heights[n / 2 - 1] + heights[n / 2])
+            };
+            let med_h = median * scale_h;
+            if med_h < ADAPTIVE_MIN_H {
+                let wanted = (params.limit_side_len as f32 * ADAPTIVE_TARGET_H / med_h.max(1.0))
+                    .min(ADAPTIVE_MAX_SIDE);
+                let adaptive_limit = (wanted as i32) / 32 * 32;
+                if adaptive_limit > params.limit_side_len {
+                    params.limit_side_len = adaptive_limit;
+                    let (re_input, re_scale_w, re_scale_h) =
+                        prepare_det_input(&padded, is_linenet_det, &params, ori_w, ori_h)?;
+                    let re_preds_dyn = self.det.run(re_input.into_dyn())?;
+                    let re_preds: Array4<f32> = re_preds_dyn
+                        .into_dimensionality()
+                        .map_err(|_| CoreError::InvalidShape("detection output must be 4D".into()))?;
+                    let (re_boxes, _) = decode_det_predictions(
+                        &re_preds,
+                        is_linenet_det,
+                        ori_w,
+                        ori_h,
+                        re_scale_w,
+                        re_scale_h,
+                        &params,
+                    )?;
+                    drop(re_preds);
+                    if !re_boxes.is_empty() {
+                        boxes = re_boxes;
+                    }
+                }
+            }
+        }
+        drop(padded);
 
         let elapse_det = start_det.elapsed().as_secs_f64();
 
@@ -478,6 +569,7 @@ impl OcrPipeline {
                 x_threshold_multiplier: global.x_threshold_multiplier,
                 img_w: working_w_f32,
                 img_h: working_h_f32,
+                ordered_by_model: false,
             });
         }
 
@@ -504,6 +596,10 @@ impl OcrPipeline {
 
         let mut crop_imgs = Vec::with_capacity(boxes.len());
         for b in &boxes {
+            if is_linenet_rec {
+                crop_imgs.push(crop_linenet_line_image(&working_img, b, pad_x_factor, pad_y_factor)?);
+                continue;
+            }
             let crop_box = calculate_crop_box(
                 b,
                 is_linenet_rec,
@@ -516,6 +612,7 @@ impl OcrPipeline {
             );
             crop_imgs.push(get_rotate_crop_image(&working_img, &crop_box)?);
         }
+        drop(working_img);
 
         // Step 5.5: Text Line Orientation Classification (CLS) on cropped images
         if global.use_cls && self.cls.is_some() {
@@ -542,6 +639,7 @@ impl OcrPipeline {
         let img_num = crop_imgs.len();
         let mut all_texts: Vec<(String, f32)> = vec![(String::new(), 0.0); img_num];
         let mut all_word_infos: Vec<Option<WordInfo>> = vec![None; img_num];
+        let mut linenet_positions: Vec<Vec<f32>> = vec![Vec::new(); img_num];
 
         if is_linenet_rec {
             let rec_h = 96usize;
@@ -556,8 +654,13 @@ impl OcrPipeline {
                 let (batch_tensor, widths) =
                     crate::preprocess::build_linenet_rec_batch(&crop_imgs, &chunk, &target_widths, rec_h)?;
                 let (batch_ids, batch_confs) = self.rec.run_linenet_rec(batch_tensor, widths)?;
-                let decoded = self.decoder.decode_linenet_batch(batch_ids, batch_confs);
-                scatter_linenet_results(&chunk, decoded, &mut all_texts);
+                let decoded = self.decoder.decode_linenet_batch_with_positions(batch_ids, batch_confs);
+                scatter_linenet_results_with_positions(
+                    &chunk,
+                    decoded,
+                    &mut all_texts,
+                    &mut linenet_positions,
+                );
             }
         } else {
             let (img_c, img_h, img_w) = (3usize, 48usize, 320usize);
@@ -603,6 +706,24 @@ impl OcrPipeline {
             }
         }
 
+        // Step 6.5: Gutter cuts, line splitting, tidying and reading order for LineNet
+        let mut ordered_by_model = false;
+        if is_linenet_rec {
+            let lines = build_lines(&boxes, &all_texts, &linenet_positions, pad_x_factor, global.text_score);
+            let mut lines = refine_lines(lines);
+            if global.reading_order {
+                if let Some(order_session) = &mut self.order {
+                    let (ordered, applied) =
+                        order_lines(order_session.as_mut(), lines, working_w_f32, working_h_f32);
+                    lines = ordered;
+                    ordered_by_model = applied;
+                }
+            }
+            boxes = lines.iter().map(|l| rect_to_quad(l.rect)).collect();
+            all_texts = lines.into_iter().map(|l| (l.text, l.score)).collect();
+            all_word_infos = vec![None; boxes.len()];
+        }
+
         let elapse_rec = start_rec.elapsed().as_secs_f64();
         let (txts, scores): (Vec<String>, Vec<f32>) = all_texts.into_iter().unzip();
 
@@ -618,7 +739,22 @@ impl OcrPipeline {
             vec![Vec::new(); boxes.len()]
         };
 
-        // Step 8: Rotate back if orientation was applied
+        // Step 8: Rotate back if skew or orientation was applied
+        let upright_boxes = boxes.clone();
+
+        if let Some(skew) = active_skew {
+            let cx = working_w_f32 / 2.0;
+            let cy = working_h_f32 / 2.0;
+            for b in &mut boxes {
+                crate::preprocess::rotate_box_points_skew_back(b, skew, cx, cy);
+            }
+            for line_words in &mut word_results_all {
+                for (_, _, word_box) in line_words.iter_mut() {
+                    crate::preprocess::rotate_box_points_skew_back(word_box, skew, cx, cy);
+                }
+            }
+        }
+
         if let Some(orient) = active_orientation {
             for b in &mut boxes {
                 orient.rotate_box_points_back(b, working_w_f32, working_h_f32);
@@ -635,18 +771,63 @@ impl OcrPipeline {
         let mut f_txts = Vec::new();
         let mut f_scores = Vec::new();
         let mut f_word_results = Vec::new();
+        let mut f_upright_boxes = Vec::new();
 
         for (idx, (b, (t, s))) in boxes.into_iter().zip(txts.into_iter().zip(scores.into_iter())).enumerate() {
-            if s < global.text_score {
+            if s < global.text_score || (is_linenet_rec && t.is_empty()) {
                 continue;
             }
             f_boxes.push(b);
             f_txts.push(t);
             f_scores.push(s);
+            f_upright_boxes.push(upright_boxes[idx]);
             if idx < word_results_all.len() {
                 f_word_results.push(word_results_all[idx].clone());
             } else {
                 f_word_results.push(Vec::new());
+            }
+        }
+
+        // Step 10: Reading order prediction
+        if global.reading_order && self.order.is_some() && !ordered_by_model {
+            if let Some(order_session) = &mut self.order {
+                if !f_boxes.is_empty() {
+                    let rect_boxes: Vec<[f32; 4]> = f_upright_boxes
+                        .iter()
+                        .map(|b| {
+                            let x0 = b[0].x.min(b[3].x);
+                            let y0 = b[0].y.min(b[1].y);
+                            let x1 = b[1].x.max(b[2].x);
+                            let y1 = b[2].y.max(b[3].y);
+                            [x0, y0, x1, y1]
+                        })
+                        .collect();
+                    if let Ok(order_indices) = crate::order::predict_reading_order(
+                        order_session.as_mut(),
+                        &rect_boxes,
+                        working_w_f32,
+                        working_h_f32,
+                        &f_txts,
+                    ) {
+                        if order_indices.len() == f_boxes.len() {
+                            let mut perm_boxes = Vec::with_capacity(f_boxes.len());
+                            let mut perm_txts = Vec::with_capacity(f_txts.len());
+                            let mut perm_scores = Vec::with_capacity(f_scores.len());
+                            let mut perm_words = Vec::with_capacity(f_word_results.len());
+                            for &idx in &order_indices {
+                                perm_boxes.push(f_boxes[idx]);
+                                perm_txts.push(f_txts[idx].clone());
+                                perm_scores.push(f_scores[idx]);
+                                perm_words.push(f_word_results[idx].clone());
+                            }
+                            f_boxes = perm_boxes;
+                            f_txts = perm_txts;
+                            f_scores = perm_scores;
+                            f_word_results = perm_words;
+                            ordered_by_model = true;
+                        }
+                    }
+                }
             }
         }
 
@@ -667,6 +848,7 @@ impl OcrPipeline {
             x_threshold_multiplier: global.x_threshold_multiplier,
             img_w: working_w_f32,
             img_h: working_h_f32,
+            ordered_by_model,
         })
     }
 

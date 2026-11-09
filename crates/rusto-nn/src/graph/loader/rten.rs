@@ -250,7 +250,7 @@ pub fn load_rten(slice: &[u8]) -> Result<Graph, MnnError> {
                     name: tensor_names[i].clone(),
                     in_indices: SmallVec::new(),
                     out_indices: smallvec::smallvec![i],
-                    op: OpKind::Const(const_t.clone()),
+                    op: OpKind::Const(const_t.clone().into_shared()),
                 });
             }
         }

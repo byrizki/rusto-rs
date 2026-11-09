@@ -824,30 +824,33 @@ pub fn order_text_results_by_layout(
     for res in results {
         let cx = res.frame.left + res.frame.width / 2.0;
         let cy = res.frame.top + res.frame.height / 2.0;
+        let line_area = (res.frame.width * res.frame.height).max(1.0);
 
         let mut best_match: Option<usize> = None;
         let mut best_overlap_area = 0.0f32;
 
         for (i, item) in ordered_regions.iter().enumerate() {
             let reg = &item.region;
+            let pad_y = (0.25 * res.frame.height).max(4.0);
             let rx1 = reg.bbox.x_min as f32 - 4.0;
-            let ry1 = reg.bbox.y_min as f32 - 4.0;
+            let ry1 = reg.bbox.y_min as f32 - pad_y;
             let rx2 = reg.bbox.x_max as f32 + 4.0;
-            let ry2 = reg.bbox.y_max as f32 + 4.0;
+            let ry2 = reg.bbox.y_max as f32 + pad_y;
 
-            if cx >= rx1 && cx <= rx2 && cy >= ry1 && cy <= ry2 {
-                let ix1 = res.frame.left.max(reg.bbox.x_min as f32);
-                let iy1 = res.frame.top.max(reg.bbox.y_min as f32);
-                let ix2 = (res.frame.left + res.frame.width).min(reg.bbox.x_max as f32);
-                let iy2 = (res.frame.top + res.frame.height).min(reg.bbox.y_max as f32);
-                let inter_w = (ix2 - ix1).max(0.0);
-                let inter_h = (iy2 - iy1).max(0.0);
-                let area = inter_w * inter_h;
+            let ix1 = res.frame.left.max(rx1);
+            let iy1 = res.frame.top.max(ry1);
+            let ix2 = (res.frame.left + res.frame.width).min(rx2);
+            let iy2 = (res.frame.top + res.frame.height).min(ry2);
+            let inter_w = (ix2 - ix1).max(0.0);
+            let inter_h = (iy2 - iy1).max(0.0);
+            let area = inter_w * inter_h;
 
-                if area >= best_overlap_area {
-                    best_overlap_area = area;
-                    best_match = Some(i);
-                }
+            let is_contained = cx >= rx1 && cx <= rx2 && cy >= ry1 && cy <= ry2;
+            let overlap_ratio = area / line_area;
+
+            if (is_contained || overlap_ratio >= 0.15) && area >= best_overlap_area {
+                best_overlap_area = area;
+                best_match = Some(i);
             }
         }
 
@@ -872,11 +875,57 @@ pub fn order_text_results_by_layout(
     }
 
     if !unassigned.is_empty() {
-        sort_lines_reading_order(&mut unassigned);
-        final_ordered.extend(unassigned);
+        interleave_unassigned_lines(&mut final_ordered, unassigned, img_w);
     }
 
     final_ordered
+}
+
+fn interleave_unassigned_lines(
+    final_ordered: &mut Vec<crate::types::TextResult>,
+    mut unassigned: Vec<crate::types::TextResult>,
+    img_w: f32,
+) {
+    if unassigned.is_empty() {
+        return;
+    }
+    sort_lines_reading_order(&mut unassigned);
+
+    for u in unassigned {
+        let u_left = u.frame.left;
+        let u_right = u.frame.left + u.frame.width;
+        let u_top = u.frame.top;
+        let is_spanning = u.frame.width > 0.65 * img_w;
+
+        let mut insert_pos = None;
+        for (idx, v) in final_ordered.iter().enumerate() {
+            let v_left = v.frame.left;
+            let v_right = v.frame.left + v.frame.width;
+            let v_top = v.frame.top;
+
+            if is_spanning || v.frame.width > 0.65 * img_w {
+                if u_top <= v_top {
+                    insert_pos = Some(idx);
+                    break;
+                }
+            } else {
+                let overlap = (u_right.min(v_right) - u_left.max(v_left)).max(0.0);
+                let col_overlap = overlap / u.frame.width.min(v.frame.width).max(1.0) > 0.3;
+                if col_overlap && u_top <= v_top {
+                    insert_pos = Some(idx);
+                    break;
+                }
+            }
+        }
+
+        if let Some(pos) = insert_pos {
+            final_ordered.insert(pos, u);
+        } else if !final_ordered.is_empty() && u_top < final_ordered[0].frame.top {
+            final_ordered.insert(0, u);
+        } else {
+            final_ordered.push(u);
+        }
+    }
 }
 
 /// Resize and normalize an image for RT-DETR (640×640, ImageNet normalization, pure-Rust).

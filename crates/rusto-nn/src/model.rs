@@ -31,9 +31,17 @@ pub struct Model {
 }
 
 impl Model {
-    /// Load model from file path using zero-copy memory mapping
+    /// Load model from file path using memory mapping (drops mmap after graph load to release memory)
     #[cfg(not(target_arch = "wasm32"))]
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, MnnError> {
+        let file = File::open(path)?;
+        let mmap = unsafe { Mmap::map(&file)? };
+        Self::from_storage(Storage::Mmap(mmap), false)
+    }
+
+    /// Load model from file path retaining raw mmap storage for net() inspection
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn from_file_retained(path: impl AsRef<Path>) -> Result<Self, MnnError> {
         let file = File::open(path)?;
         let mmap = unsafe { Mmap::map(&file)? };
         Self::from_storage(Storage::Mmap(mmap), true)
@@ -89,16 +97,10 @@ impl Model {
             load_mnn(slice)?
         };
 
-        let storage_opt = match &storage {
-            #[cfg(not(target_arch = "wasm32"))]
-            Storage::Mmap(_) => Some(storage),
-            Storage::Bytes(_) => {
-                if retain_storage {
-                    Some(storage)
-                } else {
-                    None
-                }
-            }
+        let storage_opt = if retain_storage {
+            Some(storage)
+        } else {
+            None
         };
 
         Ok(Self {

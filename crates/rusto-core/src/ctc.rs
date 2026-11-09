@@ -86,35 +86,79 @@ impl CtcDecoder {
     }
 
     pub fn decode_linenet_tokens(&self, ids: &[i32], confs: &[f32], max_len: usize) -> Option<(String, f32)> {
-        let mut text = String::new();
-        let mut char_scores = Vec::new();
+        self.decode_linenet_tokens_with_positions(ids, confs, max_len)
+            .map(|(t, s, _)| (t, s))
+    }
+
+    pub fn decode_linenet_tokens_with_positions(
+        &self,
+        ids: &[i32],
+        confs: &[f32],
+        max_len: usize,
+    ) -> Option<(String, f32, Vec<f32>)> {
+        let actual_len = max_len.min(ids.len());
+        if actual_len == 0 {
+            return None;
+        }
+
+        let mut kept: Vec<(usize, f32, &str)> = Vec::new();
         let mut last_id = 0i32;
 
-        for step in 0..max_len.min(ids.len()) {
+        let total_t = actual_len as f32;
+        for step in 0..actual_len {
             let id = ids[step];
             if id != 0 && (step == 0 || id != last_id) {
                 if let Some(ch) = self.chars.get(id as usize) {
-                    text.push_str(ch);
-                    if let Some(&score) = confs.get(step) {
-                        char_scores.push(score);
-                    }
+                    let score = confs.get(step).copied().unwrap_or(0.0);
+                    kept.push((step, score, ch.as_str()));
                 }
             }
             last_id = id;
         }
 
-        let trimmed = text.trim();
-        if trimmed.is_empty() {
+        if kept.is_empty() {
             return None;
         }
 
-        let avg_conf = if char_scores.is_empty() {
-            0.0
+        let avg_conf = kept.iter().map(|&(_, s, _)| s).sum::<f32>() / kept.len() as f32;
+
+        let mut text = String::new();
+        let mut raw_positions = Vec::new();
+        for (k, &(step, _, ch)) in kept.iter().enumerate() {
+            text.push_str(ch);
+            let pos = (step as f32 + 0.5) / total_t;
+            for _ in ch.chars() {
+                raw_positions.push(pos);
+            }
+            if ch.len() > 2 && ch.starts_with('\\') && ch[1..].chars().all(|c| c.is_alphabetic()) {
+                if let Some(&(_, _, nxt)) = kept.get(k + 1) {
+                    if nxt.chars().next().is_some_and(|c| c.is_alphabetic()) {
+                        text.push(' ');
+                        raw_positions.push(pos);
+                    }
+                }
+            }
+        }
+
+        let leading_spaces = text.chars().take_while(|c| c.is_whitespace()).count();
+        let trailing_spaces = text.chars().rev().take_while(|c| c.is_whitespace()).count();
+        let total_chars = text.chars().count();
+
+        if leading_spaces >= total_chars {
+            return None;
+        }
+
+        let trimmed = text.trim().to_string();
+        let end_idx = total_chars.saturating_sub(trailing_spaces);
+        let start_idx = leading_spaces.min(end_idx);
+
+        let positions = if start_idx <= end_idx && end_idx <= raw_positions.len() {
+            raw_positions[start_idx..end_idx].to_vec()
         } else {
-            char_scores.iter().sum::<f32>() / char_scores.len() as f32
+            raw_positions
         };
 
-        Some((trimmed.to_string(), avg_conf))
+        Some((trimmed, avg_conf, positions))
     }
 
     pub fn decode_linenet_batch(
@@ -129,6 +173,21 @@ impl CtcDecoder {
                 let len = tokens.len();
                 self.decode_linenet_tokens(&tokens, &confs, len)
                     .unwrap_or_else(|| (String::new(), 0.0))
+            })
+            .collect()
+    }
+
+    pub fn decode_linenet_batch_with_positions(
+        &self,
+        batch_ids: Vec<Vec<i32>>,
+        batch_confs: Vec<Vec<f32>>,
+    ) -> Vec<Option<(String, f32, Vec<f32>)>> {
+        batch_ids
+            .into_iter()
+            .zip(batch_confs.into_iter())
+            .map(|(tokens, confs)| {
+                let len = tokens.len();
+                self.decode_linenet_tokens_with_positions(&tokens, &confs, len)
             })
             .collect()
     }
@@ -387,5 +446,57 @@ pub fn scatter_linenet_results(
         if local_idx < chunk.len() {
             all_texts[chunk[local_idx]] = res;
         }
+    }
+}
+
+pub fn scatter_linenet_results_with_positions(
+    chunk: &[usize],
+    decoded: Vec<Option<(String, f32, Vec<f32>)>>,
+    all_texts: &mut [(String, f32)],
+    all_positions: &mut [Vec<f32>],
+) {
+    for (local_idx, res) in decoded.into_iter().enumerate() {
+        if local_idx < chunk.len() {
+            let actual_idx = chunk[local_idx];
+            if let Some((text, score, positions)) = res {
+                all_texts[actual_idx] = (text, score);
+                all_positions[actual_idx] = positions;
+            } else {
+                all_texts[actual_idx] = (String::new(), 0.0);
+                all_positions[actual_idx] = Vec::new();
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod linenet_tests {
+    use super::*;
+
+    fn decoder() -> CtcDecoder {
+        CtcDecoder::new(
+            ["blank", "a", "S", "\\in", "x", " "].iter().map(|s| s.to_string()).collect(),
+        )
+    }
+
+    #[test]
+    fn test_confidence_is_averaged_per_ctc_step() {
+        let ids = [3, 3, 0, 1, 0];
+        let confs = [0.2, 0.9, 0.0, 1.0, 0.0];
+        let (text, conf, positions) =
+            decoder().decode_linenet_tokens_with_positions(&ids, &confs, ids.len()).unwrap();
+        assert_eq!(text, "\\in a");
+        assert!((conf - 0.6).abs() < 1e-6);
+        assert_eq!(positions.len(), text.chars().count());
+    }
+
+    #[test]
+    fn test_latex_command_gets_space_before_letter() {
+        let ids = [3, 2, 0, 3, 5, 4];
+        let confs = [1.0; 6];
+        let (text, _, positions) =
+            decoder().decode_linenet_tokens_with_positions(&ids, &confs, ids.len()).unwrap();
+        assert_eq!(text, "\\in S\\in x");
+        assert_eq!(positions.len(), text.chars().count());
     }
 }

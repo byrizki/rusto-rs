@@ -166,14 +166,14 @@ fn test_rusto_config_grouped_json() {
 
 #[test]
 fn test_rusto_config_templates_and_presets() {
-    use rusto::{PPV3_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG};
+    use rusto::{INDRA_MODEL_CONFIG, PPV3_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG};
 
     let default_config = InitializeConfig::default();
     assert_eq!(
         default_config.det.limit_side_len,
-        PPV6_MODEL_CONFIG.det_limit_side_len
+        INDRA_MODEL_CONFIG.det_limit_side_len
     );
-    assert_eq!(default_config.det.box_thresh, 0.6);
+    assert_eq!(default_config.det.box_thresh, INDRA_MODEL_CONFIG.det_box_thresh);
     assert_eq!(default_config.det.score_mode, "slow");
 
     let v6_config = InitializeConfig::ppv6("det6.rten", "rec6.rten", "dict.txt");
@@ -214,7 +214,7 @@ fn test_rusto_config_templates_and_presets() {
 
     let indra_config = InitializeConfig::indra("det_indra.rten", "rec_indra.rten", "meta.json");
     assert_eq!(indra_config.rec.rec_batch_num, 1);
-    assert_eq!(indra_config.rec.rec_img_shape, [1, 48, 320]);
+    assert_eq!(indra_config.rec.rec_img_shape, [1, 96, 320]);
     assert_eq!(indra_config.det.score_mode, "slow");
 
     let json_str_indra = r#"{
@@ -225,7 +225,7 @@ fn test_rusto_config_templates_and_presets() {
     }"#;
     let json_config_indra = InitializeConfig::from_json(json_str_indra).expect("Parse indra template JSON");
     assert_eq!(json_config_indra.rec.rec_batch_num, 1);
-    assert_eq!(json_config_indra.rec.rec_img_shape, [1, 48, 320]);
+    assert_eq!(json_config_indra.rec.rec_img_shape, [1, 96, 320]);
 
     let json_str_indra_override = r#"{
         "template": "indra",

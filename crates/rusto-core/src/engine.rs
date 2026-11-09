@@ -761,7 +761,8 @@ impl RustO {
             Box::new(rec_session),
             decoder,
             config.global.clone(),
-        );
+        )
+        .with_det_config(config.det.clone());
         pipeline.rec_batch_num = config.rec.rec_batch_num.max(1) as usize;
 
         if let Some(orient_cfg) = config.orient.take() {
@@ -779,6 +780,12 @@ impl RustO {
         if let Some(layout_cfg) = config.layout.take() {
             let session = EngineSession::from_layout_config(&layout_cfg)?;
             pipeline = pipeline.with_layout(Box::new(session)).with_layout_config(layout_cfg);
+        }
+        if config.global.reading_order {
+            if let Some(order_path) = &config.global.reading_order_model {
+                let session = EngineSession::from_path(order_path, &config.det.engine_cfg)?;
+                pipeline = pipeline.with_order(Box::new(session));
+            }
         }
 
         Ok(Self { pipeline })
@@ -809,7 +816,8 @@ impl RustO {
             Box::new(rec_session),
             decoder,
             config.global.clone(),
-        );
+        )
+        .with_det_config(config.det.clone());
         pipeline.rec_batch_num = config.rec.rec_batch_num.max(1) as usize;
 
         if let Some(orient_cfg) = config.orient.take() {
@@ -828,6 +836,12 @@ impl RustO {
             let session = EngineSession::from_layout_config(&layout_cfg)?;
             pipeline = pipeline.with_layout(Box::new(session)).with_layout_config(layout_cfg);
         }
+        if config.global.reading_order {
+            if let Some(order_path) = &config.global.reading_order_model {
+                let session = EngineSession::from_path(order_path, &config.det.engine_cfg)?;
+                pipeline = pipeline.with_order(Box::new(session));
+            }
+        }
 
         Ok(Self { pipeline })
     }
@@ -845,7 +859,8 @@ impl RustO {
             Box::new(rec_session),
             decoder,
             global,
-        );
+        )
+        .with_det_config(det.cfg);
         pipeline.rec_batch_num = rec.cfg.rec_batch_num.max(1) as usize;
         Ok(Self { pipeline })
     }

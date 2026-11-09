@@ -8,7 +8,7 @@ fn test_parse_ppocrv6_det_mnn() {
     let model_path = repo_root.join("models/PPOCR_v6_tiny/det.mnn");
     assert!(model_path.exists(), "det.mnn exists: {}", model_path.display());
 
-    let model = Model::from_file(&model_path).expect("Failed to parse PP-OCRv6 det.mnn");
+    let model = Model::from_file_retained(&model_path).expect("Failed to parse PP-OCRv6 det.mnn");
     assert_eq!(model.input_names(), &["x"]);
     assert!(model.op_count() > 50);
 
@@ -31,7 +31,7 @@ fn test_parse_ppocrv6_rec_mnn() {
     let model_path = repo_root.join("models/PPOCR_v6_tiny/rec.mnn");
     assert!(model_path.exists(), "rec.mnn exists: {}", model_path.display());
 
-    let model = Model::from_file(&model_path).expect("Failed to parse PP-OCRv6 rec.mnn");
+    let model = Model::from_file_retained(&model_path).expect("Failed to parse PP-OCRv6 rec.mnn");
     assert_eq!(model.input_names(), &["x"]);
     assert!(model.op_count() > 50);
 

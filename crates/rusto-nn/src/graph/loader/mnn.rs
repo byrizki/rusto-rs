@@ -109,7 +109,7 @@ pub fn load_mnn(slice: &[u8]) -> Result<Graph, MnnError> {
                     } else {
                         Tensor::zeros(&[1], TensorLayout::NCHW)
                     };
-                    OpKind::Const(tensor)
+                    OpKind::Const(tensor.into_shared())
                 }
 
                 OpType::ConvertTensor => OpKind::ConvertTensor,
@@ -471,6 +471,8 @@ pub fn load_mnn(slice: &[u8]) -> Result<Graph, MnnError> {
                 OpType::Rank => OpKind::Rank,
                 OpType::Range => OpKind::Range,
                 OpType::Select | OpType::Where => OpKind::Select,
+                OpType::Fill => OpKind::ConstantOfShape { value: 0.0 },
+                OpType::BroadcastTo => OpKind::Expand,
 
                 OpType::Gather | OpType::GatherV2 => {
                     let axis = op.main_as_axis().map(|a| a.axis()).unwrap_or(0);

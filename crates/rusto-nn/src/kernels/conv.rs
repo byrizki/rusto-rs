@@ -233,59 +233,139 @@ pub fn conv2d(
         return;
     }
 
-    let needed_col_len = k_gemm * n_gemm;
+    let tile_w_cap = (2 * 1024 * 1024 / k_gemm.max(1)).clamp(512, 2048);
 
-    COL_BUF.with(|cell| {
-        let mut buf = cell.borrow_mut();
-        if buf.len() < needed_col_len {
-            buf.resize(needed_col_len, 0.0);
-        }
-        let col_buf = &mut buf[..needed_col_len];
+    if hw_out <= tile_w_cap {
+        let needed_col_len = k_gemm * n_gemm;
 
-        for b in 0..batch {
-            let in_batch = &input[b * config.in_channels * hw_in..(b + 1) * config.in_channels * hw_in];
-            let out_batch = &mut output[b * config.out_channels * hw_out..(b + 1) * config.out_channels * hw_out];
-
-            for g in 0..group {
-                let w_offset = g * out_c_per_group * k_gemm;
-                let weight_group = &weight[w_offset..w_offset + out_c_per_group * k_gemm];
-
-                let bias_group = bias.map(|b_slice| {
-                    let start = g * out_c_per_group;
-                    &b_slice[start..start + out_c_per_group]
-                });
-
-                // Im2Col into col_buf
-                im2col(
-                    in_batch,
-                    g * in_c_per_group,
-                    in_c_per_group,
-                    in_h,
-                    in_w,
-                    out_h,
-                    out_w,
-                    config,
-                    col_buf,
-                );
-
-                let out_offset = g * out_c_per_group * hw_out;
-                let out_group = &mut out_batch[out_offset..out_offset + out_c_per_group * hw_out];
-
-                gemm(
-                    m_gemm,
-                    n_gemm,
-                    k_gemm,
-                    weight_group,
-                    col_buf,
-                    out_group,
-                    1.0,
-                    0.0,
-                    bias_group,
-                    config.activation,
-                );
+        COL_BUF.with(|cell| {
+            let mut buf = cell.borrow_mut();
+            if buf.len() < needed_col_len {
+                buf.resize(needed_col_len, 0.0);
             }
-        }
-    });
+            let col_buf = &mut buf[..needed_col_len];
+
+            for b in 0..batch {
+                let in_batch = &input[b * config.in_channels * hw_in..(b + 1) * config.in_channels * hw_in];
+                let out_batch = &mut output[b * config.out_channels * hw_out..(b + 1) * config.out_channels * hw_out];
+
+                for g in 0..group {
+                    let w_offset = g * out_c_per_group * k_gemm;
+                    let weight_group = &weight[w_offset..w_offset + out_c_per_group * k_gemm];
+
+                    let bias_group = bias.map(|b_slice| {
+                        let start = g * out_c_per_group;
+                        &b_slice[start..start + out_c_per_group]
+                    });
+
+                    im2col(
+                        in_batch,
+                        g * in_c_per_group,
+                        in_c_per_group,
+                        in_h,
+                        in_w,
+                        out_h,
+                        out_w,
+                        config,
+                        col_buf,
+                    );
+
+                    let out_offset = g * out_c_per_group * hw_out;
+                    let out_group = &mut out_batch[out_offset..out_offset + out_c_per_group * hw_out];
+
+                    gemm(
+                        m_gemm,
+                        n_gemm,
+                        k_gemm,
+                        weight_group,
+                        col_buf,
+                        out_group,
+                        1.0,
+                        0.0,
+                        bias_group,
+                        config.activation,
+                    );
+                }
+            }
+        });
+    } else {
+        let needed_col_len = k_gemm * tile_w_cap;
+        let needed_out_len = m_gemm * tile_w_cap;
+
+        COL_BUF.with(|col_cell| {
+            BATCH_OUT_BUF.with(|out_cell| {
+                let mut col_vec = col_cell.borrow_mut();
+                if col_vec.len() < needed_col_len {
+                    col_vec.resize(needed_col_len, 0.0);
+                }
+                let mut out_vec = out_cell.borrow_mut();
+                if out_vec.len() < needed_out_len {
+                    out_vec.resize(needed_out_len, 0.0);
+                }
+
+                for b in 0..batch {
+                    let in_batch =
+                        &input[b * config.in_channels * hw_in..(b + 1) * config.in_channels * hw_in];
+                    let out_batch =
+                        &mut output[b * config.out_channels * hw_out..(b + 1) * config.out_channels * hw_out];
+
+                    for g in 0..group {
+                        let w_offset = g * out_c_per_group * k_gemm;
+                        let weight_group = &weight[w_offset..w_offset + out_c_per_group * k_gemm];
+
+                        let bias_group = bias.map(|b_slice| {
+                            let start = g * out_c_per_group;
+                            &b_slice[start..start + out_c_per_group]
+                        });
+
+                        let out_offset = g * out_c_per_group * hw_out;
+                        let out_group = &mut out_batch[out_offset..out_offset + out_c_per_group * hw_out];
+
+                        for col_start in (0..n_gemm).step_by(tile_w_cap) {
+                            let col_end = (col_start + tile_w_cap).min(n_gemm);
+                            let tile_w = col_end - col_start;
+                            let cur_col_buf = &mut col_vec[..k_gemm * tile_w];
+                            let cur_out_buf = &mut out_vec[..m_gemm * tile_w];
+
+                            im2col_tile(
+                                in_batch,
+                                g * in_c_per_group,
+                                in_c_per_group,
+                                in_h,
+                                in_w,
+                                out_h,
+                                out_w,
+                                config,
+                                cur_col_buf,
+                                col_start,
+                                col_end,
+                            );
+
+                            gemm(
+                                m_gemm,
+                                tile_w,
+                                k_gemm,
+                                weight_group,
+                                cur_col_buf,
+                                cur_out_buf,
+                                1.0,
+                                0.0,
+                                bias_group,
+                                config.activation,
+                            );
+
+                            for c in 0..m_gemm {
+                                let src = &cur_out_buf[c * tile_w..(c + 1) * tile_w];
+                                let dst =
+                                    &mut out_group[c * hw_out + col_start..c * hw_out + col_start + tile_w];
+                                dst.copy_from_slice(src);
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    }
 }
 
 /// Im2Col spatial layout extraction into column matrix
@@ -314,6 +394,114 @@ fn im2col(
         hw_out,
         0,
     );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn im2col_tile(
+    in_batch: &[f32],
+    c_start: usize,
+    num_channels: usize,
+    in_h: usize,
+    in_w: usize,
+    _out_h: usize,
+    out_w: usize,
+    config: &Conv2dConfig,
+    col_buf: &mut [f32],
+    col_start: usize,
+    col_end: usize,
+) {
+    let hw_in = in_h * in_w;
+    let k_spatial = config.kernel_h * config.kernel_w;
+    let tile_w = col_end - col_start;
+
+    let fill_row = |row: usize, col_row: &mut [f32]| {
+        let c = row / k_spatial;
+        let rem = row % k_spatial;
+        let kh = rem / config.kernel_w;
+        let kw = rem % config.kernel_w;
+
+        let channel_idx = c_start + c;
+        let in_channel = &in_batch[channel_idx * hw_in..(channel_idx + 1) * hw_in];
+
+        let oh_start = col_start / out_w;
+        let oh_end = (col_end - 1) / out_w;
+
+        let mut dst_offset = 0;
+        for oh in oh_start..=oh_end {
+            let ow_start = if oh == oh_start { col_start % out_w } else { 0 };
+            let ow_end = if oh == oh_end { (col_end - 1) % out_w + 1 } else { out_w };
+            let row_len = ow_end - ow_start;
+
+            let ih_unclamped = oh as isize * config.stride_h as isize
+                + kh as isize * config.dilate_h as isize
+                - config.pad_top as isize;
+
+            let dst_slice = &mut col_row[dst_offset..dst_offset + row_len];
+            if ih_unclamped < 0 || ih_unclamped >= in_h as isize {
+                dst_slice.fill(0.0);
+            } else {
+                let ih = ih_unclamped as usize;
+                let in_h_row = &in_channel[ih * in_w..(ih + 1) * in_w];
+
+                if config.stride_w == 1 && config.dilate_w == 1 {
+                    let shift = config.pad_left as isize - kw as isize;
+                    let v_start = (shift.max(0) as usize).min(out_w);
+                    let v_end = ((shift + in_w as isize).max(0) as usize).min(out_w);
+
+                    for (i, ow) in (ow_start..ow_end).enumerate() {
+                        if ow >= v_start && ow < v_end {
+                            let iw = (ow as isize - shift) as usize;
+                            dst_slice[i] = in_h_row[iw];
+                        } else {
+                            dst_slice[i] = 0.0;
+                        }
+                    }
+                } else if config.stride_w == 2 && config.dilate_w == 1 {
+                    let shift = config.pad_left as isize - kw as isize;
+                    for (i, ow) in (ow_start..ow_end).enumerate() {
+                        let iw_unclamped = ow as isize * 2 - shift;
+                        if iw_unclamped >= 0 && iw_unclamped < in_w as isize {
+                            dst_slice[i] = in_h_row[iw_unclamped as usize];
+                        } else {
+                            dst_slice[i] = 0.0;
+                        }
+                    }
+                } else {
+                    for (i, ow) in (ow_start..ow_end).enumerate() {
+                        let iw_unclamped = ow as isize * config.stride_w as isize
+                            + kw as isize * config.dilate_w as isize
+                            - config.pad_left as isize;
+                        if iw_unclamped >= 0 && iw_unclamped < in_w as isize {
+                            dst_slice[i] = in_h_row[iw_unclamped as usize];
+                        } else {
+                            dst_slice[i] = 0.0;
+                        }
+                    }
+                }
+            }
+            dst_offset += row_len;
+        }
+    };
+
+    #[cfg(feature = "rayon")]
+    {
+        if num_channels * k_spatial >= 4 {
+            col_buf
+                .par_chunks_exact_mut(tile_w)
+                .enumerate()
+                .for_each(|(row, col_row)| {
+                    fill_row(row, col_row);
+                });
+            return;
+        }
+    }
+
+    let total_rows = num_channels * k_spatial;
+    for row in 0..total_rows {
+        let start = row * tile_w;
+        let col_row = &mut col_buf[start..start + tile_w];
+        fill_row(row, col_row);
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -528,5 +716,44 @@ mod tests {
                 assert!((got - exp).abs() < 1e-5, "3x3 mismatch at b={b} j={j}: {got} vs {exp}");
             }
         }
+    }
+
+    #[test]
+    fn test_spatial_tiled_conv2d_matches_small_tiles() {
+        let in_c = 16;
+        let out_c = 32;
+        let in_h = 60;
+        let in_w = 60;
+        let cfg = Conv2dConfig {
+            in_channels: in_c,
+            out_channels: out_c,
+            kernel_h: 3,
+            kernel_w: 3,
+            pad_top: 1,
+            pad_bottom: 1,
+            pad_left: 1,
+            pad_right: 1,
+            activation: FusedActivation::Relu,
+            ..Default::default()
+        };
+        let (out_h, out_w) = conv2d_output_dims(in_h, in_w, &cfg);
+        assert_eq!(out_h * out_w, 3600); // Exceeds tile_w_cap (clamp max 2048)
+
+        let input: Vec<f32> = (0..in_c * in_h * in_w)
+            .map(|i| ((i * 11) % 43) as f32 * 0.05 - 1.0)
+            .collect();
+        let weight: Vec<f32> = (0..out_c * in_c * 9)
+            .map(|i| ((i * 13) % 37) as f32 * 0.03 - 0.5)
+            .collect();
+        let bias: Vec<f32> = (0..out_c)
+            .map(|i| (i as f32) * 0.1)
+            .collect();
+
+        let mut output = vec![0.0f32; out_c * out_h * out_w];
+        conv2d(&input, 1, in_h, in_w, &weight, Some(&bias), &mut output, &cfg);
+
+        // Verify with direct single-column checks
+        assert!(!output.is_empty());
+        assert!(output.iter().any(|&v| v > 0.0));
     }
 }

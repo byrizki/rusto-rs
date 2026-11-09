@@ -495,6 +495,20 @@ pub fn prepare_linenet_rec_crop(
     let scale_w = target_w as f32 / orig_w;
     let scale_h = target_h as f32 / orig_h;
 
+    if orig_h_u > target_h {
+        let rgb = img.to_rgb8();
+        let ink: Vec<f32> = rgb
+            .as_raw()
+            .chunks_exact(3)
+            .map(|p| 1.0 - (0.299 * p[0] as f32 + 0.587 * p[1] as f32 + 0.114 * p[2] as f32) / 255.0)
+            .collect();
+        let resized = crate::resample::area_resize_gray(&ink, orig_w_u, orig_h_u, target_w, target_h);
+        for (dst, v) in out.as_mut_slice().iter_mut().zip(resized) {
+            *dst = v.clamp(0.0, 1.0);
+        }
+        return Ok(out);
+    }
+
     if let Some(rgb) = img.as_dynamic().as_rgb8() {
         let raw = rgb.as_raw();
         let row_bytes = orig_w_u * 3;
@@ -562,7 +576,13 @@ pub fn build_linenet_rec_batch(
     rec_h: usize,
 ) -> Result<(Array4<f32>, Vec<i32>), CoreError> {
     let n = chunk.len();
-    let max_w = chunk.iter().map(|&idx| target_widths[idx]).max().unwrap_or(rec_h);
+    let max_w = chunk
+        .iter()
+        .map(|&idx| target_widths[idx])
+        .max()
+        .unwrap_or(rec_h)
+        .div_ceil(8)
+        * 8;
     let mut batch_tensor = Array4::<f32>::zeros((n, 1, rec_h, max_w));
     let mut widths = Vec::with_capacity(n);
 
@@ -820,7 +840,7 @@ pub fn calculate_linenet_rec_target_widths(sizes: &[(f32, f32)], rec_h: usize) -
             } else {
                 rec_h
             };
-            (target_w.div_ceil(8) * 8).clamp(8, 4096)
+            target_w.clamp(8, 4096)
         })
         .collect()
 }
@@ -914,14 +934,162 @@ pub fn plan_linenet_rec_batches(target_widths: &[usize], batch_num: usize) -> Ve
     for idx in sorted {
         let w = target_widths[idx];
         match batches.last_mut() {
-            Some(last) if w == current_w && last.len() < batch_cap => last.push(idx),
+            Some(last) if w.div_ceil(8) == current_w && last.len() < batch_cap => last.push(idx),
             _ => {
-                current_w = w;
+                current_w = w.div_ceil(8);
                 batches.push(vec![idx]);
             }
         }
     }
     batches
+}
+
+/// Estimates text line skew angle in degrees using ink projection profile variance.
+pub fn estimate_skew(img: &Mat) -> f32 {
+    let (h_orig, w_orig) = (img.rows(), img.cols());
+    if h_orig < 32 || w_orig < 32 {
+        return 0.0;
+    }
+
+    let max_dim = h_orig.max(w_orig) as f32;
+    let scale = (384.0 / max_dim).min(1.0);
+    let target_w = ((w_orig as f32 * scale).round() as i32).max(32);
+    let target_h = ((h_orig as f32 * scale).round() as i32).max(32);
+
+    let mut thumb = Mat::default();
+    if image::resize(img, &mut thumb, Size::new(target_w, target_h), image::INTER_LINEAR).is_err() {
+        return 0.0;
+    }
+
+    let tw = target_w as usize;
+    let th = target_h as usize;
+
+    let mut ink = vec![0.0f32; tw * th];
+    if let Some(rgb) = thumb.as_dynamic().as_rgb8() {
+        let raw = rgb.as_raw();
+        for i in 0..tw * th {
+            let px = i * 3;
+            let gray = 0.299 * raw[px] as f32 + 0.587 * raw[px + 1] as f32 + 0.114 * raw[px + 2] as f32;
+            ink[i] = (255.0 - gray).max(0.0);
+        }
+    } else {
+        for y in 0..th {
+            let y_off = y * tw;
+            for x in 0..tw {
+                let px = thumb.get_pixel(x as u32, y as u32);
+                let gray = 0.299 * px[0] as f32 + 0.587 * px[1] as f32 + 0.114 * px[2] as f32;
+                ink[y_off + x] = (255.0 - gray).max(0.0);
+            }
+        }
+    }
+
+    let cx = tw as f32 / 2.0;
+    let cy = th as f32 / 2.0;
+
+    let calc_variance = |angle_deg: f32| -> f32 {
+        let rad = angle_deg.to_radians();
+        let sin_a = rad.sin();
+        let cos_a = rad.cos();
+
+        let mut bins = vec![0.0f32; th];
+        for y in 0..th {
+            let dy = y as f32 - cy;
+            let y_off = y * tw;
+            for x in 0..tw {
+                let dx = x as f32 - cx;
+                let proj_y = (dx * sin_a + dy * cos_a + cy).round() as isize;
+                if proj_y >= 0 && (proj_y as usize) < th {
+                    bins[proj_y as usize] += ink[y_off + x];
+                }
+            }
+        }
+
+        let mean = bins.iter().sum::<f32>() / th as f32;
+        bins.iter().map(|&v| (v - mean).powi(2)).sum::<f32>() / th as f32
+    };
+
+    let mut best_angle = 0.0f32;
+    let mut best_var = f32::NEG_INFINITY;
+
+    let mut angle = -10.0f32;
+    while angle <= 10.0 {
+        let var = calc_variance(angle);
+        if var > best_var {
+            best_var = var;
+            best_angle = angle;
+        }
+        angle += 0.5;
+    }
+
+    let fine_start = (best_angle - 0.6).max(-10.0);
+    let fine_end = (best_angle + 0.6).min(10.0);
+    let mut fine_angle = fine_start;
+    while fine_angle <= fine_end + 1e-4 {
+        let var = calc_variance(fine_angle);
+        if var > best_var {
+            best_var = var;
+            best_angle = fine_angle;
+        }
+        fine_angle += 0.1;
+    }
+
+    best_angle
+}
+
+/// Deskews image by rotating around center by specified angle in degrees.
+pub fn rotate_skew(img: &Mat, angle_deg: f32) -> Result<Mat, CoreError> {
+    if angle_deg.abs() < 1e-4 {
+        return Ok(img.clone());
+    }
+    let (h, w) = (img.rows(), img.cols());
+    let (cx, cy) = (w as f32 / 2.0, h as f32 / 2.0);
+
+    let rad = angle_deg.to_radians();
+    let cos_a = rad.cos();
+    let sin_a = rad.sin();
+
+    let dst_corners = [
+        crate::image::Point2f::new(0.0, 0.0),
+        crate::image::Point2f::new(w as f32, 0.0),
+        crate::image::Point2f::new(w as f32, h as f32),
+        crate::image::Point2f::new(0.0, h as f32),
+    ];
+
+    let mut src_corners = [crate::image::Point2f::default(); 4];
+    for (i, p) in dst_corners.iter().enumerate() {
+        let dx = p.x - cx;
+        let dy = p.y - cy;
+        src_corners[i] = crate::image::Point2f::new(
+            cx + dx * cos_a + dy * sin_a,
+            cy - dx * sin_a + dy * cos_a,
+        );
+    }
+
+    let m = image::get_perspective_transform(&src_corners, &dst_corners)?;
+    let mut dst = Mat::default();
+    image::warp_perspective(
+        img,
+        &mut dst,
+        &m,
+        Size::new(w, h),
+        image::INTER_LINEAR,
+        image::BORDER_REPLICATE,
+    )?;
+    Ok(dst)
+}
+
+/// Rotates 4 quad points back around image center by skew angle in degrees.
+pub fn rotate_box_points_skew_back(pts: &mut [crate::image::Point2f; 4], cx: f32, cy: f32, angle_deg: f32) {
+    let rad = -angle_deg.to_radians();
+    let cos_a = rad.cos();
+    let sin_a = rad.sin();
+
+    for p in pts.iter_mut() {
+        let dx = p.x - cx;
+        let dy = p.y - cy;
+        p.x = cx + dx * cos_a - dy * sin_a;
+        p.y = cy + dx * sin_a + dy * cos_a;
+    }
 }
 
 #[cfg(test)]

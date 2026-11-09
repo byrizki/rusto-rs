@@ -4,6 +4,11 @@ use core::arch::x86_64::*;
 #[cfg(feature = "rayon")]
 use rayon::prelude::*;
 
+#[cfg(feature = "rayon")]
+thread_local! {
+    static PACKED_B_CACHE_512: core::cell::RefCell<Vec<f32>> = core::cell::RefCell::new(Vec::new());
+}
+
 use crate::kernels::activation::{apply_activation_scalar, FusedActivation};
 
 #[derive(Copy, Clone)]
@@ -771,35 +776,42 @@ pub unsafe fn gemm_avx512(
         }
 
         let n_tiles_32 = n / 32;
-        let mut packed_b = vec![0.0f32; n_tiles_32 * k * 32];
-        let pb_ptr: *mut f32 = packed_b.as_mut_ptr();
-        for jt in 0..n_tiles_32 {
-            let j = jt * 32;
-            let tile_dst = pb_ptr.add(jt * k * 32);
-            for p in 0..k {
-                let src = b.as_ptr().add(p * n + j);
-                let dst = tile_dst.add(p * 32);
-                _mm512_storeu_ps(dst, _mm512_loadu_ps(src));
-                _mm512_storeu_ps(dst.add(16), _mm512_loadu_ps(src.add(16)));
+        let packed_b_len = n_tiles_32 * k * 32;
+
+        PACKED_B_CACHE_512.with(|cell| {
+            let mut cache = cell.borrow_mut();
+            if cache.len() < packed_b_len {
+                cache.resize(packed_b_len, 0.0);
             }
-        }
-        let pb_send = SendConstPtr(packed_b.as_ptr());
+            let pb_ptr: *mut f32 = cache.as_mut_ptr();
+            for jt in 0..n_tiles_32 {
+                let j = jt * 32;
+                let tile_dst = pb_ptr.add(jt * k * 32);
+                for p in 0..k {
+                    let src = b.as_ptr().add(p * n + j);
+                    let dst = tile_dst.add(p * 32);
+                    _mm512_storeu_ps(dst, _mm512_loadu_ps(src));
+                    _mm512_storeu_ps(dst.add(16), _mm512_loadu_ps(src.add(16)));
+                }
+            }
+            let pb_send = SendConstPtr(cache.as_ptr());
 
-        let num_threads = rayon::current_num_threads();
-        let target_chunks = (num_threads * 4).max(1);
-        let ideal_chunk = (m / target_chunks).max(8);
-        let row_chunk = ideal_chunk.div_ceil(8) * 8;
-        let num_row_chunks = m.div_ceil(row_chunk);
+            let num_threads = rayon::current_num_threads();
+            let target_chunks = (num_threads * 4).max(1);
+            let ideal_chunk = (m / target_chunks).max(8);
+            let row_chunk = ideal_chunk.div_ceil(8) * 8;
+            let num_row_chunks = m.div_ceil(row_chunk);
 
-        (0..num_row_chunks).into_par_iter().for_each(move |row_block| {
-            let r_start = row_block * row_chunk;
-            let r_end = (r_start + row_chunk).min(m);
-            let r_count = r_end - r_start;
-            gemm_compute_row_block_packed(
-                r_start, r_count, n, k, a_send.get(), pb_send.get(), b_send.get(), c_send.get(),
-                alpha, beta, alpha_vec, beta_vec, bias, act,
-                zero_vec, six_vec, three_vec, inv_six_vec,
-            );
+            (0..num_row_chunks).into_par_iter().for_each(move |row_block| {
+                let r_start = row_block * row_chunk;
+                let r_end = (r_start + row_chunk).min(m);
+                let r_count = r_end - r_start;
+                gemm_compute_row_block_packed(
+                    r_start, r_count, n, k, a_send.get(), pb_send.get(), b_send.get(), c_send.get(),
+                    alpha, beta, alpha_vec, beta_vec, bias, act,
+                    zero_vec, six_vec, three_vec, inv_six_vec,
+                );
+            });
         });
     }
 

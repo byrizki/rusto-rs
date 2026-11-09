@@ -208,7 +208,7 @@ pub fn load_onnx(slice: &[u8]) -> Result<Graph, MnnError> {
                         name: in_name.clone(),
                         in_indices: SmallVec::new(),
                         out_indices: smallvec::smallvec![const_id],
-                        op: OpKind::Const(const_tensor.clone()),
+                        op: OpKind::Const(const_tensor.clone().into_shared()),
                     });
                     emitted_constants.insert(in_name.clone());
                 }

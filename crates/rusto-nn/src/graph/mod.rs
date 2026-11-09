@@ -103,6 +103,9 @@ fn compute_conv_padding(
     }
 }
 
+const MAX_POOLED_BUF_FLOATS: usize = 4 * 1024 * 1024; // 16 MB max per pooled buffer
+const MAX_POOL_TOTAL_FLOATS: usize = 16 * 1024 * 1024; // 64 MB max pool per thread
+
 thread_local! {
     static TENSOR_BUFFER_POOL: core::cell::RefCell<Vec<Vec<f32>>> = core::cell::RefCell::new(Vec::with_capacity(64));
     static MATMUL_SCRATCH_A: core::cell::RefCell<Vec<f32>> = const { core::cell::RefCell::new(Vec::new()) };
@@ -114,26 +117,19 @@ fn pop_pooled_buffer(len: usize) -> Option<Vec<f32>> {
     TENSOR_BUFFER_POOL.with(|cell| {
         let mut pool = cell.borrow_mut();
         let mut best_fit: Option<(usize, usize)> = None;
-        let mut largest: Option<(usize, usize)> = None;
 
         for (i, buf) in pool.iter().enumerate() {
             let cap = buf.capacity();
-            if cap >= len {
+            if cap >= len && cap <= (len * 4).max(len + 65536) {
                 match best_fit {
                     None => best_fit = Some((i, cap)),
                     Some((_, best_cap)) if cap < best_cap => best_fit = Some((i, cap)),
                     _ => {}
                 }
-            } else {
-                match largest {
-                    None => largest = Some((i, cap)),
-                    Some((_, max_cap)) if cap > max_cap => largest = Some((i, cap)),
-                    _ => {}
-                }
             }
         }
 
-        best_fit.or(largest).map(|(i, _)| pool.swap_remove(i))
+        best_fit.map(|(i, _)| pool.swap_remove(i))
     })
 }
 
@@ -164,14 +160,25 @@ pub fn alloc_tensor_buffer_overwrite(len: usize) -> Vec<f32> {
 
 #[inline(always)]
 pub fn recycle_tensor_buffer(buf: Vec<f32>) {
-    if buf.capacity() == 0 {
+    let cap = buf.capacity();
+    if cap == 0 || cap > MAX_POOLED_BUF_FLOATS {
         return;
     }
     TENSOR_BUFFER_POOL.with(|cell| {
         let mut pool = cell.borrow_mut();
         if pool.len() < 128 {
-            pool.push(buf);
+            let total: usize = pool.iter().map(|b| b.capacity()).sum();
+            if total + cap <= MAX_POOL_TOTAL_FLOATS {
+                pool.push(buf);
+            }
         }
+    });
+}
+
+/// Clears thread-local intermediate tensor buffer pool to free retained memory.
+pub fn clear_tensor_buffer_pool() {
+    TENSOR_BUFFER_POOL.with(|cell| {
+        cell.borrow_mut().clear();
     });
 }
 
@@ -1796,8 +1803,14 @@ pub fn execute_node_with_liveness(
             } else {
                 vec![1]
             };
+            let fill_val = if in_indices.len() >= 2 {
+                let val_tensor = ctx.get_tensor(in_indices[1])?;
+                val_tensor.to_f32_vec().first().copied().unwrap_or(*value)
+            } else {
+                *value
+            };
             let out_len: usize = out_shape.iter().product();
-            let out_tensor = Tensor::from_floats(&out_shape, vec![*value; out_len], TensorLayout::NCHW);
+            let out_tensor = Tensor::from_floats(&out_shape, vec![fill_val; out_len], TensorLayout::NCHW);
             ctx.set_tensor(out_idx, out_tensor);
             Ok(())
         }

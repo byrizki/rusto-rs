@@ -23,6 +23,9 @@ pub mod tensor;
 pub mod engine;
 pub mod pipeline;
 pub mod order;
+pub mod order_blocks;
+pub mod lines;
+pub mod resample;
 pub use pipeline as pipelines;
 
 pub use error::CoreError;

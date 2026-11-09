@@ -4,6 +4,11 @@
 //! decoding for neural reading order models (e.g. Indra OCR OrderNet).
 
 use std::cmp::Ordering;
+use std::collections::HashMap;
+use crate::engine::InferenceSession;
+use crate::error::CoreError;
+use crate::order_blocks::decode_blocks_order;
+use crate::tensor::ArrayD;
 
 const N_GEOM: usize = 10;
 const N_TEXT: usize = 6;
@@ -48,7 +53,11 @@ pub fn compute_line_features(
     }
     let mut sorted_h = heights.clone();
     sorted_h.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
-    let med_h = sorted_h[n / 2];
+    let med_h = if n % 2 == 1 {
+        sorted_h[n / 2]
+    } else {
+        0.5 * (sorted_h[n / 2 - 1] + sorted_h[n / 2])
+    };
 
     let mut feats = vec![0.0f32; n * N_ORDER_FEATS];
     let sentence_ends = ['.', '!', '?', ':', ';', '。', '！', '？', '：', '；', '．'];
@@ -78,12 +87,13 @@ pub fn compute_line_features(
                 let d_len = display_len(t);
                 feats[base + 10] = (1.0 + d_len as f32).ln() / 5.0;
 
+                let char_count = t.chars().count();
                 let digit_count = t.chars().filter(|c| c.is_ascii_digit()).count();
-                feats[base + 11] = digit_count as f32 / t.chars().count().max(1) as f32;
+                feats[base + 11] = digit_count as f32 / char_count.max(1) as f32;
 
                 let first_char = t.chars().next().unwrap();
                 let is_bullet_char = matches!(first_char, '•' | '-' | '–' | '▪' | '◦' | '*' | '·' | '→');
-                let is_num_bullet = {
+                let is_num_bullet = char_count > 3 && {
                     let prefix: String = t.chars().take(3).collect();
                     let prefix_trimmed = prefix.trim_end_matches(['.', ')']);
                     !prefix_trimmed.is_empty() && prefix_trimmed.chars().all(|c| c.is_ascii_digit())
@@ -185,6 +195,105 @@ pub fn decode_order_logits(a: &[f32], n: usize, sweeps: usize) -> Vec<usize> {
     order
 }
 
+/// Executes neural reading order prediction on extracted text lines.
+pub fn predict_reading_order(
+    session: &mut dyn InferenceSession,
+    boxes: &[[f32; 4]],
+    page_w: f32,
+    page_h: f32,
+    texts: &[String],
+) -> Result<Vec<usize>, CoreError> {
+    let n = boxes.len();
+    if n <= 1 {
+        return Ok((0..n).collect());
+    }
+
+    const MAX_ORDER_N: usize = 1024;
+    if n <= MAX_ORDER_N {
+        predict_reading_order_block(session, boxes, page_w, page_h, texts)
+    } else {
+        predict_reading_order_banded(session, boxes, page_w, page_h, texts, MAX_ORDER_N)
+    }
+}
+
+fn predict_reading_order_block(
+    session: &mut dyn InferenceSession,
+    boxes: &[[f32; 4]],
+    page_w: f32,
+    page_h: f32,
+    texts: &[String],
+) -> Result<Vec<usize>, CoreError> {
+    let n = boxes.len();
+    let feats = compute_line_features(boxes, page_w, page_h, texts);
+    let feats_arr = ArrayD::from_shape_vec(vec![1, n, N_ORDER_FEATS], feats)
+        .map_err(|e| CoreError::InvalidShape(e.to_string()))?;
+    let mask_vec = vec![1.0f32; n];
+    let mask_arr = ArrayD::from_shape_vec(vec![1, n], mask_vec)
+        .map_err(|e| CoreError::InvalidShape(e.to_string()))?;
+
+    let mut inputs = HashMap::new();
+    inputs.insert("feats".to_string(), feats_arr);
+    inputs.insert("mask".to_string(), mask_arr);
+
+    let outputs = session.run_with_inputs(inputs)?;
+    let a_tensor = outputs
+        .get("a")
+        .or_else(|| outputs.get("output"))
+        .or_else(|| outputs.values().next())
+        .ok_or_else(|| CoreError::Model("Reading order model produced no output logits 'a'".into()))?;
+
+    let a_slice = a_tensor.as_slice();
+    if a_slice.len() < n * n {
+        return Err(CoreError::InvalidShape(format!(
+            "Reading order logits output length {} < N*N {}",
+            a_slice.len(),
+            n * n
+        )));
+    }
+
+    if let (Some(same), Some(cls)) = (outputs.get("same"), outputs.get("cls")) {
+        let same_slice = same.as_slice();
+        if same_slice.len() >= n * n {
+            return Ok(decode_blocks_order(
+                &a_slice[..n * n],
+                &same_slice[..n * n],
+                boxes,
+                Some(cls.as_slice()),
+            ));
+        }
+    }
+
+    Ok(decode_order_logits(a_slice, n, 4))
+}
+
+fn predict_reading_order_banded(
+    session: &mut dyn InferenceSession,
+    boxes: &[[f32; 4]],
+    page_w: f32,
+    page_h: f32,
+    texts: &[String],
+    max_chunk: usize,
+) -> Result<Vec<usize>, CoreError> {
+    let n = boxes.len();
+    let mut sorted_indices: Vec<usize> = (0..n).collect();
+    sorted_indices.sort_by(|&i, &j| boxes[i][1].partial_cmp(&boxes[j][1]).unwrap_or(Ordering::Equal));
+
+    let mut final_order = Vec::with_capacity(n);
+    for chunk in sorted_indices.chunks(max_chunk) {
+        let chunk_boxes: Vec<[f32; 4]> = chunk.iter().map(|&idx| boxes[idx]).collect();
+        let chunk_texts: Vec<String> = chunk
+            .iter()
+            .map(|&idx| texts.get(idx).cloned().unwrap_or_default())
+            .collect();
+        let local_order =
+            predict_reading_order_block(session, &chunk_boxes, page_w, page_h, &chunk_texts)?;
+        for local_idx in local_order {
+            final_order.push(chunk[local_idx]);
+        }
+    }
+    Ok(final_order)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -227,4 +336,3 @@ mod tests {
         assert_eq!(order_rev, vec![1, 0]);
     }
 }
-

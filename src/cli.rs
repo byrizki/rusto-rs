@@ -483,7 +483,8 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    if cli.format == OutputFormat::TextOrdered {
+    let has_model_order = cli.reading_order || cli.order_model.is_some() || cli.enable_layout;
+    if cli.format == OutputFormat::TextOrdered && !has_model_order {
         effective_results = rusto_core::layout::cluster_and_sort_reading_order(effective_results, None, None);
     }
 

@@ -534,7 +534,7 @@ fn pretranspose_const_matmul_b(nodes: &mut [Node], graph_outputs: &HashSet<usize
         };
 
         if let Some(new_t) = transposed {
-            nodes[const_idx].op = OpKind::Const(new_t);
+            nodes[const_idx].op = OpKind::Const(new_t.into_shared());
             if let OpKind::MatMul(p) = &mut nodes[mm_idx].op {
                 p.trans_b = false;
             }

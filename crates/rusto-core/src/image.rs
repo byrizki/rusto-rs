@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::Arc;
 use image::{DynamicImage, GenericImageView, ImageBuffer, Rgb, Rgba};
 use crate::error::CoreError;
 
@@ -50,7 +51,7 @@ impl Rect {
 
 #[derive(Clone)]
 pub struct Mat {
-    image: DynamicImage,
+    image: Arc<DynamicImage>,
 }
 
 impl std::fmt::Debug for Mat {
@@ -65,21 +66,23 @@ impl std::fmt::Debug for Mat {
 impl Default for Mat {
     fn default() -> Self {
         Self {
-            image: DynamicImage::new_rgb8(1, 1),
+            image: Arc::new(DynamicImage::new_rgb8(1, 1)),
         }
     }
 }
 
 impl Mat {
     pub fn new(image: DynamicImage) -> Self {
-        Self { image }
+        Self {
+            image: Arc::new(image),
+        }
     }
 
     pub fn from_rgb8(width: u32, height: u32, data: Vec<u8>) -> Result<Self> {
         let img = ImageBuffer::<Rgb<u8>, _>::from_raw(width, height, data)
             .ok_or_else(|| CoreError::Image("Failed to create image from raw rgb8 data".to_string()))?;
         Ok(Self {
-            image: DynamicImage::ImageRgb8(img),
+            image: Arc::new(DynamicImage::ImageRgb8(img)),
         })
     }
 
@@ -92,7 +95,7 @@ impl Mat {
         let img = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, data)
             .ok_or_else(|| CoreError::Image("Failed to create image from raw rgba8 data".to_string()))?;
         Ok(Self {
-            image: DynamicImage::ImageRgba8(img),
+            image: Arc::new(DynamicImage::ImageRgba8(img)),
         })
     }
 
@@ -215,10 +218,10 @@ pub fn rotate(src: &Mat, dst: &mut Mat, rotation: i32) -> Result<()> {
     const ROTATE_90_COUNTERCLOCKWISE: i32 = 2;
 
     dst.image = match rotation {
-        ROTATE_90_CLOCKWISE => src.image.rotate90(),
-        ROTATE_180 => src.image.rotate180(),
-        ROTATE_90_COUNTERCLOCKWISE => src.image.rotate270(),
-        _ => src.image.clone(),
+        ROTATE_90_CLOCKWISE => Arc::new(src.image.rotate90()),
+        ROTATE_180 => Arc::new(src.image.rotate180()),
+        ROTATE_90_COUNTERCLOCKWISE => Arc::new(src.image.rotate270()),
+        _ => Arc::clone(&src.image),
     };
     Ok(())
 }

@@ -331,9 +331,6 @@ pub fn decode_linenet_det_boxes(
             let mut max_x = x;
 
             while let Some((cx, cy)) = queue.pop_front() {
-                let mean_y0 = sum_top / count as f32;
-                let mean_y1 = sum_bot / count as f32;
-
                 if cx < min_x { min_x = cx; }
                 if cx > max_x { max_x = cx; }
 
@@ -345,23 +342,17 @@ pub fn decode_linenet_det_boxes(
                 ] {
                     if nx < out_w && ny < out_h {
                         let nidx = ny * out_w + nx;
-                        if !visited[nidx] && prob[nidx] >= det_thresh {
+                        if !visited[nidx] && prob[nidx] > det_thresh {
                             let nys = (ny as f32 + 0.5) * 2.0;
                             let n_y0 = nys - preds[[0, 1, ny, nx]];
                             let n_y1 = nys + preds[[0, 2, ny, nx]];
 
-                            let overlap = (mean_y1.min(n_y1) - mean_y0.max(n_y0)).max(0.0);
-                            let union_len = mean_y1.max(n_y1) - mean_y0.min(n_y0);
-                            let iou = overlap / union_len.max(1.0);
-
-                            if iou >= 0.50 {
-                                visited[nidx] = true;
-                                sum_top += n_y0;
-                                sum_bot += n_y1;
-                                sum_prob += prob[nidx];
-                                count += 1;
-                                queue.push_back((nx, ny));
-                            }
+                            visited[nidx] = true;
+                            sum_top += n_y0;
+                            sum_bot += n_y1;
+                            sum_prob += prob[nidx];
+                            count += 1;
+                            queue.push_back((nx, ny));
                         }
                     }
                 }
@@ -383,7 +374,7 @@ pub fn decode_linenet_det_boxes(
             let x1 = (x1_in / scale_w).clamp(0.0, orig_w);
             let y1 = (y1_in / scale_h).clamp(0.0, orig_h);
 
-            if (x1 - x0) > 4.0 && (y1 - y0) > 4.0 {
+            if x1 > x0 && y1 > y0 {
                 let box_quad = [
                     Point2f::new(x0, y0),
                     Point2f::new(x1, y0),
@@ -608,9 +599,6 @@ pub fn decode_linenet_det_boxes_slice(
             let mut max_x = x;
 
             while let Some((cx, cy)) = queue.pop_front() {
-                let mean_y0 = sum_top / count as f32;
-                let mean_y1 = sum_bot / count as f32;
-
                 if cx < min_x { min_x = cx; }
                 if cx > max_x { max_x = cx; }
 
@@ -622,23 +610,17 @@ pub fn decode_linenet_det_boxes_slice(
                 ] {
                     if nx < out_w && ny < out_h {
                         let nidx = ny * out_w + nx;
-                        if !visited[nidx] && prob_at(nidx) >= det_thresh {
+                        if !visited[nidx] && prob_at(nidx) > det_thresh {
                             let nys = (ny as f32 + 0.5) * 2.0;
                             let n_y0 = nys - det_data[plane + nidx];
                             let n_y1 = nys + det_data[2 * plane + nidx];
 
-                            let overlap = (mean_y1.min(n_y1) - mean_y0.max(n_y0)).max(0.0);
-                            let union_len = mean_y1.max(n_y1) - mean_y0.min(n_y0);
-                            let iou = overlap / union_len.max(1.0);
-
-                            if iou >= 0.50 {
-                                visited[nidx] = true;
-                                sum_top += n_y0;
-                                sum_bot += n_y1;
-                                sum_prob += prob_at(nidx);
-                                count += 1;
-                                queue.push_back((nx, ny));
-                            }
+                            visited[nidx] = true;
+                            sum_top += n_y0;
+                            sum_bot += n_y1;
+                            sum_prob += prob_at(nidx);
+                            count += 1;
+                            queue.push_back((nx, ny));
                         }
                     }
                 }
@@ -660,7 +642,7 @@ pub fn decode_linenet_det_boxes_slice(
             let x1 = (x1_in / scale_w).clamp(0.0, orig_w);
             let y1 = (y1_in / scale_h).clamp(0.0, orig_h);
 
-            if (x1 - x0) > 4.0 && (y1 - y0) > 4.0 {
+            if x1 > x0 && y1 > y0 {
                 raw_boxes.push(([x0, y0, x1, y1], avg_prob));
             }
         }
