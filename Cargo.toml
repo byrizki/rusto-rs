@@ -86,7 +86,7 @@ criterion = "0.5"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 [features]
-default = ["ffi"]
+default = []
 use-opencv = ["opencv", "dep:rusto-cpp", "rusto-cpp/opencv"]
 uniffi = ["dep:uniffi", "uniffi/scaffolding-ffi-buffer-fns"]
 uniffi-cli = ["uniffi", "uniffi/cli"]

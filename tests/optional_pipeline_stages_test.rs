@@ -639,6 +639,7 @@ fn test_issue25_multi_column_reading_order_and_region_ids() {
 }
 
 #[test]
+#[cfg(feature = "ffi")]
 fn test_issue25_c_ffi_layout_api_and_results() {
     use rusto::ffi::*;
     use rusto::{InitializeConfig, RustO};
@@ -686,6 +687,7 @@ fn test_issue25_c_ffi_layout_api_and_results() {
 }
 
 #[test]
+#[cfg(feature = "ffi")]
 fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
     use rusto::ffi::*;
     use rusto::{DetectTextResult, ImageSource, OcrRunOptions, RustO};

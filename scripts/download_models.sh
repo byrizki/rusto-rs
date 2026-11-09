@@ -26,7 +26,7 @@ WITH_INDRA=false
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --all) DOWNLOAD_ALL=true ;;
-        --ci|--test-fixtures) PREPARE_CI=true ;;
+        --ci|--test-fixtures|--benchmark) PREPARE_CI=true ;;
         --convert-rten) CONVERT_RTEN=true ;; # Kept for backward-compatibility, no-op since .rten is fetched directly
         --keep-onnx) KEEP_ONNX=true ;;
         --with-cls) WITH_CLS=true ;;
@@ -269,12 +269,14 @@ download_indra() {
 }
 
 download_ci_fixtures() {
-    echo "=== Preparing All Test Model Fixtures for CI ==="
+    echo "=== Preparing All Test Model Fixtures for CI / Benchmark ==="
     local ppocr_dir="$REPO_ROOT/models/PPOCR_v6_tiny"
+    local ppocr_small_dir="$REPO_ROOT/models/PPOCR_v6_small"
     local indra_dir="$REPO_ROOT/models/indra"
     local modules_dir="$REPO_ROOT/models"
 
     download_ppocrv6 "tiny" "$ppocr_dir"
+    download_ppocrv6 "small" "$ppocr_small_dir"
     download_modules "$ppocr_dir"
     download_indra "$indra_dir"
 
@@ -299,7 +301,7 @@ elif [ "$DOWNLOAD_ALL" = true ]; then
     download_modules "${OUTPUT_DIR:-$REPO_ROOT/models}"
     download_indra "${OUTPUT_DIR:-$REPO_ROOT/models/indra}"
 else
-    TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_tiny}"
+    TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_$TIER}"
     case "$MODEL_TYPE" in
         ppocrv6)
             download_ppocrv6 "$TIER" "$TARGET_DIR"

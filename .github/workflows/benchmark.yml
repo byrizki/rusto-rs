@@ -17,8 +17,17 @@ on:
         required: false
         default: '30'
         type: string
+      benchmark_suite:
+        description: 'Benchmark Suite: "all" (both), "raw-ocr" (base det+rec), or "full-pipeline" (layout & reading order)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - raw-ocr
+          - full-pipeline
       targets:
-        description: 'Target to evaluate (default "all" for all 12 targets in parallel, or comma-separated targets)'
+        description: 'Target override (default "all" for all targets in chosen suite, or comma-separated target names/aliases)'
         required: false
         default: 'all'
         type: string
@@ -45,15 +54,16 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          shared-key: "benchmark-binaries"
+
       - name: Build All Benchmark Binaries
         run: |
-          cargo build --release \
-            --bin rusto \
-            --bin rusto-rten \
-            --bin rusto-mnn \
-            --bin rten-direct \
-            --bin mnn-direct \
-            --features rten,mnn-cpp
+          cargo build --release --bin rusto
+          cargo build --release --bin rusto-rten --bin rten-direct --features rten
+          cargo build --release --bin rusto-mnn --bin mnn-direct --features mnn-cpp
           cp target/release/rusto target/release/rusto-rs
 
       - name: Install Standalone ocrs Binary
@@ -78,6 +88,24 @@ jobs:
             benchmarks/omnidocbench/ocrs_bin/bin/ocrs
           retention-days: 7
 
+      - name: Cache OCR Models
+        uses: actions/cache@v4
+        id: models-cache
+        with:
+          path: |
+            models
+            ~/.cache/rusto
+          key: rusto-ocr-models-${{ runner.os }}-${{ hashFiles('scripts/download_models.sh') }}
+          restore-keys: |
+            rusto-ocr-models-${{ runner.os }}-
+            rusto-ocr-models-
+
+      - name: Prepare Test Models (Warm Up Cache)
+        if: steps.models-cache.outputs.cache-hit != 'true'
+        run: |
+          chmod +x scripts/download_models.sh
+          bash scripts/download_models.sh --benchmark
+
       - name: Cache OmniDocBench Dataset
         uses: actions/cache@v4
         id: dataset-cache
@@ -97,39 +125,80 @@ jobs:
       - name: Resolve Benchmark Target Matrix
         id: resolve-matrix
         env:
+          SUITE_INPUT: ${{ inputs.benchmark_suite || 'all' }}
           TARGETS_INPUT: ${{ inputs.targets || 'all' }}
         run: |
           python3 -c "
           import json, os
-          all_targets = [
-              {'target': 'paddleocr_tiny', 'name': '(a) Python PaddleOCR + PP-OCRv6 Tiny'},
-              {'target': 'rapidocr_tiny', 'name': '(b) Python RapidOCR + PP-OCRv6 Tiny'},
-              {'target': 'indra_ocr', 'name': '(c) Python Indra OCR'},
-              {'target': 'mnn_ocr_tiny', 'name': '(d) MNN OCR Standalone (Direct) + PP-OCRv6'},
-              {'target': 'rten_ocr_direct', 'name': '(e) RTen OCR Direct + PP-OCRv6'},
-              {'target': 'ocrs', 'name': '(f) RTen + ocrs'},
-              {'target': 'rusto_rten_tiny', 'name': '(g) RTen OCR (Rusto Binding) + PP-OCRv6'},
-              {'target': 'rusto_mnn_tiny', 'name': '(h) MNN OCR (Rusto Binding) + PP-OCRv6'},
-              {'target': 'rusto_rten_indra', 'name': '(i) RTen OCR (Rusto Binding) + Indra OCR'},
-              {'target': 'rusto_mnn_indra', 'name': '(j) MNN OCR (Rusto Binding) + Indra OCR'},
-              {'target': 'rusto_nn_ppocr', 'name': '(k) Rusto NN OCR (Pure-Rust MNN) + PP-OCRv6'},
-              {'target': 'rusto_nn_indra', 'name': '(l) Rusto NN OCR (Pure-Rust MNN) + Indra OCR'}
+          suite_input = os.environ.get('SUITE_INPUT', 'all').strip().lower()
+          targets_input = os.environ.get('TARGETS_INPUT', 'all').strip()
+
+          raw_ocr_targets = [
+              {'target': 'paddleocr_tiny', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-a) Python PaddleOCR + PP-OCRv6 Tiny'},
+              {'target': 'rapidocr_tiny', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-b) Python RapidOCR + PP-OCRv6 Tiny'},
+              {'target': 'mnn_ocr_tiny', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-c) MNN OCR Standalone (Direct) + PP-OCRv6'},
+              {'target': 'rten_ocr_direct', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-d) RTen OCR Direct + PP-OCRv6'},
+              {'target': 'ocrs', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-e) RTen + ocrs CLI'},
+              {'target': 'rusto_nn_ppocr', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-f) Rusto NN (Pure-Rust MNN) + PP-OCRv6 Tiny'},
+              {'target': 'rusto_rten_tiny', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-g) Rusto RTen + PP-OCRv6 Tiny'},
+              {'target': 'rusto_mnn_tiny', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-h) Rusto MNN (C++) + PP-OCRv6 Tiny'},
+              {'target': 'rusto_nn_indra', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-i) Rusto NN (Pure-Rust MNN) + Indra Models'},
+              {'target': 'rusto_rten_indra', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-j) Rusto RTen + Indra Models'},
+              {'target': 'rusto_mnn_indra', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-k) Rusto MNN (C++) + Indra Models'}
           ]
+
+          full_pipeline_targets = [
+              {'target': 'indra_ocr', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-a) Python Indra OCR (Official CLI)'},
+              {'target': 'paddle_structure', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-b) Python PaddleOCR + PP-Structure'},
+              {'target': 'rapid_structure_tiny', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-c) Python RapidOCR + RapidLayout Tiny'},
+              {'target': 'rusto_full_tiny', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-d) Rusto NN (Pure MNN) Full Pipeline + PP-OCRv6'},
+              {'target': 'rusto_rten_full_tiny', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-e) Rusto RTen Full Pipeline + PP-OCRv6'},
+              {'target': 'rusto_indra_full', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-f) Rusto NN (Pure MNN) Full Pipeline + Indra Order'},
+              {'target': 'rusto_rten_indra_full', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-g) Rusto RTen Full Pipeline + Indra Order'}
+          ]
+
           aliases = {
               'a': 'paddleocr_tiny', 'b': 'rapidocr_tiny', 'c': 'indra_ocr',
               'd': 'mnn_ocr_tiny', 'e': 'rten_ocr_direct', 'f': 'ocrs',
               'g': 'rusto_rten_tiny', 'h': 'rusto_mnn_tiny', 'i': 'rusto_rten_indra',
-              'j': 'rusto_mnn_indra', 'k': 'rusto_nn_ppocr', 'l': 'rusto_nn_indra'
+              'j': 'rusto_mnn_indra', 'k': 'rusto_nn_ppocr', 'l': 'rusto_nn_indra',
+              'raw_a': 'paddleocr_tiny', 'raw_b': 'rapidocr_tiny', 'raw_c': 'mnn_ocr_tiny',
+              'raw_d': 'rten_ocr_direct', 'raw_e': 'ocrs', 'raw_f': 'rusto_nn_ppocr',
+              'raw_g': 'rusto_rten_tiny', 'raw_h': 'rusto_mnn_tiny', 'raw_i': 'rusto_nn_indra',
+              'raw_j': 'rusto_rten_indra', 'raw_k': 'rusto_mnn_indra',
+              'p1': 'indra_ocr', 'p2': 'paddle_structure', 'p3': 'rapid_structure_tiny',
+              'p4': 'rusto_full_tiny', 'p5': 'rusto_rten_full_tiny',
+              'p6': 'rusto_indra_full', 'p7': 'rusto_rten_indra_full',
+              'pipe_a': 'indra_ocr', 'pipe_b': 'paddle_structure', 'pipe_c': 'rapid_structure_tiny',
+              'pipe_d': 'rusto_full_tiny', 'pipe_e': 'rusto_rten_full_tiny',
+              'pipe_f': 'rusto_indra_full', 'pipe_g': 'rusto_rten_indra_full',
+              'rusto_tiny': 'rusto_nn_ppocr', 'rusto_indra_base': 'rusto_nn_indra',
+              'rusto_nn_full_tiny': 'rusto_full_tiny', 'rusto_nn_indra_full': 'rusto_indra_full',
+              'python_paddleocr_tiny': 'paddleocr_tiny', 'python_rapidocr_tiny': 'rapidocr_tiny',
+              'python_indra_ocr': 'indra_ocr', 'python_paddle_structure': 'paddle_structure',
+              'python_rapid_structure': 'rapid_structure_tiny',
           }
-          req_input = os.environ.get('TARGETS_INPUT', 'all').strip()
-          if not req_input or req_input.lower() == 'all':
-              selected = all_targets
+
+          if suite_input in ('raw', 'raw-ocr', 'raw_ocr'):
+              candidates = raw_ocr_targets
+          elif suite_input in ('pipeline', 'full-pipeline', 'full_pipeline'):
+              candidates = full_pipeline_targets
           else:
-              raw = [t.strip().lower() for t in req_input.split(',') if t.strip()]
+              candidates = raw_ocr_targets + full_pipeline_targets
+
+          if not targets_input or targets_input.lower() == 'all':
+              selected = candidates
+          else:
+              raw = [t.strip().lower() for t in targets_input.split(',') if t.strip()]
               canonical = {aliases.get(t, t) for t in raw}
-              selected = [t for t in all_targets if t['target'].lower() in canonical or any(c in t['target'].lower() for c in canonical)]
+              if any(t in ('raw', 'raw-ocr', 'raw_ocr') for t in raw):
+                  canonical.update(t['target'] for t in raw_ocr_targets)
+              if any(t in ('pipeline', 'full-pipeline', 'full_pipeline') for t in raw):
+                  canonical.update(t['target'] for t in full_pipeline_targets)
+              selected = [t for t in (raw_ocr_targets + full_pipeline_targets) if t['target'].lower() in canonical or any(c in t['target'].lower() for c in canonical)]
               if not selected:
-                  selected = all_targets
+                  selected = candidates
+
           print('matrix=' + json.dumps({'include': selected}))
           " >> "$GITHUB_OUTPUT"
 
@@ -193,15 +262,55 @@ jobs:
           echo "=== target/release contents ==="
           ls -la target/release/
 
+      - name: Cache Pip Packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.target }}-${{ hashFiles('benchmarks/omnidocbench/run_full_benchmark.py') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.target }}-
+            ${{ runner.os }}-pip-
+
       - name: Install Base Python Benchmark Tools
         run: pip install Levenshtein numpy pillow
 
+      - name: Cache PaddleOCR Models
+        if: matrix.target == 'paddleocr_tiny' || matrix.target == 'paddle_structure'
+        uses: actions/cache@v4
+        with:
+          path: ~/.paddleocr
+          key: ${{ runner.os }}-paddleocr-models
+          restore-keys: |
+            ${{ runner.os }}-paddleocr-models
+
+      - name: Cache Standalone ocrs Models
+        if: matrix.target == 'ocrs'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ocrs
+          key: ${{ runner.os }}-ocrs-models
+          restore-keys: |
+            ${{ runner.os }}-ocrs-models
+
+      - name: Cache Indra OCR Dependencies
+        if: matrix.target == 'indra_ocr'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            vendor/indra-ocr
+          key: ${{ runner.os }}-indra-ocr-${{ hashFiles('benchmarks/omnidocbench/run_full_benchmark.py') }}
+          restore-keys: |
+            ${{ runner.os }}-indra-ocr-
+
       - name: Install Target-Specific Dependencies
         run: |
-          if [ "${{ matrix.target }}" = "paddleocr_tiny" ]; then
+          if [ "${{ matrix.target }}" = "paddleocr_tiny" ] || [ "${{ matrix.target }}" = "paddle_structure" ]; then
             pip install "paddleocr<3.0.0" paddlepaddle || pip install paddleocr paddlepaddle
           elif [ "${{ matrix.target }}" = "rapidocr_tiny" ]; then
             pip install rapidocr-onnxruntime
+          elif [ "${{ matrix.target }}" = "rapid_structure_tiny" ]; then
+            pip install rapidocr-onnxruntime rapid_layout "paddleocr<3.0.0" || pip install rapidocr-onnxruntime rapid_layout
           elif [ "${{ matrix.target }}" = "indra_ocr" ]; then
             pip install onnxruntime
             if [ ! -d vendor/indra-ocr ]; then
@@ -213,19 +322,25 @@ jobs:
 
       - name: Cache OCR Models
         uses: actions/cache@v4
+        id: benchmark-models-cache
         with:
-          path: models
-          key: rusto-ocr-models-${{ hashFiles('scripts/download_models.sh') }}
+          path: |
+            models
+            ~/.cache/rusto
+          key: rusto-ocr-models-${{ runner.os }}-${{ hashFiles('scripts/download_models.sh') }}
           restore-keys: |
+            rusto-ocr-models-${{ runner.os }}-
             rusto-ocr-models-
 
       - name: Prepare Test Models
+        if: steps.benchmark-models-cache.outputs.cache-hit != 'true'
         run: |
           chmod +x scripts/download_models.sh
-          bash scripts/download_models.sh --ci
+          bash scripts/download_models.sh --benchmark
 
       - name: Cache OmniDocBench Dataset
         uses: actions/cache@v4
+        id: benchmark-dataset-cache
         with:
           path: benchmarks/omnidocbench/dataset
           key: omnidocbench-${{ inputs.dataset_mode || 'english-only' }}-${{ hashFiles('scripts/download_omnidocbench.sh') }}
@@ -234,6 +349,7 @@ jobs:
             omnidocbench-
 
       - name: Ensure OmniDocBench Dataset Available
+        if: steps.benchmark-dataset-cache.outputs.cache-hit != 'true'
         run: |
           chmod +x scripts/download_omnidocbench.sh
           bash scripts/download_omnidocbench.sh --${{ inputs.dataset_mode || 'english-only' }}
@@ -267,6 +383,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Cache Pip Packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-aggregate-${{ hashFiles('benchmarks/omnidocbench/run_full_benchmark.py') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-aggregate-
+            ${{ runner.os }}-pip-
 
       - name: Install Reporting Dependencies
         run: pip install Levenshtein numpy pillow
