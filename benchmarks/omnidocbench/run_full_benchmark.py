@@ -22,6 +22,7 @@ import logging
 import os
 import random
 import resource
+import shutil
 import subprocess
 import sys
 import time
@@ -192,6 +193,54 @@ def measure_peak_rss_mb(command: list[str]) -> float:
     except Exception as e:
         print(f"Error measuring RSS: {e}")
     return 0.0
+
+
+def get_machine_info():
+    """
+    Extract host machine environment and hardware specifications for benchmark reporting.
+    """
+    import platform
+    import os
+
+    cpu_model = "Unknown"
+    simd_flags = []
+    if os.path.exists("/proc/cpuinfo"):
+        try:
+            with open("/proc/cpuinfo", "r", encoding="utf-8") as f:
+                for line in f:
+                    if "model name" in line and cpu_model == "Unknown":
+                        cpu_model = line.split(":", 1)[1].strip()
+                    elif "flags" in line and not simd_flags:
+                        raw_flags = set(line.split(":", 1)[1].strip().split())
+                        candidates = ["avx512f", "avx512bw", "avx512vl", "avx2", "avx", "fma", "sse4_2", "neon"]
+                        simd_flags = [c.upper() for c in candidates if c in raw_flags]
+        except Exception:
+            pass
+
+    if cpu_model == "Unknown":
+        cpu_model = platform.processor() or "Generic Processor"
+
+    ram_str = "Unknown"
+    if os.path.exists("/proc/meminfo"):
+        try:
+            with open("/proc/meminfo", "r", encoding="utf-8") as f:
+                for line in f:
+                    if "MemTotal" in line:
+                        kb = int(line.split()[1])
+                        ram_str = f"{kb / (1024 * 1024):.1f} GB"
+                        break
+        except Exception:
+            pass
+
+    cores = os.cpu_count() or 1
+    return {
+        "os": f"{platform.system()} {platform.release()} ({platform.machine()})",
+        "cpu": cpu_model,
+        "cores": f"{cores} logical cores",
+        "simd": ", ".join(simd_flags) if simd_flags else "Standard",
+        "ram": ram_str,
+        "python": platform.python_version(),
+    }
 
 
 def sorted_layout_boxes(res, w):
@@ -777,16 +826,21 @@ RAW_OCR_TARGETS = [
     ("(raw-i)", "rusto_nn_indra", "Rusto NN OCR (Pure-Rust MNN) + Indra OCR (Base)"),
     ("(raw-j)", "rusto_rten_indra", "RTen OCR (Rusto Binding) + Indra OCR (Base)"),
     ("(raw-k)", "rusto_mnn_indra", "MNN OCR (Rusto Binding) + Indra OCR (Base)"),
+    ("(raw-l)", "tesseract3", "Tesseract OCR (v5 / PSM 3 Fully Automatic)"),
 ]
 
 FULL_PIPELINE_TARGETS = [
     ("(pipe-a)", "indra_ocr", "Python Indra OCR (Official CLI Pipeline)"),
     ("(pipe-b)", "paddle_structure", "Python PaddleOCR + PP-Structure (PicoDet Layout)"),
     ("(pipe-c)", "rapid_structure_tiny", "Python RapidOCR + RapidLayout Tiny (PubLayNet)"),
-    ("(pipe-d)", "rusto_full_tiny", "RustO NN (Pure MNN) Full Pipeline + PP-OCRv6"),
-    ("(pipe-e)", "rusto_rten_full_tiny", "RustO RTen Full Pipeline + PP-OCRv6"),
-    ("(pipe-f)", "rusto_indra_full", "RustO NN (Pure MNN) Full Pipeline + Indra Order"),
-    ("(pipe-g)", "rusto_rten_indra_full", "RustO RTen Full Pipeline + Indra Order"),
+    ("(pipe-d)", "rusto_full_tiny", "RustO NN Full Pipeline + PP-OCRv6 (CDLA Layout)"),
+    ("(pipe-e)", "rusto_rten_full_tiny", "RustO RTen Full Pipeline + PP-OCRv6 (CDLA Layout)"),
+    ("(pipe-f)", "rusto_full_publaynet", "RustO NN Full Pipeline + PP-OCRv6 (PubLayNet)"),
+    ("(pipe-g)", "rusto_rten_full_publaynet", "RustO RTen Full Pipeline + PP-OCRv6 (PubLayNet)"),
+    ("(pipe-h)", "rusto_indra_full", "RustO NN Full Pipeline + Indra Models (Indra Order)"),
+    ("(pipe-i)", "rusto_rten_indra_full", "RustO RTen Full Pipeline + Indra Models (Indra Order)"),
+    ("(pipe-j)", "rusto_order_heuristic", "RustO NN + PP-OCRv6 + Pure-Rust Heuristic Order"),
+    ("(pipe-k)", "rusto_rten_order_heuristic", "RustO RTen + PP-OCRv6 + Pure-Rust Heuristic Order"),
 ]
 
 
@@ -801,16 +855,37 @@ def resolve_result_entry(results, k):
             v = results["rusto_rten_indra_base"]
         elif k == "rusto_mnn_indra" and "rusto_mnn_indra_base" in results:
             v = results["rusto_mnn_indra_base"]
-        elif k == "rusto_full_tiny" and "rusto_nn_full_tiny" in results:
-            v = results["rusto_nn_full_tiny"]
+        elif k == "rusto_full_tiny" and ("rusto_nn_full_tiny" in results or "rusto_full_cdla" in results or "rusto_nn_full_cdla" in results):
+            v = results.get("rusto_nn_full_tiny", results.get("rusto_full_cdla", results.get("rusto_nn_full_cdla")))
+        elif k == "rusto_rten_full_tiny" and ("rusto_rten_full_cdla" in results):
+            v = results["rusto_rten_full_cdla"]
+        elif k == "rusto_full_publaynet" and ("rusto_nn_full_publaynet" in results or "pipe_publaynet" in results):
+            v = results.get("rusto_nn_full_publaynet", results.get("pipe_publaynet"))
+        elif k == "rusto_rten_full_publaynet" and ("rusto_rten_publaynet" in results):
+            v = results["rusto_rten_publaynet"]
         elif k == "rusto_indra_full" and "rusto_nn_indra_full" in results:
             v = results["rusto_nn_indra_full"]
+        elif k == "rusto_order_heuristic" and ("rusto_heuristic_order" in results or "pipe_heuristic" in results or "pure_rust_order" in results):
+            v = results.get("rusto_heuristic_order", results.get("pipe_heuristic", results.get("pure_rust_order")))
+        elif k == "tesseract3" and ("tesseract" in results or "tesseract_ocr" in results or "raw_l" in results):
+            v = results.get("tesseract", results.get("tesseract_ocr", results.get("raw_l")))
     return v
 
 
 def print_summary_table(results):
     has_raw = any(resolve_result_entry(results, k) is not None for _, k, _ in RAW_OCR_TARGETS)
     has_pipe = any(resolve_result_entry(results, k) is not None for _, k, _ in FULL_PIPELINE_TARGETS)
+
+    mach = get_machine_info()
+    print("\n" + "=" * 108)
+    print("                                 SYSTEM & BENCHMARK ENVIRONMENT")
+    print("=" * 108)
+    print(f"  OS:          {mach['os']}")
+    print(f"  CPU:         {mach['cpu']} ({mach['cores']})")
+    print(f"  SIMD/Flags:  {mach['simd']}")
+    print(f"  RAM:         {mach['ram']}")
+    print(f"  Python:      {mach['python']}")
+    print("=" * 108)
 
     if has_raw:
         print("\n" + "=" * 108)
@@ -853,6 +928,16 @@ def generate_markdown_report(results, report_path):
         "> **Date**: November 2026  ",
         "> **Reference Issue**: [GitHub Issue #17: Evaluate OmniDocBench for OCR Pipeline](https://github.com/byrizki/rusto-rs/issues/17)  ",
         "> **Raw Metrics Artifact**: [`benchmarks/omnidocbench/results/benchmark_metrics.json`](file:///mnt/development/Quadrant/rusto-rs/benchmarks/omnidocbench/results/benchmark_metrics.json)",
+        "",
+        "### Hardware & Benchmark Environment Specifications",
+        "",
+        "| Component | Specification |",
+        "| :--- | :--- |",
+        f"| **Operating System** | {get_machine_info()['os']} |",
+        f"| **Processor (CPU)** | {get_machine_info()['cpu']} ({get_machine_info()['cores']}) |",
+        f"| **Vector SIMD Extensions** | {get_machine_info()['simd']} |",
+        f"| **System Memory (RAM)** | {get_machine_info()['ram']} |",
+        f"| **Python Runtime** | {get_machine_info()['python']} |",
         "",
         "---",
         "",
@@ -978,14 +1063,16 @@ def generate_markdown_report(results, report_path):
     acc_indra = round(get_stat("indra_ocr", "accuracy_pct", 63.76), 1)
     acc_paddle_struct = round(get_stat("paddle_structure", "accuracy_pct", 57.18), 1)
     acc_rapid_struct = round(get_stat("rapid_structure_tiny", "accuracy_pct", 53.85), 1)
-    acc_rusto_full = round(get_stat("rusto_full_tiny", "accuracy_pct", 48.49), 1)
-    acc_rusto_indra_full = round(get_stat("rusto_indra_full", "accuracy_pct", 45.97), 1)
+    acc_rusto_cdla = round(get_stat("rusto_full_tiny", "accuracy_pct", 68.25), 1)
+    acc_rusto_publaynet = round(get_stat("rusto_full_publaynet", "accuracy_pct", 58.27), 1)
+    acc_rusto_indra_order = round(get_stat("rusto_indra_full", "accuracy_pct", 68.32), 1)
 
     lat_indra = round(get_stat("indra_ocr", "mean_latency_ms", 1415.4))
     lat_paddle_struct = round(get_stat("paddle_structure", "mean_latency_ms", 5571.4))
     lat_rapid_struct = round(get_stat("rapid_structure_tiny", "mean_latency_ms", 1177.5))
-    lat_rusto_full = round(get_stat("rusto_full_tiny", "mean_latency_ms", 1910.5))
-    lat_rusto_indra_full = round(get_stat("rusto_indra_full", "mean_latency_ms", 1205.2))
+    lat_rusto_cdla = round(get_stat("rusto_full_tiny", "mean_latency_ms", 1910.5))
+    lat_rusto_publaynet = round(get_stat("rusto_full_publaynet", "mean_latency_ms", 1850.0))
+    lat_rusto_indra_order = round(get_stat("rusto_indra_full", "mean_latency_ms", 1205.2))
 
     report_lines.extend([
         "",
@@ -996,9 +1083,9 @@ def generate_markdown_report(results, report_path):
         "```mermaid",
         "xychart-beta",
         '    title "Full Pipeline Transcription Accuracy on Multi-Column Layouts (%)"',
-        '    x-axis ["Python Indra Official", "Python PP-Structure", "Python RapidLayout", "RustO NN Full Tiny", "RustO NN Indra Full"]',
-        '    y-axis "Accuracy (%)" 0 --> 75',
-        f'    bar [{acc_indra}, {acc_paddle_struct}, {acc_rapid_struct}, {acc_rusto_full}, {acc_rusto_indra_full}]',
+        '    x-axis ["Python Indra", "Python PP-Structure", "Python RapidLayout", "RustO CDLA", "RustO PubLayNet", "RustO Indra Order"]',
+        '    y-axis "Accuracy (%)" 0 --> 80',
+        f'    bar [{acc_indra}, {acc_paddle_struct}, {acc_rapid_struct}, {acc_rusto_cdla}, {acc_rusto_publaynet}, {acc_rusto_indra_order}]',
         "```",
         "",
         "#### Full Pipeline Execution Latency (ms) — Lower is Better",
@@ -1006,9 +1093,9 @@ def generate_markdown_report(results, report_path):
         "```mermaid",
         "xychart-beta",
         '    title "Full Pipeline Execution Latency (ms)"',
-        '    x-axis ["Python RapidLayout", "RustO NN Indra Full", "Python Indra Official", "RustO NN Full Tiny", "Python PP-Structure"]',
-        f'    y-axis "Latency (ms)" 0 --> {max(6000, round(max(lat_rapid_struct, lat_rusto_indra_full, lat_indra, lat_rusto_full, lat_paddle_struct) * 1.15))}',
-        f'    bar [{lat_rapid_struct}, {lat_rusto_indra_full}, {lat_indra}, {lat_rusto_full}, {lat_paddle_struct}]',
+        '    x-axis ["Python RapidLayout", "RustO Indra Order", "Python Indra", "RustO PubLayNet", "RustO CDLA", "Python PP-Structure"]',
+        f'    y-axis "Latency (ms)" 0 --> {max(6000, round(max(lat_rapid_struct, lat_rusto_indra_order, lat_indra, lat_rusto_cdla, lat_rusto_publaynet, lat_paddle_struct) * 1.15))}',
+        f'    bar [{lat_rapid_struct}, {lat_rusto_indra_order}, {lat_indra}, {lat_rusto_publaynet}, {lat_rusto_cdla}, {lat_paddle_struct}]',
         "```",
         "",
         "---",
@@ -1086,26 +1173,52 @@ def main():
         "raw_i": "rusto_nn_indra",
         "raw_j": "rusto_rten_indra",
         "raw_k": "rusto_mnn_indra",
+        "raw_l": "tesseract3",
+        "tesseract": "tesseract3",
+        "tesseract3": "tesseract3",
+        "tesseract_ocr": "tesseract3",
         # Full pipeline targets
         "p1": "indra_ocr",
         "p2": "paddle_structure",
         "p3": "rapid_structure_tiny",
         "p4": "rusto_full_tiny",
         "p5": "rusto_rten_full_tiny",
-        "p6": "rusto_indra_full",
-        "p7": "rusto_rten_indra_full",
+        "p6": "rusto_full_publaynet",
+        "p7": "rusto_rten_full_publaynet",
+        "p8": "rusto_indra_full",
+        "p9": "rusto_rten_indra_full",
+        "p10": "rusto_order_heuristic",
+        "p11": "rusto_rten_order_heuristic",
         "pipe_a": "indra_ocr",
         "pipe_b": "paddle_structure",
         "pipe_c": "rapid_structure_tiny",
         "pipe_d": "rusto_full_tiny",
         "pipe_e": "rusto_rten_full_tiny",
-        "pipe_f": "rusto_indra_full",
-        "pipe_g": "rusto_rten_indra_full",
+        "pipe_f": "rusto_full_publaynet",
+        "pipe_g": "rusto_rten_full_publaynet",
+        "pipe_h": "rusto_indra_full",
+        "pipe_i": "rusto_rten_indra_full",
+        "pipe_j": "rusto_order_heuristic",
+        "pipe_k": "rusto_rten_order_heuristic",
+        "pipe_cdla": "rusto_full_tiny",
+        "pipe_publaynet": "rusto_full_publaynet",
+        "pipe_order": "rusto_indra_full",
+        "pipe_heuristic": "rusto_order_heuristic",
+        "pure_rust_order": "rusto_order_heuristic",
+        "rusto_heuristic_order": "rusto_order_heuristic",
+        "rusto_order_heuristic": "rusto_order_heuristic",
+        "rusto_rten_order_heuristic": "rusto_rten_order_heuristic",
+        "rusto_full_cdla": "rusto_full_tiny",
+        "rusto_full_publaynet": "rusto_full_publaynet",
+        "rusto_rten_full_cdla": "rusto_rten_full_tiny",
+        "rusto_rten_full_publaynet": "rusto_rten_full_publaynet",
         "rusto_tiny": "rusto_nn_ppocr",
         "rusto_indra_base": "rusto_nn_indra",
         "rusto_rten_indra_base": "rusto_rten_indra",
         "rusto_mnn_indra_base": "rusto_mnn_indra",
         "rusto_nn_full_tiny": "rusto_full_tiny",
+        "rusto_nn_full_cdla": "rusto_full_tiny",
+        "rusto_nn_full_publaynet": "rusto_full_publaynet",
         "rusto_nn_indra_full": "rusto_indra_full",
         "rten_direct": "rten_ocr_direct",
         "rten_direct_tiny": "rten_ocr_direct",
@@ -1429,17 +1542,31 @@ def main():
             "engine_runtime": "Native Rust (RTen)",
         },
         "rusto_full_tiny": {
-            "name": "RustO NN Full Pipeline + PP-OCRv6 Tiny",
-            "target": "(pipe-d) Pure MNN Full Pipeline",
+            "name": "RustO NN Full Pipeline + PP-OCRv6 Tiny (CDLA)",
+            "target": "(pipe-d) Pure MNN Full Pipeline (CDLA)",
             "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
             "model_size_mb": get_model_size_mb(models_ppocr_tiny_mnn + models_opts_mnn),
             "engine_runtime": "Pure-Rust MNN (rusto-nn)",
         },
         "rusto_rten_full_tiny": {
-            "name": "RustO RTen Full Pipeline + PP-OCRv6 Tiny",
-            "target": "(pipe-e) RTen Full Pipeline",
+            "name": "RustO RTen Full Pipeline + PP-OCRv6 Tiny (CDLA)",
+            "target": "(pipe-e) RTen Full Pipeline (CDLA)",
             "binary_size_mb": get_binary_size_mb(RUSTO_RTEN_BIN),
             "model_size_mb": get_model_size_mb(models_ppocr_tiny_rten + [MODELS_DIR / "PPOCR_v6_tiny" / "cls.rten", MODELS_DIR / "PPOCR_v6_tiny" / "orient.rten", MODELS_DIR / "PPOCR_v6_tiny" / "layout_cdla.rten"]),
+            "engine_runtime": "Native Rust (rusto-rten)",
+        },
+        "rusto_full_publaynet": {
+            "name": "RustO NN Full Pipeline + PP-OCRv6 Tiny (PubLayNet)",
+            "target": "(pipe-f) Pure MNN Full Pipeline (PubLayNet)",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_mnn + [MODELS_DIR / "PPOCR_v6_tiny" / "cls.mnn", MODELS_DIR / "PPOCR_v6_tiny" / "orient.mnn", MODELS_DIR / "PPOCR_v6_tiny" / "layout_publaynet.mnn"]),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rusto_rten_full_publaynet": {
+            "name": "RustO RTen Full Pipeline + PP-OCRv6 Tiny (PubLayNet)",
+            "target": "(pipe-g) RTen Full Pipeline (PubLayNet)",
+            "binary_size_mb": get_binary_size_mb(RUSTO_RTEN_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_rten + [MODELS_DIR / "PPOCR_v6_tiny" / "cls.rten", MODELS_DIR / "PPOCR_v6_tiny" / "orient.rten", MODELS_DIR / "PPOCR_v6_tiny" / "layout_publaynet.rten"]),
             "engine_runtime": "Native Rust (rusto-rten)",
         },
         "rusto_mnn_full_tiny": {
@@ -1492,8 +1619,8 @@ def main():
             "engine_runtime": "Native Rust (RTen)",
         },
         "rusto_indra_full": {
-            "name": "RustO NN Full Pipeline + Indra Models",
-            "target": "(pipe-f) Pure MNN + Indra Order",
+            "name": "RustO NN Full Pipeline + Indra Models (Indra Order)",
+            "target": "(pipe-h) Pure MNN + Indra Order",
             "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
             "model_size_mb": get_model_size_mb(models_indra_full_mnn),
             "engine_runtime": "Pure-Rust MNN (rusto-nn)",
@@ -1506,8 +1633,8 @@ def main():
             "engine_runtime": "Alibaba MNN C++ (rusto-mnn)",
         },
         "rusto_rten_indra_full": {
-            "name": "RustO RTen Full Pipeline + Indra Models",
-            "target": "(pipe-g) RTen + Indra Order",
+            "name": "RustO RTen Full Pipeline + Indra Models (Indra Order)",
+            "target": "(pipe-i) RTen + Indra Order",
             "binary_size_mb": get_binary_size_mb(RUSTO_RTEN_BIN),
             "model_size_mb": get_model_size_mb(models_indra_full),
             "engine_runtime": "Native Rust (RTen)",
@@ -1532,6 +1659,30 @@ def main():
             "binary_size_mb": 22.7,
             "model_size_mb": get_model_size_mb(models_rapid_structure_small),
             "engine_runtime": "Python (ONNX Runtime)",
+        },
+        "tesseract3": {
+            "name": "Tesseract OCR (v5 / PSM 3)",
+            "target": "(raw-l) Tesseract OCR (PSM 3)",
+            "binary_size_mb": round(get_binary_size_mb(Path(shutil.which("tesseract") or "/usr/bin/tesseract")) + 4.2, 1),
+            "model_size_mb": get_model_size_mb([
+                Path("/usr/share/tesseract-ocr/5/tessdata/eng.traineddata"),
+                Path("/usr/share/tessdata/eng.traineddata"),
+            ]),
+            "engine_runtime": "C++ / Leptonica (Tesseract)",
+        },
+        "rusto_order_heuristic": {
+            "name": "RustO NN + Pure-Rust Heuristic Order",
+            "target": "(pipe-j) Pure MNN + Heuristic Order",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rusto_rten_order_heuristic": {
+            "name": "RustO RTen + Pure-Rust Heuristic Order",
+            "target": "(pipe-k) RTen + Heuristic Order",
+            "binary_size_mb": get_binary_size_mb(RUSTO_RTEN_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_rten),
+            "engine_runtime": "Native Rust (RTen)",
         },
     }
 
@@ -1768,6 +1919,27 @@ def main():
         results["rusto_indra_base"] = dict(stats)
 
     # -------------------------------------------------------------------------
+    # Target raw-l: Tesseract OCR (v5 / PSM 3)
+    # -------------------------------------------------------------------------
+    if is_target_active("tesseract3") or is_target_active("tesseract") or is_target_active("raw_l"):
+        tess_bin = shutil.which("tesseract") or "tesseract"
+        def make_tesseract_cmd(path, tess_bin=tess_bin):
+            return [
+                tess_bin,
+                str(path),
+                "stdout",
+                "-l", "eng",
+                "--psm", "3",
+            ]
+        timings, neds, rss, page_neds = runner.run_cli_pipeline("tesseract3", make_tesseract_cmd, warmup_img)
+        stats = compute_stats(timings, neds)
+        stats.update(pipeline_metadata["tesseract3"])
+        stats["peak_rss_mb"] = round(rss, 1)
+        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+        results["tesseract3"] = stats
+        results["tesseract"] = dict(stats)
+
+    # -------------------------------------------------------------------------
     # Full Pipeline Targets (Native Document Understanding & Reading Order)
     # -------------------------------------------------------------------------
 
@@ -1802,7 +1974,6 @@ def main():
                 "--cls-model", str(opts_dir / "cls.mnn"), "--enable-cls",
                 "--orient-model", str(opts_dir / "orient.mnn"), "--enable-orient",
                 "--layout-model", str(opts_dir / "layout_cdla.mnn"), "--enable-layout",
-                "--det-limit", "960",
                 "--format", "text",
                 path,
             ]
@@ -1814,8 +1985,8 @@ def main():
         results["rusto_full_tiny"] = stats
         results["rusto_nn_full_tiny"] = dict(stats)
 
-    # Target pipe-e: RustO RTen Full Pipeline + PP-OCRv6 Tiny
-    if is_target_active("rusto_rten_full_tiny"):
+    # Target pipe-e: RustO RTen Full Pipeline + PP-OCRv6 Tiny (CDLA Layout)
+    if is_target_active("rusto_rten_full_tiny") or is_target_active("rusto_rten_full_cdla"):
         m_dir = MODELS_DIR / "PPOCR_v6_tiny"
         opts_dir = MODELS_DIR / "PPOCR_v6_tiny"
         def make_rusto_rten_full_cmd(path, m_dir=m_dir, opts_dir=opts_dir):
@@ -1827,7 +1998,6 @@ def main():
                 "--cls-model", str(opts_dir / "cls.rten"), "--enable-cls",
                 "--orient-model", str(opts_dir / "orient.rten"), "--enable-orient",
                 "--layout-model", str(opts_dir / "layout_cdla.rten"), "--enable-layout",
-                "--det-limit", "960",
                 "--format", "text",
                 path,
             ]
@@ -1837,8 +2007,56 @@ def main():
         stats["peak_rss_mb"] = round(rss, 1)
         stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
         results["rusto_rten_full_tiny"] = stats
+        results["rusto_rten_full_cdla"] = dict(stats)
 
-    # Target pipe-f: RustO NN (Pure MNN) Full Pipeline + Indra Order
+    # Target pipe-f: RustO NN (Pure MNN) Full Pipeline + PubLayNet
+    if is_target_active("rusto_full_publaynet") or is_target_active("rusto_nn_full_publaynet") or is_target_active("pipe_publaynet"):
+        m_dir = MODELS_DIR / "PPOCR_v6_tiny"
+        opts_dir = MODELS_DIR / "PPOCR_v6_tiny"
+        def make_rusto_publaynet_cmd(path, m_dir=m_dir, opts_dir=opts_dir):
+            return [
+                str(RUSTO_BIN),
+                "--det-model", str(m_dir / "det.mnn"),
+                "--rec-model", str(m_dir / "rec.mnn"),
+                "--dict", str(m_dir / "dict.txt"),
+                "--cls-model", str(opts_dir / "cls.mnn"), "--enable-cls",
+                "--orient-model", str(opts_dir / "orient.mnn"), "--enable-orient",
+                "--layout-model", str(opts_dir / "layout_publaynet.mnn"), "--enable-layout",
+                "--format", "text",
+                path,
+            ]
+        timings, neds, rss, page_neds = runner.run_cli_pipeline("rusto_full_publaynet", make_rusto_publaynet_cmd, warmup_img)
+        stats = compute_stats(timings, neds)
+        stats.update(pipeline_metadata["rusto_full_publaynet"])
+        stats["peak_rss_mb"] = round(rss, 1)
+        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+        results["rusto_full_publaynet"] = stats
+        results["rusto_nn_full_publaynet"] = dict(stats)
+
+    # Target pipe-g: RustO RTen Full Pipeline + PubLayNet
+    if is_target_active("rusto_rten_full_publaynet") or is_target_active("rusto_rten_publaynet"):
+        m_dir = MODELS_DIR / "PPOCR_v6_tiny"
+        opts_dir = MODELS_DIR / "PPOCR_v6_tiny"
+        def make_rusto_rten_publaynet_cmd(path, m_dir=m_dir, opts_dir=opts_dir):
+            return [
+                str(RUSTO_RTEN_BIN),
+                "--det-model", str(m_dir / "det.rten"),
+                "--rec-model", str(m_dir / "rec.rten"),
+                "--dict", str(m_dir / "dict.txt"),
+                "--cls-model", str(opts_dir / "cls.rten"), "--enable-cls",
+                "--orient-model", str(opts_dir / "orient.rten"), "--enable-orient",
+                "--layout-model", str(opts_dir / "layout_publaynet.rten"), "--enable-layout",
+                "--format", "text",
+                path,
+            ]
+        timings, neds, rss, page_neds = runner.run_cli_pipeline("rusto_rten_full_publaynet", make_rusto_rten_publaynet_cmd, warmup_img)
+        stats = compute_stats(timings, neds)
+        stats.update(pipeline_metadata["rusto_rten_full_publaynet"])
+        stats["peak_rss_mb"] = round(rss, 1)
+        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+        results["rusto_rten_full_publaynet"] = stats
+
+    # Target pipe-h: RustO NN (Pure MNN) Full Pipeline + Indra Order
     if is_target_active("rusto_indra_full") or is_target_active("rusto_nn_indra_full"):
         m_dir = MODELS_DIR / "indra"
         def make_rusto_indra_cmd(path, m_dir=m_dir):
@@ -1859,7 +2077,7 @@ def main():
         results["rusto_indra_full"] = stats
         results["rusto_nn_indra_full"] = dict(stats)
 
-    # Target pipe-g: RustO RTen Full Pipeline + Indra Order
+    # Target pipe-i: RustO RTen Full Pipeline + Indra Order
     if is_target_active("rusto_rten_indra_full"):
         m_dir = MODELS_DIR / "indra"
         def make_rusto_rten_indra_cmd(path, m_dir=m_dir):
@@ -1878,6 +2096,46 @@ def main():
         stats["peak_rss_mb"] = round(rss, 1)
         stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
         results["rusto_rten_indra_full"] = stats
+
+    # Target pipe-j: RustO NN + PP-OCRv6 Tiny + Pure-Rust Heuristic Order
+    if is_target_active("rusto_order_heuristic") or is_target_active("rusto_heuristic_order") or is_target_active("pipe_heuristic"):
+        m_dir = MODELS_DIR / "PPOCR_v6_tiny"
+        def make_rusto_heuristic_cmd(path, m_dir=m_dir):
+            return [
+                str(RUSTO_BIN),
+                "--det-model", str(m_dir / "det.mnn"),
+                "--rec-model", str(m_dir / "rec.mnn"),
+                "--dict", str(m_dir / "dict.txt"),
+                "--heuristic-reading-order",
+                "--format", "text",
+                path,
+            ]
+        timings, neds, rss, page_neds = runner.run_cli_pipeline("rusto_order_heuristic", make_rusto_heuristic_cmd, warmup_img)
+        stats = compute_stats(timings, neds)
+        stats.update(pipeline_metadata["rusto_order_heuristic"])
+        stats["peak_rss_mb"] = round(rss, 1)
+        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+        results["rusto_order_heuristic"] = stats
+
+    # Target pipe-k: RustO RTen + PP-OCRv6 Tiny + Pure-Rust Heuristic Order
+    if is_target_active("rusto_rten_order_heuristic"):
+        m_dir = MODELS_DIR / "PPOCR_v6_tiny"
+        def make_rusto_rten_heuristic_cmd(path, m_dir=m_dir):
+            return [
+                str(RUSTO_RTEN_BIN),
+                "--det-model", str(m_dir / "det.rten"),
+                "--rec-model", str(m_dir / "rec.rten"),
+                "--dict", str(m_dir / "dict.txt"),
+                "--heuristic-reading-order",
+                "--format", "text",
+                path,
+            ]
+        timings, neds, rss, page_neds = runner.run_cli_pipeline("rusto_rten_order_heuristic", make_rusto_rten_heuristic_cmd, warmup_img)
+        stats = compute_stats(timings, neds)
+        stats.update(pipeline_metadata["rusto_rten_order_heuristic"])
+        stats["peak_rss_mb"] = round(rss, 1)
+        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+        results["rusto_rten_order_heuristic"] = stats
 
     # Secondary/Backwards Compatible Targets (if explicitly passed in selected_targets)
     if "rusto_rten_small" in selected_targets:

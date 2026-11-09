@@ -70,6 +70,14 @@ pub struct OcrArgs {
     #[arg(long)]
     pub reading_order: bool,
 
+    /// Enable pure-Rust algorithmic reading order without neural tensor models
+    #[arg(long, alias = "reading-order-heuristic", alias = "pure-rust-order", alias = "heuristic-order")]
+    pub heuristic_reading_order: bool,
+
+    /// Path to neural reading order model (order.mnn / indra_order.rten)
+    #[arg(long)]
+    pub order_model: Option<PathBuf>,
+
     /// Output format
     #[arg(short, long, value_enum, default_value_t = OutputFormat::Json)]
     pub format: OutputFormat,
@@ -318,7 +326,7 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
                 };
                 resolve_asset_local(None, None, "layout", layout_file, &cache_dir).is_err()
             })
-            || (cli.reading_order && resolve_asset_local(None, None, "order", order_file, &cache_dir).is_err());
+            || (cli.reading_order && cli.order_model.is_none() && resolve_asset_local(None, None, "order", order_file, &cache_dir).is_err());
 
         if needs_download {
             eprintln!("Downloading missing {} model assets to {}...", cli.model, cache_dir.display());
@@ -333,7 +341,7 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
                 } else {
                     None
                 },
-                cli.reading_order,
+                cli.reading_order && cli.order_model.is_none(),
                 &cache_dir,
             )?;
         }
@@ -413,9 +421,9 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
         config = config.with_layout(layout_path);
     }
 
-    if cli.reading_order {
+    if !cli.heuristic_reading_order && (cli.reading_order || cli.order_model.is_some()) {
         let order_path = resolve_asset_local(
-            None,
+            cli.order_model.as_deref(),
             effective_dir,
             "order",
             order_file,
@@ -444,7 +452,7 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
     if cli.enable_unwarp {
         options.auto_unwarp = Some(true);
     }
-    if cli.enable_layout {
+    if cli.enable_layout || cli.reading_order || cli.order_model.is_some() || cli.heuristic_reading_order {
         options.layout_reading = Some(true);
     }
     if let Some(det_limit) = cli.det_limit {
@@ -476,14 +484,7 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
     };
 
     if cli.format == OutputFormat::TextOrdered {
-        effective_results.sort_by(|a, b| {
-            let y_diff = (a.frame.top - b.frame.top).abs();
-            if y_diff < 10.0 {
-                a.frame.left.partial_cmp(&b.frame.left).unwrap()
-            } else {
-                a.frame.top.partial_cmp(&b.frame.top).unwrap()
-            }
-        });
+        effective_results = rusto_core::layout::cluster_and_sort_reading_order(effective_results, None, None);
     }
 
     match cli.format {

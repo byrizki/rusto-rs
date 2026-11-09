@@ -26,16 +26,21 @@ RAW_TARGETS = [
     ("rusto_nn_indra", "(raw-i) Rusto NN OCR (Pure-Rust MNN) + Indra OCR (Base)"),
     ("rusto_rten_indra", "(raw-j) RTen OCR (Rusto Binding) + Indra OCR (Base)"),
     ("rusto_mnn_indra", "(raw-k) MNN OCR (Rusto Binding) + Indra OCR (Base)"),
+    ("tesseract3", "(raw-l) Tesseract OCR (v5 / PSM 3 Fully Automatic)"),
 ]
 
 FULL_PIPELINE_TARGETS = [
     ("indra_ocr", "(pipe-a) Python Indra OCR (Official CLI Pipeline)"),
     ("paddle_structure", "(pipe-b) Python PaddleOCR + PP-Structure (PicoDet Layout)"),
     ("rapid_structure_tiny", "(pipe-c) Python RapidOCR + RapidLayout Tiny (PubLayNet)"),
-    ("rusto_full_tiny", "(pipe-d) RustO NN (Pure MNN) Full Pipeline + PP-OCRv6"),
-    ("rusto_rten_full_tiny", "(pipe-e) RustO RTen Full Pipeline + PP-OCRv6"),
-    ("rusto_indra_full", "(pipe-f) RustO NN (Pure MNN) Full Pipeline + Indra Order"),
-    ("rusto_rten_indra_full", "(pipe-g) RustO RTen Full Pipeline + Indra Order"),
+    ("rusto_full_tiny", "(pipe-d) RustO NN Full Pipeline + PP-OCRv6 (CDLA Layout)"),
+    ("rusto_rten_full_tiny", "(pipe-e) RustO RTen Full Pipeline + PP-OCRv6 (CDLA Layout)"),
+    ("rusto_full_publaynet", "(pipe-f) RustO NN Full Pipeline + PP-OCRv6 (PubLayNet)"),
+    ("rusto_rten_full_publaynet", "(pipe-g) RustO RTen Full Pipeline + PP-OCRv6 (PubLayNet)"),
+    ("rusto_indra_full", "(pipe-h) RustO NN Full Pipeline + Indra Models (Indra Order)"),
+    ("rusto_rten_indra_full", "(pipe-i) RustO RTen Full Pipeline + Indra Models (Indra Order)"),
+    ("rusto_order_heuristic", "(pipe-j) RustO NN + Pure-Rust Heuristic Order"),
+    ("rusto_rten_order_heuristic", "(pipe-k) RustO RTen + Pure-Rust Heuristic Order"),
 ]
 
 def main():

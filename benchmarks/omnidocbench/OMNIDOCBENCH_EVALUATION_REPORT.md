@@ -7,6 +7,16 @@
 > **Reference Issue**: [GitHub Issue #17: Evaluate OmniDocBench for OCR Pipeline](https://github.com/byrizki/rusto-rs/issues/17)  
 > **Raw Metrics Artifact**: [`benchmarks/omnidocbench/results/benchmark_metrics.json`](file:///mnt/development/Quadrant/rusto-rs/benchmarks/omnidocbench/results/benchmark_metrics.json)
 
+### Hardware & Benchmark Environment Specifications
+
+| Component | Specification |
+| :--- | :--- |
+| **Operating System** | Linux 7.0.0-42-generic (x86_64) |
+| **Processor (CPU)** | 11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz (8 logical cores) |
+| **Vector SIMD Extensions** | AVX512F, AVX512BW, AVX512VL, AVX2, AVX, FMA, SSE4_2 |
+| **System Memory (RAM)** | 37.9 GB |
+| **Python Runtime** | 3.14.6 |
+
 ---
 
 ## 1. Part I: Raw OCR Benchmark (Base Text Detection & Recognition)
@@ -26,6 +36,7 @@
 | **(raw-i)** | Rusto NN OCR (Pure Rust MNN) + Indra OCR | Pure-Rust MNN (rusto-nn) | **2.0 MB** | 5.4 MB | 1141.3 ms | 3255.9 ms | 285.9 MB | 0.5403 | 45.97% |
 | **(raw-j)** | RTen OCR (rusto binding) + Indra OCR | Native Rust (rusto-rten) | **8.3 MB** | 5.4 MB | 1054.7 ms | 2823.1 ms | **196.2 MB** | 0.5403 | 45.97% |
 | **(raw-k)** | MNN OCR (rusto binding) + Indra OCR | Alibaba MNN C++ (rusto-mnn) | **7.2 MB** | 5.4 MB | 1141.3 ms | 3255.9 ms | 285.9 MB | 0.5403 | 45.97% |
+| **(raw-l)** | Tesseract OCR (v5 / PSM 3) | C++ / Leptonica (Tesseract) | 4.2 MB | 3.9 MB | 1886.8 ms | 1886.8 ms | **184.8 MB** | 0.2920 | 70.80% |
 
 ### Raw OCR Visual Performance & Memory Comparisons
 
@@ -70,9 +81,11 @@ xychart-beta
 | **(pipe-a)** | Indra OCR (Official Pipeline) | Python (ONNX Runtime) | 22.7 MB | 8.6 MB | 1415.4 ms | 2454.6 ms | 492.0 MB | 0.3624 | 63.76% |
 | **(pipe-b)** | PaddleOCR + PP-Structure | Python (PaddleStructure) | 120.1 MB | 23.0 MB | 5571.4 ms | 13002.7 ms | 10624.3 MB | 0.4282 | 57.18% |
 | **(pipe-c)** | RapidOCR + RapidLayout Tiny | Python (ONNX Runtime) | 22.7 MB | 13.1 MB | 1177.5 ms | 2380.2 ms | 449.5 MB | 0.4615 | 53.85% |
-| **(pipe-d)** | RustO NN Full Pipeline + PP-OCRv6 Tiny | Pure-Rust MNN (rusto-nn) | **2.0 MB** | 49.8 MB | 3614.3 ms | 3614.3 ms | **312.1 MB** | 0.5151 | 48.49% |
-| **(pipe-f)** | RustO Full Pipeline + Indra Models | Pure-Rust MNN (rusto-nn) | **2.0 MB** | 8.6 MB | 1205.2 ms | 2853.5 ms | **316.1 MB** | 0.5403 | 45.97% |
-| **(pipe-g)** | RustO Full Pipeline + Indra Models (RTen) | Native Rust (RTen) | **8.2 MB** | 8.6 MB | 1113.6 ms | 2766.3 ms | **223.8 MB** | 0.5403 | 45.97% |
+| **(pipe-d)** | RustO NN Full Pipeline + PP-OCRv6 Tiny (CDLA) | Pure-Rust MNN (rusto-nn) | **2.0 MB** | 49.8 MB | 11887.4 ms | 17679.5 ms | 680.6 MB | 0.7557 | 24.43% |
+| **(pipe-f)** | RustO NN Full Pipeline + PP-OCRv6 Tiny (PubLayNet) | Pure-Rust MNN (rusto-nn) | **2.0 MB** | 19.7 MB | 17944.5 ms | 24871.5 ms | 666.9 MB | 0.6437 | 35.63% |
+| **(pipe-h)** | RustO NN Full Pipeline + Indra Models (Indra Order) | Pure-Rust MNN (rusto-nn) | **2.0 MB** | 8.6 MB | 7845.4 ms | 13133.2 ms | **283.6 MB** | 0.6326 | 36.74% |
+| **(pipe-i)** | RustO Full Pipeline + Indra Models (RTen) | Native Rust (RTen) | **8.2 MB** | 8.6 MB | 1113.6 ms | 2766.3 ms | **223.8 MB** | 0.5403 | 45.97% |
+| **(pipe-j)** | RustO NN + Pure-Rust Heuristic Order | Pure-Rust MNN (rusto-nn) | **2.0 MB** | 5.9 MB | 3917.3 ms | 3917.3 ms | 621.5 MB | 0.2874 | 71.26% |
 
 ### Full Pipeline Visual Comparisons
 
@@ -81,9 +94,9 @@ xychart-beta
 ```mermaid
 xychart-beta
     title "Full Pipeline Transcription Accuracy on Multi-Column Layouts (%)"
-    x-axis ["Python Indra Official", "Python PP-Structure", "Python RapidLayout", "RustO NN Full Tiny", "RustO NN Indra Full"]
-    y-axis "Accuracy (%)" 0 --> 75
-    bar [63.8, 57.2, 53.9, 48.5, 46.0]
+    x-axis ["Python Indra", "Python PP-Structure", "Python RapidLayout", "RustO CDLA", "RustO PubLayNet", "RustO Indra Order"]
+    y-axis "Accuracy (%)" 0 --> 80
+    bar [63.8, 57.2, 53.9, 24.4, 35.6, 36.7]
 ```
 
 #### Full Pipeline Execution Latency (ms) — Lower is Better
@@ -91,9 +104,9 @@ xychart-beta
 ```mermaid
 xychart-beta
     title "Full Pipeline Execution Latency (ms)"
-    x-axis ["Python RapidLayout", "RustO NN Indra Full", "Python Indra Official", "RustO NN Full Tiny", "Python PP-Structure"]
-    y-axis "Latency (ms)" 0 --> 6407
-    bar [1177, 1205, 1415, 3614, 5571]
+    x-axis ["Python RapidLayout", "RustO Indra Order", "Python Indra", "RustO PubLayNet", "RustO CDLA", "Python PP-Structure"]
+    y-axis "Latency (ms)" 0 --> 20636
+    bar [1177, 7845, 1415, 17944, 11887, 5571]
 ```
 
 ---

@@ -419,12 +419,12 @@ pub fn resolve_asset_local(
         } else {
             dir
         };
-        if let Some(found) = find_in_model_dir(dir_path, asset_kind) {
-            return Ok(found);
-        }
         let direct = dir_path.join(asset_filename);
         if direct.exists() && fs::metadata(&direct).map(|m| m.len() > 0).unwrap_or(false) {
             return Ok(direct);
+        }
+        if let Some(found) = find_in_model_dir(dir_path, asset_kind) {
+            return Ok(found);
         }
         return Ok(resolve_default_model_dir_asset(dir_path, asset_kind, asset_filename));
     }

@@ -76,6 +76,13 @@ impl PipelineOutput {
                     return order_text_results_by_layout(&grouped, regions, self.img_w);
                 }
             }
+            if options.layout_reading.unwrap_or(false) {
+                return crate::layout::cluster_and_sort_reading_order(
+                    grouped,
+                    Some(line_y),
+                    Some(word_x),
+                );
+            }
             grouped
         } else {
             let entries = self.to_text_results();

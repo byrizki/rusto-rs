@@ -144,17 +144,22 @@ jobs:
               {'target': 'rusto_mnn_tiny', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-h) Rusto MNN (C++) + PP-OCRv6 Tiny'},
               {'target': 'rusto_nn_indra', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-i) Rusto NN (Pure-Rust MNN) + Indra Models'},
               {'target': 'rusto_rten_indra', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-j) Rusto RTen + Indra Models'},
-              {'target': 'rusto_mnn_indra', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-k) Rusto MNN (C++) + Indra Models'}
+              {'target': 'rusto_mnn_indra', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-k) Rusto MNN (C++) + Indra Models'},
+              {'target': 'tesseract3', 'suite': 'raw_ocr', 'name': 'Raw OCR: (raw-l) Tesseract OCR (v5 / PSM 3)'}
           ]
 
           full_pipeline_targets = [
               {'target': 'indra_ocr', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-a) Python Indra OCR (Official CLI)'},
               {'target': 'paddle_structure', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-b) Python PaddleOCR + PP-Structure'},
-              {'target': 'rapid_structure_tiny', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-c) Python RapidOCR + RapidLayout Tiny'},
-              {'target': 'rusto_full_tiny', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-d) Rusto NN (Pure MNN) Full Pipeline + PP-OCRv6'},
-              {'target': 'rusto_rten_full_tiny', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-e) Rusto RTen Full Pipeline + PP-OCRv6'},
-              {'target': 'rusto_indra_full', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-f) Rusto NN (Pure MNN) Full Pipeline + Indra Order'},
-              {'target': 'rusto_rten_indra_full', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-g) Rusto RTen Full Pipeline + Indra Order'}
+              {'target': 'rapid_structure_tiny', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-c) Python RapidOCR + RapidLayout Tiny (PubLayNet)'},
+              {'target': 'rusto_full_tiny', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-d) RustO NN Full Pipeline + CDLA Layout'},
+              {'target': 'rusto_rten_full_tiny', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-e) RustO RTen Full Pipeline + CDLA Layout'},
+              {'target': 'rusto_full_publaynet', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-f) RustO NN Full Pipeline + PubLayNet Layout'},
+              {'target': 'rusto_rten_full_publaynet', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-g) RustO RTen Full Pipeline + PubLayNet Layout'},
+              {'target': 'rusto_indra_full', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-h) RustO NN Full Pipeline + Indra Order'},
+              {'target': 'rusto_rten_indra_full', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-i) RustO RTen Full Pipeline + Indra Order'},
+              {'target': 'rusto_order_heuristic', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-j) RustO NN + PP-OCRv6 + Pure-Rust Heuristic Order'},
+              {'target': 'rusto_rten_order_heuristic', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-k) RustO RTen + PP-OCRv6 + Pure-Rust Heuristic Order'}
           ]
 
           aliases = {
@@ -162,18 +167,29 @@ jobs:
               'd': 'mnn_ocr_tiny', 'e': 'rten_ocr_direct', 'f': 'ocrs',
               'g': 'rusto_rten_tiny', 'h': 'rusto_mnn_tiny', 'i': 'rusto_rten_indra',
               'j': 'rusto_mnn_indra', 'k': 'rusto_nn_ppocr', 'l': 'rusto_nn_indra',
+              'm': 'tesseract3', 'raw_l': 'tesseract3', 'tesseract': 'tesseract3', 'tesseract3': 'tesseract3',
               'raw_a': 'paddleocr_tiny', 'raw_b': 'rapidocr_tiny', 'raw_c': 'mnn_ocr_tiny',
               'raw_d': 'rten_ocr_direct', 'raw_e': 'ocrs', 'raw_f': 'rusto_nn_ppocr',
               'raw_g': 'rusto_rten_tiny', 'raw_h': 'rusto_mnn_tiny', 'raw_i': 'rusto_nn_indra',
               'raw_j': 'rusto_rten_indra', 'raw_k': 'rusto_mnn_indra',
               'p1': 'indra_ocr', 'p2': 'paddle_structure', 'p3': 'rapid_structure_tiny',
               'p4': 'rusto_full_tiny', 'p5': 'rusto_rten_full_tiny',
-              'p6': 'rusto_indra_full', 'p7': 'rusto_rten_indra_full',
+              'p6': 'rusto_full_publaynet', 'p7': 'rusto_rten_full_publaynet',
+              'p8': 'rusto_indra_full', 'p9': 'rusto_rten_indra_full',
+              'p10': 'rusto_order_heuristic', 'p11': 'rusto_rten_order_heuristic',
               'pipe_a': 'indra_ocr', 'pipe_b': 'paddle_structure', 'pipe_c': 'rapid_structure_tiny',
               'pipe_d': 'rusto_full_tiny', 'pipe_e': 'rusto_rten_full_tiny',
-              'pipe_f': 'rusto_indra_full', 'pipe_g': 'rusto_rten_indra_full',
+              'pipe_f': 'rusto_full_publaynet', 'pipe_g': 'rusto_rten_full_publaynet',
+              'pipe_h': 'rusto_indra_full', 'pipe_i': 'rusto_rten_indra_full',
+              'pipe_j': 'rusto_order_heuristic', 'pipe_k': 'rusto_rten_order_heuristic',
+              'pipe_heuristic': 'rusto_order_heuristic', 'rusto_heuristic_order': 'rusto_order_heuristic',
+              'pipe_cdla': 'rusto_full_tiny', 'pipe_publaynet': 'rusto_full_publaynet',
+              'pipe_order': 'rusto_indra_full',
+              'rusto_full_cdla': 'rusto_full_tiny', 'rusto_full_publaynet': 'rusto_full_publaynet',
+              'rusto_rten_full_cdla': 'rusto_rten_full_tiny', 'rusto_rten_full_publaynet': 'rusto_rten_full_publaynet',
               'rusto_tiny': 'rusto_nn_ppocr', 'rusto_indra_base': 'rusto_nn_indra',
-              'rusto_nn_full_tiny': 'rusto_full_tiny', 'rusto_nn_indra_full': 'rusto_indra_full',
+              'rusto_nn_full_tiny': 'rusto_full_tiny', 'rusto_nn_full_cdla': 'rusto_full_tiny',
+              'rusto_nn_full_publaynet': 'rusto_full_publaynet', 'rusto_nn_indra_full': 'rusto_indra_full',
               'python_paddleocr_tiny': 'paddleocr_tiny', 'python_rapidocr_tiny': 'rapidocr_tiny',
               'python_indra_ocr': 'indra_ocr', 'python_paddle_structure': 'paddle_structure',
               'python_rapid_structure': 'rapid_structure_tiny',
@@ -279,9 +295,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.paddleocr
-          key: ${{ runner.os }}-paddleocr-models
+          key: ${{ runner.os }}-paddleocr-${{ matrix.target }}-v1
           restore-keys: |
-            ${{ runner.os }}-paddleocr-models
+            ${{ runner.os }}-paddleocr-${{ matrix.target }}-
+            ${{ runner.os }}-paddleocr-
 
       - name: Cache Standalone ocrs Models
         if: matrix.target == 'ocrs'
@@ -318,6 +335,17 @@ jobs:
               git clone --depth 1 https://github.com/datalab-to/indra.git vendor/indra-ocr
             fi
             pip install -e vendor/indra-ocr
+          elif [ "${{ matrix.target }}" = "tesseract3" ]; then
+            sudo apt-get update -y && sudo apt-get install -y tesseract-ocr tesseract-ocr-eng
+          fi
+
+      - name: Pre-warm PaddleOCR Model Cache
+        if: matrix.target == 'paddle_structure' || matrix.target == 'paddleocr_tiny'
+        run: |
+          if [ "${{ matrix.target }}" = "paddle_structure" ]; then
+            python3 -c "from paddleocr import PPStructure; PPStructure(table=False, ocr=True, show_log=False, lang='en')" || true
+          elif [ "${{ matrix.target }}" = "paddleocr_tiny" ]; then
+            python3 -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=False, lang='en')" || true
           fi
 
       - name: Cache OCR Models
