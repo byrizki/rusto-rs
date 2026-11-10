@@ -11,6 +11,7 @@ use crate::tensor::Tensor;
 
 type PrunedPlan = Arc<(Vec<bool>, Vec<usize>)>;
 
+#[derive(Clone)]
 pub enum ModelHandle<'a> {
     Ref(&'a Model),
     Arc(Arc<Model>),
@@ -35,6 +36,21 @@ pub struct Session<'a> {
     output_indices: Vec<(String, usize)>,
     ctx: RefCell<GraphContext>,
     pruned_plans: RefCell<HashMap<Vec<usize>, PrunedPlan>>,
+}
+
+impl<'a> Clone for Session<'a> {
+    fn clone(&self) -> Self {
+        let tensor_names = self.model.tensor_names();
+        let ctx = RefCell::new(GraphContext::new(tensor_names.len(), tensor_names));
+        Self {
+            model: self.model.clone(),
+            input_map: self.input_map.clone(),
+            output_map: self.output_map.clone(),
+            output_indices: self.output_indices.clone(),
+            ctx,
+            pruned_plans: RefCell::new(HashMap::new()),
+        }
+    }
 }
 
 impl<'a> Session<'a> {

@@ -580,15 +580,19 @@ pub fn build_linenet_rec_batch(
         * 8;
     let mut batch_tensor = Array4::<f32>::zeros((n, 1, rec_h, max_w));
     let mut widths = Vec::with_capacity(n);
+    let batch_slice = batch_tensor.as_mut_slice();
+    let item_len = rec_h * max_w;
 
     for (local_i, &idx) in chunk.iter().enumerate() {
         let w = target_widths[idx];
         widths.push(w as i32);
         let ink_crop = prepare_linenet_rec_crop(&img_list[idx], rec_h, w)?;
+        let item_dest = &mut batch_slice[local_i * item_len..(local_i + 1) * item_len];
+        let crop_slice = ink_crop.as_slice();
         for y in 0..rec_h {
-            for x in 0..w {
-                batch_tensor[[local_i, 0, y, x]] = ink_crop[[y, x]];
-            }
+            let src_row = &crop_slice[y * w..(y + 1) * w];
+            let dst_row = &mut item_dest[y * max_w..y * max_w + w];
+            dst_row.copy_from_slice(src_row);
         }
     }
 
@@ -649,21 +653,21 @@ static NORM_LUT: std::sync::LazyLock<[f32; 256]> = std::sync::LazyLock::new(|| {
     lut
 });
 
-/// Resizes and normalizes an image crop for PP-OCR recognition models.
-pub fn resize_norm_rec_img(
+/// Resizes and normalizes an image crop for PP-OCR recognition models directly into a target slice.
+pub fn resize_norm_rec_img_to_slice(
     img: &Mat,
     img_c: usize,
     img_h: usize,
-    max_wh_ratio: f32,
-) -> Result<Array3<f32>, CoreError> {
-    let img_width = (img_h as f32 * max_wh_ratio).round() as i32;
-
+    target_w: usize,
+    dest: &mut [f32],
+) -> Result<(), CoreError> {
     let h = img.rows();
     let w = img.cols();
     if h <= 0 || w <= 0 {
         return Err(CoreError::Preprocess("invalid image size".to_string()));
     }
 
+    let img_width = target_w as i32;
     let ratio = w as f32 / h as f32;
     let resized_w = if ((img_h as f32) * ratio).ceil() as i32 > img_width {
         img_width
@@ -683,19 +687,15 @@ pub fn resize_norm_rec_img(
     let h2 = size.height as usize;
     let w2 = size.width as usize;
 
-    let target_w = img_width as usize;
     let plane_size = img_h * target_w;
     let valid_w = w2.min(target_w);
     let valid_h = h2.min(img_h);
-
-    let mut out = Array3::<f32>::zeros((img_c, img_h, target_w));
 
     if img_c == 3 && resized.as_dynamic().as_rgb8().is_some() {
         let rgb = resized.as_dynamic().as_rgb8().unwrap();
         let raw: &[u8] = rgb.as_raw();
         let stride = w2 * 3;
-        let out_slice = out.as_mut_slice();
-        let (b_plane, rest) = out_slice.split_at_mut(plane_size);
+        let (b_plane, rest) = dest.split_at_mut(plane_size);
         let (g_plane, r_plane) = rest.split_at_mut(plane_size);
 
         for y in 0..valid_h {
@@ -714,14 +714,49 @@ pub fn resize_norm_rec_img(
         for y in 0..valid_h {
             for x in 0..valid_w {
                 let pix = resized.get_pixel(x as u32, y as u32);
-                out[[0, y, x]] = NORM_LUT[pix[2] as usize];
-                out[[1, y, x]] = NORM_LUT[pix[1] as usize];
-                out[[2, y, x]] = NORM_LUT[pix[0] as usize];
+                dest[y * target_w + x] = NORM_LUT[pix[2] as usize];
+                dest[plane_size + y * target_w + x] = NORM_LUT[pix[1] as usize];
+                dest[2 * plane_size + y * target_w + x] = NORM_LUT[pix[0] as usize];
             }
         }
     }
 
+    Ok(())
+}
+
+/// Resizes and normalizes an image crop for PP-OCR recognition models.
+pub fn resize_norm_rec_img(
+    img: &Mat,
+    img_c: usize,
+    img_h: usize,
+    max_wh_ratio: f32,
+) -> Result<Array3<f32>, CoreError> {
+    let img_width = (img_h as f32 * max_wh_ratio).round() as usize;
+    let mut out = Array3::<f32>::zeros((img_c, img_h, img_width));
+    resize_norm_rec_img_to_slice(img, img_c, img_h, img_width, out.as_mut_slice())?;
     Ok(out)
+}
+
+/// Builds a stacked PP-OCR recognition batch tensor directly without intermediate allocations.
+pub fn build_rec_batch(
+    crop_imgs: &[Mat],
+    indices: &[usize],
+    img_c: usize,
+    img_h: usize,
+    max_wh_ratio: f32,
+) -> Result<Array4<f32>, CoreError> {
+    let n = indices.len();
+    let batch_img_width = (img_h as f32 * max_wh_ratio).round() as usize;
+    let item_len = img_c * img_h * batch_img_width;
+    let mut batch = Array4::<f32>::zeros((n, img_c, img_h, batch_img_width));
+    let batch_slice = batch.as_mut_slice();
+
+    for (i, &idx) in indices.iter().enumerate() {
+        let dest = &mut batch_slice[i * item_len..(i + 1) * item_len];
+        resize_norm_rec_img_to_slice(&crop_imgs[idx], img_c, img_h, batch_img_width, dest)?;
+    }
+
+    Ok(batch)
 }
 
 #[derive(Debug, Clone)]

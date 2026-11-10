@@ -748,7 +748,7 @@ pub fn pool2d(
 
     #[cfg(feature = "rayon")]
     {
-        if total_channels >= 2 {
+        if total_channels * hw_out >= 8192 && total_channels >= 4 {
             output
                 .par_chunks_exact_mut(hw_out)
                 .enumerate()

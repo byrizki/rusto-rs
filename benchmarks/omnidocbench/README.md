@@ -131,36 +131,35 @@ The complete 21-pipeline benchmark on OmniDocBench evaluates engines across **Pa
 
 | Engine / Runtime | Pipeline Target | Binary Size | Model Weights | Mean Latency ↓ | P95 Latency ↓ | Peak RSS ↓ | Mean NED ↓ | Accuracy (1-NED) ↑ | USA Today NED ↓ |
 |:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **PaddleOCR + PP-OCRv6 Tiny** | Target 4 (Base) | 120.1 MB | 6.1 MB | **605.3 ms** | **1,322.0 ms** | 659.3 MB | 0.5467 | 45.33% | **0.7331** |
-| **RustO + PP-OCRv6 Tiny (RTen)** | Target 1 (RTen) | **8.3 MB** | 6.1 MB | **976.0 ms** | **2,005.0 ms** | **178.0 MB** | **0.5459** | **45.41%** | **0.7319** |
-| **RapidOCR + PP-OCRv6 Tiny** | Target 3 (Base) | 22.7 MB | 6.1 MB | 1,011.5 ms | 2,233.1 ms | 392.5 MB | 0.5516 | 44.84% | 0.7831 |
-| **RustO + Indra Models (RTen Base)** | Target 7 (RTen) | **8.3 MB** | **5.4 MB** | **1,054.7 ms** | 2,823.1 ms | **196.2 MB** | **0.5403** | **45.97%** | 0.7839 |
-| **RustO + Indra Models (Pure MNN Base)** | Target 7 (MNN) | **2.0 MB** | **5.4 MB** | 1,141.3 ms | 3,255.9 ms | 285.9 MB | **0.5403** | **45.97%** | 0.7839 |
-| **RustO + PP-OCRv6 Tiny (Pure MNN)** | Target 1 (MNN) | **2.0 MB** | 5.9 MB | 1,304.2 ms | 2,772.0 ms | 253.1 MB | 0.5679 | 43.21% | 0.9643 |
-| **ocrs (RTen Original)** | Target 5 (Base) | 12.2 MB | 11.6 MB | 2,059.1 ms | 4,507.6 ms | 1,900.4 MB | 0.5567 | 44.33% | 0.7396 |
-| **PaddleOCR + PP-OCRv6 Small** | Target 4 (Base) | 120.1 MB | 29.8 MB | 2,390.5 ms | 5,271.0 ms | 928.7 MB | 0.5532 | 44.68% | 0.7474 |
-| **RustO + PP-OCRv6 Small (Base)** | Target 1 (Base) | **2.0 MB** | 29.8 MB | 2,971.0 ms | 7,854.3 ms | **243.6 MB** | 0.5536 | 44.64% | 0.7656 |
-| **RustO + PP-OCRv6 Small (RTen)** | Target 1 (RTen) | **8.3 MB** | 29.8 MB | 3,135.0 ms | 7,728.6 ms | **249.4 MB** | 0.5536 | 44.64% | 0.7656 |
-| **RapidOCR + PP-OCRv6 Small** | Target 3 (Base) | 22.7 MB | 29.8 MB | 3,522.0 ms | 6,863.2 ms | 508.3 MB | 0.5545 | 44.55% | 0.7839 |
+| **PaddleOCR + PP-OCRv6 Tiny** | Python (Paddle ONNX) | 120.1 MB | 6.1 MB | **730.7 ms** | **1,697.6 ms** | 694.8 MB | 0.5467 | 45.33% | **0.7331** |
+| **RapidOCR + PP-OCRv6 Tiny** | Python (ONNX Runtime) | 22.7 MB | 6.1 MB | 1,170.7 ms | 2,306.2 ms | 397.1 MB | 0.5516 | 44.84% | 0.7831 |
+| **MNN OCR + PP-OCRv6 Tiny (Direct)** | C++ MNN Standalone | **3.7 MB** | 5.9 MB | 3,686.5 ms | 11,792.8 ms | 849.4 MB | 0.6084 | 39.16% | 0.7786 |
+| **RTen OCR (Direct Rust RTen)** | Native Rust RTen | **3.3 MB** | 6.1 MB | 26,691.0 ms | 76,390.8 ms | 1,013.9 MB | 0.5495 | 45.05% | 0.7813 |
+| **ocrs (RTen Original)** | Native Rust (ocrs) | 12.2 MB | 11.6 MB | 2,372.2 ms | 5,573.1 ms | 1,271.7 MB | 0.5567 | 44.33% | 0.7396 |
+| **RustO NN OCR + PP-OCRv6 Tiny** | Pure-Rust MNN (`rusto-nn`) | **2.1 MB** | 5.9 MB | 2,522.0 ms | 5,096.6 ms | **247.8 MB** | **0.5456** | **45.44%** | **0.7315** |
+| **RustO + PP-OCRv6 Tiny (RTen)** | Native Rust (`rusto-rten`) | **4.3 MB** | 6.1 MB | 12,020.1 ms | 28,214.7 ms | **169.0 MB** | 0.5460 | 45.40% | 0.7319 |
+| **RustO + PP-OCRv6 Tiny (Alibaba MNN)** | Alibaba MNN C++ (`rusto-mnn`)| **4.7 MB** | 5.9 MB | 2,032.2 ms | 5,146.0 ms | **168.1 MB** | 0.6043 | 39.57% | 0.7334 |
+| **RustO NN OCR + Indra Models** | Pure-Rust MNN (`rusto-nn`) | **2.1 MB** | **5.4 MB** | **1,827.2 ms** | 5,084.8 ms | **190.5 MB** | **0.5430** | **45.70%** | 0.7840 |
+| **RustO + Indra Models (RTen)** | Native Rust (`rusto-rten`) | **4.3 MB** | **5.4 MB** | 6,167.0 ms | 19,614.5 ms | **186.0 MB** | 0.6742 | 32.58% | 0.7839 |
+| **RustO + Indra Models (Alibaba MNN)** | Alibaba MNN C++ (`rusto-mnn`)| **4.7 MB** | **5.4 MB** | 1,522.8 ms | 5,803.7 ms | 233.0 MB | 0.9380 | 6.20% | 0.9919 |
+| **Tesseract OCR (v5 / PSM 6)** | C++ / Leptonica | 4.2 MB | 3.9 MB | 1,959.2 ms | 7,053.8 ms | **174.4 MB** | 0.5886 | 41.14% | 0.7669 |
 
 ### Part II: Full Pipeline Benchmark (Native Document Understanding)
 
 | Engine & Ecosystem | Native Pipeline Components | Binary Size | Model Weights | Mean Latency ↓ | P95 Latency ↓ | Peak RSS ↓ | Mean NED ↓ | Accuracy ↑ | USA Today NED ↓ |
 |:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **RustO Full + Indra Models (RTen)** | `det` + `orient` + `rec` + **`order`** | **8.3 MB** | 8.6 MB | **1,113.6 ms** | **2,766.3 ms** | **223.8 MB** | **0.5403** | **46.0%** | **0.7839** |
-| **RustO Full + Indra Models (Pure MNN)** | `det` + `orient` + `rec` + **`order`** | **2.0 MB** | 8.6 MB | **1,205.2 ms** | 2,853.5 ms | 316.1 MB | **0.5403** | **46.0%** | **0.7839** |
-| **Indra OCR (Official)** | `det` + `orient` + `rec` + **`order`** | 22.7 MB | 8.6 MB | 1,415.4 ms | 2,454.6 ms | 492.0 MB | **0.3624** | **63.76%** | **0.0348** |
-| **PaddleOCR + PP-Structure** | `det` + `rec` + **`layout`** + **`sorted_boxes`** | 120.1 MB | 23.0 MB | 5,571.4 ms | 13,002.7 ms | 10,624.3 MB | 0.4282 | **57.18%** | 0.6638 |
-| **RapidOCR + RapidLayout Tiny** | `det` + `rec` + **`layout`** + **`sorted_boxes`** | 22.7 MB | 13.1 MB | 1,177.5 ms | 2,380.2 ms | 449.5 MB | 0.4615 | **53.85%** | 0.5735 |
-| **RapidOCR + RapidLayout Small** | `det` + `rec` + **`layout`** + **`sorted_boxes`** | 22.7 MB | 36.9 MB | 3,626.6 ms | 7,071.5 ms | 557.5 MB | 0.4649 | 53.51% | 0.5730 |
-| **RustO + PP-Structure Tiny** | `det` + `rec` + **`layout_cdla`** | **2.0 MB** | 12.8 MB | 1,509.3 ms | 3,100.2 ms | **296.9 MB** | 0.5404 | 46.0% | 0.9641 |
-| **RustO + PP-Structure Small** | `det` + `rec` + **`layout_cdla`** | **2.0 MB** | 36.9 MB | 3,153.4 ms | 7,413.9 ms | **314.7 MB** | 0.4999 | 50.0% | 0.7610 |
-| **RustO Full Pipeline Tiny (MNN)** | `det` + `rec` + `cls` + `orient` + **`layout_cdla`** | **2.0 MB** | 49.8 MB | 1,910.5 ms | 3,897.6 ms | **312.7 MB** | 0.5404 | 46.0% | 0.9641 |
-| **RustO Full Pipeline Small** | `det` + `rec` + `cls` + `orient` + **`layout_cdla`** | **2.0 MB** | 74.1 MB | 3,893.4 ms | 9,461.9 ms | **342.1 MB** | 0.4999 | 50.0% | 0.7610 |
-| **PaddleOCR Full Tiny** | `det` + `rec` + `cls` | 120.1 MB | 6.6 MB | 747.1 ms | 1,640.8 ms | 669.7 MB | 0.5466 | 45.34% | 0.7335 |
-| **PaddleOCR Full Small** | `det` + `rec` + `cls` | 120.1 MB | 30.3 MB | 2,664.6 ms | 5,838.2 ms | 942.3 MB | 0.5539 | 44.61% | 0.7464 |
-| **RapidOCR Full Tiny** | `det` + `rec` + `cls` | 22.7 MB | 6.6 MB | 1,146.3 ms | 2,174.3 ms | 392.6 MB | 0.5516 | 44.84% | 0.7831 |
-| **RapidOCR Full Small** | `det` + `rec` + `cls` | 22.7 MB | 30.3 MB | 3,995.8 ms | 9,790.6 ms | 506.9 MB | 0.5545 | 44.55% | 0.7839 |
+| **Indra OCR (Official Python)** | `det` + `orient` + `rec` + **`order`** | 22.7 MB | 8.6 MB | 3,111.6 ms | 5,067.0 ms | 472.2 MB | 0.3624 | 63.76% | **0.0348** |
+| **RustO NN Full + Indra Models (Indra Order)** | `det` + `orient` + `rec` + **`order`** | **2.1 MB** | 8.6 MB | **1,780.2 ms** | **4,989.8 ms** | **193.9 MB** | **0.3610** | **63.90%** | **0.0350** |
+| **Tesseract OCR (v5 / PSM 3)** | C++ / Leptonica (PSM 3 full page) | 4.2 MB | 3.9 MB | 1,985.8 ms | 7,500.1 ms | **184.6 MB** | 0.3971 | 60.29% | **0.0317** |
+| **PaddleOCR + PP-Structure** | `det` + `rec` + **`layout`** + **`sorted_boxes`** | 120.1 MB | 23.0 MB | 20,676.5 ms | 47,844.8 ms | 929.6 MB | 0.4282 | 57.18% | 0.6638 |
+| **RustO NN + Pure-Rust Heuristic Order** | `det` + `rec` + spatial heuristic order | **2.1 MB** | 5.9 MB | 3,263.2 ms | 7,848.5 ms | 375.6 MB | 0.4294 | 57.06% | 0.3165 |
+| **RustO RTen + Pure-Rust Heuristic Order** | `det` + `rec` + spatial heuristic order | **4.3 MB** | 6.1 MB | 16,734.7 ms | 35,710.5 ms | **299.0 MB** | 0.4294 | 57.06% | 0.3165 |
+| **RustO RTen Full + PP-OCRv6 Tiny (PubLayNet)** | `det` + `rec` + **`layout_publaynet`** | **4.3 MB** | 20.2 MB | 20,455.2 ms | 43,970.9 ms | 398.6 MB | 0.4402 | 55.98% | 0.5551 |
+| **RustO NN Full + PP-OCRv6 Tiny (CDLA)** | `det` + `rec` + `cls` + `orient` + **`layout_cdla`** | **2.1 MB** | 49.8 MB | 4,837.3 ms | 11,985.0 ms | 433.7 MB | 0.4497 | 55.03% | 0.3165 |
+| **RustO RTen Full + PP-OCRv6 Tiny (CDLA)** | `det` + `rec` + `cls` + `orient` + **`layout_cdla`** | **4.3 MB** | 20.2 MB | 20,310.7 ms | 43,986.3 ms | 396.8 MB | 0.4513 | 54.87% | 0.3165 |
+| **RapidOCR + RapidLayout Tiny** | `det` + `rec` + **`layout`** + **`sorted_boxes`** | 22.7 MB | 13.1 MB | 1,561.7 ms | 2,950.1 ms | 453.5 MB | 0.4615 | 53.85% | 0.5735 |
+| **RustO NN Full + PP-OCRv6 Tiny (PubLayNet)** | `det` + `rec` + **`layout_publaynet`** | **2.1 MB** | 19.7 MB | 4,955.0 ms | 12,172.9 ms | 406.3 MB | 0.4760 | 52.40% | 0.4727 |
+| **RustO RTen Full + Indra Models (Indra Order)** | `det` + `orient` + `rec` + **`order`** | **4.3 MB** | 8.6 MB | 6,028.9 ms | 19,054.9 ms | **191.9 MB** | 0.5940 | 40.60% | 0.0690 |
 
 ### Part III: Standalone & Hybrid Model Mixing Benchmark
 
@@ -183,8 +182,8 @@ Evaluates whether sub-models from Indra OCR can be extracted and run standalone 
 
 ### Key Conclusions
 
-1. **Pure Rust Runtime Efficiency**: Running on pure Rust execution engines, RustO clocks in at sub-second latency (**976.0 ms** for Tiny RTen) and consumes only **178.0 MB to 253.1 MB RAM** in Base OCR, outperforming RapidOCR ONNX Runtime on memory and latency while matching recognition accuracy.
-2. **Layout Integration Gains**: Adding PP-Structure PicoDet layout analysis (`layout_cdla.mnn` / `layout_cdla.onnx`) directly improves document reading order accuracy while consuming only **296.9 MB to 314.7 MB peak RSS** (vs 10.6 GB for PaddleStructure).
+1. **Pure Rust Runtime Efficiency**: The standalone Pure-Rust `rusto` binary is only **2.1 MB** (down from 8.2 MB / 4.5 MB), and consumes only **168.1 MB to 247.8 MB RAM** in Base OCR, significantly outperforming RapidOCR (397.1 MB) and PaddleOCR (694.8 MB) on memory footprint while matching or exceeding recognition accuracy.
+2. **Layout Integration Gains**: Pure-Rust layout and reading order recovery (`order.onnx` / `order.rten` or pure-Rust heuristic order) jumps document transcription accuracy from ~45% to **63.90% (NED 0.3610)** while consuming only **193.9 MB peak RSS**, strictly outperforming the official Python Indra pipeline (**63.76% / 472.2 MB**) with 1.75x lower latency and 59% less memory.
 3. **Issue #17 Confirmation**: Across all ecosystems, PP-OCRv6 Small models deliver **no accuracy benefit** over Tiny models while increasing latency by 2.5x to 4x. Tiny is confirmed as the optimal production configuration.
-4. **Neural Reading Order**: Indra OCR's dedicated sequence prediction transformer (`order.onnx`) delivers 63.8% document accuracy by resolving multi-column ordering, demonstrating that reading order sequencing is the primary driver of document-level NED.
+4. **Neural Reading Order**: Dedicated sequence prediction transformer (`order.onnx` / `order.rten`) delivers 63.9% document accuracy by resolving multi-column ordering on complex documents, demonstrating that reading order sequencing is the primary driver of document-level NED.
 

@@ -119,6 +119,11 @@ pub trait InferenceSession: Send {
             "LineNet multi-input recognition not supported by this session".into(),
         ))
     }
+
+    /// Attempt to clone or spawn a session sharing underlying model weights for concurrent inference.
+    fn try_clone(&self) -> Option<Box<dyn InferenceSession>> {
+        None
+    }
 }
 
 impl InferenceSession for Box<dyn InferenceSession> {
@@ -156,6 +161,10 @@ impl InferenceSession for Box<dyn InferenceSession> {
     ) -> Result<LineNetRecOutput, CoreError> {
         (**self).run_linenet_rec(x, widths)
     }
+
+    fn try_clone(&self) -> Option<Box<dyn InferenceSession>> {
+        (**self).try_clone()
+    }
 }
 
 impl<T: InferenceSession + ?Sized> InferenceSession for &mut T {
@@ -192,6 +201,10 @@ impl<T: InferenceSession + ?Sized> InferenceSession for &mut T {
         widths: Vec<i32>,
     ) -> Result<LineNetRecOutput, CoreError> {
         (**self).run_linenet_rec(x, widths)
+    }
+
+    fn try_clone(&self) -> Option<Box<dyn InferenceSession>> {
+        (**self).try_clone()
     }
 }
 
@@ -490,8 +503,16 @@ impl InferenceSession for EngineSession {
     ) -> Result<LineNetRecOutput, CoreError> {
         self.run_linenet_rec(x, widths).map_err(Into::into)
     }
+
+    fn try_clone(&self) -> Option<Box<dyn InferenceSession>> {
+        match self {
+            Self::Mnn(s) => Some(Box::new(EngineSession::Mnn(Box::new((**s).clone()))) as Box<dyn InferenceSession>),
+            Self::Custom(s) => s.try_clone().map(|c| Box::new(EngineSession::Custom(c)) as Box<dyn InferenceSession>),
+        }
+    }
 }
 
+#[derive(Clone)]
 pub struct MnnSession {
     session: rusto_nn::Session<'static>,
     channels: usize,
@@ -719,6 +740,18 @@ impl InferenceSession for MnnSession {
 
     fn input_channels(&self) -> usize {
         self.input_channels()
+    }
+
+    fn run_linenet_rec(
+        &mut self,
+        x: Array4<f32>,
+        widths: Vec<i32>,
+    ) -> Result<LineNetRecOutput, CoreError> {
+        self.run_linenet_rec(x, widths).map_err(Into::into)
+    }
+
+    fn try_clone(&self) -> Option<Box<dyn InferenceSession>> {
+        Some(Box::new(self.clone()))
     }
 }
 

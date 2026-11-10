@@ -1698,7 +1698,7 @@ pub fn depthwise_conv2d_nchw(
 
         #[cfg(feature = "rayon")]
         {
-            if channels >= 2 {
+            if channels * hw_out >= 8192 && channels >= 4 {
                 out_batch
                     .par_chunks_exact_mut(hw_out)
                     .enumerate()

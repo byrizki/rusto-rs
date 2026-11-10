@@ -747,31 +747,40 @@ pub unsafe fn gemm_avx2(
 
     #[cfg(feature = "rayon")]
     {
+        let in_rayon_worker = rayon::current_thread_index().is_some();
+
         if n >= 2048 || m < 12 {
             let col_chunk = 256;
             let num_col_chunks = n.div_ceil(col_chunk);
 
-            (0..num_col_chunks).into_par_iter().for_each(move |col_block| {
-                let j_start = col_block * col_chunk;
-                let j_end = (j_start + col_chunk).min(n);
-                gemm_compute_col_panel(
-                    m, n, k, a_send.get(), b_send.get(), c_send.get(), j_start, j_end,
-                    alpha, beta, alpha_vec, beta_vec, bias, act,
-                    zero_vec, six_vec, three_vec, inv_six_vec,
-                );
-            });
+            if !in_rayon_worker && num_col_chunks > 1 {
+                (0..num_col_chunks).into_par_iter().for_each(move |col_block| {
+                    let j_start = col_block * col_chunk;
+                    let j_end = (j_start + col_chunk).min(n);
+                    gemm_compute_col_panel(
+                        m, n, k, a_send.get(), b_send.get(), c_send.get(), j_start, j_end,
+                        alpha, beta, alpha_vec, beta_vec, bias, act,
+                        zero_vec, six_vec, three_vec, inv_six_vec,
+                    );
+                });
+            } else {
+                for col_block in 0..num_col_chunks {
+                    let j_start = col_block * col_chunk;
+                    let j_end = (j_start + col_chunk).min(n);
+                    gemm_compute_col_panel(
+                        m, n, k, a_send.get(), b_send.get(), c_send.get(), j_start, j_end,
+                        alpha, beta, alpha_vec, beta_vec, bias, act,
+                        zero_vec, six_vec, three_vec, inv_six_vec,
+                    );
+                }
+            }
             return;
         }
 
         let n_tiles = n / 16;
         let packed_b_len = n_tiles * k * 16;
 
-        PACKED_B_CACHE.with(|cell| {
-            let mut cache = cell.borrow_mut();
-            if cache.len() < packed_b_len {
-                cache.resize(packed_b_len, 0.0);
-            }
-            let pb_ptr: *mut f32 = cache.as_mut_ptr();
+        let pack_b = |pb_ptr: *mut f32| {
             for jt in 0..n_tiles {
                 let j = jt * 16;
                 let tile_dst = pb_ptr.add(jt * k * 16);
@@ -782,25 +791,59 @@ pub unsafe fn gemm_avx2(
                     _mm256_storeu_ps(dst.add(8), _mm256_loadu_ps(src.add(8)));
                 }
             }
-            let pb_send = SendConstPtr(cache.as_ptr());
+        };
 
+        let compute_with_packed_b = |pb_ptr: *const f32| {
+            let pb_send = SendConstPtr(pb_ptr);
             let num_threads = rayon::current_num_threads();
             let target_chunks = (num_threads * 4).max(1);
             let ideal_chunk = (m / target_chunks).max(6);
             let row_chunk = ideal_chunk.div_ceil(6) * 6;
             let num_row_chunks = m.div_ceil(row_chunk);
 
-            (0..num_row_chunks).into_par_iter().for_each(move |row_block| {
-                let r_start = row_block * row_chunk;
-                let r_end = (r_start + row_chunk).min(m);
-                let r_count = r_end - r_start;
-                gemm_compute_row_block_packed(
-                    r_start, r_count, n, k, a_send.get(), pb_send.get(), b_send.get(), c_send.get(),
-                    alpha, beta, alpha_vec, beta_vec, bias, act,
-                    zero_vec, six_vec, three_vec, inv_six_vec,
-                );
-            });
+            if !in_rayon_worker && num_row_chunks > 1 && m * n * k >= 131072 {
+                (0..num_row_chunks).into_par_iter().for_each(move |row_block| {
+                    let r_start = row_block * row_chunk;
+                    let r_end = (r_start + row_chunk).min(m);
+                    let r_count = r_end - r_start;
+                    gemm_compute_row_block_packed(
+                        r_start, r_count, n, k, a_send.get(), pb_send.get(), b_send.get(), c_send.get(),
+                        alpha, beta, alpha_vec, beta_vec, bias, act,
+                        zero_vec, six_vec, three_vec, inv_six_vec,
+                    );
+                });
+            } else {
+                for row_block in 0..num_row_chunks {
+                    let r_start = row_block * row_chunk;
+                    let r_end = (r_start + row_chunk).min(m);
+                    let r_count = r_end - r_start;
+                    gemm_compute_row_block_packed(
+                        r_start, r_count, n, k, a_send.get(), pb_send.get(), b_send.get(), c_send.get(),
+                        alpha, beta, alpha_vec, beta_vec, bias, act,
+                        zero_vec, six_vec, three_vec, inv_six_vec,
+                    );
+                }
+            }
+        };
+
+        let borrowed = PACKED_B_CACHE.with(|cell| {
+            if let Ok(mut cache) = cell.try_borrow_mut() {
+                if cache.len() < packed_b_len {
+                    cache.resize(packed_b_len, 0.0);
+                }
+                pack_b(cache.as_mut_ptr());
+                compute_with_packed_b(cache.as_ptr());
+                true
+            } else {
+                false
+            }
         });
+
+        if !borrowed {
+            let mut fallback = vec![0.0f32; packed_b_len];
+            pack_b(fallback.as_mut_ptr());
+            compute_with_packed_b(fallback.as_ptr());
+        }
     }
 
     #[cfg(not(feature = "rayon"))]

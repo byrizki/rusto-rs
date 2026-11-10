@@ -11,6 +11,12 @@ thread_local! {
     static BATCH_OUT_BUF: RefCell<Vec<f32>> = const { RefCell::new(Vec::new()) };
 }
 
+/// Clears thread-local convolution intermediate scratch buffers.
+pub fn clear_conv_buffers() {
+    COL_BUF.with(|c| c.borrow_mut().clear());
+    BATCH_OUT_BUF.with(|c| c.borrow_mut().clear());
+}
+
 /// Configuration parameters for 2D convolution
 #[derive(Debug, Clone)]
 pub struct Conv2dConfig {
@@ -238,13 +244,7 @@ pub fn conv2d(
     if hw_out <= tile_w_cap {
         let needed_col_len = k_gemm * n_gemm;
 
-        COL_BUF.with(|cell| {
-            let mut buf = cell.borrow_mut();
-            if buf.len() < needed_col_len {
-                buf.resize(needed_col_len, 0.0);
-            }
-            let col_buf = &mut buf[..needed_col_len];
-
+        let mut run_conv_full = |col_buf: &mut [f32]| {
             for b in 0..batch {
                 let in_batch = &input[b * config.in_channels * hw_in..(b + 1) * config.in_channels * hw_in];
                 let out_batch = &mut output[b * config.out_channels * hw_out..(b + 1) * config.out_channels * hw_out];
@@ -287,84 +287,115 @@ pub fn conv2d(
                     );
                 }
             }
+        };
+
+        let borrowed = COL_BUF.with(|cell| {
+            if let Ok(mut buf) = cell.try_borrow_mut() {
+                if buf.len() < needed_col_len {
+                    buf.resize(needed_col_len, 0.0);
+                }
+                run_conv_full(&mut buf[..needed_col_len]);
+                true
+            } else {
+                false
+            }
         });
+
+        if !borrowed {
+            let mut fallback = vec![0.0f32; needed_col_len];
+            run_conv_full(&mut fallback);
+        }
     } else {
         let needed_col_len = k_gemm * tile_w_cap;
         let needed_out_len = m_gemm * tile_w_cap;
 
-        COL_BUF.with(|col_cell| {
-            BATCH_OUT_BUF.with(|out_cell| {
-                let mut col_vec = col_cell.borrow_mut();
-                if col_vec.len() < needed_col_len {
-                    col_vec.resize(needed_col_len, 0.0);
-                }
-                let mut out_vec = out_cell.borrow_mut();
-                if out_vec.len() < needed_out_len {
-                    out_vec.resize(needed_out_len, 0.0);
-                }
+        let mut run_conv_tiled = |col_vec: &mut [f32], out_vec: &mut [f32]| {
+            for b in 0..batch {
+                let in_batch =
+                    &input[b * config.in_channels * hw_in..(b + 1) * config.in_channels * hw_in];
+                let out_batch =
+                    &mut output[b * config.out_channels * hw_out..(b + 1) * config.out_channels * hw_out];
 
-                for b in 0..batch {
-                    let in_batch =
-                        &input[b * config.in_channels * hw_in..(b + 1) * config.in_channels * hw_in];
-                    let out_batch =
-                        &mut output[b * config.out_channels * hw_out..(b + 1) * config.out_channels * hw_out];
+                for g in 0..group {
+                    let w_offset = g * out_c_per_group * k_gemm;
+                    let weight_group = &weight[w_offset..w_offset + out_c_per_group * k_gemm];
 
-                    for g in 0..group {
-                        let w_offset = g * out_c_per_group * k_gemm;
-                        let weight_group = &weight[w_offset..w_offset + out_c_per_group * k_gemm];
+                    let bias_group = bias.map(|b_slice| {
+                        let start = g * out_c_per_group;
+                        &b_slice[start..start + out_c_per_group]
+                    });
 
-                        let bias_group = bias.map(|b_slice| {
-                            let start = g * out_c_per_group;
-                            &b_slice[start..start + out_c_per_group]
-                        });
+                    let out_offset = g * out_c_per_group * hw_out;
+                    let out_group = &mut out_batch[out_offset..out_offset + out_c_per_group * hw_out];
 
-                        let out_offset = g * out_c_per_group * hw_out;
-                        let out_group = &mut out_batch[out_offset..out_offset + out_c_per_group * hw_out];
+                    for col_start in (0..n_gemm).step_by(tile_w_cap) {
+                        let col_end = (col_start + tile_w_cap).min(n_gemm);
+                        let tile_w = col_end - col_start;
+                        let cur_col_buf = &mut col_vec[..k_gemm * tile_w];
+                        let cur_out_buf = &mut out_vec[..m_gemm * tile_w];
 
-                        for col_start in (0..n_gemm).step_by(tile_w_cap) {
-                            let col_end = (col_start + tile_w_cap).min(n_gemm);
-                            let tile_w = col_end - col_start;
-                            let cur_col_buf = &mut col_vec[..k_gemm * tile_w];
-                            let cur_out_buf = &mut out_vec[..m_gemm * tile_w];
+                        im2col_tile(
+                            in_batch,
+                            g * in_c_per_group,
+                            in_c_per_group,
+                            in_h,
+                            in_w,
+                            out_h,
+                            out_w,
+                            config,
+                            cur_col_buf,
+                            col_start,
+                            col_end,
+                        );
 
-                            im2col_tile(
-                                in_batch,
-                                g * in_c_per_group,
-                                in_c_per_group,
-                                in_h,
-                                in_w,
-                                out_h,
-                                out_w,
-                                config,
-                                cur_col_buf,
-                                col_start,
-                                col_end,
-                            );
+                        gemm(
+                            m_gemm,
+                            tile_w,
+                            k_gemm,
+                            weight_group,
+                            cur_col_buf,
+                            cur_out_buf,
+                            1.0,
+                            0.0,
+                            bias_group,
+                            config.activation,
+                        );
 
-                            gemm(
-                                m_gemm,
-                                tile_w,
-                                k_gemm,
-                                weight_group,
-                                cur_col_buf,
-                                cur_out_buf,
-                                1.0,
-                                0.0,
-                                bias_group,
-                                config.activation,
-                            );
-
-                            for c in 0..m_gemm {
-                                let src = &cur_out_buf[c * tile_w..(c + 1) * tile_w];
-                                let dst =
-                                    &mut out_group[c * hw_out + col_start..c * hw_out + col_start + tile_w];
-                                dst.copy_from_slice(src);
-                            }
+                        for c in 0..m_gemm {
+                            let src = &cur_out_buf[c * tile_w..(c + 1) * tile_w];
+                            let dst =
+                                &mut out_group[c * hw_out + col_start..c * hw_out + col_start + tile_w];
+                            dst.copy_from_slice(src);
                         }
                     }
                 }
-            });
+            }
+        };
+
+        let borrowed = COL_BUF.with(|col_cell| {
+            BATCH_OUT_BUF.with(|out_cell| {
+                if let (Ok(mut col_vec), Ok(mut out_vec)) =
+                    (col_cell.try_borrow_mut(), out_cell.try_borrow_mut())
+                {
+                    if col_vec.len() < needed_col_len {
+                        col_vec.resize(needed_col_len, 0.0);
+                    }
+                    if out_vec.len() < needed_out_len {
+                        out_vec.resize(needed_out_len, 0.0);
+                    }
+                    run_conv_tiled(&mut col_vec, &mut out_vec);
+                    true
+                } else {
+                    false
+                }
+            })
         });
+
+        if !borrowed {
+            let mut fallback_col = vec![0.0f32; needed_col_len];
+            let mut fallback_out = vec![0.0f32; needed_out_len];
+            run_conv_tiled(&mut fallback_col, &mut fallback_out);
+        }
     }
 }
 
@@ -485,7 +516,7 @@ fn im2col_tile(
 
     #[cfg(feature = "rayon")]
     {
-        if num_channels * k_spatial >= 4 {
+        if col_buf.len() >= 8192 && num_channels * k_spatial >= 4 {
             col_buf
                 .par_chunks_exact_mut(tile_w)
                 .enumerate()

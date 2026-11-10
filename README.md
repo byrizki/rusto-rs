@@ -468,17 +468,17 @@ Empirically evaluated against official PaddleOCR and RapidOCR (C++ ONNX Runtime)
 
 | Capability / Metric | RustO! (Pure Rust Core) | OpenCV / C++ Stacks (RapidOCR / PaddleOCR) | Benchmark Reference |
 |---|:---:|:---:|---|
-| **CLI Binary Size (Self-Contained)** | ✅ **4.5 MB** (`rusto`) / 8.3 MB (`rusto-rten`) | ❌ ~55 MB+ (libopencv + onnxruntime) | Production Linux x86-64 release |
+| **CLI Binary Size (Self-Contained)** | ✅ **2.1 MB** (`rusto`) / 4.3 MB (`rusto-rten`) | ❌ ~55 MB+ (libopencv + onnxruntime) | Production Linux x86-64 release |
 | **C FFI Shared Library (`librusto.so`)** | ✅ **304 KB** | ❌ ~15–30 MB | Stripped release `.so` |
 | **Android Native Size (Per-ABI)** | ✅ **~1.8 MB** | ❌ ~20 MB+ (`libopencv.so` + ONNX) | Android release AAR |
 | **WebAssembly (WASM) Bundle** | ✅ **238 KB** (gzipped `rusto-nn` WASM) | ❌ 3.78 MB (gzipped ONNX Runtime WASM) | Web client bundle size |
 | **Zero External C++ Dependencies** | ✅ Pure Rust (`cargo build`) | ❌ Requires CMake, OpenCV & NDK | Toolchain build dependencies |
-| **Peak Memory (OmniDocBench)** | ✅ **178.0 MB - 253.1 MB** | ❌ 392.5 MB (RapidOCR) / 659.3 MB (PaddleOCR) | OmniDocBench full dataset peak RSS |
+| **Peak Memory (OmniDocBench)** | ✅ **168.1 MB - 247.8 MB** | ❌ 397.1 MB (RapidOCR) / 694.8 MB (PaddleOCR) | OmniDocBench full dataset peak RSS |
 | **Document Pipeline (1600×993 px)** | ⚡ **678.08 ms** (Det: 312 ms, Rec: 169 ms, 27 lines) | ⚡ 447.83 ms (C++ ONNX Runtime) | Base pipeline end-to-end benchmark |
-| **OmniDocBench Mean Latency** | ⚡ **976.0 ms** (Tiny) / **1,054.7 ms** (Indra) | ⚡ 605.3 ms (PaddleOCR) / 1,011.5 ms (RapidOCR) | OmniDocBench full evaluation |
+| **OmniDocBench Mean Latency** | ⚡ **1,780.2 ms** (Indra Full) / **2,522.0 ms** (Tiny) | ⚡ 730.7 ms (PaddleOCR) / 1,170.7 ms (RapidOCR) | OmniDocBench full evaluation |
 | **Transcription Parity (High-Res Scan)** | 🎯 **100% token identical** across all 27 lines | 🎯 Baseline reference | Character-for-character comparison |
-| **OmniDocBench Baseline Accuracy (1 - NED)** | 🎯 **45.41%** (Tiny) / **45.97%** (Indra) | 🎯 45.33% (PaddleOCR Tiny) / 44.84% (RapidOCR) | Standard 1D reading order |
-| **Full Pipeline Accuracy (Reading Order)** | 🎯 **63.75%** (RustO Indra Full) | 🎯 63.76% (Indra Official) / 57.18% (Paddle Structure)| Graph neural reading order |
+| **OmniDocBench Baseline Accuracy (1 - NED)** | 🎯 **45.44%** (Tiny) / **45.70%** (Indra) | 🎯 45.33% (PaddleOCR Tiny) / 44.84% (RapidOCR) | Standard 1D reading order |
+| **Full Pipeline Accuracy (Reading Order)** | 🎯 **63.90%** (RustO Indra Full) | 🎯 63.76% (Indra Official) / 57.18% (Paddle Structure)| Graph neural reading order |
 | **Memory & Thread Safety** | ✅ Guaranteed by Rust borrow checker | ❌ Manual pointers & thread locks | Data-race free concurrency |
 
 ---

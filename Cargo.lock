@@ -1674,6 +1674,7 @@ dependencies = [
  "dirs",
  "image",
  "nanoserde",
+ "rayon",
  "rusto-nn",
  "thiserror 1.0.69",
 ]

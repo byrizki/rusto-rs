@@ -24,10 +24,13 @@ use crate::layout::{
 use crate::orient::{
     postprocess_orient_tensor, preprocess_indra_orient_image, preprocess_orient_image, Orientation,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use rayon::prelude::*;
+
 use crate::postprocess::{decode_det_predictions, sort_det_boxes};
 use crate::preprocess::{
-    calculate_linenet_rec_target_widths, plan_rec_batches, prepare_det_input,
-    resize_norm_rec_img, resolve_det_params, stack_rec_batch,
+    build_rec_batch, calculate_linenet_rec_target_widths, plan_rec_batches, prepare_det_input,
+    resolve_det_params,
 };
 use crate::spatial::{build_text_results, build_word_results, group_words, to_spatial_text};
 use crate::types::{
@@ -550,6 +553,7 @@ impl OcrPipeline {
         drop(padded);
 
         let elapse_det = start_det.elapsed().as_secs_f64();
+        rusto_nn::clear_tensor_buffer_pool();
 
         if boxes.is_empty() {
             return Ok(PipelineOutput {
@@ -594,24 +598,72 @@ impl OcrPipeline {
             (0.3, 1.6)
         };
 
-        let mut crop_imgs = Vec::with_capacity(boxes.len());
-        for b in &boxes {
-            if is_linenet_rec {
-                crop_imgs.push(crop_linenet_line_image(&working_img, b, pad_x_factor, pad_y_factor)?);
-                continue;
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut crop_imgs: Vec<Mat> = if boxes.len() >= 4 {
+            boxes
+                .par_iter()
+                .map(|b| {
+                    if is_linenet_rec {
+                        crop_linenet_line_image(&working_img, b, pad_x_factor, pad_y_factor)
+                    } else {
+                        let crop_box = calculate_crop_box(
+                            b,
+                            is_linenet_rec,
+                            pad_x,
+                            pad_y,
+                            pad_x_factor,
+                            pad_y_factor,
+                            working_w_f32,
+                            working_h_f32,
+                        );
+                        get_rotate_crop_image(&working_img, &crop_box)
+                    }
+                })
+                .collect::<Result<Vec<Mat>, CoreError>>()?
+        } else {
+            let mut crops = Vec::with_capacity(boxes.len());
+            for b in &boxes {
+                if is_linenet_rec {
+                    crops.push(crop_linenet_line_image(&working_img, b, pad_x_factor, pad_y_factor)?);
+                } else {
+                    let crop_box = calculate_crop_box(
+                        b,
+                        is_linenet_rec,
+                        pad_x,
+                        pad_y,
+                        pad_x_factor,
+                        pad_y_factor,
+                        working_w_f32,
+                        working_h_f32,
+                    );
+                    crops.push(get_rotate_crop_image(&working_img, &crop_box)?);
+                }
             }
-            let crop_box = calculate_crop_box(
-                b,
-                is_linenet_rec,
-                pad_x,
-                pad_y,
-                pad_x_factor,
-                pad_y_factor,
-                working_w_f32,
-                working_h_f32,
-            );
-            crop_imgs.push(get_rotate_crop_image(&working_img, &crop_box)?);
-        }
+            crops
+        };
+
+        #[cfg(target_arch = "wasm32")]
+        let mut crop_imgs: Vec<Mat> = {
+            let mut crops = Vec::with_capacity(boxes.len());
+            for b in &boxes {
+                if is_linenet_rec {
+                    crops.push(crop_linenet_line_image(&working_img, b, pad_x_factor, pad_y_factor)?);
+                } else {
+                    let crop_box = calculate_crop_box(
+                        b,
+                        is_linenet_rec,
+                        pad_x,
+                        pad_y,
+                        pad_x_factor,
+                        pad_y_factor,
+                        working_w_f32,
+                        working_h_f32,
+                    );
+                    crops.push(get_rotate_crop_image(&working_img, &crop_box)?);
+                }
+            }
+            crops
+        };
         drop(working_img);
 
         // Step 5.5: Text Line Orientation Classification (CLS) on cropped images
@@ -649,18 +701,83 @@ impl OcrPipeline {
                 .collect();
             let target_widths = calculate_linenet_rec_target_widths(&sizes, rec_h);
             let batch_num = self.rec_batch_num.max(1);
+            let chunks = crate::preprocess::plan_linenet_rec_batches(&target_widths, batch_num);
+            let total_chunks = chunks.len();
 
-            for chunk in crate::preprocess::plan_linenet_rec_batches(&target_widths, batch_num) {
-                let (batch_tensor, widths) =
-                    crate::preprocess::build_linenet_rec_batch(&crop_imgs, &chunk, &target_widths, rec_h)?;
-                let (batch_ids, batch_confs) = self.rec.run_linenet_rec(batch_tensor, widths)?;
-                let decoded = self.decoder.decode_linenet_batch_with_positions(batch_ids, batch_confs);
-                scatter_linenet_results_with_positions(
-                    &chunk,
-                    decoded,
-                    &mut all_texts,
-                    &mut linenet_positions,
-                );
+            #[cfg(not(target_arch = "wasm32"))]
+            let num_workers = if total_chunks > 1 {
+                rayon::current_num_threads().min(total_chunks).min(2).max(1)
+            } else {
+                1
+            };
+            #[cfg(target_arch = "wasm32")]
+            let num_workers = 1;
+
+            let mut worker_sessions: Vec<Box<dyn InferenceSession>> = Vec::with_capacity(num_workers);
+            if num_workers > 1 {
+                for _ in 0..num_workers {
+                    if let Some(s) = self.rec.try_clone() {
+                        worker_sessions.push(s);
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            if worker_sessions.len() > 1 {
+                let k = worker_sessions.len().min(total_chunks);
+                worker_sessions.truncate(k);
+                let mut worker_buckets: Vec<Vec<Vec<usize>>> = (0..k).map(|_| Vec::new()).collect();
+                for (i, ch) in chunks.into_iter().enumerate() {
+                    worker_buckets[i % k].push(ch);
+                }
+                let tasks: Vec<(Box<dyn InferenceSession>, Vec<Vec<usize>>)> =
+                    worker_sessions.into_iter().zip(worker_buckets).collect();
+
+                let decoder = &self.decoder;
+                let crop_slice = crop_imgs.as_slice();
+                let tw_slice = target_widths.as_slice();
+
+                let worker_outputs: Result<Vec<Vec<(Vec<usize>, Vec<Option<(String, f32, Vec<f32>)>>)>>, CoreError> = tasks
+                    .into_par_iter()
+                    .map(|(mut session, worker_chunks)| {
+                        let mut results = Vec::with_capacity(worker_chunks.len());
+                        for chunk in worker_chunks {
+                            let (batch_tensor, widths) = crate::preprocess::build_linenet_rec_batch(
+                                crop_slice, &chunk, tw_slice, rec_h,
+                            )?;
+                            let (batch_ids, batch_confs) = session.run_linenet_rec(batch_tensor, widths)?;
+                            let decoded = decoder.decode_linenet_batch_with_positions(batch_ids, batch_confs);
+                            results.push((chunk, decoded));
+                        }
+                        rusto_nn::clear_tensor_buffer_pool();
+                        Ok(results)
+                    })
+                    .collect();
+
+                for worker_res in worker_outputs? {
+                    for (chunk, decoded) in worker_res {
+                        scatter_linenet_results_with_positions(
+                            &chunk,
+                            decoded,
+                            &mut all_texts,
+                            &mut linenet_positions,
+                        );
+                    }
+                }
+            } else {
+                for chunk in chunks {
+                    let (batch_tensor, widths) =
+                        crate::preprocess::build_linenet_rec_batch(&crop_imgs, &chunk, &target_widths, rec_h)?;
+                    let (batch_ids, batch_confs) = self.rec.run_linenet_rec(batch_tensor, widths)?;
+                    let decoded = self.decoder.decode_linenet_batch_with_positions(batch_ids, batch_confs);
+                    scatter_linenet_results_with_positions(
+                        &chunk,
+                        decoded,
+                        &mut all_texts,
+                        &mut linenet_positions,
+                    );
+                }
             }
         } else {
             let (img_c, img_h, img_w) = (3usize, 48usize, 320usize);
@@ -670,41 +787,127 @@ impl OcrPipeline {
                 .collect();
             let default_wh_ratio = img_w as f32 / img_h as f32;
             let plan = plan_rec_batches(&sizes, self.rec_batch_num.max(1), default_wh_ratio);
+            let total_batches = plan.batches.len();
 
-            for batch_item in plan.batches {
-                let mut norm_batch: Vec<Array3<f32>> = Vec::with_capacity(batch_item.indices.len());
-                for &idx in &batch_item.indices {
-                    norm_batch.push(resize_norm_rec_img(&crop_imgs[idx], img_c, img_h, batch_item.max_wh_ratio)?);
+            #[cfg(not(target_arch = "wasm32"))]
+            let num_workers = if total_batches > 1 {
+                rayon::current_num_threads().min(total_batches).min(2).max(1)
+            } else {
+                1
+            };
+            #[cfg(target_arch = "wasm32")]
+            let num_workers = 1;
+
+            let mut worker_sessions: Vec<Box<dyn InferenceSession>> = Vec::with_capacity(num_workers);
+            if num_workers > 1 {
+                for _ in 0..num_workers {
+                    if let Some(s) = self.rec.try_clone() {
+                        worker_sessions.push(s);
+                    } else {
+                        break;
+                    }
                 }
+            }
 
-                let batch_img_width = (img_h as f32 * batch_item.max_wh_ratio).round() as usize;
-                let batch = stack_rec_batch(&norm_batch, img_c, img_h, batch_img_width);
-                let preds_dyn = self.rec.run(batch.into_dyn())?;
-                let preds: Array3<f32> = preds_dyn
-                    .into_dimensionality()
-                    .map_err(|_| CoreError::InvalidShape("recognition output must be 3D".into()))?;
+            if worker_sessions.len() > 1 {
+                let k = worker_sessions.len().min(total_batches);
+                worker_sessions.truncate(k);
+                let mut worker_buckets: Vec<Vec<crate::preprocess::RecBatchItem>> =
+                    (0..k).map(|_| Vec::new()).collect();
+                for (i, b) in plan.batches.into_iter().enumerate() {
+                    worker_buckets[i % k].push(b);
+                }
+                let tasks: Vec<(Box<dyn InferenceSession>, Vec<crate::preprocess::RecBatchItem>)> =
+                    worker_sessions.into_iter().zip(worker_buckets).collect();
 
-                let (line_results, batch_word_infos) = self.decoder.decode(
-                    preds,
-                    global.return_word_box,
-                    &batch_item.wh_ratio_list,
-                    batch_item.max_wh_ratio,
-                );
+                let decoder = &self.decoder;
+                let return_word_box = global.return_word_box;
+                let crop_slice = crop_imgs.as_slice();
 
-                let word_infos = if global.return_word_box {
-                    Some(batch_word_infos)
-                } else {
-                    None
-                };
-                scatter_rec_results(
-                    &batch_item.indices,
-                    line_results,
-                    word_infos,
-                    &mut all_texts,
-                    &mut all_word_infos,
-                );
+                let worker_outputs: Result<Vec<Vec<(Vec<usize>, Vec<(String, f32)>, Option<Vec<WordInfo>>)>>, CoreError> = tasks
+                    .into_par_iter()
+                    .map(|(mut session, batches)| {
+                        let mut results = Vec::with_capacity(batches.len());
+                        for batch_item in batches {
+                            let batch = build_rec_batch(
+                                crop_slice,
+                                &batch_item.indices,
+                                img_c,
+                                img_h,
+                                batch_item.max_wh_ratio,
+                            )?;
+                            let preds_dyn = session.run(batch.into_dyn())?;
+                            let preds: Array3<f32> = preds_dyn
+                                .into_dimensionality()
+                                .map_err(|_| CoreError::InvalidShape("recognition output must be 3D".into()))?;
+
+                            let (line_results, batch_word_infos) = decoder.decode(
+                                preds,
+                                return_word_box,
+                                &batch_item.wh_ratio_list,
+                                batch_item.max_wh_ratio,
+                            );
+
+                            let word_infos = if return_word_box {
+                                Some(batch_word_infos)
+                            } else {
+                                None
+                            };
+                            results.push((batch_item.indices, line_results, word_infos));
+                        }
+                        rusto_nn::clear_tensor_buffer_pool();
+                        Ok(results)
+                    })
+                    .collect();
+
+                for batch_res in worker_outputs? {
+                    for (indices, line_results, word_infos) in batch_res {
+                        scatter_rec_results(
+                            &indices,
+                            line_results,
+                            word_infos,
+                            &mut all_texts,
+                            &mut all_word_infos,
+                        );
+                    }
+                }
+            } else {
+                for batch_item in plan.batches {
+                    let batch = build_rec_batch(
+                        &crop_imgs,
+                        &batch_item.indices,
+                        img_c,
+                        img_h,
+                        batch_item.max_wh_ratio,
+                    )?;
+                    let preds_dyn = self.rec.run(batch.into_dyn())?;
+                    let preds: Array3<f32> = preds_dyn
+                        .into_dimensionality()
+                        .map_err(|_| CoreError::InvalidShape("recognition output must be 3D".into()))?;
+
+                    let (line_results, batch_word_infos) = self.decoder.decode(
+                        preds,
+                        global.return_word_box,
+                        &batch_item.wh_ratio_list,
+                        batch_item.max_wh_ratio,
+                    );
+
+                    let word_infos = if global.return_word_box {
+                        Some(batch_word_infos)
+                    } else {
+                        None
+                    };
+                    scatter_rec_results(
+                        &batch_item.indices,
+                        line_results,
+                        word_infos,
+                        &mut all_texts,
+                        &mut all_word_infos,
+                    );
+                }
             }
         }
+        rusto_nn::clear_tensor_buffer_pool();
 
         // Step 6.5: Gutter cuts, line splitting, tidying and reading order for LineNet
         let mut ordered_by_model = false;
