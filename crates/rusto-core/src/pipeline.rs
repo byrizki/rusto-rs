@@ -702,28 +702,30 @@ impl OcrPipeline {
             let target_widths = calculate_linenet_rec_target_widths(&sizes, rec_h);
             let batch_num = self.rec_batch_num.max(1);
             let chunks = crate::preprocess::plan_linenet_rec_batches(&target_widths, batch_num);
+            #[cfg(not(target_arch = "wasm32"))]
             let total_chunks = chunks.len();
 
             #[cfg(not(target_arch = "wasm32"))]
-            let num_workers = if total_chunks > 1 {
-                rayon::current_num_threads().min(total_chunks).min(2).max(1)
-            } else {
-                1
-            };
-            #[cfg(target_arch = "wasm32")]
-            let num_workers = 1;
-
-            let mut worker_sessions: Vec<Box<dyn InferenceSession>> = Vec::with_capacity(num_workers);
-            if num_workers > 1 {
-                for _ in 0..num_workers {
-                    if let Some(s) = self.rec.try_clone() {
-                        worker_sessions.push(s);
-                    } else {
-                        break;
+            let mut worker_sessions: Vec<Box<dyn InferenceSession>> = {
+                let num_workers = if total_chunks > 1 {
+                    rayon::current_num_threads().min(total_chunks).min(2).max(1)
+                } else {
+                    1
+                };
+                let mut sessions = Vec::with_capacity(num_workers);
+                if num_workers > 1 {
+                    for _ in 0..num_workers {
+                        if let Some(s) = self.rec.try_clone() {
+                            sessions.push(s);
+                        } else {
+                            break;
+                        }
                     }
                 }
-            }
+                sessions
+            };
 
+            #[cfg(not(target_arch = "wasm32"))]
             if worker_sessions.len() > 1 {
                 let k = worker_sessions.len().min(total_chunks);
                 worker_sessions.truncate(k);
@@ -779,6 +781,20 @@ impl OcrPipeline {
                     );
                 }
             }
+
+            #[cfg(target_arch = "wasm32")]
+            for chunk in chunks {
+                let (batch_tensor, widths) =
+                    crate::preprocess::build_linenet_rec_batch(&crop_imgs, &chunk, &target_widths, rec_h)?;
+                let (batch_ids, batch_confs) = self.rec.run_linenet_rec(batch_tensor, widths)?;
+                let decoded = self.decoder.decode_linenet_batch_with_positions(batch_ids, batch_confs);
+                scatter_linenet_results_with_positions(
+                    &chunk,
+                    decoded,
+                    &mut all_texts,
+                    &mut linenet_positions,
+                );
+            }
         } else {
             let (img_c, img_h, img_w) = (3usize, 48usize, 320usize);
             let sizes: Vec<(f32, f32)> = crop_imgs
@@ -787,28 +803,30 @@ impl OcrPipeline {
                 .collect();
             let default_wh_ratio = img_w as f32 / img_h as f32;
             let plan = plan_rec_batches(&sizes, self.rec_batch_num.max(1), default_wh_ratio);
+            #[cfg(not(target_arch = "wasm32"))]
             let total_batches = plan.batches.len();
 
             #[cfg(not(target_arch = "wasm32"))]
-            let num_workers = if total_batches > 1 {
-                rayon::current_num_threads().min(total_batches).min(2).max(1)
-            } else {
-                1
-            };
-            #[cfg(target_arch = "wasm32")]
-            let num_workers = 1;
-
-            let mut worker_sessions: Vec<Box<dyn InferenceSession>> = Vec::with_capacity(num_workers);
-            if num_workers > 1 {
-                for _ in 0..num_workers {
-                    if let Some(s) = self.rec.try_clone() {
-                        worker_sessions.push(s);
-                    } else {
-                        break;
+            let mut worker_sessions: Vec<Box<dyn InferenceSession>> = {
+                let num_workers = if total_batches > 1 {
+                    rayon::current_num_threads().min(total_batches).min(2).max(1)
+                } else {
+                    1
+                };
+                let mut sessions = Vec::with_capacity(num_workers);
+                if num_workers > 1 {
+                    for _ in 0..num_workers {
+                        if let Some(s) = self.rec.try_clone() {
+                            sessions.push(s);
+                        } else {
+                            break;
+                        }
                     }
                 }
-            }
+                sessions
+            };
 
+            #[cfg(not(target_arch = "wasm32"))]
             if worker_sessions.len() > 1 {
                 let k = worker_sessions.len().min(total_batches);
                 worker_sessions.truncate(k);
@@ -905,6 +923,41 @@ impl OcrPipeline {
                         &mut all_word_infos,
                     );
                 }
+            }
+
+            #[cfg(target_arch = "wasm32")]
+            for batch_item in plan.batches {
+                let batch = build_rec_batch(
+                    &crop_imgs,
+                    &batch_item.indices,
+                    img_c,
+                    img_h,
+                    batch_item.max_wh_ratio,
+                )?;
+                let preds_dyn = self.rec.run(batch.into_dyn())?;
+                let preds: Array3<f32> = preds_dyn
+                    .into_dimensionality()
+                    .map_err(|_| CoreError::InvalidShape("recognition output must be 3D".into()))?;
+
+                let (line_results, batch_word_infos) = self.decoder.decode(
+                    preds,
+                    global.return_word_box,
+                    &batch_item.wh_ratio_list,
+                    batch_item.max_wh_ratio,
+                );
+
+                let word_infos = if global.return_word_box {
+                    Some(batch_word_infos)
+                } else {
+                    None
+                };
+                scatter_rec_results(
+                    &batch_item.indices,
+                    line_results,
+                    word_infos,
+                    &mut all_texts,
+                    &mut all_word_infos,
+                );
             }
         }
         rusto_nn::clear_tensor_buffer_pool();
