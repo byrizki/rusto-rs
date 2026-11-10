@@ -215,25 +215,19 @@ pub fn calculate_linenet_dims(
     limit_side_len: i32,
     limit_type: &str,
 ) -> (usize, usize, f32, f32) {
-    let ratio = if limit_type == "max" {
+    let scale = if limit_type == "max" {
         (limit_side_len as f32 / (ori_h.max(ori_w) as f32)).min(1.0)
     } else {
         1.0
     };
 
-    let mut resize_h = ((ori_h as f32 * ratio / 32.0).round() * 32.0) as usize;
-    let mut resize_w = ((ori_w as f32 * ratio / 32.0).round() * 32.0) as usize;
-    if resize_h == 0 {
-        resize_h = 32;
-    }
-    if resize_w == 0 {
-        resize_w = 32;
-    }
+    let nh = ((ori_h as f32 * scale).round() as usize).max(1);
+    let nw = ((ori_w as f32 * scale).round() as usize).max(1);
 
-    let scale_w = resize_w as f32 / ori_w as f32;
-    let scale_h = resize_h as f32 / ori_h as f32;
+    let ph = ((nh + 31) / 32) * 32;
+    let pw = ((nw + 31) / 32) * 32;
 
-    (resize_w, resize_h, scale_w, scale_h)
+    (pw, ph, scale, scale)
 }
 
 pub fn prepare_linenet_det_input(
@@ -250,14 +244,15 @@ pub fn prepare_linenet_det_input(
 
     let orig_w = orig_w_u as f32;
     let orig_h = orig_h_u as f32;
-    let scale_w = target_w as f32 / orig_w;
-    let scale_h = target_h as f32 / orig_h;
+    let scale = (target_w as f32 / orig_w).min(target_h as f32 / orig_h).min(1.0);
+    let nw = ((orig_w * scale).round() as usize).clamp(1, target_w);
+    let nh = ((orig_h * scale).round() as usize).clamp(1, target_h);
 
     if let Some(rgb) = img.as_dynamic().as_rgb8() {
         let raw = rgb.as_raw();
         let row_bytes = orig_w_u * 3;
-        let x_tab = build_bilinear_table(target_w, 0.0, 1.0 / scale_w, orig_w_u, 3);
-        let y_tab = build_bilinear_table(target_h, 0.0, 1.0 / scale_h, orig_h_u, row_bytes);
+        let x_tab = build_bilinear_table(nw, 0.0, 1.0 / scale, orig_w_u, 3);
+        let y_tab = build_bilinear_table(nh, 0.0, 1.0 / scale, orig_h_u, row_bytes);
         let out_slice = input.as_mut_slice();
 
         const WR: f32 = 0.299 / 255.0;
@@ -267,7 +262,7 @@ pub fn prepare_linenet_det_input(
         for (ty, &(ry0, ry1, wy0, wy1)) in y_tab.iter().enumerate() {
             let row0 = &raw[ry0..ry0 + row_bytes];
             let row1 = &raw[ry1..ry1 + row_bytes];
-            let dst_row = &mut out_slice[ty * target_w..(ty + 1) * target_w];
+            let dst_row = &mut out_slice[ty * target_w..(ty * target_w + nw)];
             for (tx, &(ox0, ox1, wx0, wx1)) in x_tab.iter().enumerate() {
                 let l00 = row0[ox0] as f32 * WR + row0[ox0 + 1] as f32 * WG + row0[ox0 + 2] as f32 * WB;
                 let l10 = row0[ox1] as f32 * WR + row0[ox1 + 1] as f32 * WG + row0[ox1 + 2] as f32 * WB;
@@ -280,14 +275,14 @@ pub fn prepare_linenet_det_input(
         return Ok(input);
     }
 
-    for ty in 0..target_h {
-        let sy = ((ty as f32 + 0.5) / scale_h - 0.5).clamp(0.0, orig_h - 1.0);
+    for ty in 0..nh {
+        let sy = ((ty as f32 + 0.5) / scale - 0.5).clamp(0.0, orig_h - 1.0);
         let y0 = sy.floor() as u32;
         let y1 = (y0 + 1).min(img.rows() as u32 - 1);
         let fy = sy - y0 as f32;
 
-        for tx in 0..target_w {
-            let sx = ((tx as f32 + 0.5) / scale_w - 0.5).clamp(0.0, orig_w - 1.0);
+        for tx in 0..nw {
+            let sx = ((tx as f32 + 0.5) / scale - 0.5).clamp(0.0, orig_w - 1.0);
             let x0 = sx.floor() as u32;
             let x1 = (x0 + 1).min(img.cols() as u32 - 1);
             let fx = sx - x0 as f32;
@@ -616,18 +611,22 @@ pub fn preprocess_linenet_det_rgba(
         return (det_input, target_w, target_h, scale_w, scale_h);
     }
 
-    let x_tab = build_bilinear_table(target_w, 0.0, 1.0 / scale_w, orig_w, 4);
-    let y_tab = build_bilinear_table(target_h, 0.0, 1.0 / scale_h, orig_h, orig_w * 4);
+    let scale = scale_w.min(scale_h);
+    let nw = ((orig_w as f32 * scale).round() as usize).clamp(1, target_w);
+    let nh = ((orig_h as f32 * scale).round() as usize).clamp(1, target_h);
+
+    let row_bytes = orig_w * 4;
+    let x_tab = build_bilinear_table(nw, 0.0, 1.0 / scale, orig_w, 4);
+    let y_tab = build_bilinear_table(nh, 0.0, 1.0 / scale, orig_h, row_bytes);
 
     const WR: f32 = 0.299 / 255.0;
     const WG: f32 = 0.587 / 255.0;
     const WB: f32 = 0.114 / 255.0;
 
-    let row_bytes = orig_w * 4;
     for (ty, &(ry0, ry1, wy0, wy1)) in y_tab.iter().enumerate() {
         let row0 = &rgba[ry0..ry0 + row_bytes];
         let row1 = &rgba[ry1..ry1 + row_bytes];
-        let dst_row = &mut det_input[ty * target_w..(ty + 1) * target_w];
+        let dst_row = &mut det_input[ty * target_w..(ty * target_w + nw)];
 
         for (tx, &(ox0, ox1, wx0, wx1)) in x_tab.iter().enumerate() {
             let l00 = row0[ox0] as f32 * WR + row0[ox0 + 1] as f32 * WG + row0[ox0 + 2] as f32 * WB;

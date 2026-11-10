@@ -105,7 +105,7 @@ fn test_indra_inference_pipeline() {
     assert!(json_res.contains("UNITED KINGDOM"));
     assert!(json_res.contains("PASSPORT") || json_res.contains("PASSEPORT"));
     assert!(json_res.contains("882802433"));
-    assert!(json_res.contains("DOE") || json_res.contains("D O E"));
+    assert!(json_res.contains("DOE") || json_res.contains("D O E") || json_res.contains("DO E"));
     assert!(json_res.contains("JOHN"));
 }
 

@@ -357,15 +357,28 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
         &cache_dir,
     )?;
 
+    let det_str = det_path.to_string_lossy().to_ascii_lowercase();
+    let rec_str = rec_path.to_string_lossy().to_ascii_lowercase();
+    let dict_str = dict_path.to_string_lossy().to_ascii_lowercase();
+    let is_dict_txt = dict_path.extension().and_then(|s| s.to_str()).map_or(false, |e| e.eq_ignore_ascii_case("txt"));
+    let is_indra_asset = dict_str.contains("meta.json") || det_str.contains("indra") || rec_str.contains("indra") || det_str.contains("linenet");
+    let is_ppocr_asset = is_dict_txt || det_str.contains("ppocr") || rec_str.contains("ppocr");
+
     let model_lower = cli.model.to_ascii_lowercase();
-    let preset = if model_lower.contains("indra") || model_lower.contains("linenet") {
+    let preset = if is_indra_asset {
         crate::INDRA_MODEL_CONFIG
-    } else if model_lower.contains("v5") || model_lower.contains("ppocrv5") {
-        crate::PPV5_MODEL_CONFIG
-    } else if model_lower.contains("v4") || model_lower.contains("ppocrv4") {
-        crate::PPV4_MODEL_CONFIG
-    } else if model_lower.contains("v3") || model_lower.contains("ppocrv3") {
-        crate::PPV3_MODEL_CONFIG
+    } else if is_ppocr_asset || (!model_lower.contains("indra") && !model_lower.contains("linenet")) {
+        if det_str.contains("v5") || rec_str.contains("v5") || model_lower.contains("v5") {
+            crate::PPV5_MODEL_CONFIG
+        } else if det_str.contains("v4") || rec_str.contains("v4") || model_lower.contains("v4") {
+            crate::PPV4_MODEL_CONFIG
+        } else if det_str.contains("v3") || rec_str.contains("v3") || model_lower.contains("v3") {
+            crate::PPV3_MODEL_CONFIG
+        } else {
+            crate::PPV6_MODEL_CONFIG
+        }
+    } else if model_lower.contains("indra") || model_lower.contains("linenet") {
+        crate::INDRA_MODEL_CONFIG
     } else {
         crate::PPV6_MODEL_CONFIG
     };

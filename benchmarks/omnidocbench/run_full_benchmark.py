@@ -826,7 +826,7 @@ RAW_OCR_TARGETS = [
     ("(raw-i)", "rusto_nn_indra", "Rusto NN OCR (Pure-Rust MNN) + Indra OCR (Base)"),
     ("(raw-j)", "rusto_rten_indra", "RTen OCR (Rusto Binding) + Indra OCR (Base)"),
     ("(raw-k)", "rusto_mnn_indra", "MNN OCR (Rusto Binding) + Indra OCR (Base)"),
-    ("(raw-l)", "tesseract3", "Tesseract OCR (v5 / PSM 3 Fully Automatic)"),
+    ("(raw-l)", "tesseract_raw", "Tesseract OCR (v5 / PSM 6 Uniform Block)"),
 ]
 
 FULL_PIPELINE_TARGETS = [
@@ -841,6 +841,7 @@ FULL_PIPELINE_TARGETS = [
     ("(pipe-i)", "rusto_rten_indra_full", "RustO RTen Full Pipeline + Indra Models (Indra Order)"),
     ("(pipe-j)", "rusto_order_heuristic", "RustO NN + PP-OCRv6 + Pure-Rust Heuristic Order"),
     ("(pipe-k)", "rusto_rten_order_heuristic", "RustO RTen + PP-OCRv6 + Pure-Rust Heuristic Order"),
+    ("(pipe-l)", "tesseract3", "Tesseract OCR (v5 / PSM 3 Fully Automatic)"),
 ]
 
 
@@ -867,8 +868,10 @@ def resolve_result_entry(results, k):
             v = results["rusto_nn_indra_full"]
         elif k == "rusto_order_heuristic" and ("rusto_heuristic_order" in results or "pipe_heuristic" in results or "pure_rust_order" in results):
             v = results.get("rusto_heuristic_order", results.get("pipe_heuristic", results.get("pure_rust_order")))
-        elif k == "tesseract3" and ("tesseract" in results or "tesseract_ocr" in results or "raw_l" in results):
-            v = results.get("tesseract", results.get("tesseract_ocr", results.get("raw_l")))
+        elif k == "tesseract3" and ("tesseract" in results or "tesseract_ocr" in results or "pipe_l" in results or "tesseract_psm3" in results or "tesseract_pipe" in results):
+            v = results.get("tesseract3", results.get("tesseract", results.get("tesseract_ocr", results.get("pipe_l", results.get("tesseract_psm3", results.get("tesseract_pipe"))))))
+        elif k == "tesseract_raw" and ("tesseract6" in results or "raw_l" in results or "tesseract_psm6" in results):
+            v = results.get("tesseract_raw", results.get("tesseract6", results.get("raw_l", results.get("tesseract_psm6"))))
     return v
 
 
@@ -1173,10 +1176,10 @@ def main():
         "raw_i": "rusto_nn_indra",
         "raw_j": "rusto_rten_indra",
         "raw_k": "rusto_mnn_indra",
-        "raw_l": "tesseract3",
-        "tesseract": "tesseract3",
-        "tesseract3": "tesseract3",
-        "tesseract_ocr": "tesseract3",
+        "raw_l": "tesseract_raw",
+        "tesseract_raw": "tesseract_raw",
+        "tesseract6": "tesseract_raw",
+        "tesseract_psm6": "tesseract_raw",
         # Full pipeline targets
         "p1": "indra_ocr",
         "p2": "paddle_structure",
@@ -1189,6 +1192,7 @@ def main():
         "p9": "rusto_rten_indra_full",
         "p10": "rusto_order_heuristic",
         "p11": "rusto_rten_order_heuristic",
+        "p12": "tesseract3",
         "pipe_a": "indra_ocr",
         "pipe_b": "paddle_structure",
         "pipe_c": "rapid_structure_tiny",
@@ -1200,6 +1204,12 @@ def main():
         "pipe_i": "rusto_rten_indra_full",
         "pipe_j": "rusto_order_heuristic",
         "pipe_k": "rusto_rten_order_heuristic",
+        "pipe_l": "tesseract3",
+        "tesseract": "tesseract3",
+        "tesseract3": "tesseract3",
+        "tesseract_psm3": "tesseract3",
+        "tesseract_pipe": "tesseract3",
+        "tesseract_ocr": "tesseract3",
         "pipe_cdla": "rusto_full_tiny",
         "pipe_publaynet": "rusto_full_publaynet",
         "pipe_order": "rusto_indra_full",
@@ -1662,7 +1672,17 @@ def main():
         },
         "tesseract3": {
             "name": "Tesseract OCR (v5 / PSM 3)",
-            "target": "(raw-l) Tesseract OCR (PSM 3)",
+            "target": "(pipe-l) Tesseract OCR (PSM 3)",
+            "binary_size_mb": round(get_binary_size_mb(Path(shutil.which("tesseract") or "/usr/bin/tesseract")) + 4.2, 1),
+            "model_size_mb": get_model_size_mb([
+                Path("/usr/share/tesseract-ocr/5/tessdata/eng.traineddata"),
+                Path("/usr/share/tessdata/eng.traineddata"),
+            ]),
+            "engine_runtime": "C++ / Leptonica (Tesseract)",
+        },
+        "tesseract_raw": {
+            "name": "Tesseract OCR (v5 / PSM 6)",
+            "target": "(raw-l) Tesseract OCR (Raw / PSM 6)",
             "binary_size_mb": round(get_binary_size_mb(Path(shutil.which("tesseract") or "/usr/bin/tesseract")) + 4.2, 1),
             "model_size_mb": get_model_size_mb([
                 Path("/usr/share/tesseract-ocr/5/tessdata/eng.traineddata"),
@@ -1919,25 +1939,25 @@ def main():
         results["rusto_indra_base"] = dict(stats)
 
     # -------------------------------------------------------------------------
-    # Target raw-l: Tesseract OCR (v5 / PSM 3)
+    # Target raw-l: Tesseract OCR (v5 / Raw PSM 6 Uniform Block)
     # -------------------------------------------------------------------------
-    if is_target_active("tesseract3") or is_target_active("tesseract") or is_target_active("raw_l"):
+    if is_target_active("tesseract_raw") or is_target_active("tesseract6") or is_target_active("raw_l") or is_target_active("tesseract_psm6"):
         tess_bin = shutil.which("tesseract") or "tesseract"
-        def make_tesseract_cmd(path, tess_bin=tess_bin):
+        def make_tesseract_raw_cmd(path, tess_bin=tess_bin):
             return [
                 tess_bin,
                 str(path),
                 "stdout",
                 "-l", "eng",
-                "--psm", "3",
+                "--psm", "6",
             ]
-        timings, neds, rss, page_neds = runner.run_cli_pipeline("tesseract3", make_tesseract_cmd, warmup_img)
+        timings, neds, rss, page_neds = runner.run_cli_pipeline("tesseract_raw", make_tesseract_raw_cmd, warmup_img)
         stats = compute_stats(timings, neds)
-        stats.update(pipeline_metadata["tesseract3"])
+        stats.update(pipeline_metadata["tesseract_raw"])
         stats["peak_rss_mb"] = round(rss, 1)
         stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
-        results["tesseract3"] = stats
-        results["tesseract"] = dict(stats)
+        results["tesseract_raw"] = stats
+        results["raw_l"] = dict(stats)
 
     # -------------------------------------------------------------------------
     # Full Pipeline Targets (Native Document Understanding & Reading Order)
@@ -2136,6 +2156,27 @@ def main():
         stats["peak_rss_mb"] = round(rss, 1)
         stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
         results["rusto_rten_order_heuristic"] = stats
+
+    # -------------------------------------------------------------------------
+    # Target pipe-l: Tesseract OCR (v5 / PSM 3 Fully Automatic)
+    # -------------------------------------------------------------------------
+    if is_target_active("tesseract3") or is_target_active("tesseract") or is_target_active("pipe_l") or is_target_active("tesseract_psm3") or is_target_active("tesseract_pipe"):
+        tess_bin = shutil.which("tesseract") or "tesseract"
+        def make_tesseract_cmd(path, tess_bin=tess_bin):
+            return [
+                tess_bin,
+                str(path),
+                "stdout",
+                "-l", "eng",
+                "--psm", "3",
+            ]
+        timings, neds, rss, page_neds = runner.run_cli_pipeline("tesseract3", make_tesseract_cmd, warmup_img)
+        stats = compute_stats(timings, neds)
+        stats.update(pipeline_metadata["tesseract3"])
+        stats["peak_rss_mb"] = round(rss, 1)
+        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+        results["tesseract3"] = stats
+        results["tesseract"] = dict(stats)
 
     # Secondary/Backwards Compatible Targets (if explicitly passed in selected_targets)
     if "rusto_rten_small" in selected_targets:

@@ -151,6 +151,45 @@ pub fn load_mnn(slice: &[u8]) -> Result<Graph, MnnError> {
                             _ => schema::PadMode::CAFFE,
                         };
                         (p_type, kh, kw, sh, sw, pad_m, pad_x, pad_y, pads, is_global)
+                    } else if let Some(p3d) = op.main_as_pool_3d() {
+                        let p_type = match p3d.type_() {
+                            MnnPoolType::AVEPOOL => CorePoolType::AvgPool,
+                            _ => CorePoolType::MaxPool,
+                        };
+                        let (kh, kw) = if let Some(k) = p3d.kernels() {
+                            if k.len() >= 3 {
+                                (k.get(1).max(1) as usize, k.get(2).max(1) as usize)
+                            } else if k.len() == 2 {
+                                (k.get(0).max(1) as usize, k.get(1).max(1) as usize)
+                            } else if k.len() == 1 {
+                                (k.get(0).max(1) as usize, k.get(0).max(1) as usize)
+                            } else {
+                                (1, 1)
+                            }
+                        } else {
+                            (1, 1)
+                        };
+                        let (sh, sw) = if let Some(s) = p3d.strides() {
+                            if s.len() >= 3 {
+                                (s.get(1).max(1) as usize, s.get(2).max(1) as usize)
+                            } else if s.len() == 2 {
+                                (s.get(0).max(1) as usize, s.get(1).max(1) as usize)
+                            } else if s.len() == 1 {
+                                (s.get(0).max(1) as usize, s.get(0).max(1) as usize)
+                            } else {
+                                (1, 1)
+                            }
+                        } else {
+                            (1, 1)
+                        };
+                        let pads = p3d.pads().map(|v| v.iter().collect());
+                        let is_global = p3d.isGlobal();
+                        let pad_m = match p3d.padType() {
+                            schema::PoolPadType::SAME => schema::PadMode::SAME,
+                            schema::PoolPadType::VALID => schema::PadMode::VALID,
+                            _ => schema::PadMode::CAFFE,
+                        };
+                        (p_type, kh, kw, sh, sw, pad_m, 0, 0, pads, is_global)
                     } else {
                         (CorePoolType::MaxPool, 1, 1, 1, 1, schema::PadMode::CAFFE, 0, 0, None, false)
                     };

@@ -298,7 +298,8 @@ pub fn sort_lines_reading_order(lines: &mut [crate::types::TextResult]) {
             section_max_y = item_bottom;
             current_section.push(item);
         } else {
-            let prev_was_spanning = current_section.last().unwrap().frame.width > 0.65 * doc_w;
+            let prev = current_section.last().unwrap();
+            let prev_was_spanning = prev.frame.width > 0.65 * doc_w;
             if is_spanning || prev_was_spanning {
                 sections.push(current_section);
                 section_max_y = item_bottom;
@@ -465,11 +466,12 @@ pub fn cluster_and_sort_reading_order(
         return lines;
     }
 
-    let doc_w = lines
+    let min_x = lines.iter().map(|l| l.frame.left).fold(f32::INFINITY, f32::min);
+    let max_x = lines
         .iter()
         .map(|l| l.frame.left + l.frame.width)
-        .fold(0.0f32, f32::max)
-        .max(1.0);
+        .fold(f32::NEG_INFINITY, f32::max);
+    let doc_w = (max_x - min_x).max(1.0);
 
     let mut heights: Vec<f32> = lines.iter().map(|l| l.frame.height).collect();
     heights.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -505,7 +507,8 @@ pub fn cluster_and_sort_reading_order(
             section_max_y = item_bottom;
             current_section.push(item);
         } else {
-            let prev_was_spanning = current_section.last().unwrap().frame.width > 0.65 * doc_w;
+            let prev = current_section.last().unwrap();
+            let prev_was_spanning = prev.frame.width > 0.65 * doc_w;
             if is_spanning || prev_was_spanning {
                 sections.push(current_section);
                 section_max_y = item_bottom;
@@ -723,7 +726,10 @@ pub fn order_layout_regions(regions: &[LayoutRegion], img_w: f32) -> Vec<Indexed
 
     for item in indexed {
         let w = (item.region.bbox.x_max - item.region.bbox.x_min) as f32;
-        let is_spanning = w > 0.65 * img_w
+        let x1 = item.region.bbox.x_min as f32;
+        let x2 = item.region.bbox.x_max as f32;
+        let is_spanning = w > 0.50 * img_w
+            || (x1 < 0.45 * img_w && x2 > 0.55 * img_w)
             || item.region.layout_type == LayoutType::Header
             || item.region.layout_type == LayoutType::Footer;
 
@@ -734,12 +740,15 @@ pub fn order_layout_regions(regions: &[LayoutRegion], img_w: f32) -> Vec<Indexed
             let prev_was_spanning = {
                 let prev = current_section.last().unwrap();
                 let pw = (prev.region.bbox.x_max - prev.region.bbox.x_min) as f32;
-                pw > 0.65 * img_w
+                let px1 = prev.region.bbox.x_min as f32;
+                let px2 = prev.region.bbox.x_max as f32;
+                pw > 0.50 * img_w
+                    || (px1 < 0.45 * img_w && px2 > 0.55 * img_w)
                     || prev.region.layout_type == LayoutType::Header
                     || prev.region.layout_type == LayoutType::Footer
             };
 
-            if is_spanning || prev_was_spanning || item.region.bbox.y_min >= section_max_y {
+            if is_spanning || prev_was_spanning {
                 sections.push(current_section);
                 section_max_y = item.region.bbox.y_max;
                 current_section = vec![item];
@@ -794,6 +803,32 @@ pub fn order_layout_regions(regions: &[LayoutRegion], img_w: f32) -> Vec<Indexed
             }
         }
 
+        // Transitive merge for columns with horizontal overlap
+        let mut merged = true;
+        while merged {
+            merged = false;
+            'outer: for i in 0..columns.len() {
+                for j in (i + 1)..columns.len() {
+                    let a_x1 = columns[i].iter().map(|r| r.region.bbox.x_min).min().unwrap();
+                    let a_x2 = columns[i].iter().map(|r| r.region.bbox.x_max).max().unwrap();
+                    let b_x1 = columns[j].iter().map(|r| r.region.bbox.x_min).min().unwrap();
+                    let b_x2 = columns[j].iter().map(|r| r.region.bbox.x_max).max().unwrap();
+                    let a_w = (a_x2 - a_x1).max(1);
+                    let b_w = (b_x2 - b_x1).max(1);
+
+                    let ov_x1 = a_x1.max(b_x1);
+                    let ov_x2 = a_x2.min(b_x2);
+                    let ov = (ov_x2 - ov_x1).max(0) as f32;
+                    if ov / (a_w.min(b_w) as f32) > 0.35 {
+                        let to_merge = columns.remove(j);
+                        columns[i].extend(to_merge);
+                        merged = true;
+                        break 'outer;
+                    }
+                }
+            }
+        }
+
         columns.sort_by_key(|col| col.iter().map(|r| r.region.bbox.x_min).min().unwrap_or(0));
 
         for mut col in columns {
@@ -812,9 +847,7 @@ pub fn order_text_results_by_layout(
     img_w: f32,
 ) -> Vec<crate::types::TextResult> {
     if regions.is_empty() || results.is_empty() {
-        let mut sorted = results.to_vec();
-        sort_lines_reading_order(&mut sorted);
-        return sorted;
+        return cluster_and_sort_reading_order(results.to_vec(), None, None);
     }
 
     let ordered_regions = order_layout_regions(regions, img_w);
@@ -869,13 +902,16 @@ pub fn order_text_results_by_layout(
 
     let mut final_ordered = Vec::with_capacity(results.len());
 
-    for mut bucket in region_buckets {
-        sort_lines_reading_order(&mut bucket);
-        final_ordered.extend(bucket);
+    for bucket in region_buckets {
+        if !bucket.is_empty() {
+            let sorted_bucket = cluster_and_sort_reading_order(bucket, None, None);
+            final_ordered.extend(sorted_bucket);
+        }
     }
 
     if !unassigned.is_empty() {
-        interleave_unassigned_lines(&mut final_ordered, unassigned, img_w);
+        let sorted_unassigned = cluster_and_sort_reading_order(unassigned, None, None);
+        interleave_unassigned_lines(&mut final_ordered, sorted_unassigned, img_w);
     }
 
     final_ordered
@@ -883,13 +919,12 @@ pub fn order_text_results_by_layout(
 
 fn interleave_unassigned_lines(
     final_ordered: &mut Vec<crate::types::TextResult>,
-    mut unassigned: Vec<crate::types::TextResult>,
+    unassigned: Vec<crate::types::TextResult>,
     img_w: f32,
 ) {
     if unassigned.is_empty() {
         return;
     }
-    sort_lines_reading_order(&mut unassigned);
 
     for u in unassigned {
         let u_left = u.frame.left;
