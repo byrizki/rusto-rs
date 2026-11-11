@@ -465,7 +465,8 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
     if cli.enable_unwarp {
         options.auto_unwarp = Some(true);
     }
-    if cli.enable_layout || cli.reading_order || cli.order_model.is_some() || cli.heuristic_reading_order {
+    let layout_active = cli.enable_layout || cli.layout_model.is_some() || cli.layout_variant.is_some();
+    if layout_active || cli.reading_order || cli.order_model.is_some() || cli.heuristic_reading_order {
         options.layout_reading = Some(true);
     }
     if let Some(det_limit) = cli.det_limit {
@@ -496,7 +497,7 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let has_model_order = cli.reading_order || cli.order_model.is_some() || cli.enable_layout;
+    let has_model_order = cli.reading_order || cli.order_model.is_some() || layout_active;
     if cli.format == OutputFormat::TextOrdered && !has_model_order {
         effective_results = rusto_core::layout::cluster_and_sort_reading_order(effective_results, None, None);
     }

@@ -735,10 +735,48 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
         panic!("Expected structured text results");
     };
 
-    assert_eq!(lines.len(), 249, "Dense chronicling america page must detect exactly 249 lines");
+    assert_eq!(lines.len(), 238, "Dense chronicling america page must detect 238 clustered lines");
     assert!(lines[0].text.starts_with("All Orders in"));
     assert!(lines[0].region_id.is_some(), "region_id should be populated when layout is enabled");
     assert!(lines[0].layout_type.is_some(), "layout_type should be populated when layout is enabled");
+
+    let unique_regions: std::collections::HashSet<i32> =
+        lines.iter().filter_map(|l| l.region_id).collect();
+    assert!(
+        unique_regions.len() >= 20,
+        "Coarse table region should decompose into distinct ad/column sub-regions, got {}",
+        unique_regions.len()
+    );
+
+    let plaid_idx = lines
+        .iter()
+        .position(|l| l.text.contains("Plaid Mohairs"))
+        .expect("Should find Plaid Mohairs");
+    let linen_idx = lines
+        .iter()
+        .position(|l| l.text.contains("LINEN"))
+        .expect("Should find All Linen Crash Toweling at bottom of left subcolumn");
+    let blankets_idx = lines
+        .iter()
+        .position(|l| l.text.contains("Sale of Blankets"))
+        .expect("Should find Sale of Blankets");
+    let waists_idx = lines
+        .iter()
+        .position(|l| l.text.contains("RHIRT WAIRT"))
+        .expect("Should find Ladies Stylish Shirt Waists at bottom of right subcolumn");
+
+    assert!(
+        plaid_idx < linen_idx && linen_idx < blankets_idx && blankets_idx < waists_idx,
+        "Plaid Mohairs subcolumn ({}..{}) must completely precede Sale of Blankets subcolumn ({}..{}) without alternating",
+        plaid_idx,
+        linen_idx,
+        blankets_idx,
+        waists_idx
+    );
+    assert_ne!(
+        lines[plaid_idx].region_id, lines[blankets_idx].region_id,
+        "Plaid Mohairs and Sale of Blankets must have distinct region_ids"
+    );
 
     // 2. C FFI API verification
     let c_config = CString::new(config_json).unwrap();
@@ -761,7 +799,7 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
         )
     };
     assert_eq!(ret, 0, "rocr_detect_text_file should succeed");
-    assert_eq!(c_count, 249, "C FFI must return exactly 249 lines");
+    assert_eq!(c_count, 238, "C FFI must return 238 clustered lines");
     assert!(!c_results.is_null());
 
     unsafe {
@@ -774,6 +812,106 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
         rocr_free_results(c_results, c_count);
         rocr_free(handle);
     }
+}
+
+#[test]
+fn test_nested_subcolumns_under_central_spanning_article_reading_order_and_regions() {
+    use rusto::{Frame, TextResult};
+    use rusto_core::layout::{order_text_results_by_layout, BBox, LayoutRegion, LayoutType};
+
+    let make_line = |text: &str, left: f32, top: f32, width: f32, height: f32| TextResult {
+        text: text.to_string(),
+        score: 0.99,
+        box_points: [
+            (left, top),
+            (left + width, top),
+            (left + width, top + height),
+            (left, top + height),
+        ],
+        frame: Frame::new(width, height, top, left),
+        region_id: None,
+        layout_type: None,
+    };
+
+    // Mirrors USA Today 497x960 geometry:
+    // - Outer Left column (x=19..124, y=77..400)
+    // - Center 2-column spanning article (x=138..358, y=77..285)
+    // - Inner Left subcolumn (Iowa..Minnesota, x=138..242, y=308..400)
+    // - Inner Right subcolumn (Mississippi..Ohio, x=253..353, y=309..400)
+    // - Outer Right column (Oklahoma..Wyoming, x=370..478, y=77..400)
+    let interleaved = vec![
+        make_line("ALABAMA_1", 20.0, 77.0, 100.0, 10.0),
+        make_line("HIGHLIGHT: NORTH CAROLINA", 138.8, 77.4, 137.8, 11.0),
+        make_line("OKLAHOMA_1", 370.0, 77.0, 105.0, 10.0),
+        make_line("ALABAMA_2", 20.0, 226.0, 100.0, 10.0),
+        make_line("Wilmington: Lions Bridge spanning line 1", 138.1, 226.0, 220.1, 11.0),
+        make_line("OKLAHOMA_2", 370.0, 226.0, 105.0, 10.0),
+        make_line("Wilmington: Lions Bridge spanning line 2", 137.4, 254.0, 220.1, 11.0),
+        make_line("an immediate safety hazard and deemed beyond repair.", 138.1, 275.1, 156.7, 10.0),
+        // Interleaved inner subcolumns at y=308..350
+        make_line("IOWA_1", 138.1, 308.0, 104.7, 9.0),
+        make_line("MISSISSIPPI_1", 252.9, 309.0, 99.3, 9.0),
+        make_line("ALABAMA_3", 20.0, 315.0, 100.0, 9.0),
+        make_line("IOWA_2", 138.1, 320.0, 102.6, 9.0),
+        make_line("MISSISSIPPI_2", 254.2, 321.0, 92.5, 9.0),
+        make_line("OKLAHOMA_3", 370.0, 321.0, 105.0, 9.0),
+        make_line("IOWA_3", 137.4, 332.0, 100.6, 9.0),
+        make_line("MISSISSIPPI_3", 252.2, 333.0, 100.6, 9.0),
+        make_line("IOWA_4", 137.4, 344.0, 105.3, 9.0),
+        make_line("MISSISSIPPI_4", 252.2, 345.0, 96.6, 9.0),
+    ];
+
+    let coarse_regions = vec![LayoutRegion {
+        bbox: BBox {
+            x_min: 8,
+            y_min: 17,
+            x_max: 487,
+            y_max: 943,
+        },
+        layout_type: LayoutType::Text,
+        confidence: 0.92,
+    }];
+
+    let ordered = order_text_results_by_layout(&interleaved, &coarse_regions, 497.0);
+    let texts: Vec<&str> = ordered.iter().map(|r| r.text.as_str()).collect();
+
+    assert_eq!(
+        texts,
+        vec![
+            "ALABAMA_1",
+            "ALABAMA_2",
+            "ALABAMA_3",
+            "HIGHLIGHT: NORTH CAROLINA",
+            "Wilmington: Lions Bridge spanning line 1",
+            "Wilmington: Lions Bridge spanning line 2",
+            "an immediate safety hazard and deemed beyond repair.",
+            "IOWA_1",
+            "IOWA_2",
+            "IOWA_3",
+            "IOWA_4",
+            "MISSISSIPPI_1",
+            "MISSISSIPPI_2",
+            "MISSISSIPPI_3",
+            "MISSISSIPPI_4",
+            "OKLAHOMA_1",
+            "OKLAHOMA_2",
+            "OKLAHOMA_3",
+        ]
+    );
+
+    let iowa_reg = ordered.iter().find(|r| r.text == "IOWA_1").unwrap().region_id;
+    let miss_reg = ordered
+        .iter()
+        .find(|r| r.text == "MISSISSIPPI_1")
+        .unwrap()
+        .region_id;
+    let nc_reg = ordered
+        .iter()
+        .find(|r| r.text == "HIGHLIGHT: NORTH CAROLINA")
+        .unwrap()
+        .region_id;
+    assert_ne!(nc_reg, iowa_reg);
+    assert_ne!(iowa_reg, miss_reg);
 }
 
 #[test]
@@ -859,4 +997,111 @@ fn test_newspaper_page_column_clustering_prevents_merging_and_explosion() {
             );
         }
     }
+}
+
+#[test]
+fn test_issue25_chronam_dense_page_pure_rusto_nn_engine_subcolumns_and_regions() {
+    use rusto::{DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, RustO};
+    use std::path::Path;
+
+    let img_path = "tests/fixtures/chronam-ad-page.png";
+    let det_path = "models/PPOCR_v6_tiny/det.mnn";
+    let rec_path = "models/PPOCR_v6_tiny/rec.mnn";
+    let dict_path = "models/PPOCR_v6_tiny/dict.txt";
+    let layout_path = "models/PPOCR_v6_tiny/layout_cdla.mnn";
+
+    if !Path::new(img_path).exists()
+        || !Path::new(det_path).exists()
+        || !Path::new(rec_path).exists()
+        || !Path::new(dict_path).exists()
+        || !Path::new(layout_path).exists()
+    {
+        return;
+    }
+
+    let config_json = format!(
+        r#"{{
+            "detection": {{ "modelPath": "{}", "enabled": true }},
+            "recognition": {{ "modelPath": "{}", "dictPath": "{}", "enabled": true }},
+            "layout": {{ "modelPath": "{}", "enabled": true }}
+        }}"#,
+        det_path, rec_path, dict_path, layout_path
+    );
+
+    let init_config = InitializeConfig::from_json(&config_json).expect("Parse config JSON");
+    let mut ocr = RustO::initialize(init_config).expect("Init pure rusto-nn engine");
+
+    let options = OcrRunOptions {
+        layout_reading: Some(true),
+        ..Default::default()
+    };
+
+    let res = ocr
+        .detect_text(&ImageSource::Path(img_path.into()), &options)
+        .expect("detect_text on chronam with rusto-nn");
+    let DetectTextResult::Structured(lines) = res else {
+        panic!("Expected structured text results");
+    };
+
+    assert!(
+        lines.len() >= 200,
+        "Dense page should detect >= 200 clustered lines, got {}",
+        lines.len()
+    );
+
+    let unique_regions: std::collections::HashSet<i32> =
+        lines.iter().filter_map(|l| l.region_id).collect();
+    assert!(
+        unique_regions.len() >= 20,
+        "Coarse table region should decompose into >= 20 distinct ad sub-regions in rusto-nn, got {}",
+        unique_regions.len()
+    );
+
+    let plaid_idx = lines
+        .iter()
+        .position(|l| l.text.to_lowercase().contains("plaid mohair"))
+        .expect("Should find Plaid Mohairs");
+    let linen_idx = lines
+        .iter()
+        .position(|l| l.text.to_lowercase().contains("linen") && l.frame.left < 480.0 && l.frame.top > 650.0)
+        .expect("Should find Linen at bottom of left subcolumn");
+    let blankets_idx = lines
+        .iter()
+        .position(|l| l.text.to_lowercase().contains("sale of blanket"))
+        .expect("Should find Sale of Blankets");
+    let waists_idx = lines
+        .iter()
+        .position(|l| {
+            (l.text.to_lowercase().contains("waist") || l.text.to_lowercase().contains("rhirt"))
+                && l.frame.left > 480.0
+                && l.frame.top > 650.0
+        })
+        .expect("Should find Shirt Waists at bottom of right subcolumn");
+
+    assert!(
+        plaid_idx < linen_idx,
+        "Plaid Mohairs (line {}) should precede Linen (line {})",
+        plaid_idx,
+        linen_idx
+    );
+    assert!(
+        linen_idx < blankets_idx,
+        "Entire left subcolumn (Linen line {}) should precede right subcolumn (Blankets line {})",
+        linen_idx,
+        blankets_idx
+    );
+    assert!(
+        blankets_idx < waists_idx,
+        "Sale of Blankets (line {}) should precede Shirt Waists (line {})",
+        blankets_idx,
+        waists_idx
+    );
+
+    let plaid_reg = lines[plaid_idx].region_id.unwrap();
+    let blankets_reg = lines[blankets_idx].region_id.unwrap();
+    assert_ne!(
+        plaid_reg, blankets_reg,
+        "Plaid Mohairs (reg {}) and Sale of Blankets (reg {}) must have distinct region IDs",
+        plaid_reg, blankets_reg
+    );
 }

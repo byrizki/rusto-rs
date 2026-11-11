@@ -114,11 +114,16 @@ debug = true
 incremental = true
 
 [profile.release]
-opt-level = "z"
+opt-level = 3
 lto = "fat"
 codegen-units = 1
 strip = true
 panic = "abort"
+
+# Size-optimized profile for embedded or size-sensitive deployments
+[profile.compressed]
+inherits = "release"
+opt-level = "z"
 
 [profile.release-with-debug]
 inherits = "release"

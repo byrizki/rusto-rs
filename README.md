@@ -522,8 +522,14 @@ rusto-rs/
 # Run core library unit tests across the workspace
 cargo test --workspace --lib
 
-# Build the `rusto` CLI in release mode
+# Build the `rusto` CLI in release mode (high-performance default: opt-level=3)
 cargo build --release --bin rusto
+
+# Build C FFI + RTen shared/static library in release mode
+cargo build --release --locked --features ffi,rten --lib
+
+# Optional size-optimized release profile (opt-level="z") for embedded/minimal footprint:
+cargo build --profile compressed --locked --features ffi,rten --lib
 
 # Run linter & formatter
 cargo clippy --workspace
