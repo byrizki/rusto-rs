@@ -294,9 +294,6 @@ jobs:
         working-directory: packages/dart
         run: |
           dart pub get
-          if [ -n "${{ secrets.PUB_DEV_TOKEN }}" ]; then
-            dart pub token add https://pub.dev --env-var PUB_DEV_TOKEN
-          fi
 
           output=$(dart pub publish --force 2>&1) && {
             echo "$output"
@@ -311,16 +308,11 @@ jobs:
           fi
 
           exit 1
-        env:
-          PUB_DEV_TOKEN: ${{ secrets.PUB_DEV_TOKEN }}
 
       - name: Publish Flutter package to pub.dev
         working-directory: packages/flutter
         run: |
           flutter pub get
-          if [ -n "${{ secrets.PUB_DEV_TOKEN }}" ]; then
-            dart pub token add https://pub.dev --env-var PUB_DEV_TOKEN
-          fi
 
           output=$(flutter pub publish --force 2>&1) && {
             echo "$output"
@@ -335,8 +327,6 @@ jobs:
           fi
 
           exit 1
-        env:
-          PUB_DEV_TOKEN: ${{ secrets.PUB_DEV_TOKEN }}
 
   # Trigger JitPack build for Android & Java
   publish-jitpack:
