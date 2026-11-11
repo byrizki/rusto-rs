@@ -1,5 +1,5 @@
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResizeType {
@@ -162,9 +162,9 @@ pub fn interp2d(
         }
     };
 
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     {
-        if total_channels >= 2 {
+        if crate::par::current_thread_index().is_none() && total_channels >= 2 {
             output
                 .par_chunks_exact_mut(hw_out)
                 .enumerate()

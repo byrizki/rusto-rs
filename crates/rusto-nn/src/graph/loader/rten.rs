@@ -17,6 +17,34 @@ use crate::kernels::unary::UnaryOpType;
 use crate::schema::PadMode;
 use crate::tensor::{DataType, Tensor, TensorLayout};
 
+/// Decodes little-endian 4-byte scalar bytes into a `Vec<T>`, using a bulk copy when aligned.
+fn decode_le_4bytes<T: Copy>(bytes: &[u8], from_le: fn([u8; 4]) -> T) -> Vec<T> {
+    #[cfg(target_endian = "little")]
+    {
+        let (head, body, tail) = unsafe { bytes.align_to::<T>() };
+        if head.is_empty() && tail.is_empty() {
+            return body.to_vec();
+        }
+    }
+    let mut out = Vec::with_capacity(bytes.len() / 4);
+    for chunk in bytes.chunks_exact(4) {
+        out.push(from_le([chunk[0], chunk[1], chunk[2], chunk[3]]));
+    }
+    out
+}
+
+fn slice_const_bytes<'a>(
+    slice: &'a [u8],
+    abs_offset: usize,
+    byte_len: usize,
+    err_msg: &'static str,
+) -> Result<&'a [u8], MnnError> {
+    abs_offset
+        .checked_add(byte_len)
+        .and_then(|end| slice.get(abs_offset..end))
+        .ok_or_else(|| MnnError::InvalidModel(err_msg.into()))
+}
+
 fn extract_rten_constant(
     c: &sg::ConstantNode,
     slice: &[u8],
@@ -32,68 +60,39 @@ fn extract_rten_constant(
         let abs_offset = (base + data_offset) as usize;
 
         match c.dtype() {
-            Some(sg::ConstantDataType::Float32) => {
-                let byte_len = num_elems * 4;
-                if abs_offset + byte_len > slice.len() {
-                    return Err(MnnError::InvalidModel("Constant float buffer out of bounds".into()));
-                }
-                let bytes = &slice[abs_offset..abs_offset + byte_len];
-                let mut floats = Vec::with_capacity(num_elems);
-                for chunk in bytes.chunks_exact(4) {
-                    floats.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
-                }
-                Ok(Tensor::from_floats(&shape, floats, TensorLayout::NCHW))
-            }
             Some(sg::ConstantDataType::Int32) => {
-                let byte_len = num_elems * 4;
-                if abs_offset + byte_len > slice.len() {
-                    return Err(MnnError::InvalidModel("Constant int32 buffer out of bounds".into()));
-                }
-                let bytes = &slice[abs_offset..abs_offset + byte_len];
-                let mut ints = Vec::with_capacity(num_elems);
-                for chunk in bytes.chunks_exact(4) {
-                    ints.push(i32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
-                }
+                let bytes = slice_const_bytes(slice, abs_offset, num_elems * 4, "Constant int32 buffer out of bounds")?;
+                let ints = decode_le_4bytes(bytes, i32::from_le_bytes);
                 Ok(Tensor::from_ints(&shape, ints))
             }
             Some(sg::ConstantDataType::Int8) => {
-                let byte_len = num_elems;
-                if abs_offset + byte_len > slice.len() {
-                    return Err(MnnError::InvalidModel("Constant int8 buffer out of bounds".into()));
-                }
-                let bytes = &slice[abs_offset..abs_offset + byte_len];
+                let bytes = slice_const_bytes(slice, abs_offset, num_elems, "Constant int8 buffer out of bounds")?;
                 let ints: Vec<i32> = bytes.iter().map(|&b| (b as i8) as i32).collect();
                 Ok(Tensor::from_ints(&shape, ints))
             }
             Some(sg::ConstantDataType::UInt8) => {
-                let byte_len = num_elems;
-                if abs_offset + byte_len > slice.len() {
-                    return Err(MnnError::InvalidModel("Constant uint8 buffer out of bounds".into()));
-                }
-                let bytes = &slice[abs_offset..abs_offset + byte_len];
+                let bytes = slice_const_bytes(slice, abs_offset, num_elems, "Constant uint8 buffer out of bounds")?;
                 let ints: Vec<i32> = bytes.iter().map(|&b| b as i32).collect();
                 Ok(Tensor::from_ints(&shape, ints))
             }
             _ => {
-                let byte_len = num_elems * 4;
-                if abs_offset + byte_len > slice.len() {
-                    return Err(MnnError::InvalidModel("Constant buffer out of bounds".into()));
-                }
-                let bytes = &slice[abs_offset..abs_offset + byte_len];
-                let mut floats = Vec::with_capacity(num_elems);
-                for chunk in bytes.chunks_exact(4) {
-                    floats.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
-                }
+                let err_msg = if matches!(c.dtype(), Some(sg::ConstantDataType::Float32)) {
+                    "Constant float buffer out of bounds"
+                } else {
+                    "Constant buffer out of bounds"
+                };
+                let bytes = slice_const_bytes(slice, abs_offset, num_elems * 4, err_msg)?;
+                let floats = decode_le_4bytes(bytes, f32::from_le_bytes);
                 Ok(Tensor::from_floats(&shape, floats, TensorLayout::NCHW))
             }
         }
     } else {
         // Inline constant data
         if let Some(f_data) = c.data_as_float_data() {
-            let floats: Vec<f32> = f_data.data().iter().collect();
+            let floats = decode_le_4bytes(f_data.data().bytes(), f32::from_le_bytes);
             Ok(Tensor::from_floats(&shape, floats, TensorLayout::NCHW))
         } else if let Some(i_data) = c.data_as_int_32_data() {
-            let ints: Vec<i32> = i_data.data().iter().collect();
+            let ints = decode_le_4bytes(i_data.data().bytes(), i32::from_le_bytes);
             Ok(Tensor::from_ints(&shape, ints))
         } else if let Some(i8_data) = c.data_as_int_8_data() {
             let ints: Vec<i32> = i8_data.data().iter().map(|b| b as i32).collect();

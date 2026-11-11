@@ -1,5 +1,5 @@
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOpType {
@@ -140,9 +140,9 @@ fn process_unary_chunk(input: &[f32], output: &mut [f32], op: UnaryOpType) {
 pub fn unary_op(input: &[f32], output: &mut [f32], op: UnaryOpType) {
     assert_eq!(input.len(), output.len(), "Unary op input and output sizes must match");
 
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     {
-        if input.len() >= 4096 {
+        if crate::par::current_thread_index().is_none() && input.len() >= 4096 {
             let chunk_size = 4096;
             input
                 .par_chunks(chunk_size)
@@ -168,7 +168,7 @@ unsafe fn exp_avx2(x: core::arch::x86_64::__m256) -> core::arch::x86_64::__m256 
     let mask = _mm256_cmp_ps(x, min_x, _CMP_GE_OQ);
     let xc = _mm256_min_ps(_mm256_max_ps(x, min_x), max_x);
 
-    let log2_e = _mm256_set1_ps(1.4426950408889634f32);
+    let log2_e = _mm256_set1_ps(core::f32::consts::LOG2_E);
     let k = _mm256_round_ps(_mm256_mul_ps(xc, log2_e), _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
 
     let ln2_hi = _mm256_set1_ps(0.693359375f32);

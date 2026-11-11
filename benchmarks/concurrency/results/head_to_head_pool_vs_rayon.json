@@ -1,0 +1,276 @@
+{
+  "latency": [
+    {
+      "name": "Chronam: PP-OCRv6 Tiny (Plain)",
+      "rayon_latency": {
+        "median": 1698.6850729990692,
+        "mean": 1715.4314207500647,
+        "min": 1457.5641560004442,
+        "max": 2006.7913810016762
+      },
+      "pool_latency": {
+        "median": 1867.3810780001077,
+        "mean": 1921.8572427507752,
+        "min": 1809.115670999745,
+        "max": 2143.5511440031405
+      },
+      "rayon_res": {
+        "user_s": 5.87,
+        "sys_s": 0.29,
+        "total_cpu_s": 6.16,
+        "peak_rss_mb": 490,
+        "minor_faults": 147336
+      },
+      "pool_res": {
+        "user_s": 5.9,
+        "sys_s": 0.25,
+        "total_cpu_s": 6.15,
+        "peak_rss_mb": 438,
+        "minor_faults": 134072
+      },
+      "diff_ms": 168.69600500103843
+    },
+    {
+      "name": "Chronam: PP-OCRv6 Tiny (CDLA Layout)",
+      "rayon_latency": {
+        "median": 1869.343515500077,
+        "mean": 1866.6847132508337,
+        "min": 1801.7379240009177,
+        "max": 1926.3138980022632
+      },
+      "pool_latency": {
+        "median": 1795.8616525011166,
+        "mean": 1795.4657082509584,
+        "min": 1763.2256800025061,
+        "max": 1826.9138479990943
+      },
+      "rayon_res": {
+        "user_s": 6.62,
+        "sys_s": 0.35,
+        "total_cpu_s": 6.97,
+        "peak_rss_mb": 507,
+        "minor_faults": 155531
+      },
+      "pool_res": {
+        "user_s": 6.52,
+        "sys_s": 0.28,
+        "total_cpu_s": 6.8,
+        "peak_rss_mb": 456,
+        "minor_faults": 142571
+      },
+      "diff_ms": -73.48186299896042
+    },
+    {
+      "name": "Chronam: Indra OCR (Plain)",
+      "rayon_latency": {
+        "median": 693.0664224983047,
+        "mean": 692.7274347490311,
+        "min": 666.7813800013391,
+        "max": 717.9955139981757
+      },
+      "pool_latency": {
+        "median": 680.5017794995365,
+        "mean": 689.0637797496311,
+        "min": 667.4401220006985,
+        "max": 727.8114379987528
+      },
+      "rayon_res": {
+        "user_s": 2.61,
+        "sys_s": 0.09,
+        "total_cpu_s": 2.6999999999999997,
+        "peak_rss_mb": 64,
+        "minor_faults": 34211
+      },
+      "pool_res": {
+        "user_s": 2.41,
+        "sys_s": 0.05,
+        "total_cpu_s": 2.46,
+        "peak_rss_mb": 64,
+        "minor_faults": 33039
+      },
+      "diff_ms": -12.56464299876825
+    },
+    {
+      "name": "Chronam: Indra OCR (Neural Order)",
+      "rayon_latency": {
+        "median": 715.6643885009544,
+        "mean": 717.9851797500305,
+        "min": 698.9620629974524,
+        "max": 741.6498790007608
+      },
+      "pool_latency": {
+        "median": 713.8496874995326,
+        "mean": 710.5849217487048,
+        "min": 688.8814199992339,
+        "max": 725.7588919965201
+      },
+      "rayon_res": {
+        "user_s": 2.58,
+        "sys_s": 0.07,
+        "total_cpu_s": 2.65,
+        "peak_rss_mb": 69,
+        "minor_faults": 35959
+      },
+      "pool_res": {
+        "user_s": 2.45,
+        "sys_s": 0.06,
+        "total_cpu_s": 2.5100000000000002,
+        "peak_rss_mb": 67,
+        "minor_faults": 33802
+      },
+      "diff_ms": -1.8147010014217813
+    },
+    {
+      "name": "USAToday 960: PP-OCRv6 Tiny (Plain)",
+      "rayon_latency": {
+        "median": 2061.21121149954,
+        "mean": 2183.8506672502263,
+        "min": 2054.1353480002726,
+        "max": 2558.844898001553
+      },
+      "pool_latency": {
+        "median": 2057.7986245007196,
+        "mean": 2175.1957264996236,
+        "min": 2020.5644109992136,
+        "max": 2564.6212459978415
+      },
+      "rayon_res": {
+        "user_s": 6.95,
+        "sys_s": 0.18,
+        "total_cpu_s": 7.13,
+        "peak_rss_mb": 352,
+        "minor_faults": 112228
+      },
+      "pool_res": {
+        "user_s": 6.8,
+        "sys_s": 0.16,
+        "total_cpu_s": 6.96,
+        "peak_rss_mb": 317,
+        "minor_faults": 103196
+      },
+      "diff_ms": -3.4125869988201885
+    },
+    {
+      "name": "USAToday 960: Indra OCR (Plain)",
+      "rayon_latency": {
+        "median": 1468.6495135010773,
+        "mean": 1467.630637250295,
+        "min": 1448.2474340002227,
+        "max": 1484.9760879988025
+      },
+      "pool_latency": {
+        "median": 1460.7084425006178,
+        "mean": 1452.4264497504191,
+        "min": 1421.5293890010798,
+        "max": 1466.759524999361
+      },
+      "rayon_res": {
+        "user_s": 4.69,
+        "sys_s": 0.18,
+        "total_cpu_s": 4.87,
+        "peak_rss_mb": 201,
+        "minor_faults": 103616
+      },
+      "pool_res": {
+        "user_s": 4.86,
+        "sys_s": 0.12,
+        "total_cpu_s": 4.98,
+        "peak_rss_mb": 173,
+        "minor_faults": 96005
+      },
+      "diff_ms": -7.9410710004594875
+    },
+    {
+      "name": "USAToday 960: Indra OCR (Neural Order)",
+      "rayon_latency": {
+        "median": 1499.4379675008531,
+        "mean": 1508.0237769998348,
+        "min": 1477.9750179986877,
+        "max": 1555.2441549989453
+      },
+      "pool_latency": {
+        "median": 1477.5330454995128,
+        "mean": 1483.3161962496888,
+        "min": 1464.2140190007922,
+        "max": 1513.9846749989374
+      },
+      "rayon_res": {
+        "user_s": 4.89,
+        "sys_s": 0.18,
+        "total_cpu_s": 5.069999999999999,
+        "peak_rss_mb": 204,
+        "minor_faults": 104600
+      },
+      "pool_res": {
+        "user_s": 4.71,
+        "sys_s": 0.15,
+        "total_cpu_s": 4.86,
+        "peak_rss_mb": 181,
+        "minor_faults": 98400
+      },
+      "diff_ms": -21.90492200134031
+    }
+  ],
+  "concurrency": [
+    {
+      "c": 1,
+      "rayon": {
+        "concurrency": 1,
+        "wall_s": 13.880966184999124,
+        "qps": 0.5763287579106299,
+        "mean_latency_ms": 1735.04604212485
+      },
+      "pool": {
+        "concurrency": 1,
+        "wall_s": 13.304495199001394,
+        "qps": 0.6013005289069864,
+        "mean_latency_ms": 1662.9956735000633
+      }
+    },
+    {
+      "c": 2,
+      "rayon": {
+        "concurrency": 2,
+        "wall_s": 12.497369425000215,
+        "qps": 0.6401347137899672,
+        "mean_latency_ms": 3109.824560749985
+      },
+      "pool": {
+        "concurrency": 2,
+        "wall_s": 12.40378105599666,
+        "qps": 0.6449646252125972,
+        "mean_latency_ms": 3091.210725875044
+      }
+    },
+    {
+      "c": 4,
+      "rayon": {
+        "concurrency": 4,
+        "wall_s": 12.515667530999053,
+        "qps": 0.6391988266055679,
+        "mean_latency_ms": 5980.877634374792
+      },
+      "pool": {
+        "concurrency": 4,
+        "wall_s": 12.970229462000134,
+        "qps": 0.6167971062839102,
+        "mean_latency_ms": 6240.413978875495
+      }
+    },
+    {
+      "c": 8,
+      "rayon": {
+        "concurrency": 8,
+        "wall_s": 13.134340202002932,
+        "qps": 0.609090359847694,
+        "mean_latency_ms": 12792.516784249983
+      },
+      "pool": {
+        "concurrency": 8,
+        "wall_s": 12.831577808003203,
+        "qps": 0.6234619093382505,
+        "mean_latency_ms": 12242.43683212535
+      }
+    }
+  ]
+}

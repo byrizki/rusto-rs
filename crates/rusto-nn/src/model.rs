@@ -114,12 +114,15 @@ impl Model {
         &self.graph
     }
 
-    /// Access underlying FlatBuffers Net representation if loaded from MNN format
-    pub fn net(&self) -> Net<'_> {
-        if let Some(storage) = &self.storage {
-            schema::parse_net(storage.as_slice())
+    /// Access underlying FlatBuffers Net representation if loaded from MNN format.
+    /// Returns `None` if the model was not loaded from MNN format or storage was not retained.
+    pub fn net(&self) -> Option<Net<'_>> {
+        let storage = self.storage.as_ref()?;
+        let slice = storage.as_slice();
+        if slice.len() >= 4 && !slice.starts_with(b"RTEN") && !slice.starts_with(b"\x08") {
+            Some(schema::parse_net(slice))
         } else {
-            schema::parse_net(&[])
+            None
         }
     }
 

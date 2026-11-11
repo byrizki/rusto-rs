@@ -1,8 +1,5 @@
-pub mod mnn_generated;
+pub mod mnn;
+pub mod reader;
 
-pub use mnn_generated::mnn::*;
-
-/// Parse root Net from byte buffer
-pub fn parse_net<'a>(buf: &'a [u8]) -> Net<'a> {
-    get_root_as_net(buf)
-}
+pub use mnn::*;
+pub use reader::{ScalarVec, StringVec, Table, TableVec};

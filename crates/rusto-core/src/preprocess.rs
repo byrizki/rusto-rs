@@ -748,7 +748,10 @@ pub fn build_rec_batch(
     let n = indices.len();
     let batch_img_width = (img_h as f32 * max_wh_ratio).round() as usize;
     let item_len = img_c * img_h * batch_img_width;
-    let mut batch = Array4::<f32>::zeros((n, img_c, img_h, batch_img_width));
+    let total_len = n * item_len;
+    let raw_buf = rusto_nn::alloc_tensor_buffer_overwrite(total_len);
+    let mut batch = Array4::<f32>::from_shape_vec((n, img_c, img_h, batch_img_width), raw_buf)
+        .map_err(|e| CoreError::InvalidShape(format!("Failed to build batch shape: {}", e)))?;
     let batch_slice = batch.as_mut_slice();
 
     for (i, &idx) in indices.iter().enumerate() {

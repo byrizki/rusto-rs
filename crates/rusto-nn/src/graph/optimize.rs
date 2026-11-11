@@ -31,9 +31,11 @@ pub fn optimize_graph(graph: &mut Graph) {
 
     eliminate_identities(&mut graph.nodes, &graph_inputs, &graph_outputs);
     fuse_gelu_subgraphs(&mut graph.nodes, &graph_outputs);
+    fuse_hardswish_subgraphs(&mut graph.nodes, &graph_outputs);
     fold_conv_scale(&mut graph.nodes, &graph_inputs, &graph_outputs);
     fuse_post_activations(&mut graph.nodes, &graph_inputs, &graph_outputs);
     pretranspose_const_matmul_b(&mut graph.nodes, &graph_outputs);
+    fuse_flatten_softmax_reshape(&mut graph.nodes, &graph_outputs);
     sweep_dead_nodes_and_share_consts(&mut graph.nodes, &graph_outputs);
     graph.last_use = compute_last_use(&graph.nodes, graph.tensor_names.len(), &graph_inputs, &graph_outputs);
 }
@@ -354,6 +356,177 @@ fn fuse_gelu_subgraphs(nodes: &mut [Node], graph_outputs: &HashSet<usize>) {
     }
 }
 
+fn is_div_or_mul_inv6(
+    node: &Node,
+    src_tid: usize,
+    nodes: &[Node],
+    producer_of: &HashMap<usize, usize>,
+    def_count: &HashMap<usize, usize>,
+) -> bool {
+    if is_plain_binary(node, BinaryOpType::Div) && node.in_indices[0] == src_tid {
+        let rhs = node.in_indices[1];
+        return scalar_const_val(rhs, nodes, producer_of, def_count)
+            .is_some_and(|v| approx_eq(v, 6.0, 1e-4));
+    }
+    if is_plain_binary(node, BinaryOpType::Mul) {
+        let other = if node.in_indices[0] == src_tid {
+            node.in_indices[1]
+        } else if node.in_indices[1] == src_tid {
+            node.in_indices[0]
+        } else {
+            return false;
+        };
+        return scalar_const_val(other, nodes, producer_of, def_count)
+            .is_some_and(|v| approx_eq(v, 1.0 / 6.0, 1e-4));
+    }
+    false
+}
+
+fn fuse_hardswish_subgraphs(nodes: &mut [Node], graph_outputs: &HashSet<usize>) {
+    let (producer_of, def_count, use_count) = build_def_use(nodes, graph_outputs);
+
+    let mut single_consumer: HashMap<usize, usize> = HashMap::new();
+    for (idx, node) in nodes.iter().enumerate() {
+        if matches!(node.op, OpKind::NoOp) {
+            continue;
+        }
+        for &in_tid in &node.in_indices {
+            if def_count.get(&in_tid).copied().unwrap_or(0) == 1
+                && use_count.get(&in_tid).copied().unwrap_or(0) == 1
+            {
+                single_consumer.insert(in_tid, idx);
+            }
+        }
+    }
+
+    let mut fusions_4: Vec<(usize, usize, [usize; 3])> = Vec::new();
+    let mut fusions_2: Vec<(usize, usize, usize)> = Vec::new();
+
+    for idx in 0..nodes.len() {
+        if let OpKind::Unary(UnaryParams {
+            op_type: UnaryOpType::HardSigmoid { alpha, beta },
+            activation: FusedActivation::None,
+            ..
+        }) = &nodes[idx].op
+        {
+            if nodes[idx].in_indices.len() == 1
+                && nodes[idx].out_indices.len() == 1
+                && approx_eq(*alpha, 1.0 / 6.0, 1e-3)
+                && approx_eq(*beta, 0.5, 1e-3)
+            {
+                let x_tid = nodes[idx].in_indices[0];
+                let hsig_out = nodes[idx].out_indices[0];
+                if def_count.get(&x_tid).copied().unwrap_or(0) <= 1 {
+                    if let Some(&mul_idx) = single_consumer.get(&hsig_out) {
+                        let mul_node = &nodes[mul_idx];
+                        if is_plain_binary(mul_node, BinaryOpType::Mul) {
+                            let other = if mul_node.in_indices[0] == hsig_out {
+                                mul_node.in_indices[1]
+                            } else {
+                                mul_node.in_indices[0]
+                            };
+                            if other == x_tid {
+                                fusions_2.push((mul_idx, x_tid, idx));
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let is_relu6 = matches!(
+            &nodes[idx].op,
+            OpKind::Relu6 { min_val, max_val }
+            if approx_eq(*min_val, 0.0, 1e-4) && approx_eq(*max_val, 6.0, 1e-4)
+        ) && nodes[idx].in_indices.len() == 1
+            && nodes[idx].out_indices.len() == 1;
+
+        if !is_relu6 {
+            continue;
+        }
+
+        let add_out = nodes[idx].in_indices[0];
+        let relu6_out = nodes[idx].out_indices[0];
+        if def_count.get(&add_out).copied().unwrap_or(0) != 1
+            || use_count.get(&add_out).copied().unwrap_or(0) != 1
+        {
+            continue;
+        }
+
+        let Some(&add_idx) = producer_of.get(&add_out) else { continue };
+        let add_node = &nodes[add_idx];
+        if !is_plain_binary(add_node, BinaryOpType::Add) {
+            continue;
+        }
+        let (a, b) = (add_node.in_indices[0], add_node.in_indices[1]);
+        let x_tid = if scalar_const_val(b, nodes, &producer_of, &def_count)
+            .is_some_and(|v| approx_eq(v, 3.0, 1e-4))
+        {
+            Some(a)
+        } else if scalar_const_val(a, nodes, &producer_of, &def_count)
+            .is_some_and(|v| approx_eq(v, 3.0, 1e-4))
+        {
+            Some(b)
+        } else {
+            None
+        };
+        let Some(x_tid) = x_tid else { continue };
+        if def_count.get(&x_tid).copied().unwrap_or(0) > 1 {
+            continue;
+        }
+
+        let Some(&op3_idx) = single_consumer.get(&relu6_out) else { continue };
+        let op3_node = &nodes[op3_idx];
+        if op3_node.out_indices.len() != 1 {
+            continue;
+        }
+        let op3_out = op3_node.out_indices[0];
+        let Some(&op4_idx) = single_consumer.get(&op3_out) else { continue };
+        let op4_node = &nodes[op4_idx];
+
+        let matches_mul_then_div = is_plain_binary(op3_node, BinaryOpType::Mul)
+            && ((op3_node.in_indices[0] == relu6_out && op3_node.in_indices[1] == x_tid)
+                || (op3_node.in_indices[1] == relu6_out && op3_node.in_indices[0] == x_tid))
+            && is_div_or_mul_inv6(op4_node, op3_out, nodes, &producer_of, &def_count);
+
+        let matches_div_then_mul = is_div_or_mul_inv6(op3_node, relu6_out, nodes, &producer_of, &def_count)
+            && is_plain_binary(op4_node, BinaryOpType::Mul)
+            && ((op4_node.in_indices[0] == op3_out && op4_node.in_indices[1] == x_tid)
+                || (op4_node.in_indices[1] == op3_out && op4_node.in_indices[0] == x_tid));
+
+        if matches_mul_then_div || matches_div_then_mul {
+            fusions_4.push((op4_idx, x_tid, [add_idx, idx, op3_idx]));
+        }
+    }
+
+    for (target_idx, x_tid, dead_indices) in fusions_4 {
+        nodes[target_idx].in_indices = smallvec![x_tid];
+        nodes[target_idx].op = OpKind::Unary(UnaryParams {
+            op_type: UnaryOpType::HardSwish,
+            activation: FusedActivation::None,
+            table: None,
+        });
+        for dead in dead_indices {
+            nodes[dead].op = OpKind::NoOp;
+            nodes[dead].in_indices.clear();
+            nodes[dead].out_indices.clear();
+        }
+    }
+
+    for (target_idx, x_tid, dead_idx) in fusions_2 {
+        nodes[target_idx].in_indices = smallvec![x_tid];
+        nodes[target_idx].op = OpKind::Unary(UnaryParams {
+            op_type: UnaryOpType::HardSwish,
+            activation: FusedActivation::None,
+            table: None,
+        });
+        nodes[dead_idx].op = OpKind::NoOp;
+        nodes[dead_idx].in_indices.clear();
+        nodes[dead_idx].out_indices.clear();
+    }
+}
+
 fn fold_conv_scale(
     nodes: &mut [Node],
     graph_inputs: &HashSet<usize>,
@@ -660,6 +833,76 @@ pub(crate) fn compute_pruned_plan(
     }
 
     (active, last_use)
+}
+
+/// Fuses Flatten -> Softmax -> Shape -> Reshape into a direct Softmax(axis = -1)
+fn fuse_flatten_softmax_reshape(nodes: &mut [Node], graph_outputs: &HashSet<usize>) {
+    let (producer_of, _def_count, use_count) = build_def_use(nodes, graph_outputs);
+    for reshape_idx in 0..nodes.len() {
+        if !matches!(nodes[reshape_idx].op, OpKind::Reshape { .. }) || nodes[reshape_idx].in_indices.len() < 2 {
+            continue;
+        }
+        let in_data_tid = nodes[reshape_idx].in_indices[0];
+        let in_shape_tid = nodes[reshape_idx].in_indices[1];
+        let reshape_out_tid = nodes[reshape_idx].out_indices[0];
+
+        let Some(&softmax_idx) = producer_of.get(&in_data_tid) else { continue };
+        let OpKind::Softmax { axis } = nodes[softmax_idx].op else { continue };
+        if axis != -1 && axis != 1 {
+            continue;
+        }
+        if nodes[softmax_idx].in_indices.is_empty() {
+            continue;
+        }
+        let softmax_in_tid = nodes[softmax_idx].in_indices[0];
+
+        let Some(&flatten_idx) = producer_of.get(&softmax_in_tid) else { continue };
+        let OpKind::Flatten { .. } = nodes[flatten_idx].op else { continue };
+        if nodes[flatten_idx].in_indices.is_empty() {
+            continue;
+        }
+        let x_tid = nodes[flatten_idx].in_indices[0];
+
+        let Some(&shape_idx) = producer_of.get(&in_shape_tid) else { continue };
+        if !matches!(nodes[shape_idx].op, OpKind::Shape) || nodes[shape_idx].in_indices.is_empty() {
+            continue;
+        }
+        let shape_in_tid = nodes[shape_idx].in_indices[0];
+
+        if shape_in_tid != x_tid {
+            continue;
+        }
+
+        if graph_outputs.contains(&in_data_tid)
+            || graph_outputs.contains(&in_shape_tid)
+            || graph_outputs.contains(&softmax_in_tid)
+        {
+            continue;
+        }
+
+        if use_count.get(&softmax_in_tid).copied().unwrap_or(0) != 1
+            || use_count.get(&in_data_tid).copied().unwrap_or(0) != 1
+            || use_count.get(&in_shape_tid).copied().unwrap_or(0) != 1
+        {
+            continue;
+        }
+
+        nodes[softmax_idx].in_indices = smallvec![x_tid];
+        nodes[softmax_idx].out_indices = smallvec![reshape_out_tid];
+        nodes[softmax_idx].op = OpKind::Softmax { axis: -1 };
+
+        nodes[flatten_idx].op = OpKind::NoOp;
+        nodes[flatten_idx].in_indices.clear();
+        nodes[flatten_idx].out_indices.clear();
+
+        nodes[shape_idx].op = OpKind::NoOp;
+        nodes[shape_idx].in_indices.clear();
+        nodes[shape_idx].out_indices.clear();
+
+        nodes[reshape_idx].op = OpKind::NoOp;
+        nodes[reshape_idx].in_indices.clear();
+        nodes[reshape_idx].out_indices.clear();
+    }
 }
 
 #[cfg(test)]

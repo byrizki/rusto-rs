@@ -10,6 +10,7 @@ This directory contains evaluation harnesses, ground-truth datasets, and reprodu
 |---|---|---|---|
 | **OmniDocBench Comprehensive Evaluation** | [`omnidocbench/`](omnidocbench/) | Multi-page real-world document OCR, reading order, and layout analysis across 21 configurations | [OmniDocBench Report](omnidocbench/OMNIDOCBENCH_EVALUATION_REPORT.md) / [GitHub Issue #17](https://github.com/byrizki/rusto-rs/issues/17) |
 | **Inference Engine Comparison** | [`engine_comparison/`](engine_comparison/) | Low-level runtime execution (RTen vs ONNX Runtime vs MNN) | [`ORT_RTEN_MNN_COMPARISON.md`](ORT_RTEN_MNN_COMPARISON.md) |
+| **Concurrency & Throughput Suite** | [`concurrency/`](concurrency/) | End-to-end single-call latency, concurrent throughput (C=1 to C=8), and memory working set | [`concurrency/README.md`](concurrency/README.md) |
 | **Base Pipeline Baseline** | [`BASE_PIPELINE_COMPARISON.md`](BASE_PIPELINE_COMPARISON.md) | Initial baseline benchmarks across model tiers | [`COMPARISON_RESULT.md`](COMPARISON_RESULT.md) |
 
 ---

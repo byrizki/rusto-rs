@@ -1,5 +1,5 @@
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
@@ -33,13 +33,13 @@ unsafe fn exp_approx_avx2(x: __m256) -> __m256 {
     let x = _mm256_max_ps(x, _mm256_set1_ps(-87.33654f32));
     let x = _mm256_min_ps(x, _mm256_set1_ps(88.722839f32));
 
-    let log2_e = _mm256_set1_ps(1.4426950408889634f32);
+    let log2_e = _mm256_set1_ps(core::f32::consts::LOG2_E);
     let y = _mm256_mul_ps(x, log2_e);
     let k = _mm256_round_ps(y, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
     let f = _mm256_sub_ps(y, k);
 
     // Minimax polynomial for 2^f on [-0.5, 0.5]
-    let c1 = _mm256_set1_ps(0.69314718056f32);
+    let c1 = _mm256_set1_ps(core::f32::consts::LN_2);
     let c2 = _mm256_set1_ps(0.24022650696f32);
     let c3 = _mm256_set1_ps(0.05550410866f32);
     let c4 = _mm256_set1_ps(0.00961812911f32);
@@ -60,13 +60,9 @@ unsafe fn exp_approx_avx2(x: __m256) -> __m256 {
 
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2,fma")]
-pub unsafe fn softmax_row_avx2(in_row: &[f32], out_row: &mut [f32]) {
-    let len = in_row.len();
+unsafe fn softmax_row_ptr_avx2(in_ptr: *const f32, out_ptr: *mut f32, len: usize) {
     let chunks = len / 8;
-    let in_ptr = in_row.as_ptr();
-    let out_ptr = out_row.as_mut_ptr();
 
-    // 1. Find max value
     let mut max_vec = _mm256_set1_ps(f32::NEG_INFINITY);
     for i in 0..chunks {
         let v = _mm256_loadu_ps(in_ptr.add(i * 8));
@@ -81,7 +77,6 @@ pub unsafe fn softmax_row_avx2(in_row: &[f32], out_row: &mut [f32]) {
     }
     let max_broadcast = _mm256_set1_ps(max_val);
 
-    // 2. Compute exp(x - max) and accumulate sum
     let mut sum_vec = _mm256_setzero_ps();
     for i in 0..chunks {
         let v = _mm256_loadu_ps(in_ptr.add(i * 8));
@@ -98,7 +93,6 @@ pub unsafe fn softmax_row_avx2(in_row: &[f32], out_row: &mut [f32]) {
         sum_exp += e;
     }
 
-    // 3. Normalize by sum_exp
     let inv_sum = 1.0 / sum_exp.max(1e-12);
     let inv_vec = _mm256_set1_ps(inv_sum);
     for i in 0..chunks {
@@ -108,6 +102,12 @@ pub unsafe fn softmax_row_avx2(in_row: &[f32], out_row: &mut [f32]) {
     for i in (chunks * 8)..len {
         *out_ptr.add(i) *= inv_sum;
     }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+pub unsafe fn softmax_row_avx2(in_row: &[f32], out_row: &mut [f32]) {
+    softmax_row_ptr_avx2(in_row.as_ptr(), out_row.as_mut_ptr(), in_row.len());
 }
 
 pub fn softmax_row_scalar(in_row: &[f32], out_row: &mut [f32]) {
@@ -131,18 +131,39 @@ pub fn softmax_row_scalar(in_row: &[f32], out_row: &mut [f32]) {
     }
 }
 
+pub fn softmax_row_scalar_inplace(row: &mut [f32]) {
+    let mut max_val = f32::NEG_INFINITY;
+    for &v in row.iter() {
+        if v > max_val {
+            max_val = v;
+        }
+    }
+
+    let mut sum_exp = 0.0f32;
+    for v in row.iter_mut() {
+        let exp_val = (*v - max_val).exp();
+        *v = exp_val;
+        sum_exp += exp_val;
+    }
+
+    let inv_sum = 1.0 / sum_exp.max(1e-12);
+    for v in row.iter_mut() {
+        *v *= inv_sum;
+    }
+}
+
 #[cfg(target_arch = "x86_64")]
 #[inline(always)]
 unsafe fn exp_approx_avx512(x: __m512) -> __m512 {
     let x = _mm512_max_ps(x, _mm512_set1_ps(-87.33654f32));
     let x = _mm512_min_ps(x, _mm512_set1_ps(88.722839f32));
 
-    let log2_e = _mm512_set1_ps(1.4426950408889634f32);
+    let log2_e = _mm512_set1_ps(core::f32::consts::LOG2_E);
     let y = _mm512_mul_ps(x, log2_e);
     let k = _mm512_roundscale_ps(y, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
     let f = _mm512_sub_ps(y, k);
 
-    let c1 = _mm512_set1_ps(0.69314718056f32);
+    let c1 = _mm512_set1_ps(core::f32::consts::LN_2);
     let c2 = _mm512_set1_ps(0.24022650696f32);
     let c3 = _mm512_set1_ps(0.05550410866f32);
     let c4 = _mm512_set1_ps(0.00961812911f32);
@@ -350,7 +371,45 @@ pub unsafe fn softmax_row_wasm(in_row: &[f32], out_row: &mut [f32]) {
     }
 }
 
+pub fn softmax_inplace_row(row: &mut [f32]) {
+    let ptr = row.as_mut_ptr();
+    let len = row.len();
+    #[cfg(target_arch = "x86_64")]
+    {
+        if is_x86_feature_detected!("avx512f") {
+            unsafe {
+                let slice = std::slice::from_raw_parts_mut(ptr, len);
+                let in_slice = std::slice::from_raw_parts(ptr, len);
+                softmax_row_avx512(in_slice, slice);
+                return;
+            }
+        }
+        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            unsafe {
+                let slice = std::slice::from_raw_parts_mut(ptr, len);
+                let in_slice = std::slice::from_raw_parts(ptr, len);
+                softmax_row_avx2(in_slice, slice);
+                return;
+            }
+        }
+    }
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr, len);
+            let in_slice = std::slice::from_raw_parts(ptr, len);
+            softmax_row_wasm(in_slice, slice);
+            return;
+        }
+    }
+    softmax_row_scalar_inplace(row);
+}
+
 pub fn softmax_row(in_row: &[f32], out_row: &mut [f32]) {
+    if in_row.as_ptr() == out_row.as_ptr() {
+        softmax_inplace_row(out_row);
+        return;
+    }
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
@@ -377,6 +436,51 @@ pub fn softmax_row(in_row: &[f32], out_row: &mut [f32]) {
     softmax_row_scalar(in_row, out_row);
 }
 
+/// In-place numerically stable Softmax along specified axis with parallel row processing
+pub fn softmax_inplace(
+    data: &mut [f32],
+    shape: &[usize],
+    axis: isize,
+) {
+    let ndim = shape.len();
+    let norm_axis = if axis < 0 {
+        (ndim as isize + axis) as usize
+    } else {
+        axis as usize
+    };
+    assert!(norm_axis < ndim);
+
+    let total_len = shape.iter().product::<usize>();
+    assert!(data.len() >= total_len);
+
+    let outer_size: usize = shape[..norm_axis].iter().product();
+    let axis_size = shape[norm_axis];
+    let inner_size: usize = shape[norm_axis + 1..].iter().product();
+
+    if inner_size == 1 {
+        #[cfg(feature = "parallel")]
+        {
+            if crate::par::current_thread_index().is_none() && outer_size > 1 {
+                data
+                    .par_chunks_mut(axis_size)
+                    .for_each(|row| {
+                        softmax_inplace_row(row);
+                    });
+                return;
+            }
+        }
+
+        for row in data[..outer_size * axis_size].chunks_exact_mut(axis_size) {
+            softmax_inplace_row(row);
+        }
+        return;
+    }
+
+    let mut tmp = vec![0.0f32; total_len];
+    softmax(data, shape, axis, &mut tmp);
+    data[..total_len].copy_from_slice(&tmp);
+}
+
 /// Numerically stable Softmax along specified axis with parallel row processing
 pub fn softmax(
     input: &[f32],
@@ -400,9 +504,9 @@ pub fn softmax(
     let inner_size: usize = shape[norm_axis + 1..].iter().product();
 
     if inner_size == 1 {
-        #[cfg(feature = "rayon")]
+        #[cfg(feature = "parallel")]
         {
-            if outer_size > 1 {
+            if crate::par::current_thread_index().is_none() && outer_size > 1 {
                 output
                     .par_chunks_mut(axis_size)
                     .zip(input.par_chunks(axis_size))
@@ -594,9 +698,9 @@ pub fn log_softmax(
     let inner_size: usize = shape[norm_axis + 1..].iter().product();
 
     if inner_size == 1 {
-        #[cfg(feature = "rayon")]
+        #[cfg(feature = "parallel")]
         {
-            if outer_size > 1 {
+            if crate::par::current_thread_index().is_none() && outer_size > 1 {
                 output
                     .par_chunks_mut(axis_size)
                     .zip(input.par_chunks(axis_size))
@@ -766,6 +870,85 @@ pub fn argmax_row(row: &[f32]) -> (i32, f32) {
         }
         (max_idx, max_val)
     }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn sum_exp_row_avx2(row: &[f32], max_val: f32) -> f32 {
+    use core::arch::x86_64::*;
+
+    let len = row.len();
+    let chunks = len / 8;
+    let ptr = row.as_ptr();
+    let max_broadcast = _mm256_set1_ps(max_val);
+
+    let mut sum_vec = _mm256_setzero_ps();
+    for i in 0..chunks {
+        let v = _mm256_loadu_ps(ptr.add(i * 8));
+        let diff = _mm256_sub_ps(v, max_broadcast);
+        let e = exp_approx_avx2(diff);
+        sum_vec = _mm256_add_ps(sum_vec, e);
+    }
+    let mut sum_exp = hsum_avx2(sum_vec);
+    for i in (chunks * 8)..len {
+        let diff = *ptr.add(i) - max_val;
+        sum_exp += diff.exp();
+    }
+    sum_exp
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx512f")]
+unsafe fn sum_exp_row_avx512(row: &[f32], max_val: f32) -> f32 {
+    use core::arch::x86_64::*;
+
+    let len = row.len();
+    let chunks = len / 16;
+    let ptr = row.as_ptr();
+    let max_broadcast = _mm512_set1_ps(max_val);
+
+    let mut sum_vec = _mm512_setzero_ps();
+    for i in 0..chunks {
+        let v = _mm512_loadu_ps(ptr.add(i * 16));
+        let diff = _mm512_sub_ps(v, max_broadcast);
+        let e = exp_approx_avx512(diff);
+        sum_vec = _mm512_add_ps(sum_vec, e);
+    }
+    let mut sum_exp = _mm512_reduce_add_ps(sum_vec);
+    for i in (chunks * 16)..len {
+        let diff = *ptr.add(i) - max_val;
+        sum_exp += diff.exp();
+    }
+    sum_exp
+}
+
+#[inline]
+pub fn fused_softmax_argmax_row(row: &[f32]) -> (i32, f32) {
+    if row.is_empty() {
+        return (-1, 0.0);
+    }
+    let (max_idx, max_val) = argmax_row(row);
+
+    #[cfg(target_arch = "x86_64")]
+    {
+        if is_x86_feature_detected!("avx512f") {
+            let sum_exp = unsafe { sum_exp_row_avx512(row, max_val) };
+            let max_prob = 1.0 / sum_exp.max(1e-12);
+            return (max_idx, max_prob);
+        }
+        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            let sum_exp = unsafe { sum_exp_row_avx2(row, max_val) };
+            let max_prob = 1.0 / sum_exp.max(1e-12);
+            return (max_idx, max_prob);
+        }
+    }
+
+    let mut sum_exp = 0.0f32;
+    for &v in row {
+        sum_exp += (v - max_val).exp();
+    }
+    let max_prob = 1.0 / sum_exp.max(1e-12);
+    (max_idx, max_prob)
 }
 
 /// Fast greedy CTC decode shortcut directly from logits or probabilities
@@ -1015,6 +1198,31 @@ mod tests {
                     assert!((vals[o * k + j] - expected[j].0).abs() < 1e-6);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_softmax_inplace_matches_out_of_place() {
+        let shape = [2, 5, 6906];
+        let total = shape.iter().product::<usize>();
+        let mut input = vec![0.0f32; total];
+        for (i, v) in input.iter_mut().enumerate() {
+            *v = ((i % 103) as f32 - 50.0) * 0.1;
+        }
+
+        let mut expected = vec![0.0f32; total];
+        softmax(&input, &shape, -1, &mut expected);
+
+        let mut inplace = input.clone();
+        softmax_inplace(&mut inplace, &shape, -1);
+
+        for i in 0..total {
+            let diff = (expected[i] - inplace[i]).abs();
+            assert!(
+                diff < 1e-4,
+                "Inplace softmax mismatch at {}: exp={}, got={}, diff={}",
+                i, expected[i], inplace[i], diff
+            );
         }
     }
 }

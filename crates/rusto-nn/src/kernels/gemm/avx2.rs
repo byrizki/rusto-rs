@@ -1,12 +1,12 @@
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
 
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
 use crate::kernels::activation::{apply_activation_scalar, FusedActivation};
 
-#[cfg(feature = "rayon")]
+#[cfg(feature = "parallel")]
 thread_local! {
     static PACKED_B_CACHE: core::cell::RefCell<Vec<f32>> = core::cell::RefCell::new(Vec::new());
 }
@@ -381,7 +381,7 @@ unsafe fn gemm_avx2_m1(
     let bias_val = bias.map(|b| b[0]).unwrap_or(0.0);
     let bias_vec = _mm256_set1_ps(bias_val);
 
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     {
         if n >= 1024 {
             let chunk_n = 1024;
@@ -745,15 +745,15 @@ pub unsafe fn gemm_avx2(
     let b_send = SendConstPtr(b.as_ptr());
     let c_send = SendMutPtr(c.as_mut_ptr());
 
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     {
-        let in_rayon_worker = rayon::current_thread_index().is_some();
+        let in_worker = crate::par::current_thread_index().is_some();
 
         if n >= 2048 || m < 12 {
             let col_chunk = 256;
             let num_col_chunks = n.div_ceil(col_chunk);
 
-            if !in_rayon_worker && num_col_chunks > 1 {
+            if !in_worker && num_col_chunks > 1 {
                 (0..num_col_chunks).into_par_iter().for_each(move |col_block| {
                     let j_start = col_block * col_chunk;
                     let j_end = (j_start + col_chunk).min(n);
@@ -795,13 +795,13 @@ pub unsafe fn gemm_avx2(
 
         let compute_with_packed_b = |pb_ptr: *const f32| {
             let pb_send = SendConstPtr(pb_ptr);
-            let num_threads = rayon::current_num_threads();
+            let num_threads = crate::par::current_num_threads();
             let target_chunks = (num_threads * 4).max(1);
             let ideal_chunk = (m / target_chunks).max(6);
             let row_chunk = ideal_chunk.div_ceil(6) * 6;
             let num_row_chunks = m.div_ceil(row_chunk);
 
-            if !in_rayon_worker && num_row_chunks > 1 && m * n * k >= 131072 {
+            if !in_worker && num_row_chunks > 1 && m * n * k >= 131072 {
                 (0..num_row_chunks).into_par_iter().for_each(move |row_block| {
                     let r_start = row_block * row_chunk;
                     let r_end = (r_start + row_chunk).min(m);
@@ -846,7 +846,7 @@ pub unsafe fn gemm_avx2(
         }
     }
 
-    #[cfg(not(feature = "rayon"))]
+    #[cfg(not(feature = "parallel"))]
     {
         gemm_compute_col_panel(
             m, n, k, a_send.get(), b_send.get(), c_send.get(), 0, n,

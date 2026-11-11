@@ -333,15 +333,42 @@ impl<'a> Session<'a> {
             return Err(MnnError::ExecutionError("Model has no output tensors declared".into()));
         }
 
-        let results = if output_names.len() == 1 {
-            self.run(&[(&input_names[0], input_tensor)])?
-        } else {
-            self.run_outputs(&[(&input_names[0], input_tensor)], &[output_names[0].as_str()])?
-        };
+        if output_names.len() > 1 {
+            let mut results = self.run_outputs(&[(&input_names[0], input_tensor)], &[output_names[0].as_str()])?;
+            return results
+                .remove(&output_names[0])
+                .ok_or_else(|| MnnError::ExecutionError(format!("Output '{}' not produced", output_names[0])));
+        }
 
-        results
-            .get(&output_names[0])
-            .cloned()
-            .ok_or_else(|| MnnError::ExecutionError(format!("Output '{}' not produced", output_names[0])))
+        let mut ctx = self.ctx.borrow_mut();
+        ctx.reset();
+
+        let &in_idx = self.input_map.get(&input_names[0]).ok_or_else(|| {
+            MnnError::ExecutionError(format!(
+                "Input name '{}' not found in model inputs {:?}",
+                input_names[0],
+                self.model.input_names()
+            ))
+        })?;
+        ctx.set_tensor(in_idx, input_tensor.clone());
+
+        let graph = self.model.graph();
+        for (i, node) in graph.nodes.iter().enumerate() {
+            if let Err(e) = execute_node_with_liveness(node, i, &mut *ctx, Some(&graph.last_use)) {
+                return Err(MnnError::ExecutionError(format!(
+                    "Op [{:>3}] {} ({}): {}",
+                    i,
+                    node.op.kind_name(),
+                    node.name,
+                    e
+                )));
+            }
+            ctx.recycle_dead_inputs(node, i, &graph.last_use);
+        }
+
+        let &out_idx = self.output_map.get(&output_names[0]).ok_or_else(|| {
+            MnnError::ExecutionError(format!("Output name '{}' not found", output_names[0]))
+        })?;
+        ctx.take_tensor(out_idx)
     }
 }

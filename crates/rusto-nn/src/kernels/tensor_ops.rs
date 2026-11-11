@@ -1,5 +1,5 @@
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
 /// Permute (transpose) multidimensional tensor
 pub fn permute(
@@ -32,9 +32,9 @@ pub fn permute(
             }
         };
 
-        #[cfg(feature = "rayon")]
+        #[cfg(feature = "parallel")]
         {
-            if n >= 2 {
+            if crate::par::current_thread_index().is_none() && n >= 2 {
                 output.par_chunks_exact_mut(hw_c).enumerate().for_each(|(b, out_b)| {
                     process_batch(b, out_b);
                 });
@@ -68,9 +68,9 @@ pub fn permute(
             }
         };
 
-        #[cfg(feature = "rayon")]
+        #[cfg(feature = "parallel")]
         {
-            if batch >= 2 {
+            if crate::par::current_thread_index().is_none() && batch >= 2 {
                 output.par_chunks_exact_mut(rc).enumerate().for_each(|(b, out_b)| {
                     process_matrix(b, out_b);
                 });
@@ -142,6 +142,27 @@ pub fn concat(
     }
 
     let out_stride_outer = out_axis_size * inner_size;
+    if outer_size == 1 {
+        #[cfg(feature = "parallel")]
+        if crate::par::current_thread_index().is_none()
+            && out_stride_outer >= 32768
+            && inputs.len() >= 2
+        {
+            let mut rem = &mut output[..out_stride_outer];
+            let mut slices: Vec<(&[f32], &mut [f32])> = Vec::with_capacity(inputs.len());
+            for (data, shape) in inputs {
+                let len = shape[axis] * inner_size;
+                let (head, tail) = rem.split_at_mut(len);
+                slices.push((&data[..len], head));
+                rem = tail;
+            }
+            slices.into_par_iter().for_each(|(src, dst)| {
+                dst.copy_from_slice(src);
+            });
+            return;
+        }
+    }
+
     let mut out_offset = 0;
 
     for (data, shape) in inputs {

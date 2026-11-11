@@ -92,10 +92,10 @@ pub fn load_mnn(slice: &[u8]) -> Result<Graph, MnnError> {
                             .unwrap_or_else(|| vec![1]);
 
                         if let Some(floats) = blob.float32s() {
-                            let v: Vec<f32> = floats.iter().collect();
+                            let v: Vec<f32> = floats.safe_slice().to_vec();
                             Tensor::from_floats(&dims, v, TensorLayout::NCHW)
                         } else if let Some(ints) = blob.int32s() {
-                            let v: Vec<i32> = ints.iter().collect();
+                            let v: Vec<i32> = ints.safe_slice().to_vec();
                             Tensor::from_ints(&dims, v)
                         } else if let Some(i64s) = blob.int64s() {
                             let v: Vec<i32> = i64s.iter().map(|x| x as i32).collect();
@@ -444,8 +444,8 @@ pub fn load_mnn(slice: &[u8]) -> Result<Graph, MnnError> {
 
                 OpType::Scale => {
                     let (scale, bias) = if let Some(s) = op.main_as_scale() {
-                        let sc = s.scaleData().map(|d| d.iter().collect()).unwrap_or_default();
-                        let bi = s.biasData().map(|d| d.iter().collect());
+                        let sc = s.scaleData().map(|d| d.safe_slice().to_vec()).unwrap_or_default();
+                        let bi = s.biasData().map(|d| d.safe_slice().to_vec());
                         (sc, bi)
                     } else {
                         (Vec::new(), None)
@@ -554,8 +554,8 @@ pub fn load_mnn(slice: &[u8]) -> Result<Graph, MnnError> {
                         let axis = ln.axis().and_then(|a| a.iter().next()).unwrap_or(-1);
                         let epsilon = ln.epsilon();
                         let use_rms_norm = ln.useRMSNorm();
-                        let gamma = ln.gamma().map(|g| g.iter().collect());
-                        let beta = ln.beta().map(|b| b.iter().collect());
+                        let gamma = ln.gamma().map(|g| g.safe_slice().to_vec());
+                        let beta = ln.beta().map(|b| b.safe_slice().to_vec());
                         OpKind::LayerNorm(LayerNormParams {
                             axis,
                             epsilon,

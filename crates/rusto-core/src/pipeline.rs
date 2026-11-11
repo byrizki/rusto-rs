@@ -25,7 +25,7 @@ use crate::orient::{
     postprocess_orient_tensor, preprocess_indra_orient_image, preprocess_orient_image, Orientation,
 };
 #[cfg(not(target_arch = "wasm32"))]
-use rayon::prelude::*;
+use rusto_nn::par::prelude::*;
 
 use crate::postprocess::{decode_det_predictions, sort_det_boxes};
 use crate::preprocess::{
@@ -441,6 +441,8 @@ impl OcrPipeline {
                     })?
                 };
                 layout_regions = Some(regions);
+                rusto_nn::clear_tensor_buffer_pool();
+                rusto_nn::kernels::conv::clear_conv_buffers();
             }
         }
 
@@ -707,8 +709,12 @@ impl OcrPipeline {
 
             #[cfg(not(target_arch = "wasm32"))]
             let mut worker_sessions: Vec<Box<dyn InferenceSession>> = {
-                let num_workers = if total_chunks > 1 {
-                    rayon::current_num_threads().min(total_chunks).min(2).max(1)
+                let num_workers = if let Ok(val) = std::env::var("RUSTO_REC_WORKERS") {
+                    val.parse::<usize>().unwrap_or(1).min(total_chunks).max(1)
+                } else if std::env::var("RUSTO_SERIAL_REC").is_ok() {
+                    1
+                } else if total_chunks > 1 {
+                    rusto_nn::par::current_num_threads().min(total_chunks).clamp(1, 8)
                 } else {
                     1
                 };
@@ -729,38 +735,41 @@ impl OcrPipeline {
             if worker_sessions.len() > 1 {
                 let k = worker_sessions.len().min(total_chunks);
                 worker_sessions.truncate(k);
-                let mut worker_buckets: Vec<Vec<Vec<usize>>> = (0..k).map(|_| Vec::new()).collect();
-                for (i, ch) in chunks.into_iter().enumerate() {
-                    worker_buckets[i % k].push(ch);
-                }
-                let tasks: Vec<(Box<dyn InferenceSession>, Vec<Vec<usize>>)> =
-                    worker_sessions.into_iter().zip(worker_buckets).collect();
-
+                let next_idx = std::sync::atomic::AtomicUsize::new(0);
+                let chunks_slice = chunks.as_slice();
                 let decoder = &self.decoder;
                 let crop_slice = crop_imgs.as_slice();
                 let tw_slice = target_widths.as_slice();
 
-                let worker_outputs: Result<Vec<Vec<(Vec<usize>, Vec<Option<(String, f32, Vec<f32>)>>)>>, CoreError> = tasks
-                    .into_par_iter()
-                    .map(|(mut session, worker_chunks)| {
-                        let mut results = Vec::with_capacity(worker_chunks.len());
-                        for chunk in worker_chunks {
-                            let (batch_tensor, widths) = crate::preprocess::build_linenet_rec_batch(
-                                crop_slice, &chunk, tw_slice, rec_h,
-                            )?;
-                            let (batch_ids, batch_confs) = session.run_linenet_rec(batch_tensor, widths)?;
-                            let decoded = decoder.decode_linenet_batch_with_positions(batch_ids, batch_confs);
-                            results.push((chunk, decoded));
-                        }
-                        rusto_nn::clear_tensor_buffer_pool();
-                        Ok(results)
-                    })
-                    .collect();
+                let worker_outputs: Result<Vec<Vec<(usize, Vec<Option<(String, f32, Vec<f32>)>>)>>, CoreError> =
+                    worker_sessions
+                        .into_par_iter()
+                        .map(|mut session| {
+                            let mut results = Vec::new();
+                            loop {
+                                let step = next_idx.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                if step >= total_chunks {
+                                    break;
+                                }
+                                let chunk_idx = total_chunks - 1 - step;
+                                let chunk = &chunks_slice[chunk_idx];
+                                let (batch_tensor, widths) = crate::preprocess::build_linenet_rec_batch(
+                                    crop_slice, chunk, tw_slice, rec_h,
+                                )?;
+                                let (batch_ids, batch_confs) = session.run_linenet_rec(batch_tensor, widths)?;
+                                let decoded = decoder.decode_linenet_batch_with_positions(batch_ids, batch_confs);
+                                results.push((chunk_idx, decoded));
+                            }
+                            rusto_nn::clear_tensor_buffer_pool();
+                            rusto_nn::kernels::conv::clear_conv_buffers();
+                            Ok(results)
+                        })
+                        .collect();
 
                 for worker_res in worker_outputs? {
-                    for (chunk, decoded) in worker_res {
+                    for (chunk_idx, decoded) in worker_res {
                         scatter_linenet_results_with_positions(
-                            &chunk,
+                            &chunks_slice[chunk_idx],
                             decoded,
                             &mut all_texts,
                             &mut linenet_positions,
@@ -808,8 +817,12 @@ impl OcrPipeline {
 
             #[cfg(not(target_arch = "wasm32"))]
             let mut worker_sessions: Vec<Box<dyn InferenceSession>> = {
-                let num_workers = if total_batches > 1 {
-                    rayon::current_num_threads().min(total_batches).min(2).max(1)
+                let num_workers = if let Ok(val) = std::env::var("RUSTO_REC_WORKERS") {
+                    val.parse::<usize>().unwrap_or(1).min(total_batches).max(1)
+                } else if std::env::var("RUSTO_SERIAL_REC").is_ok() {
+                    1
+                } else if total_batches > 1 {
+                    rusto_nn::par::current_num_threads().min(total_batches).clamp(1, 8)
                 } else {
                     1
                 };
@@ -830,58 +843,62 @@ impl OcrPipeline {
             if worker_sessions.len() > 1 {
                 let k = worker_sessions.len().min(total_batches);
                 worker_sessions.truncate(k);
-                let mut worker_buckets: Vec<Vec<crate::preprocess::RecBatchItem>> =
-                    (0..k).map(|_| Vec::new()).collect();
-                for (i, b) in plan.batches.into_iter().enumerate() {
-                    worker_buckets[i % k].push(b);
-                }
-                let tasks: Vec<(Box<dyn InferenceSession>, Vec<crate::preprocess::RecBatchItem>)> =
-                    worker_sessions.into_iter().zip(worker_buckets).collect();
-
+                let next_idx = std::sync::atomic::AtomicUsize::new(0);
+                let batches_slice = plan.batches.as_slice();
                 let decoder = &self.decoder;
                 let return_word_box = global.return_word_box;
                 let crop_slice = crop_imgs.as_slice();
 
-                let worker_outputs: Result<Vec<Vec<(Vec<usize>, Vec<(String, f32)>, Option<Vec<WordInfo>>)>>, CoreError> = tasks
-                    .into_par_iter()
-                    .map(|(mut session, batches)| {
-                        let mut results = Vec::with_capacity(batches.len());
-                        for batch_item in batches {
-                            let batch = build_rec_batch(
-                                crop_slice,
-                                &batch_item.indices,
-                                img_c,
-                                img_h,
-                                batch_item.max_wh_ratio,
-                            )?;
-                            let preds_dyn = session.run(batch.into_dyn())?;
-                            let preds: Array3<f32> = preds_dyn
-                                .into_dimensionality()
-                                .map_err(|_| CoreError::InvalidShape("recognition output must be 3D".into()))?;
+                let worker_outputs: Result<Vec<Vec<(usize, Vec<(String, f32)>, Option<Vec<WordInfo>>)>>, CoreError> =
+                    worker_sessions
+                        .into_par_iter()
+                        .map(|mut session| {
+                            let mut results = Vec::new();
+                            loop {
+                                let step = next_idx.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                if step >= total_batches {
+                                    break;
+                                }
+                                let batch_idx = total_batches - 1 - step;
+                                let batch_item = &batches_slice[batch_idx];
+                                let batch = build_rec_batch(
+                                    crop_slice,
+                                    &batch_item.indices,
+                                    img_c,
+                                    img_h,
+                                    batch_item.max_wh_ratio,
+                                )?;
+                                let preds_dyn = session.run(batch.into_dyn())?;
+                                let preds: Array3<f32> = preds_dyn
+                                    .into_dimensionality()
+                                    .map_err(|_| CoreError::InvalidShape("recognition output must be 3D".into()))?;
 
-                            let (line_results, batch_word_infos) = decoder.decode(
-                                preds,
-                                return_word_box,
-                                &batch_item.wh_ratio_list,
-                                batch_item.max_wh_ratio,
-                            );
+                                let (line_results, batch_word_infos) = decoder.decode(
+                                    preds,
+                                    return_word_box,
+                                    &batch_item.wh_ratio_list,
+                                    batch_item.max_wh_ratio,
+                                );
 
-                            let word_infos = if return_word_box {
-                                Some(batch_word_infos)
-                            } else {
-                                None
-                            };
-                            results.push((batch_item.indices, line_results, word_infos));
-                        }
-                        rusto_nn::clear_tensor_buffer_pool();
-                        Ok(results)
-                    })
-                    .collect();
+                                let word_infos = if return_word_box {
+                                    Some(batch_word_infos)
+                                } else {
+                                    None
+                                };
+                                results.push((batch_idx, line_results, word_infos));
+                            }
+                            rusto_nn::clear_tensor_buffer_pool();
+                            rusto_nn::kernels::conv::clear_conv_buffers();
+                            Ok(results)
+                        })
+                        .collect();
 
-                for batch_res in worker_outputs? {
-                    for (indices, line_results, word_infos) in batch_res {
+                let worker_results = worker_outputs?;
+
+                for batch_res in worker_results {
+                    for (batch_idx, line_results, word_infos) in batch_res {
                         scatter_rec_results(
-                            &indices,
+                            &batches_slice[batch_idx].indices,
                             line_results,
                             word_infos,
                             &mut all_texts,

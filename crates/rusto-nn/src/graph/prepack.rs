@@ -56,8 +56,8 @@ pub fn extract_conv_weights_and_bias(
     output_count: usize,
 ) -> (Vec<f32>, Option<Vec<f32>>) {
     if let Some(w) = conv.weight() {
-        let weight_vec: Vec<f32> = w.iter().collect();
-        let bias_vec = conv.bias().map(|b| b.iter().collect());
+        let weight_vec: Vec<f32> = w.safe_slice().to_vec();
+        let bias_vec = conv.bias().map(|b| b.safe_slice().to_vec());
         return (weight_vec, bias_vec);
     }
 
@@ -114,12 +114,12 @@ pub fn extract_conv_weights_and_bias(
                 float_weights.push(w_byte as f32 * scale);
             }
 
-            let bias_vec = conv.bias().map(|b| b.iter().collect());
+            let bias_vec = conv.bias().map(|b| b.safe_slice().to_vec());
             return (float_weights, bias_vec);
         }
     }
 
-    (Vec::new(), conv.bias().map(|b| b.iter().collect()))
+    (Vec::new(), conv.bias().map(|b| b.safe_slice().to_vec()))
 }
 
 /// Pre-pack operation metadata and static parameters at model load time
@@ -143,7 +143,7 @@ pub fn prepack_op(op: &Op<'_>) -> Option<PrepackedOp> {
             let is_depthwise = op.type_() == OpType::ConvolutionDepthwise
                 || (group > 1 && group == out_channels);
 
-            let pads: Option<Vec<i32>> = common.pads().map(|p| p.iter().collect());
+            let pads: Option<Vec<i32>> = common.pads().map(|p| p.safe_slice().to_vec());
 
             Some(PrepackedOp::Conv(PrepackedConv {
                 weight,
@@ -179,7 +179,7 @@ pub fn prepack_op(op: &Op<'_>) -> Option<PrepackedOp> {
                 act = FusedActivation::Relu6;
             }
 
-            let pads: Option<Vec<i32>> = common.pads().map(|p| p.iter().collect());
+            let pads: Option<Vec<i32>> = common.pads().map(|p| p.safe_slice().to_vec());
 
             Some(PrepackedOp::Deconv(PrepackedDeconv {
                 weight,
@@ -207,10 +207,10 @@ pub fn prepack_op(op: &Op<'_>) -> Option<PrepackedOp> {
                 .unwrap_or_else(|| vec![1]);
 
             let tensor = if let Some(floats) = blob.float32s() {
-                let v: Vec<f32> = floats.iter().collect();
+                let v: Vec<f32> = floats.safe_slice().to_vec();
                 Tensor::from_floats(&dims, v, TensorLayout::NCHW)
             } else if let Some(ints) = blob.int32s() {
-                let v: Vec<i32> = ints.iter().collect();
+                let v: Vec<i32> = ints.safe_slice().to_vec();
                 Tensor::from_ints(&dims, v)
             } else if let Some(i64s) = blob.int64s() {
                 let v: Vec<i32> = i64s.iter().map(|x| x as i32).collect();

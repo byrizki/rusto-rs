@@ -1,5 +1,5 @@
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PoolType {
@@ -746,9 +746,12 @@ pub fn pool2d(
     let total_channels = batch * channels;
     assert!(output.len() >= total_channels * hw_out);
 
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     {
-        if total_channels * hw_out >= 8192 && total_channels >= 4 {
+        if crate::par::current_thread_index().is_none()
+            && total_channels * hw_out >= 8192
+            && total_channels >= 4
+        {
             output
                 .par_chunks_exact_mut(hw_out)
                 .enumerate()

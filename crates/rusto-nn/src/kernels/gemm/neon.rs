@@ -1,8 +1,8 @@
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
 
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
 use crate::kernels::activation::{apply_activation_scalar, FusedActivation};
 
@@ -278,7 +278,7 @@ pub unsafe fn gemm_neon(
         }
     };
 
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     {
         if m * n > 4096 {
             let (c_full, _) = c.split_at_mut(full_rows * n);
@@ -300,7 +300,7 @@ pub unsafe fn gemm_neon(
         }
     }
 
-    #[cfg(not(feature = "rayon"))]
+    #[cfg(not(feature = "parallel"))]
     {
         for i_block in 0..m_blocks {
             let offset = i_block * 4 * n;

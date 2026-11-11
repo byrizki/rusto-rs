@@ -1,5 +1,5 @@
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
 use crate::kernels::activation::{apply_activation_scalar, FusedActivation};
 
@@ -150,8 +150,8 @@ fn deconv2d_2x2_s2(
     let hw_in = in_h * in_w;
     let hw_out = out_h * out_w;
 
-    #[cfg(feature = "rayon")]
-    {
+    #[cfg(feature = "parallel")]
+    if crate::par::current_thread_index().is_none() {
         if out_c == 1 {
             let b_val = bias.map(|b| b[0]).unwrap_or(0.0);
             out_batch
@@ -224,41 +224,39 @@ fn deconv2d_2x2_s2(
                     }
                 }
             });
+        return;
     }
 
-    #[cfg(not(feature = "rayon"))]
-    {
-        for oc in 0..out_c {
-            let b_val = bias.map(|b| b[oc]).unwrap_or(0.0);
-            let out_channel = &mut out_batch[oc * hw_out..(oc + 1) * hw_out];
-            out_channel.fill(b_val);
+    for oc in 0..out_c {
+        let b_val = bias.map(|b| b[oc]).unwrap_or(0.0);
+        let out_channel = &mut out_batch[oc * hw_out..(oc + 1) * hw_out];
+        out_channel.fill(b_val);
 
-            for ic in 0..in_c {
-                let in_channel = &in_batch[ic * hw_in..(ic + 1) * hw_in];
-                let w_idx = (ic * out_c + oc) * 4;
-                let k00 = weight[w_idx + 0];
-                let k01 = weight[w_idx + 1];
-                let k10 = weight[w_idx + 2];
-                let k11 = weight[w_idx + 3];
+        for ic in 0..in_c {
+            let in_channel = &in_batch[ic * hw_in..(ic + 1) * hw_in];
+            let w_idx = (ic * out_c + oc) * 4;
+            let k00 = weight[w_idx];
+            let k01 = weight[w_idx + 1];
+            let k10 = weight[w_idx + 2];
+            let k11 = weight[w_idx + 3];
 
-                for ih in 0..in_h {
-                    let in_row = &in_channel[ih * in_w..(ih + 1) * in_w];
-                    let (out_row0, out_row1) = out_channel[(2 * ih) * out_w..(2 * ih + 2) * out_w].split_at_mut(out_w);
+            for ih in 0..in_h {
+                let in_row = &in_channel[ih * in_w..(ih + 1) * in_w];
+                let (out_row0, out_row1) = out_channel[(2 * ih) * out_w..(2 * ih + 2) * out_w].split_at_mut(out_w);
 
-                    for iw in 0..in_w {
-                        let val = in_row[iw];
-                        out_row0[2 * iw] += val * k00;
-                        out_row0[2 * iw + 1] += val * k01;
-                        out_row1[2 * iw] += val * k10;
-                        out_row1[2 * iw + 1] += val * k11;
-                    }
+                for iw in 0..in_w {
+                    let val = in_row[iw];
+                    out_row0[2 * iw] += val * k00;
+                    out_row0[2 * iw + 1] += val * k01;
+                    out_row1[2 * iw] += val * k10;
+                    out_row1[2 * iw + 1] += val * k11;
                 }
             }
+        }
 
-            if act != FusedActivation::None {
-                for v in out_channel.iter_mut() {
-                    *v = apply_activation_scalar(*v, act);
-                }
+        if act != FusedActivation::None {
+            for v in out_channel.iter_mut() {
+                *v = apply_activation_scalar(*v, act);
             }
         }
     }
@@ -323,9 +321,9 @@ pub fn deconv2d(
         let in_batch = &input[b * config.in_channels * hw_in..(b + 1) * config.in_channels * hw_in];
         let out_batch = &mut output[b * config.out_channels * hw_out..(b + 1) * config.out_channels * hw_out];
 
-        #[cfg(feature = "rayon")]
+        #[cfg(feature = "parallel")]
         {
-            if config.out_channels >= 2 {
+            if crate::par::current_thread_index().is_none() && config.out_channels >= 2 {
                 out_batch
                     .par_chunks_exact_mut(hw_out)
                     .enumerate()

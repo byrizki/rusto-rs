@@ -571,15 +571,6 @@ checksum = "3a3076410a55c90011c298b04d0cfa770b00fa04e1e3c97d3f6c9de105a03844"
 
 [[package]]
 name = "flatbuffers"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a788f068dd10687940565bf4b5480ee943176cbd114b12e811074bcf7c04e4b9"
-dependencies = [
- "smallvec",
-]
-
-[[package]]
-name = "flatbuffers"
 version = "24.12.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f1baf0dbf96932ec9a3038d57900329c015b0bfb7b63d904f3bc27e2b02a096"
@@ -1531,7 +1522,7 @@ version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "639c5d2ce961f3e154878d1d48c2ac3451e5a6ea5d9c0b0d5f0da362f4c57dab"
 dependencies = [
- "flatbuffers 24.12.23",
+ "flatbuffers",
  "num_cpus",
  "rayon",
  "rten-base",
@@ -1574,7 +1565,7 @@ version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1bc4ee6d1e064a84cbffd240c3bfde0d7a1b4d5172f577c9c821fcf0b7124f00"
 dependencies = [
- "flatbuffers 24.12.23",
+ "flatbuffers",
  "rten-base",
 ]
 
@@ -1674,7 +1665,6 @@ dependencies = [
  "dirs",
  "image",
  "nanoserde",
- "rayon",
  "rusto-nn",
  "thiserror 1.0.69",
 ]
@@ -1703,9 +1693,7 @@ dependencies = [
 name = "rusto-nn"
 version = "0.4.0"
 dependencies = [
- "flatbuffers 0.6.1",
  "memmap2",
- "rayon",
  "rten",
  "rten-model-file",
  "rten-onnx",

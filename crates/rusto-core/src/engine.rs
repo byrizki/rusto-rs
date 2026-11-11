@@ -519,7 +519,8 @@ pub struct MnnSession {
 }
 
 impl MnnSession {
-    pub fn from_path(model_path: &Path, _engine_cfg: &EngineConfig) -> Result<Self, EngineError> {
+    pub fn from_path(model_path: &Path, engine_cfg: &EngineConfig) -> Result<Self, EngineError> {
+        rusto_nn::init_thread_pool(engine_cfg.intra_op_num_threads.max(0) as usize);
         let resolved = resolve_model_path(model_path);
         let model = rusto_nn::Model::from_file(&resolved)
             .map_err(|e| EngineError::Engine(format!("Failed to load MNN model {}: {}", resolved.display(), e)))?;

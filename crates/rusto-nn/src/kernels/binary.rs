@@ -1,5 +1,5 @@
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
 use crate::kernels::activation::{apply_activation_scalar, apply_activation_slice, FusedActivation};
 
@@ -903,6 +903,9 @@ pub fn binary_op(
             }
         }
 
+        #[cfg(feature = "parallel")]
+        let can_parallel = crate::par::current_thread_index().is_none();
+
         if valid {
             match n_segs {
                 0 => {
@@ -912,8 +915,8 @@ pub fn binary_op(
                 }
                 1 => match seg_mode[0] {
                     BcastMode::Match => {
-                        #[cfg(feature = "rayon")]
-                        if out_len >= 8192 {
+                        #[cfg(feature = "parallel")]
+                        if can_parallel && out_len >= 8192 {
                             let chunk_size = 4096;
                             out_data[..out_len]
                                 .par_chunks_mut(chunk_size)
@@ -930,8 +933,8 @@ pub fn binary_op(
                     }
                     BcastMode::Rhs => {
                         let b = rhs_data[0];
-                        #[cfg(feature = "rayon")]
-                        if out_len >= 8192 {
+                        #[cfg(feature = "parallel")]
+                        if can_parallel && out_len >= 8192 {
                             let chunk_size = 4096;
                             out_data[..out_len]
                                 .par_chunks_mut(chunk_size)
@@ -948,8 +951,8 @@ pub fn binary_op(
                     }
                     BcastMode::Lhs => {
                         let a = lhs_data[0];
-                        #[cfg(feature = "rayon")]
-                        if out_len >= 8192 {
+                        #[cfg(feature = "parallel")]
+                        if can_parallel && out_len >= 8192 {
                             let chunk_size = 4096;
                             out_data[..out_len]
                                 .par_chunks_mut(chunk_size)
@@ -970,8 +973,8 @@ pub fn binary_op(
                     match (seg_mode[0], seg_mode[1]) {
                         (BcastMode::Rhs, BcastMode::Match) => {
                             let r_slice = &rhs_data[..inner];
-                            #[cfg(feature = "rayon")]
-                            if outer >= 4 && out_len >= 8192 {
+                            #[cfg(feature = "parallel")]
+                            if can_parallel && outer >= 4 && out_len >= 8192 {
                                 out_data[..out_len]
                                     .par_chunks_exact_mut(inner)
                                     .enumerate()
@@ -993,8 +996,8 @@ pub fn binary_op(
                         }
                         (BcastMode::Lhs, BcastMode::Match) => {
                             let l_slice = &lhs_data[..inner];
-                            #[cfg(feature = "rayon")]
-                            if outer >= 4 && out_len >= 8192 {
+                            #[cfg(feature = "parallel")]
+                            if can_parallel && outer >= 4 && out_len >= 8192 {
                                 out_data[..out_len]
                                     .par_chunks_exact_mut(inner)
                                     .enumerate()
@@ -1015,8 +1018,8 @@ pub fn binary_op(
                             return;
                         }
                         (BcastMode::Match, BcastMode::Rhs) => {
-                            #[cfg(feature = "rayon")]
-                            if outer >= 2 && out_len >= 4096 {
+                            #[cfg(feature = "parallel")]
+                            if can_parallel && outer >= 2 && out_len >= 4096 {
                                 out_data[..out_len]
                                     .par_chunks_exact_mut(inner)
                                     .enumerate()
@@ -1037,8 +1040,8 @@ pub fn binary_op(
                             return;
                         }
                         (BcastMode::Match, BcastMode::Lhs) => {
-                            #[cfg(feature = "rayon")]
-                            if outer >= 2 && out_len >= 4096 {
+                            #[cfg(feature = "parallel")]
+                            if can_parallel && outer >= 2 && out_len >= 4096 {
                                 out_data[..out_len]
                                     .par_chunks_exact_mut(inner)
                                     .enumerate()
@@ -1124,8 +1127,8 @@ pub fn binary_op(
                         }
                         (BcastMode::Rhs, BcastMode::Match, BcastMode::Rhs) => {
                             let total_chunks = outer * mid;
-                            #[cfg(feature = "rayon")]
-                            if total_chunks >= 2 && out_len >= 4096 {
+                            #[cfg(feature = "parallel")]
+                            if can_parallel && total_chunks >= 2 && out_len >= 4096 {
                                 out_data[..out_len]
                                     .par_chunks_exact_mut(inner)
                                     .enumerate()
@@ -1150,8 +1153,8 @@ pub fn binary_op(
                         }
                         (BcastMode::Lhs, BcastMode::Match, BcastMode::Lhs) => {
                             let total_chunks = outer * mid;
-                            #[cfg(feature = "rayon")]
-                            if total_chunks >= 2 && out_len >= 4096 {
+                            #[cfg(feature = "parallel")]
+                            if can_parallel && total_chunks >= 2 && out_len >= 4096 {
                                 out_data[..out_len]
                                     .par_chunks_exact_mut(inner)
                                     .enumerate()
@@ -1406,6 +1409,9 @@ pub fn try_binary_op_inplace_lhs(
         }
     }
 
+    #[cfg(feature = "parallel")]
+    let can_parallel = crate::par::current_thread_index().is_none();
+
     let buf = &mut lhs_buf[..out_len];
     match n_segs {
         0 => {
@@ -1415,8 +1421,8 @@ pub fn try_binary_op_inplace_lhs(
         }
         1 => match seg_mode[0] {
             BcastMode::Match => {
-                #[cfg(feature = "rayon")]
-                if out_len >= 8192 {
+                #[cfg(feature = "parallel")]
+                if can_parallel && out_len >= 8192 {
                     buf.par_chunks_mut(4096).enumerate().for_each(|(ci, sub)| {
                         let start = ci * 4096;
                         binary_inplace_slice(sub, &rhs_data[start..start + sub.len()], op_type, act);
@@ -1428,8 +1434,8 @@ pub fn try_binary_op_inplace_lhs(
             }
             BcastMode::Rhs => {
                 let b = rhs_data[0];
-                #[cfg(feature = "rayon")]
-                if out_len >= 8192 {
+                #[cfg(feature = "parallel")]
+                if can_parallel && out_len >= 8192 {
                     buf.par_chunks_mut(4096)
                         .for_each(|sub| binary_inplace_scalar_rhs(sub, b, op_type, act));
                     return true;
@@ -1444,8 +1450,8 @@ pub fn try_binary_op_inplace_lhs(
             match (seg_mode[0], seg_mode[1]) {
                 (BcastMode::Rhs, BcastMode::Match) => {
                     let r_slice = &rhs_data[..inner];
-                    #[cfg(feature = "rayon")]
-                    if _outer >= 4 && out_len >= 8192 {
+                    #[cfg(feature = "parallel")]
+                    if can_parallel && _outer >= 4 && out_len >= 8192 {
                         buf.par_chunks_exact_mut(inner)
                             .for_each(|sub| binary_inplace_slice(sub, r_slice, op_type, act));
                         return true;
@@ -1456,8 +1462,8 @@ pub fn try_binary_op_inplace_lhs(
                     true
                 }
                 (BcastMode::Match, BcastMode::Rhs) => {
-                    #[cfg(feature = "rayon")]
-                    if _outer >= 2 && out_len >= 4096 {
+                    #[cfg(feature = "parallel")]
+                    if can_parallel && _outer >= 2 && out_len >= 4096 {
                         buf.par_chunks_exact_mut(inner)
                             .enumerate()
                             .for_each(|(o, sub)| {
@@ -1487,8 +1493,8 @@ pub fn try_binary_op_inplace_lhs(
                     true
                 }
                 (BcastMode::Rhs, BcastMode::Match, BcastMode::Rhs) => {
-                    #[cfg(feature = "rayon")]
-                    if outer * mid >= 2 && out_len >= 4096 {
+                    #[cfg(feature = "parallel")]
+                    if can_parallel && outer * mid >= 2 && out_len >= 4096 {
                         buf.par_chunks_exact_mut(inner)
                             .enumerate()
                             .for_each(|(i, sub)| {

@@ -103,8 +103,8 @@ fn compute_conv_padding(
     }
 }
 
-const MAX_POOLED_BUF_FLOATS: usize = 1 * 1024 * 1024; // 4 MB max per pooled buffer
-const MAX_POOL_TOTAL_FLOATS: usize = 2 * 1024 * 1024; // 8 MB max pool per thread
+const MAX_POOLED_BUF_FLOATS: usize = 4 * 1024 * 1024; // 16 MB max per pooled buffer (covers large rec and det buffers)
+const MAX_POOL_TOTAL_FLOATS: usize = 6 * 1024 * 1024; // 24 MB max pool per thread
 
 thread_local! {
     static TENSOR_BUFFER_POOL: core::cell::RefCell<Vec<Vec<f32>>> = core::cell::RefCell::new(Vec::with_capacity(64));
@@ -993,7 +993,12 @@ pub fn execute_node_with_liveness(
             let resolved_shape = compute_reshape_dims(in_tensor.shape(), &target_dims)
                 .map_err(MnnError::ExecutionError)?;
 
-            let mut out_t = ctx.get_tensor_mut(in_indices[0])?.share();
+            let is_dead = last_use.map_or(false, |lu| in_indices[0] < lu.len() && lu[in_indices[0]] == op_idx);
+            let mut out_t = if is_dead {
+                ctx.take_tensor(in_indices[0])?
+            } else {
+                ctx.get_tensor_mut(in_indices[0])?.share()
+            };
             out_t.set_shape(&resolved_shape);
             ctx.set_tensor(out_idx, out_t);
             Ok(())
@@ -1343,7 +1348,12 @@ pub fn execute_node_with_liveness(
                 out_shape.push(1);
             }
 
-            let mut out_t = ctx.get_tensor_mut(in_indices[0])?.share();
+            let is_dead = last_use.map_or(false, |lu| in_indices[0] < lu.len() && lu[in_indices[0]] == op_idx);
+            let mut out_t = if is_dead {
+                ctx.take_tensor(in_indices[0])?
+            } else {
+                ctx.get_tensor_mut(in_indices[0])?.share()
+            };
             out_t.set_shape(&out_shape);
             ctx.set_tensor(out_idx, out_t);
             Ok(())
@@ -1394,7 +1404,12 @@ pub fn execute_node_with_liveness(
                 }
             }
 
-            let mut out_t = ctx.get_tensor_mut(in_indices[0])?.share();
+            let is_dead = last_use.map_or(false, |lu| in_indices[0] < lu.len() && lu[in_indices[0]] == op_idx);
+            let mut out_t = if is_dead {
+                ctx.take_tensor(in_indices[0])?
+            } else {
+                ctx.get_tensor_mut(in_indices[0])?.share()
+            };
             out_t.set_shape(&out_shape);
             ctx.set_tensor(out_idx, out_t);
             Ok(())
@@ -1540,7 +1555,12 @@ pub fn execute_node_with_liveness(
                 }
                 ns
             };
-            let mut out_t = ctx.get_tensor_mut(in_indices[0])?.share();
+            let is_dead = last_use.map_or(false, |lu| in_indices[0] < lu.len() && lu[in_indices[0]] == op_idx);
+            let mut out_t = if is_dead {
+                ctx.take_tensor(in_indices[0])?
+            } else {
+                ctx.get_tensor_mut(in_indices[0])?.share()
+            };
             out_t.set_shape(&new_shape);
             ctx.set_tensor(out_idx, out_t);
             Ok(())
@@ -1550,12 +1570,13 @@ pub fn execute_node_with_liveness(
             if in_indices.is_empty() || out_indices.is_empty() {
                 return Ok(());
             }
-            let in_tensor = ctx.get_tensor(in_indices[0])?;
+            let in_tid = in_indices[0];
             let out_idx = out_indices[0];
 
-            let in_shape = in_tensor.shape();
-            let in_floats = in_tensor.as_f32_cow();
-            let mut out_data = alloc_tensor_buffer_overwrite(in_floats.len());
+            let (in_shape, in_layout) = {
+                let in_tensor = ctx.get_tensor(in_tid)?;
+                (in_tensor.shape().to_vec(), in_tensor.layout())
+            };
 
             let raw_axis = *axis;
             let actual_axis = if raw_axis < 0 {
@@ -1564,9 +1585,20 @@ pub fn execute_node_with_liveness(
                 raw_axis as usize
             };
 
-            softmax(&in_floats, in_shape, actual_axis as isize, &mut out_data);
+            if let Some(mut in_buf) = ctx.take_unique_dead_float_buffer(in_tid, op_idx, last_use) {
+                crate::kernels::classification::softmax_inplace(&mut in_buf, &in_shape, actual_axis as isize);
+                let out_tensor = Tensor::from_floats(&in_shape, in_buf, in_layout);
+                ctx.set_tensor(out_idx, out_tensor);
+                return Ok(());
+            }
 
-            let out_tensor = Tensor::from_floats(in_shape, out_data, in_tensor.layout());
+            let in_tensor = ctx.get_tensor(in_tid)?;
+            let in_floats = in_tensor.as_f32_cow();
+            let mut out_data = alloc_tensor_buffer_overwrite(in_floats.len());
+
+            softmax(&in_floats, &in_shape, actual_axis as isize, &mut out_data);
+
+            let out_tensor = Tensor::from_floats(&in_shape, out_data, in_layout);
             ctx.set_tensor(out_idx, out_tensor);
             Ok(())
         }

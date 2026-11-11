@@ -222,14 +222,8 @@ impl CtcDecoder {
             for ti in 0..t {
                 let row_start = b_offset + ti * c;
                 let row_slice = &preds_slice[row_start..row_start + c];
-                let mut b_idx = 0usize;
-                let mut b_val = f32::MIN;
-                for (ci, &v) in row_slice.iter().enumerate() {
-                    if v > b_val {
-                        b_val = v;
-                        b_idx = ci;
-                    }
-                }
+                let (b_idx_i32, b_val) = rusto_nn::kernels::classification::argmax_row(row_slice);
+                let b_idx = b_idx_i32.max(0) as usize;
 
                 token_indices.push(b_idx);
                 token_probs.push(b_val);
@@ -289,6 +283,7 @@ impl CtcDecoder {
             }
         }
 
+        rusto_nn::recycle_tensor_buffer(preds.into_raw_vec());
         (line_results, word_infos)
     }
 
@@ -304,16 +299,10 @@ impl CtcDecoder {
 
         for step in 0..seq_len {
             let step_offset = step * num_classes;
-            let mut best_idx = 0usize;
-            let mut best_val = f32::NEG_INFINITY;
-
-            for c in 0..num_classes {
-                let val = rec_data[step_offset + c];
-                if val > best_val {
-                    best_val = val;
-                    best_idx = c;
-                }
-            }
+            let (best_idx_i32, best_val) = rusto_nn::kernels::classification::argmax_row(
+                &rec_data[step_offset..step_offset + num_classes],
+            );
+            let best_idx = best_idx_i32.max(0) as usize;
 
             if best_idx != 0 && (step == 0 || best_idx != last_idx) {
                 if let Some(ch) = self.chars.get(best_idx) {

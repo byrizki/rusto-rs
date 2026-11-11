@@ -1,5 +1,5 @@
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
 use std::cell::RefCell;
 
@@ -110,7 +110,7 @@ pub fn conv2d(
         let k = config.in_channels;
         let n = hw_out;
 
-        if batch > 1 && n <= 256 && batch * n <= 4096 && m * k >= 4096 {
+        if batch > 1 && n <= 1024 && batch * n <= 8192 && m * k >= 1024 {
             let n_total = batch * n;
             let needed_in = k * n_total;
             let needed_out = m * n_total;
@@ -177,7 +177,7 @@ pub fn conv2d(
     let m_gemm = out_c_per_group;
     let n_gemm = hw_out;
 
-    if batch > 1 && group == 1 && hw_out <= 256 && batch * hw_out <= 4096 && m_gemm * k_gemm >= 4096 {
+    if batch > 1 && group == 1 && hw_out <= 1024 && batch * hw_out <= 8192 && m_gemm * k_gemm >= 1024 {
         let n_total = batch * hw_out;
         let needed_col = k_gemm * n_total;
         let needed_out = m_gemm * n_total;
@@ -514,14 +514,29 @@ fn im2col_tile(
         }
     };
 
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     {
-        if col_buf.len() >= 8192 && num_channels * k_spatial >= 4 {
+        let total_rows = num_channels * k_spatial;
+        if crate::par::current_thread_index().is_none()
+            && col_buf.len() >= 16384
+            && total_rows >= 4
+        {
+            let num_threads = crate::par::current_num_threads().max(1);
+            let min_rows_per_chunk = 8192usize.div_ceil(tile_w.max(1)).max(4);
+            let rows_per_chunk = total_rows.div_ceil(num_threads).max(min_rows_per_chunk);
+            let chunk_size = rows_per_chunk * tile_w;
+
             col_buf
-                .par_chunks_exact_mut(tile_w)
+                .par_chunks_mut(chunk_size)
                 .enumerate()
-                .for_each(|(row, col_row)| {
-                    fill_row(row, col_row);
+                .for_each(|(chunk_idx, col_chunk)| {
+                    let start_row = chunk_idx * rows_per_chunk;
+                    let count = col_chunk.len() / tile_w;
+                    for i in 0..count {
+                        let row = start_row + i;
+                        let col_row = &mut col_chunk[i * tile_w..(i + 1) * tile_w];
+                        fill_row(row, col_row);
+                    }
                 });
             return;
         }
@@ -636,14 +651,30 @@ fn im2col_strided(
         }
     };
 
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     {
-        if col_stride == hw_out && col_offset == 0 && num_channels * k_spatial >= 4 {
+        let total_rows = num_channels * k_spatial;
+        if col_stride == hw_out && col_offset == 0
+            && crate::par::current_thread_index().is_none()
+            && col_buf.len() >= 16384
+            && total_rows >= 4
+        {
+            let num_threads = crate::par::current_num_threads().max(1);
+            let min_rows_per_chunk = 8192usize.div_ceil(hw_out.max(1)).max(4);
+            let rows_per_chunk = total_rows.div_ceil(num_threads).max(min_rows_per_chunk);
+            let chunk_size = rows_per_chunk * hw_out;
+
             col_buf
-                .par_chunks_exact_mut(hw_out)
+                .par_chunks_mut(chunk_size)
                 .enumerate()
-                .for_each(|(row, col_row)| {
-                    fill_row(row, col_row);
+                .for_each(|(chunk_idx, col_chunk)| {
+                    let start_row = chunk_idx * rows_per_chunk;
+                    let count = col_chunk.len() / hw_out;
+                    for i in 0..count {
+                        let row = start_row + i;
+                        let col_row = &mut col_chunk[i * hw_out..(i + 1) * hw_out];
+                        fill_row(row, col_row);
+                    }
                 });
             return;
         }

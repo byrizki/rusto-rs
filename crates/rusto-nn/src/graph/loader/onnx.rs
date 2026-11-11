@@ -189,7 +189,10 @@ pub fn load_onnx(slice: &[u8]) -> Result<Graph, MnnError> {
 
         // For inputs that are initializers: if this op doesn't absorb them (like Conv absorbs weights),
         // we emit Const nodes for them so they are populated in GraphContext.
-        let is_absorbed_op = op_type == "Conv" || op_type == "ConvTranspose" || op_type == "BatchNormalization";
+        let is_absorbed_op = op_type == "Conv"
+            || op_type == "ConvTranspose"
+            || op_type == "BatchNormalization"
+            || op_type == "Clip";
 
         let mut in_indices: SmallVec<[usize; 4]> = SmallVec::new();
         for (idx, in_name) in onnx_node.input.iter().enumerate() {

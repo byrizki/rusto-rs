@@ -12,7 +12,7 @@ fn test_parse_ppocrv6_det_mnn() {
     assert_eq!(model.input_names(), &["x"]);
     assert!(model.op_count() > 50);
 
-    let net = model.net();
+    let net = model.net().expect("Valid MNN net");
     let ops = net.oplists().expect("Oplists exists");
     assert_eq!(ops.get(0).type_(), OpType::Input);
 
@@ -35,7 +35,7 @@ fn test_parse_ppocrv6_rec_mnn() {
     assert_eq!(model.input_names(), &["x"]);
     assert!(model.op_count() > 50);
 
-    let net = model.net();
+    let net = model.net().expect("Valid MNN net");
     let ops = net.oplists().expect("Oplists exists");
     assert_eq!(ops.get(0).type_(), OpType::Input);
 

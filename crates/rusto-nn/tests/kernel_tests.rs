@@ -217,6 +217,28 @@ fn test_softmax_and_argmax() {
     argmax(&input, &[1, 4], -1, &mut ids);
     assert_eq!(ids[0], 1);
 
+    // Test fused_softmax_argmax_row against separate softmax + argmax_row
+    let (fused_idx, fused_prob) = rusto_nn::kernels::classification::fused_softmax_argmax_row(&input);
+    let (sep_idx, sep_prob) = rusto_nn::kernels::classification::argmax_row(&prob);
+    assert_eq!(fused_idx, sep_idx);
+    assert!((fused_prob - sep_prob).abs() < 1e-4);
+
+    // Larger vocab test (e.g. 6906 items)
+    let vocab_size = 6906;
+    let mut large_logits = vec![0.0f32; vocab_size];
+    for (i, v) in large_logits.iter_mut().enumerate() {
+        *v = ((i % 103) as f32 - 50.0) * 0.1;
+    }
+    large_logits[4242] = 15.0; // explicit maximum
+
+    let mut large_probs = vec![0.0f32; vocab_size];
+    softmax(&large_logits, &[1, vocab_size], -1, &mut large_probs);
+    let (expected_idx, expected_prob) = rusto_nn::kernels::classification::argmax_row(&large_probs);
+    let (got_idx, got_prob) = rusto_nn::kernels::classification::fused_softmax_argmax_row(&large_logits);
+    assert_eq!(got_idx, expected_idx);
+    assert_eq!(got_idx, 4242);
+    assert!((got_prob - expected_prob).abs() < 1e-4);
+
     let mut top_v = vec![0.0; 2];
     let mut top_i = vec![0i32; 2];
     topk(&input, 1, 4, 2, &mut top_v, &mut top_i);

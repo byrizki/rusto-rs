@@ -1,5 +1,5 @@
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReductionOp {
@@ -421,7 +421,7 @@ pub fn reduce(
             }
 
             if inner == 1 {
-                #[cfg(feature = "rayon")]
+                #[cfg(feature = "parallel")]
                 {
                     if outer >= 4 {
                         output
@@ -443,7 +443,7 @@ pub fn reduce(
             }
 
             let block_stride = reduce_len * inner;
-            #[cfg(feature = "rayon")]
+            #[cfg(feature = "parallel")]
             {
                 if outer >= 2 {
                     output

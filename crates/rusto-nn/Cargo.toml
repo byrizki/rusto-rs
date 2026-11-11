@@ -10,10 +10,8 @@ categories = ["science", "computer-vision"]
 exclude = ["tools/**"]
 
 [dependencies]
-flatbuffers = "0.6.1"
 thiserror = "1.0"
 smallvec = { version = "1.13", features = ["union"] }
-rayon = { version = "1.10", optional = true }
 rten-onnx = { version = "0.27.0", optional = true }
 rten-model-file = { version = "0.27.0", optional = true }
 
@@ -25,8 +23,9 @@ rten = { version = "0.27.0", features = ["rten_format"] }
 rten-tensor = "0.27.0"
 
 [features]
-default = ["std", "rayon", "rten", "onnx"]
+default = ["std", "parallel", "rten", "onnx"]
 std = []
-rayon = ["dep:rayon"]
+parallel = []
+pool = ["parallel"]
 rten = ["dep:rten-model-file"]
 onnx = ["dep:rten-onnx"]

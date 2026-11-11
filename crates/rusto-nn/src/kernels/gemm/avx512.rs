@@ -1,10 +1,10 @@
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
 
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
-#[cfg(feature = "rayon")]
+#[cfg(feature = "parallel")]
 thread_local! {
     static PACKED_B_CACHE_512: core::cell::RefCell<Vec<f32>> = core::cell::RefCell::new(Vec::new());
 }
@@ -304,7 +304,116 @@ unsafe fn microkernel_1x32_packed(
     store_row_2x16(&mut c00, &mut c01, c_ptr, global_i, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
 }
 
-#[allow(dead_code)]
+#[inline(always)]
+unsafe fn microkernel_8x16_packed(
+    a_ptr: *const f32,
+    b_packed: *const f32,
+    c_ptr: *mut f32,
+    k: usize,
+    n: usize,
+    global_i: usize,
+    alpha_vec: __m512,
+    beta: f32,
+    beta_vec: __m512,
+    bias: Option<&[f32]>,
+    act: FusedActivation,
+    zero_vec: __m512,
+    six_vec: __m512,
+    three_vec: __m512,
+    inv_six_vec: __m512,
+) {
+    let mut c00 = _mm512_setzero_ps();
+    let mut c10 = _mm512_setzero_ps();
+    let mut c20 = _mm512_setzero_ps();
+    let mut c30 = _mm512_setzero_ps();
+    let mut c40 = _mm512_setzero_ps();
+    let mut c50 = _mm512_setzero_ps();
+    let mut c60 = _mm512_setzero_ps();
+    let mut c70 = _mm512_setzero_ps();
+
+    for p in 0..k {
+        let b0 = _mm512_loadu_ps(b_packed.add(p * 16));
+
+        let a0 = _mm512_set1_ps(*a_ptr.add(p));
+        c00 = _mm512_fmadd_ps(a0, b0, c00);
+
+        let a1 = _mm512_set1_ps(*a_ptr.add(k + p));
+        c10 = _mm512_fmadd_ps(a1, b0, c10);
+
+        let a2 = _mm512_set1_ps(*a_ptr.add(2 * k + p));
+        c20 = _mm512_fmadd_ps(a2, b0, c20);
+
+        let a3 = _mm512_set1_ps(*a_ptr.add(3 * k + p));
+        c30 = _mm512_fmadd_ps(a3, b0, c30);
+
+        let a4 = _mm512_set1_ps(*a_ptr.add(4 * k + p));
+        c40 = _mm512_fmadd_ps(a4, b0, c40);
+
+        let a5 = _mm512_set1_ps(*a_ptr.add(5 * k + p));
+        c50 = _mm512_fmadd_ps(a5, b0, c50);
+
+        let a6 = _mm512_set1_ps(*a_ptr.add(6 * k + p));
+        c60 = _mm512_fmadd_ps(a6, b0, c60);
+
+        let a7 = _mm512_set1_ps(*a_ptr.add(7 * k + p));
+        c70 = _mm512_fmadd_ps(a7, b0, c70);
+    }
+
+    store_row_1x16(&mut c00, c_ptr, global_i, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
+    store_row_1x16(&mut c10, c_ptr.add(n), global_i + 1, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
+    store_row_1x16(&mut c20, c_ptr.add(2 * n), global_i + 2, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
+    store_row_1x16(&mut c30, c_ptr.add(3 * n), global_i + 3, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
+    store_row_1x16(&mut c40, c_ptr.add(4 * n), global_i + 4, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
+    store_row_1x16(&mut c50, c_ptr.add(5 * n), global_i + 5, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
+    store_row_1x16(&mut c60, c_ptr.add(6 * n), global_i + 6, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
+    store_row_1x16(&mut c70, c_ptr.add(7 * n), global_i + 7, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
+}
+
+#[inline(always)]
+unsafe fn microkernel_4x16_packed(
+    a_ptr: *const f32,
+    b_packed: *const f32,
+    c_ptr: *mut f32,
+    k: usize,
+    n: usize,
+    global_i: usize,
+    alpha_vec: __m512,
+    beta: f32,
+    beta_vec: __m512,
+    bias: Option<&[f32]>,
+    act: FusedActivation,
+    zero_vec: __m512,
+    six_vec: __m512,
+    three_vec: __m512,
+    inv_six_vec: __m512,
+) {
+    let mut c00 = _mm512_setzero_ps();
+    let mut c10 = _mm512_setzero_ps();
+    let mut c20 = _mm512_setzero_ps();
+    let mut c30 = _mm512_setzero_ps();
+
+    for p in 0..k {
+        let b0 = _mm512_loadu_ps(b_packed.add(p * 16));
+
+        let a0 = _mm512_set1_ps(*a_ptr.add(p));
+        c00 = _mm512_fmadd_ps(a0, b0, c00);
+
+        let a1 = _mm512_set1_ps(*a_ptr.add(k + p));
+        c10 = _mm512_fmadd_ps(a1, b0, c10);
+
+        let a2 = _mm512_set1_ps(*a_ptr.add(2 * k + p));
+        c20 = _mm512_fmadd_ps(a2, b0, c20);
+
+        let a3 = _mm512_set1_ps(*a_ptr.add(3 * k + p));
+        c30 = _mm512_fmadd_ps(a3, b0, c30);
+    }
+
+    store_row_1x16(&mut c00, c_ptr, global_i, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
+    store_row_1x16(&mut c10, c_ptr.add(n), global_i + 1, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
+    store_row_1x16(&mut c20, c_ptr.add(2 * n), global_i + 2, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
+    store_row_1x16(&mut c30, c_ptr.add(3 * n), global_i + 3, alpha_vec, beta, beta_vec, bias, act, zero_vec, six_vec, three_vec, inv_six_vec);
+}
+
 #[inline(always)]
 unsafe fn microkernel_1x16_packed(
     a_ptr: *const f32,
@@ -339,6 +448,7 @@ unsafe fn gemm_compute_row_block_packed(
     r_count: usize,
     n: usize,
     k: usize,
+    has_rem_16: bool,
     a_base: *const f32,
     pb_base: *const f32,
     b_raw: *const f32,
@@ -355,7 +465,7 @@ unsafe fn gemm_compute_row_block_packed(
     inv_six_vec: __m512,
 ) {
     let n_tiles_32 = n / 32;
-    let n_packed_32 = n_tiles_32 * 32;
+    let n_done = n_tiles_32 * 32 + if has_rem_16 { 16 } else { 0 };
 
     let mut i = 0;
     while i + 8 <= r_count {
@@ -385,8 +495,30 @@ unsafe fn gemm_compute_row_block_packed(
             );
         }
 
+        if has_rem_16 {
+            let j = n_tiles_32 * 32;
+            let b_tile = pb_base.add(n_tiles_32 * k * 32);
+            microkernel_8x16_packed(
+                a_ptr,
+                b_tile,
+                c_ptr.add(j),
+                k,
+                n,
+                global_i,
+                alpha_vec,
+                beta,
+                beta_vec,
+                bias,
+                act,
+                zero_vec,
+                six_vec,
+                three_vec,
+                inv_six_vec,
+            );
+        }
+
         // Remainder columns for this 8-row block
-        for col in n_packed_32..n {
+        for col in n_done..n {
             for r in 0..8 {
                 let row = global_i + r;
                 let mut sum = 0.0f32;
@@ -434,7 +566,29 @@ unsafe fn gemm_compute_row_block_packed(
             );
         }
 
-        for col in n_packed_32..n {
+        if has_rem_16 {
+            let j = n_tiles_32 * 32;
+            let b_tile = pb_base.add(n_tiles_32 * k * 32);
+            microkernel_4x16_packed(
+                a_ptr,
+                b_tile,
+                c_ptr.add(j),
+                k,
+                n,
+                global_i,
+                alpha_vec,
+                beta,
+                beta_vec,
+                bias,
+                act,
+                zero_vec,
+                six_vec,
+                three_vec,
+                inv_six_vec,
+            );
+        }
+
+        for col in n_done..n {
             for r in 0..4 {
                 let row = global_i + r;
                 let mut sum = 0.0f32;
@@ -481,7 +635,28 @@ unsafe fn gemm_compute_row_block_packed(
             );
         }
 
-        for col in n_packed_32..n {
+        if has_rem_16 {
+            let j = n_tiles_32 * 32;
+            let b_tile = pb_base.add(n_tiles_32 * k * 32);
+            microkernel_1x16_packed(
+                a_ptr,
+                b_tile,
+                c_ptr.add(j),
+                k,
+                global_i,
+                alpha_vec,
+                beta,
+                beta_vec,
+                bias,
+                act,
+                zero_vec,
+                six_vec,
+                three_vec,
+                inv_six_vec,
+            );
+        }
+
+        for col in n_done..n {
             let mut sum = 0.0f32;
             for p in 0..k {
                 sum += *a_base.add(global_i * k + p) * *b_raw.add(p * n + col);
@@ -757,15 +932,15 @@ pub unsafe fn gemm_avx512(
     let b_send = SendConstPtr(b.as_ptr());
     let c_send = SendMutPtr(c.as_mut_ptr());
 
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     {
-        let in_rayon_worker = rayon::current_thread_index().is_some();
+        let in_worker = crate::par::current_thread_index().is_some();
 
         if n >= 2048 || m < 16 {
             let col_chunk = 512;
             let num_col_chunks = n.div_ceil(col_chunk);
 
-            if !in_rayon_worker && num_col_chunks > 1 {
+            if !in_worker && num_col_chunks > 1 {
                 (0..num_col_chunks).into_par_iter().for_each(move |col_block| {
                     let j_start = col_block * col_chunk;
                     let j_end = (j_start + col_chunk).min(n);
@@ -790,7 +965,8 @@ pub unsafe fn gemm_avx512(
         }
 
         let n_tiles_32 = n / 32;
-        let packed_b_len = n_tiles_32 * k * 32;
+        let has_rem_16 = (n % 32) >= 16;
+        let packed_b_len = (n_tiles_32 * 32 + if has_rem_16 { 16 } else { 0 }) * k;
 
         let pack_b = |pb_ptr: *mut f32| {
             for jt in 0..n_tiles_32 {
@@ -803,23 +979,32 @@ pub unsafe fn gemm_avx512(
                     _mm512_storeu_ps(dst.add(16), _mm512_loadu_ps(src.add(16)));
                 }
             }
+            if has_rem_16 {
+                let j = n_tiles_32 * 32;
+                let tile_dst = pb_ptr.add(n_tiles_32 * k * 32);
+                for p in 0..k {
+                    let src = b.as_ptr().add(p * n + j);
+                    let dst = tile_dst.add(p * 16);
+                    _mm512_storeu_ps(dst, _mm512_loadu_ps(src));
+                }
+            }
         };
 
         let compute_with_packed_b = |pb_ptr: *const f32| {
             let pb_send = SendConstPtr(pb_ptr);
-            let num_threads = rayon::current_num_threads();
+            let num_threads = crate::par::current_num_threads();
             let target_chunks = (num_threads * 4).max(1);
             let ideal_chunk = (m / target_chunks).max(8);
             let row_chunk = ideal_chunk.div_ceil(8) * 8;
             let num_row_chunks = m.div_ceil(row_chunk);
 
-            if !in_rayon_worker && num_row_chunks > 1 && m * n * k >= 131072 {
+            if !in_worker && num_row_chunks > 1 && m * n * k >= 131072 {
                 (0..num_row_chunks).into_par_iter().for_each(move |row_block| {
                     let r_start = row_block * row_chunk;
                     let r_end = (r_start + row_chunk).min(m);
                     let r_count = r_end - r_start;
                     gemm_compute_row_block_packed(
-                        r_start, r_count, n, k, a_send.get(), pb_send.get(), b_send.get(), c_send.get(),
+                        r_start, r_count, n, k, has_rem_16, a_send.get(), pb_send.get(), b_send.get(), c_send.get(),
                         alpha, beta, alpha_vec, beta_vec, bias, act,
                         zero_vec, six_vec, three_vec, inv_six_vec,
                     );
@@ -830,7 +1015,7 @@ pub unsafe fn gemm_avx512(
                     let r_end = (r_start + row_chunk).min(m);
                     let r_count = r_end - r_start;
                     gemm_compute_row_block_packed(
-                        r_start, r_count, n, k, a_send.get(), pb_send.get(), b_send.get(), c_send.get(),
+                        r_start, r_count, n, k, has_rem_16, a_send.get(), pb_send.get(), b_send.get(), c_send.get(),
                         alpha, beta, alpha_vec, beta_vec, bias, act,
                         zero_vec, six_vec, three_vec, inv_six_vec,
                     );
@@ -858,7 +1043,7 @@ pub unsafe fn gemm_avx512(
         }
     }
 
-    #[cfg(not(feature = "rayon"))]
+    #[cfg(not(feature = "parallel"))]
     {
         gemm_compute_col_panel(
             m, n, k, a_send.get(), b_send.get(), c_send.get(), 0, n,

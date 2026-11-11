@@ -1,8 +1,8 @@
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
 
-#[cfg(feature = "rayon")]
-use rayon::prelude::*;
+#[cfg(feature = "parallel")]
+use crate::par::prelude::*;
 
 use crate::kernels::activation::{apply_activation_scalar, FusedActivation};
 
@@ -1692,18 +1692,30 @@ pub fn depthwise_conv2d_nchw(
         }
     };
 
-    for b in 0..batch {
-        let in_batch = &input[b * channels * hw_in..(b + 1) * channels * hw_in];
-        let out_batch = &mut output[b * channels * hw_out..(b + 1) * channels * hw_out];
+    let total_channels = batch * channels;
 
-        #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
+    {
+        if crate::par::current_thread_index().is_none()
+            && total_channels * hw_out >= 16384
+            && total_channels >= 4
         {
-            if channels * hw_out >= 8192 && channels >= 4 {
-                out_batch
-                    .par_chunks_exact_mut(hw_out)
-                    .enumerate()
-                    .for_each(|(c, out_channel)| {
-                        let in_channel = &in_batch[c * hw_in..(c + 1) * hw_in];
+            let num_threads = crate::par::current_num_threads().max(1);
+            let min_c_per_chunk = 8192usize.div_ceil(hw_out.max(1)).max(4);
+            let c_per_chunk = total_channels.div_ceil(num_threads).max(min_c_per_chunk);
+            let chunk_size = c_per_chunk * hw_out;
+
+            output[..total_channels * hw_out]
+                .par_chunks_mut(chunk_size)
+                .enumerate()
+                .for_each(|(chunk_idx, out_chunk)| {
+                    let start_c = chunk_idx * c_per_chunk;
+                    let count = out_chunk.len() / hw_out;
+                    for i in 0..count {
+                        let global_c = start_c + i;
+                        let c = global_c % channels;
+                        let in_channel = &input[global_c * hw_in..(global_c + 1) * hw_in];
+                        let out_channel = &mut out_chunk[i * hw_out..(i + 1) * hw_out];
                         let w_channel = &weight[c * kernel_size..(c + 1) * kernel_size];
                         let b_val = bias.map(|b_slice| b_slice[c]).unwrap_or(0.0);
                         process_depthwise_channel(
@@ -1718,29 +1730,30 @@ pub fn depthwise_conv2d_nchw(
                             out_w,
                             config,
                         );
-                    });
-                continue;
-            }
+                    }
+                });
+            return;
         }
+    }
 
-        for c in 0..channels {
-            let in_channel = &in_batch[c * hw_in..(c + 1) * hw_in];
-            let out_channel = &mut out_batch[c * hw_out..(c + 1) * hw_out];
-            let w_channel = &weight[c * kernel_size..(c + 1) * kernel_size];
-            let b_val = bias.map(|b_slice| b_slice[c]).unwrap_or(0.0);
-            process_depthwise_channel(
-                kernel_kind,
-                in_channel,
-                w_channel,
-                b_val,
-                out_channel,
-                in_h,
-                in_w,
-                out_h,
-                out_w,
-                config,
-            );
-        }
+    for global_c in 0..total_channels {
+        let c = global_c % channels;
+        let in_channel = &input[global_c * hw_in..(global_c + 1) * hw_in];
+        let out_channel = &mut output[global_c * hw_out..(global_c + 1) * hw_out];
+        let w_channel = &weight[c * kernel_size..(c + 1) * kernel_size];
+        let b_val = bias.map(|b_slice| b_slice[c]).unwrap_or(0.0);
+        process_depthwise_channel(
+            kernel_kind,
+            in_channel,
+            w_channel,
+            b_val,
+            out_channel,
+            in_h,
+            in_w,
+            out_h,
+            out_w,
+            config,
+        );
     }
 }
 
