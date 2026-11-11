@@ -30,13 +30,14 @@ pub fn normalize_model_name(name: Option<&str>) -> &'static str {
         Some("ppocrv6") | Some("v6") | Some("ppv6") | Some("ppocrv6-tiny") | Some("v6-tiny") | Some("tiny") => {
             "ppocrv6-tiny"
         }
+        Some("ppocrv6-tiny-fp16") | Some("v6-tiny-fp16") | Some("tiny-fp16") => "ppocrv6-tiny-fp16",
         Some("ppocrv6-tiny-int8") | Some("tiny-int8") => "ppocrv6-tiny-int8",
         Some("ppocrv5-server") | Some("v5-server") => "ppocrv5-server",
         Some("ppocrv5") | Some("ppv5") | Some("ppocrv5-mobile") | Some("v5") => "ppocrv5-mobile",
         Some("ppocrv4-server") | Some("v4-server") => "ppocrv4-server",
         Some("ppocrv4") | Some("ppv4") | Some("ppocrv4-mobile") | Some("v4") => "ppocrv4-mobile",
         Some("ppocrv3") | Some("ppv3") | Some("ppocrv3-mobile") | Some("v3") => "ppocrv3-mobile",
-        _ => "indraocr",
+        _ => "ppocrv6-tiny",
     }
 }
 
@@ -120,26 +121,31 @@ pub fn get_base_pipeline_assets(model_name: &str) -> BasePipelineAssets {
         "ppocrv6-small" => BasePipelineAssets {
             det_filename: "ppocrv6_small_det.rten",
             rec_filename: "ppocrv6_small_rec.rten",
-            dict_filename: "ppocrv6_dict.txt",
+            dict_filename: "ppocrv6_small_dict.txt",
         },
         "ppocrv6-small-int8" => BasePipelineAssets {
             det_filename: "ppocrv6_small_int8_det.rten",
             rec_filename: "ppocrv6_small_int8_rec.rten",
-            dict_filename: "ppocrv6_dict.txt",
+            dict_filename: "ppocrv6_small_dict.txt",
         },
         "ppocrv6-medium" => BasePipelineAssets {
             det_filename: "ppocrv6_medium_det.rten",
             rec_filename: "ppocrv6_medium_rec.rten",
-            dict_filename: "ppocrv6_dict.txt",
+            dict_filename: "ppocrv6_medium_dict.txt",
         },
         "ppocrv6-medium-int8" => BasePipelineAssets {
             det_filename: "ppocrv6_medium_int8_det.rten",
             rec_filename: "ppocrv6_medium_int8_rec.rten",
-            dict_filename: "ppocrv6_dict.txt",
+            dict_filename: "ppocrv6_medium_dict.txt",
         },
         "ppocrv6-tiny-int8" => BasePipelineAssets {
             det_filename: "ppocrv6_tiny_int8_det.rten",
             rec_filename: "ppocrv6_tiny_int8_rec.rten",
+            dict_filename: "ppocrv6_dict.txt",
+        },
+        "ppocrv6-tiny-fp16" => BasePipelineAssets {
+            det_filename: "ppocrv6_tiny_fp16_det.mnn",
+            rec_filename: "ppocrv6_tiny_fp16_rec.mnn",
             dict_filename: "ppocrv6_dict.txt",
         },
         "ppocrv5-mobile" => BasePipelineAssets {
@@ -162,15 +168,10 @@ pub fn get_base_pipeline_assets(model_name: &str) -> BasePipelineAssets {
             rec_filename: "ppocrv4_server_rec.rten",
             dict_filename: "ppocrv4_dict.txt",
         },
-        "ppocrv6-tiny" | "ppocrv6" => BasePipelineAssets {
+        "ppocrv6-tiny" | "ppocrv6" | _ => BasePipelineAssets {
             det_filename: "ppocrv6_tiny_det.rten",
             rec_filename: "ppocrv6_tiny_rec.rten",
             dict_filename: "ppocrv6_dict.txt",
-        },
-        _ => BasePipelineAssets {
-            det_filename: "indra_det.rten",
-            rec_filename: "indra_rec.rten",
-            dict_filename: "indra_meta.json",
         },
     }
 }
@@ -198,16 +199,59 @@ pub fn get_cache_dir(custom: Option<&Path>) -> PathBuf {
     PathBuf::from(".cache").join("rusto").join("models")
 }
 
+fn preferred_model_extensions() -> &'static [&'static str] {
+    match crate::engine::active_backend() {
+        crate::engine::EngineBackend::Rten => &["rten", "onnx", "mnn"],
+        _ => &["mnn", "rten", "onnx"],
+    }
+}
+
+fn strip_model_ext(name: &str) -> (&str, bool) {
+    for ext in [".mnn", ".rten", ".onnx"] {
+        if let Some(stem) = name.strip_suffix(ext) {
+            return (stem, true);
+        }
+    }
+    (name, false)
+}
+
 /// Finds local checkout repository fallback candidates for an asset filename.
 pub fn find_local_repo_candidates(asset_filename: &str) -> Vec<PathBuf> {
+    const PPOCR_TIER_DIRS: &[(&str, &[&str])] = &[
+        // Match quantized/half-precision prefixes before their base tier prefixes.
+        ("ppocrv6_tiny_fp16_", &["models/PPOCR_v6_tiny_fp16"]),
+        ("ppocrv6_tiny_int8_", &["models/PPOCR_v6_tiny_int8"]),
+        ("ppocrv6_small_int8_", &["models/PPOCR_v6_small_int8"]),
+        ("ppocrv6_medium_int8_", &["models/PPOCR_v6_medium_int8"]),
+        ("ppocrv6_tiny_", &["models/PPOCR_v6_tiny", "models/PPOCR_v6"]),
+        ("ppocrv6_small_", &["models/PPOCR_v6_small"]),
+        ("ppocrv6_medium_", &["models/PPOCR_v6_medium"]),
+        ("ppocrv5_mobile_", &["models/PPOCR_v5_mobile"]),
+        ("ppocrv5_server_", &["models/PPOCR_v5_server"]),
+        ("ppocrv4_mobile_", &["models/PPOCR_v4_mobile"]),
+        ("ppocrv4_server_", &["models/PPOCR_v4_server"]),
+    ];
+
     let mut candidates = vec![
         PathBuf::from("models").join(asset_filename),
     ];
 
     if asset_filename == "ppocrv6_dict.txt" {
         candidates.push(PathBuf::from("models/PPOCR_v6_tiny/dict.txt"));
+        candidates.push(PathBuf::from("models/PPOCR_v6_tiny_fp16/dict.txt"));
+        candidates.push(PathBuf::from("models/PPOCR_v6_tiny_int8/dict.txt"));
         candidates.push(PathBuf::from("models/PPOCR_v6/ppocrv6_tiny_dict.txt"));
         candidates.push(PathBuf::from("models/PPOCR_v6/dict.txt"));
+        candidates.push(PathBuf::from("models/PPOCR_v6_small/dict.txt"));
+    } else if asset_filename == "ppocrv6_small_dict.txt" {
+        candidates.push(PathBuf::from("models/PPOCR_v6_small/dict.txt"));
+        candidates.push(PathBuf::from("models/PPOCR_v6_small_int8/dict.txt"));
+        candidates.push(PathBuf::from("models/PPOCR_v6/ppocrv6_dict.txt"));
+        candidates.push(PathBuf::from("models/PPOCR_v6_medium/dict.txt"));
+    } else if asset_filename == "ppocrv6_medium_dict.txt" {
+        candidates.push(PathBuf::from("models/PPOCR_v6_medium/dict.txt"));
+        candidates.push(PathBuf::from("models/PPOCR_v6_medium_int8/dict.txt"));
+        candidates.push(PathBuf::from("models/PPOCR_v6/ppocrv6_dict.txt"));
         candidates.push(PathBuf::from("models/PPOCR_v6_small/dict.txt"));
     } else if asset_filename == "ppocrv5_dict.txt" {
         candidates.push(PathBuf::from("models/PPOCR_v5_mobile/dict.txt"));
@@ -221,64 +265,21 @@ pub fn find_local_repo_candidates(asset_filename: &str) -> Vec<PathBuf> {
         candidates.push(PathBuf::from(format!("models/indra/{}", sub)));
         candidates.push(PathBuf::from(format!("models/indra/{}.rten", base)));
         candidates.push(PathBuf::from(format!("models/indra/{}.onnx", base)));
-    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv6_tiny_") {
-        let base = sub.strip_suffix(".mnn").or_else(|| sub.strip_suffix(".rten")).unwrap_or(sub);
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_tiny/{}.mnn", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_tiny/{}", sub)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_tiny/{}.rten", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_tiny/{}.onnx", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6/{}.mnn", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6/{}.rten", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6/{}.onnx", base)));
-    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv6_tiny_int8_") {
-        let base = sub.strip_suffix(".rten").unwrap_or(sub);
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_tiny_int8/{}", sub)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_tiny_int8/{}.rten", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_tiny_int8/{}.onnx", base)));
-    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv6_small_") {
-        let base = sub.strip_suffix(".rten").unwrap_or(sub);
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_small/{}", sub)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_small/{}.rten", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_small/{}.onnx", base)));
-    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv6_small_int8_") {
-        let base = sub.strip_suffix(".rten").unwrap_or(sub);
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_small_int8/{}", sub)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_small_int8/{}.rten", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_small_int8/{}.onnx", base)));
-    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv6_medium_") {
-        let base = sub.strip_suffix(".rten").unwrap_or(sub);
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_medium/{}", sub)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_medium/{}.rten", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_medium/{}.onnx", base)));
-    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv6_medium_int8_") {
-        let base = sub.strip_suffix(".rten").unwrap_or(sub);
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_medium_int8/{}", sub)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_medium_int8/{}.rten", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v6_medium_int8/{}.onnx", base)));
-    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv5_mobile_") {
-        let base = sub.strip_suffix(".mnn").or_else(|| sub.strip_suffix(".rten")).unwrap_or(sub);
-        candidates.push(PathBuf::from(format!("models/PPOCR_v5_mobile/{}.mnn", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v5_mobile/{}", sub)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v5_mobile/{}.rten", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v5_mobile/{}.onnx", base)));
-    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv5_server_") {
-        let base = sub.strip_suffix(".mnn").or_else(|| sub.strip_suffix(".rten")).unwrap_or(sub);
-        candidates.push(PathBuf::from(format!("models/PPOCR_v5_server/{}.mnn", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v5_server/{}", sub)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v5_server/{}.rten", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v5_server/{}.onnx", base)));
-    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv4_mobile_") {
-        let base = sub.strip_suffix(".mnn").or_else(|| sub.strip_suffix(".rten")).unwrap_or(sub);
-        candidates.push(PathBuf::from(format!("models/PPOCR_v4_mobile/{}.mnn", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v4_mobile/{}", sub)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v4_mobile/{}.rten", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v4_mobile/{}.onnx", base)));
-    } else if let Some(sub) = asset_filename.strip_prefix("ppocrv4_server_") {
-        let base = sub.strip_suffix(".mnn").or_else(|| sub.strip_suffix(".rten")).unwrap_or(sub);
-        candidates.push(PathBuf::from(format!("models/PPOCR_v4_server/{}.mnn", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v4_server/{}", sub)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v4_server/{}.rten", base)));
-        candidates.push(PathBuf::from(format!("models/PPOCR_v4_server/{}.onnx", base)));
+    } else if let Some((sub, dirs)) = PPOCR_TIER_DIRS
+        .iter()
+        .find_map(|(prefix, dirs)| asset_filename.strip_prefix(prefix).map(|sub| (sub, *dirs)))
+    {
+        let (base, is_model) = strip_model_ext(sub);
+        let exts = preferred_model_extensions();
+        for dir in dirs {
+            if is_model {
+                for ext in exts {
+                    candidates.push(PathBuf::from(format!("{dir}/{base}.{ext}")));
+                }
+            } else {
+                candidates.push(PathBuf::from(format!("{dir}/{sub}")));
+            }
+        }
     } else if asset_filename == "uvdoc.rten" || asset_filename == "uvdoc.mnn" {
         candidates.push(PathBuf::from("models/uvdoc/uvdoc.mnn"));
         candidates.push(PathBuf::from("models/uvdoc/uvdoc.rten"));
@@ -314,23 +315,38 @@ pub fn find_in_model_dir(dir: &Path, kind: &str) -> Option<PathBuf> {
         check_dirs.push(PathBuf::from("../..").join(dir));
     }
 
-    let exact_names: &[&str] = match kind {
-        "det" => &["det.mnn", "det.rten", "det.onnx", "model.mnn", "model.rten"],
-        "rec" => &["rec.mnn", "rec.rten", "rec.onnx"],
-        "dict" => &["dict.txt", "ppocr_keys_v1.txt", "keys.txt", "vocab.txt", "meta.json", "indra_meta.json"],
-        "cls" => &["cls.mnn", "cls.rten", "cls.onnx", "ppocr_cls.mnn", "ppocr_cls.rten"],
-        "orient" => &["orient.mnn", "orient.rten", "orient.onnx", "ppocr_orient.mnn", "ppocr_orient.rten"],
-        "unwarp" => &["uvdoc.mnn", "uvdoc.rten", "unwarp.mnn", "unwarp.rten"],
-        "layout" => &["layout_cdla.mnn", "layout_cdla.rten", "layout_publaynet.mnn", "layout_publaynet.rten", "layout.mnn", "layout.rten"],
-        "order" => &["indra_order.mnn", "indra_order.rten", "order.mnn", "order.rten"],
+    let model_stems: &[&str] = match kind {
+        "det" => &["det", "model"],
+        "rec" => &["rec"],
+        "cls" => &["cls", "ppocr_cls"],
+        "orient" => &["orient", "ppocr_orient"],
+        "unwarp" => &["uvdoc", "unwarp"],
+        "layout" => &["layout_cdla", "layout_publaynet", "layout"],
+        "order" => &["indra_order", "order"],
         _ => &[],
     };
 
-    for check_dir in &check_dirs {
-        for &name in exact_names {
-            let p = check_dir.join(name);
-            if p.exists() && fs::metadata(&p).map(|m| m.len() > 0).unwrap_or(false) {
-                return Some(dir.join(name));
+    if kind == "dict" {
+        let dict_names = ["dict.txt", "ppocr_keys_v1.txt", "keys.txt", "vocab.txt", "meta.json", "indra_meta.json"];
+        for check_dir in &check_dirs {
+            for name in dict_names {
+                let p = check_dir.join(name);
+                if p.exists() && fs::metadata(&p).map(|m| m.len() > 0).unwrap_or(false) {
+                    return Some(dir.join(name));
+                }
+            }
+        }
+    } else if !model_stems.is_empty() {
+        let exts = preferred_model_extensions();
+        for check_dir in &check_dirs {
+            for stem in model_stems {
+                for ext in exts {
+                    let name = format!("{stem}.{ext}");
+                    let p = check_dir.join(&name);
+                    if p.exists() && fs::metadata(&p).map(|m| m.len() > 0).unwrap_or(false) {
+                        return Some(dir.join(name));
+                    }
+                }
             }
         }
     }
@@ -434,15 +450,9 @@ pub fn resolve_asset_local(
     if cached_file.exists() && fs::metadata(&cached_file).map(|m| m.len() > 0).unwrap_or(false) {
         return Ok(cached_file);
     }
-    if let Some(stem) = asset_filename
-        .strip_suffix(".mnn")
-        .or_else(|| asset_filename.strip_suffix(".rten"))
-    {
-        let exts: &[&str] = match crate::engine::active_backend() {
-            crate::engine::EngineBackend::Rten => &["rten", "onnx", "mnn"],
-            _ => &["mnn", "rten", "onnx"],
-        };
-        for ext in exts {
+    let (stem, is_model) = strip_model_ext(asset_filename);
+    if is_model {
+        for ext in preferred_model_extensions() {
             let alt = cache_dir.join(format!("{stem}.{ext}"));
             if alt.exists() && fs::metadata(&alt).map(|m| m.len() > 0).unwrap_or(false) {
                 return Ok(alt);
@@ -525,9 +535,13 @@ pub fn resolve_hf_asset_path(asset_filename: &str) -> &str {
 
         "ppocrv6_tiny_det.rten" => "ppocrv6-tiny/det.rten",
         "ppocrv6_tiny_rec.rten" => "ppocrv6-tiny/rec.rten",
+        "ppocrv6_tiny_fp16_det.mnn" => "ppocrv6-tiny-fp16/det.mnn",
+        "ppocrv6_tiny_fp16_rec.mnn" => "ppocrv6-tiny-fp16/rec.mnn",
         "ppocrv6_tiny_int8_det.rten" => "ppocrv6-tiny-int8/det.rten",
         "ppocrv6_tiny_int8_rec.rten" => "ppocrv6-tiny-int8/rec.rten",
         "ppocrv6_dict.txt" => "ppocrv6-tiny/dict.txt",
+        "ppocrv6_small_dict.txt" => "ppocrv6-small/dict.txt",
+        "ppocrv6_medium_dict.txt" => "ppocrv6-medium/dict.txt",
         "ppocrv6_small_det.rten" => "ppocrv6-small/det.rten",
         "ppocrv6_small_rec.rten" => "ppocrv6-small/rec.rten",
         "ppocrv6_small_int8_det.rten" => "ppocrv6-small-int8/det.rten",
@@ -727,6 +741,7 @@ pub fn plan_assets_download<S: AsRef<str>>(assets: &[S], cache_dir: &Path) -> Ve
 
 pub const ALL_MODEL_ASSETS: &[&str] = &[
     "ppocrv6_tiny_det.rten", "ppocrv6_tiny_rec.rten", "ppocrv6_dict.txt",
+    "ppocrv6_tiny_fp16_det.mnn", "ppocrv6_tiny_fp16_rec.mnn",
     "ppocrv6_tiny_int8_det.rten", "ppocrv6_tiny_int8_rec.rten",
     "ppocrv6_small_det.rten", "ppocrv6_small_rec.rten",
     "ppocrv6_small_int8_det.rten", "ppocrv6_small_int8_rec.rten",
@@ -801,5 +816,53 @@ mod tests {
         assert_eq!(plan[1].filename, "ppocrv6_tiny_rec.rten");
         assert_eq!(plan[2].filename, "ppocrv6_dict.txt");
         assert!(!plan[0].urls.is_empty());
+    }
+
+    #[test]
+    fn test_ppocrv6_tiny_fp16_and_int8_assets() {
+        assert_eq!(normalize_model_name(Some("ppocrv6-tiny-fp16")), "ppocrv6-tiny-fp16");
+        assert_eq!(normalize_model_name(Some("tiny-fp16")), "ppocrv6-tiny-fp16");
+        assert_eq!(normalize_model_name(Some("tiny-int8")), "ppocrv6-tiny-int8");
+
+        let temp_dir = std::env::temp_dir().join("rusto_test_models_plan_fp16_int8");
+        let fp16_plan = plan_pipeline_download(Some("tiny-fp16"), None, false, false, false, None, false, &temp_dir);
+        assert_eq!(fp16_plan.len(), 3);
+        assert_eq!(fp16_plan[0].filename, "ppocrv6_tiny_fp16_det.mnn");
+        assert_eq!(fp16_plan[1].filename, "ppocrv6_tiny_fp16_rec.mnn");
+        assert_eq!(fp16_plan[2].filename, "ppocrv6_dict.txt");
+        assert_eq!(resolve_hf_asset_path("ppocrv6_tiny_fp16_det.mnn"), "ppocrv6-tiny-fp16/det.mnn");
+        assert_eq!(resolve_hf_asset_path("ppocrv6_tiny_fp16_rec.mnn"), "ppocrv6-tiny-fp16/rec.mnn");
+
+        let int8_plan = plan_pipeline_download(Some("ppocrv6-tiny-int8"), None, false, false, false, None, false, &temp_dir);
+        assert_eq!(int8_plan[0].filename, "ppocrv6_tiny_int8_det.rten");
+        assert_eq!(int8_plan[1].filename, "ppocrv6_tiny_int8_rec.rten");
+
+        // Ensure int8 / fp16 candidate lookup is not shadowed by the parent ppocrv6_tiny_ prefix.
+        let int8_cands = find_local_repo_candidates("ppocrv6_tiny_int8_det.rten");
+        assert!(int8_cands.iter().any(|p| p == Path::new("models/PPOCR_v6_tiny_int8/det.rten")));
+        assert!(!int8_cands.iter().any(|p| p.starts_with("models/PPOCR_v6_tiny/")));
+
+        let fp16_cands = find_local_repo_candidates("ppocrv6_tiny_fp16_det.mnn");
+        assert!(fp16_cands.iter().any(|p| p == Path::new("models/PPOCR_v6_tiny_fp16/det.mnn")));
+        assert!(!fp16_cands.iter().any(|p| p.starts_with("models/PPOCR_v6_tiny/")));
+    }
+
+    #[test]
+    fn test_ppocrv6_small_and_medium_assets() {
+        let temp_dir = std::env::temp_dir().join("rusto_test_models_plan_small_medium");
+        let small_plan = plan_pipeline_download(Some("ppocrv6-small"), None, false, false, false, None, false, &temp_dir);
+        assert_eq!(small_plan.len(), 3);
+        assert_eq!(small_plan[0].filename, "ppocrv6_small_det.rten");
+        assert_eq!(small_plan[1].filename, "ppocrv6_small_rec.rten");
+        assert_eq!(small_plan[2].filename, "ppocrv6_small_dict.txt");
+        assert_eq!(resolve_hf_asset_path("ppocrv6_small_dict.txt"), "ppocrv6-small/dict.txt");
+
+        let small_cands = find_local_repo_candidates("ppocrv6_small_dict.txt");
+        assert!(small_cands.iter().any(|p| p == Path::new("models/PPOCR_v6_small/dict.txt")));
+
+        let medium_plan = plan_pipeline_download(Some("ppocrv6-medium"), None, false, false, false, None, false, &temp_dir);
+        assert_eq!(medium_plan.len(), 3);
+        assert_eq!(medium_plan[2].filename, "ppocrv6_medium_dict.txt");
+        assert_eq!(resolve_hf_asset_path("ppocrv6_medium_dict.txt"), "ppocrv6-medium/dict.txt");
     }
 }

@@ -39,7 +39,9 @@ https://huggingface.co/byrizki/rusto-models/resolve/main/<folder>/<filename>
 
 ## Model Catalog by Directory
 
-### 1. Indra OCR (`indraocr/`) — Flagship Layout & Multi-Script Engine
+### 1. Indra OCR (`indraocr/`) — DataLab Multi-Script & Layout Engine
+
+> **License Note**: While RustO! integration code is MIT / Apache 2.0, upstream `datalab-to/indra-ocr` model weights are licensed under a **modified OpenRAIL-M license** (free for research, personal use, and startups/organizations under \$20M funding or revenue; non-competitive against Datalab's API). See [datalab-to/indra-ocr](https://huggingface.co/datalab-to/indra-ocr/blob/main/LICENSE). For permissive Apache 2.0 defaults, RustO! uses `ppocrv6-tiny/` (FP32).
 
 | Asset Base | MNN (`.mnn`) | ONNX (`.onnx`) | RTen (`.rten`) | Description |
 |:---|:---:|:---:|:---:|:---|
@@ -63,11 +65,12 @@ https://huggingface.co/byrizki/rusto-models/resolve/main/<folder>/<filename>
 | Folder | Detection Formats | Recognition Formats | Dictionary | Description |
 |:---|:---|:---|:---:|:---|
 | `ppocrv6-tiny/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (27 KB) | PP-OCRv6 Tiny (Default Ultra-lightweight) |
-| `ppocrv6-tiny-int8/` | `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (27 KB) | PP-OCRv6 Tiny INT8 Quantized |
+| `ppocrv6-tiny-fp16/` | `det.mnn`, `det.onnx` | `rec.mnn`, `rec.onnx` | `dict.txt` (27 KB) | PP-OCRv6 Tiny FP16 Half-Precision |
+| `ppocrv6-tiny-int8/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (27 KB) | PP-OCRv6 Tiny INT8 Quantized |
 | `ppocrv6-small/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (74 KB) | PP-OCRv6 Small High-Recall |
-| `ppocrv6-small-int8/` | `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (74 KB) | PP-OCRv6 Small INT8 Quantized |
+| `ppocrv6-small-int8/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (74 KB) | PP-OCRv6 Small INT8 Quantized |
 | `ppocrv6-medium/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (74 KB) | PP-OCRv6 Medium High-Capacity |
-| `ppocrv6-medium-int8/` | `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (74 KB) | PP-OCRv6 Medium INT8 Quantized |
+| `ppocrv6-medium-int8/` | `det.mnn`, `det.onnx`, `det.rten` | `rec.mnn`, `rec.onnx`, `rec.rten` | `dict.txt` (74 KB) | PP-OCRv6 Medium INT8 Quantized |
 
 ### 3. PP-OCRv5 Tiers
 

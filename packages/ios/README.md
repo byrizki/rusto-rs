@@ -4,7 +4,7 @@ Official Swift / iOS XCFramework SDK for **RustO!** — a high-performance, pure
 
 ## Features
 
-- **Zero-Config Indra OCR**: `try RustO.initialize()` uses bundled `det.mnn` (or `det.rten`) / `rec.mnn` (or `rec.rten`) / `dict.txt` resources when present in your app bundle, or automatically downloads and caches the default `indraocr` pipeline from Hugging Face Hub in `Library/Caches/rusto/models`.
+- **Zero-Config PP-OCRv6 Tiny**: `try RustO.initialize()` uses bundled `det.mnn` (or `det.rten`) / `rec.mnn` (or `rec.rten`) / `dict.txt` resources when present in your app bundle, or automatically downloads and caches the default `ppocrv6-tiny` (FP32, Apache 2.0) pipeline from Hugging Face Hub in `Library/Caches/rusto/models`.
 - **Universal XCFramework**: Native `arm64` iOS device and `arm64` / `x86_64` iOS Simulator slices targeting iOS 13.0+.
 - **Document Intelligence**: UVDoc document unwarping (`withAutoUnwarp()`), 4-way orientation detection (`withOrientationDetection()`), semantic layout analysis, and neural reading-order recovery (`withLayoutReading()`).
 - **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, `.asTsv()`, or `.withOutput(...)` into a single `try ...run()` call returning Swift's `DetectTextResult` enum.
@@ -45,7 +45,7 @@ Run `pod install` in your `ios/` directory.
 import RustO
 
 func recognizeInvoice(at imagePath: String) throws {
-    // Uses bundled models if present, otherwise auto-downloads Indra OCR from Hugging Face Hub into Caches/rusto/models
+    // Uses bundled models if present, otherwise auto-downloads PP-OCRv6 Tiny (FP32) from Hugging Face Hub into Caches/rusto/models
     let ocr = try RustO.initialize()
 
     // 1. Structured line-level recognition with unwarping & layout reading order
@@ -83,7 +83,7 @@ Add your model and dictionary files (into the main app target's **Copy Bundle Re
 ```swift
 import RustO
 
-// 1. Default Indra OCR preset (resolves bundled files or auto-downloads)
+// 1. Explicit DataLab Indra OCR preset (resolves bundled files or auto-downloads)
 let indraOcr = try RustO.initializeWithBundledModels(config: .indra())
 
 // 2. Explicit bundled filenames in Bundle.main or RustoModels.bundle
@@ -104,7 +104,7 @@ let multiLangOcr = try RustO.initializeWithBundledModels(
 Pre-warm the model cache ahead of time if desired:
 
 ```swift
-let cachedFiles = try RustO.downloadModel(model: "indraocr", lang: "latin")
+let cachedFiles = try RustO.downloadModel(model: "ppocrv6-tiny")
 ```
 
 ## `UIImage`, `CGImage`, `Data`, & Raw RGB8 Input

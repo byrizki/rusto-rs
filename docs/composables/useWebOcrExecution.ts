@@ -15,6 +15,7 @@ import {
   type OcrConfig,
 } from '../types/ocrConfig';
 import { loadAndInitModel } from '../utils/ocrModelLoader';
+import { isModelSupportedByBackend } from '../utils/ocrReleaseModels';
 import { buildActiveRunConfig, processOcrOutput } from '../utils/ocrResultFormatter';
 
 export interface WebOcrExecutionOptions {
@@ -270,6 +271,12 @@ export function useWebOcrExecution(options: WebOcrExecutionOptions) {
     selectedModel.value = modelId;
     const modelMeta = availableModels.find((m) => m.id === modelId) ?? defaultModel;
     ocrConfig.value.recBatchNum = modelMeta.recommendedBatchSize;
+    let switchedBackendNote = '';
+    if (!isModelSupportedByBackend(modelId, ocrConfig.value.inferenceBackend)) {
+      ocrConfig.value.inferenceBackend = 'rusto-nn';
+      ocrConfig.value.useWebGpu = false;
+      switchedBackendNote = ' · switched engine to rusto-nn';
+    }
     resetResults();
     const isLoaded =
       state.activeLoadedModel.value === modelId &&
@@ -278,7 +285,7 @@ export function useWebOcrExecution(options: WebOcrExecutionOptions) {
     state.status.value = isLoaded ? 'ready' : 'idle';
     state.statusMessage.value = isLoaded
       ? 'Engine Ready'
-      : `${currentModel.value.name} selected (click Run OCR to load)`;
+      : `${currentModel.value.name} selected${switchedBackendNote} (click Run OCR to load)`;
   };
 
   const runOcr = () =>

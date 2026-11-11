@@ -1175,7 +1175,7 @@ public func FfiConverterTypeFrame_lower(_ value: Frame) -> RustBuffer {
  */
 public struct InitializeConfig: Equatable, Hashable {
     /**
-     * Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
+     * Model identifier or directory (e.g. "ppocrv6-tiny", "ppocrv6-tiny-fp16", "ppocrv6-small", "indraocr", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
      */
     public var model: String?
     /**
@@ -1231,7 +1231,7 @@ public struct InitializeConfig: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
-         * Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
+         * Model identifier or directory (e.g. "ppocrv6-tiny", "ppocrv6-tiny-fp16", "ppocrv6-small", "indraocr", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
          */model: String?, 
         /**
          * Base model directory containing det, rec, and dict files.

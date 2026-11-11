@@ -2782,7 +2782,7 @@ class FfiConverterTypeFrame : FfiConverterRustBuffer<Frame>
 /// Engine initialization configuration specifying model paths, preset, and optional extensions.
 /// </summary>
 /// <param name="Model">
-/// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
+/// Model identifier or directory (e.g. "ppocrv6-tiny", "ppocrv6-tiny-fp16", "ppocrv6-small", "indraocr", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
 /// </param>
 /// <param name="ModelPath">
 /// Base model directory containing det, rec, and dict files.
@@ -2822,7 +2822,7 @@ class FfiConverterTypeFrame : FfiConverterRustBuffer<Frame>
 /// </param>
 public record InitializeConfig(
     /// <summary>
-    /// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
+    /// Model identifier or directory (e.g. "ppocrv6-tiny", "ppocrv6-tiny-fp16", "ppocrv6-small", "indraocr", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
     /// </summary>
     string? Model,
     /// <summary>

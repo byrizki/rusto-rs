@@ -310,7 +310,7 @@ pub struct LayoutConfig {
 /// Engine initialization configuration specifying model paths, preset, and optional extensions.
 #[derive(uniffi::Record, Clone, Debug, Default, DeJson, SerJson)]
 pub struct InitializeConfig {
-    /// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
+    /// Model identifier or directory (e.g. "ppocrv6-tiny", "ppocrv6-tiny-fp16", "ppocrv6-small", "indraocr", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
     pub model: Option<String>,
     /// Base model directory containing det, rec, and dict files.
     pub model_path: Option<String>,

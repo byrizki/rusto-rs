@@ -242,7 +242,7 @@ export interface InitializeConfig {
   preset?: 'indra' | 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3';
   /** Alias for preset. */
   template?: 'indra' | 'ppv6' | 'ppv5' | 'ppv4' | 'ppv3';
-  /** Canonical model identifier or name (e.g. 'indraocr' (default), 'ppocrv6-tiny', 'ppocrv6-small', 'ppocrv5', 'ppocrv4'). */
+  /** Canonical model identifier or name (e.g. 'ppocrv6-tiny' (default), 'ppocrv6-tiny-fp16', 'ppocrv6-small', 'indraocr', 'ppocrv5', 'ppocrv4'). */
   model?: string;
   /** Directory path containing det, rec, and dict model files. */
   modelPath?: string;
@@ -337,7 +337,7 @@ export class RustO {
   /**
    * Constructs and initializes a new RustO OCR engine instance.
    *
-   * @param config - Optional initialization options or JSON string. Defaults to Indra OCR (`indraocr`).
+   * @param config - Optional initialization options or JSON string. Defaults to PP-OCRv6 Tiny FP32 (`ppocrv6-tiny`).
    */
   constructor(config?: InitializeConfig | string);
 
@@ -352,7 +352,7 @@ export class RustO {
   /**
    * Downloads model assets for a specific OCR pipeline ahead of time.
    *
-   * @param model - Canonical model name (e.g. 'indraocr', 'ppocrv6-tiny', 'ppocrv5'). Defaults to 'indraocr'.
+   * @param model - Canonical model name (e.g. 'ppocrv6-tiny', 'indraocr', 'ppocrv5'). Defaults to 'ppocrv6-tiny'.
    * @param lang - Optional language identifier (e.g. 'latin', 'cyrillic', 'ar', 'ja').
    * @param cacheDir - Optional custom cache directory.
    * @returns Array of downloaded local file paths.

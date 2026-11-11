@@ -3,40 +3,60 @@ use smallvec::SmallVec;
 
 use crate::error::MnnError;
 use crate::graph::ir::{
-    BinaryParams, FusedActivation, Graph, GridSampleParams, InterpParams, LayerNormParams, MatMulParams, Node, OpKind,
-    PoolParams, PrepackedConv, PrepackedDeconv, ResizeType, UnaryParams,
+    BinaryParams, ConvIntegerParams, FusedActivation, Graph, GridSampleParams, InterpParams, LayerNormParams,
+    MatMulIntegerParams, MatMulParams, Node, OpKind, PoolParams, PrepackedConv, PrepackedDeconv, ResizeType,
+    UnaryParams,
 };
 use crate::kernels::binary::BinaryOpType;
 use crate::kernels::pool::PoolType;
 use crate::kernels::reduction::ReductionOp;
 use crate::kernels::unary::UnaryOpType;
 use crate::schema::PadMode;
-use crate::tensor::{DataType, Tensor, TensorLayout};
+use crate::tensor::{f16_to_f32, DataType, Tensor, TensorLayout};
+
+/// Clamps an ONNX 64-bit integer to `i32` bounds so sentinel slice bounds such
+/// as `i64::MAX` saturate to `i32::MAX` instead of wrapping to `-1`.
+#[inline]
+fn clamp_i64_to_i32(v: i64) -> i32 {
+    v.clamp(i32::MIN as i64, i32::MAX as i64) as i32
+}
 
 fn extract_tensor_proto(tp: &rten_onnx::onnx::TensorProto) -> Tensor {
     let shape: Vec<usize> = tp.dims.iter().map(|&d| d.max(0) as usize).collect();
     let num_elems: usize = shape.iter().product::<usize>().max(1);
+    let dtype = tp.data_type.map(|d| d.0).unwrap_or(1);
 
     if !tp.float_data.is_empty() {
         return Tensor::from_floats(&shape, tp.float_data.clone(), TensorLayout::NCHW);
     }
     if !tp.int32_data.is_empty() {
+        // ONNX stores FLOAT16 raw bit patterns in the low 16 bits of int32_data when raw_data is absent.
+        if dtype == 10 {
+            let floats: Vec<f32> = tp.int32_data.iter().map(|&x| f16_to_f32(x as u16)).collect();
+            return Tensor::from_floats(&shape, floats, TensorLayout::NCHW);
+        }
         return Tensor::from_ints(&shape, tp.int32_data.clone());
     }
     if !tp.int64_data.is_empty() {
-        let ints: Vec<i32> = tp.int64_data.iter().map(|&x| x as i32).collect();
+        let ints: Vec<i32> = tp.int64_data.iter().map(|&x| clamp_i64_to_i32(x)).collect();
         return Tensor::from_ints(&shape, ints);
     }
 
     if let Some(raw) = &tp.raw_data {
         let bytes = raw.borrow();
-        let dtype = tp.data_type.map(|d| d.0).unwrap_or(1);
         if dtype == 1 {
             // FLOAT
             let mut floats = Vec::with_capacity(num_elems);
             for chunk in bytes.chunks_exact(4) {
                 floats.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
             }
+            return Tensor::from_floats(&shape, floats, TensorLayout::NCHW);
+        } else if dtype == 10 {
+            // FLOAT16
+            let floats: Vec<f32> = bytes
+                .chunks_exact(2)
+                .map(|chunk| f16_to_f32(u16::from_le_bytes([chunk[0], chunk[1]])))
+                .collect();
             return Tensor::from_floats(&shape, floats, TensorLayout::NCHW);
         } else if dtype == 6 {
             // INT32
@@ -46,27 +66,83 @@ fn extract_tensor_proto(tp: &rten_onnx::onnx::TensorProto) -> Tensor {
             }
             return Tensor::from_ints(&shape, ints);
         } else if dtype == 7 {
-            // INT64 -> convert to INT32
+            // INT64 -> convert to INT32 with saturation
             let mut ints = Vec::with_capacity(num_elems);
             for chunk in bytes.chunks_exact(8) {
                 let v = i64::from_le_bytes([
                     chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7],
                 ]);
-                ints.push(v as i32);
+                ints.push(clamp_i64_to_i32(v));
             }
             return Tensor::from_ints(&shape, ints);
         } else if dtype == 9 || dtype == 2 {
-            // BOOL or UINT8
-            let floats: Vec<f32> = bytes.iter().map(|&b| b as f32).collect();
-            return Tensor::from_floats(&shape, floats, TensorLayout::NCHW);
+            // BOOL or UINT8: preserve exact unsigned byte values in Int32 for integer ops
+            let ints: Vec<i32> = bytes.iter().map(|&b| b as i32).collect();
+            return Tensor::from_ints(&shape, ints);
         } else if dtype == 3 {
-            // INT8
-            let floats: Vec<f32> = bytes.iter().map(|&b| (b as i8) as f32).collect();
-            return Tensor::from_floats(&shape, floats, TensorLayout::NCHW);
+            // INT8: preserve signed [-128..127] values in Int32 for integer ops
+            let ints: Vec<i32> = bytes.iter().map(|&b| (b as i8) as i32).collect();
+            return Tensor::from_ints(&shape, ints);
         }
     }
 
     Tensor::zeros(&shape, TensorLayout::NCHW)
+}
+
+struct OnnxConvAttrs {
+    stride_h: usize,
+    stride_w: usize,
+    dilate_h: usize,
+    dilate_w: usize,
+    pad_mode: PadMode,
+    pad_x: usize,
+    pad_y: usize,
+    pads: Option<Vec<i32>>,
+    group: usize,
+}
+
+fn parse_onnx_conv_attrs(attrs: &[rten_onnx::onnx::AttributeProto]) -> OnnxConvAttrs {
+    let find_attr = |name: &str| attrs.iter().find(|a| a.name.as_deref() == Some(name));
+    let group = find_attr("group").and_then(|a| a.i).unwrap_or(1).max(1) as usize;
+    let strides = find_attr("strides").map(|a| &a.ints[..]).unwrap_or(&[]);
+    let stride_h = strides.first().copied().unwrap_or(1).max(1) as usize;
+    let stride_w = strides.get(1).copied().unwrap_or(stride_h as i64).max(1) as usize;
+
+    let dilations = find_attr("dilations").map(|a| &a.ints[..]).unwrap_or(&[]);
+    let dilate_h = dilations.first().copied().unwrap_or(1).max(1) as usize;
+    let dilate_w = dilations.get(1).copied().unwrap_or(dilate_h as i64).max(1) as usize;
+
+    let pads = find_attr("pads").map(|a| &a.ints[..]).unwrap_or(&[]);
+    let (pad_y, pad_x) = if pads.len() >= 2 {
+        (pads[0].max(0) as usize, pads[1].max(0) as usize)
+    } else {
+        (0, 0)
+    };
+
+    let auto_pad = find_attr("auto_pad").and_then(|a| a.s.as_deref()).unwrap_or("NOTSET");
+    let pad_mode = match auto_pad {
+        "SAME_UPPER" | "SAME_LOWER" => PadMode::SAME,
+        "VALID" => PadMode::VALID,
+        _ => PadMode::CAFFE,
+    };
+
+    let pads_vec = if !pads.is_empty() {
+        Some(pads.iter().map(|&x| x as i32).collect())
+    } else {
+        None
+    };
+
+    OnnxConvAttrs {
+        stride_h,
+        stride_w,
+        dilate_h,
+        dilate_w,
+        pad_mode,
+        pad_x,
+        pad_y,
+        pads: pads_vec,
+        group,
+    }
 }
 
 pub fn load_onnx(slice: &[u8]) -> Result<Graph, MnnError> {
@@ -100,7 +176,7 @@ pub fn load_onnx(slice: &[u8]) -> Result<Graph, MnnError> {
                         }
                     } else if attr.name.as_deref() == Some("value_int") {
                         if let Some(i) = attr.i {
-                            initializers.insert(out_name.clone(), Tensor::from_ints(&[1], vec![i as i32]));
+                            initializers.insert(out_name.clone(), Tensor::from_ints(&[1], vec![clamp_i64_to_i32(i)]));
                         }
                     } else if attr.name.as_deref() == Some("value_floats") {
                         if !attr.floats.is_empty() {
@@ -108,7 +184,7 @@ pub fn load_onnx(slice: &[u8]) -> Result<Graph, MnnError> {
                         }
                     } else if attr.name.as_deref() == Some("value_ints") {
                         if !attr.ints.is_empty() {
-                            let ints32: Vec<i32> = attr.ints.iter().map(|&x| x as i32).collect();
+                            let ints32: Vec<i32> = attr.ints.iter().map(|&x| clamp_i64_to_i32(x)).collect();
                             initializers.insert(out_name.clone(), Tensor::from_ints(&[ints32.len()], ints32));
                         }
                     }
@@ -191,8 +267,7 @@ pub fn load_onnx(slice: &[u8]) -> Result<Graph, MnnError> {
         // we emit Const nodes for them so they are populated in GraphContext.
         let is_absorbed_op = op_type == "Conv"
             || op_type == "ConvTranspose"
-            || op_type == "BatchNormalization"
-            || op_type == "Clip";
+            || op_type == "BatchNormalization";
 
         let mut in_indices: SmallVec<[usize; 4]> = SmallVec::new();
         for (idx, in_name) in onnx_node.input.iter().enumerate() {
@@ -201,6 +276,9 @@ pub fn load_onnx(slice: &[u8]) -> Result<Graph, MnnError> {
             }
             if is_absorbed_op && idx >= 1 {
                 // Weights/bias/BN params are absorbed directly into the op, skip index binding
+                continue;
+            }
+            if op_type == "Clip" && idx >= 1 && initializers.contains_key(in_name) {
                 continue;
             }
 
@@ -248,54 +326,64 @@ pub fn load_onnx(slice: &[u8]) -> Result<Graph, MnnError> {
                 let group = find_attr("group").and_then(|a| a.i).unwrap_or(1) as usize;
                 let in_channels = in_channels_per_group * group;
                 let is_depthwise = group == in_channels && in_channels == out_channels && in_channels > 1;
-
-                let strides = find_attr("strides").map(|a| &a.ints[..]).unwrap_or(&[]);
-                let stride_h = strides.first().copied().unwrap_or(1).max(1) as usize;
-                let stride_w = strides.get(1).copied().unwrap_or(stride_h as i64).max(1) as usize;
-
-                let dilations = find_attr("dilations").map(|a| &a.ints[..]).unwrap_or(&[]);
-                let dilate_h = dilations.first().copied().unwrap_or(1).max(1) as usize;
-                let dilate_w = dilations.get(1).copied().unwrap_or(dilate_h as i64).max(1) as usize;
-
-                let pads = find_attr("pads").map(|a| &a.ints[..]).unwrap_or(&[]);
-                let (pad_y, pad_x) = if pads.len() >= 4 {
-                    (pads[0].max(0) as usize, pads[1].max(0) as usize)
-                } else if pads.len() >= 2 {
-                    (pads[0].max(0) as usize, pads[1].max(0) as usize)
-                } else {
-                    (0, 0)
-                };
-
-                let auto_pad = find_attr("auto_pad").and_then(|a| a.s.as_deref()).unwrap_or("NOTSET");
-                let pad_mode = match auto_pad {
-                    "SAME_UPPER" | "SAME_LOWER" => PadMode::SAME,
-                    "VALID" => PadMode::VALID,
-                    _ => PadMode::CAFFE,
-                };
-
-                let pads_vec = if !pads.is_empty() {
-                    Some(pads.iter().map(|&x| x as i32).collect())
-                } else {
-                    None
-                };
+                let attrs = parse_onnx_conv_attrs(&onnx_node.attribute);
 
                 OpKind::Conv(PrepackedConv {
                     weight: weight_vec,
                     bias: bias_vec,
                     kernel_h: kh,
                     kernel_w: kw,
-                    stride_h,
-                    stride_w,
-                    dilate_h,
-                    dilate_w,
-                    pad_mode,
-                    pad_x,
-                    pad_y,
-                    pads: pads_vec,
-                    group,
+                    stride_h: attrs.stride_h,
+                    stride_w: attrs.stride_w,
+                    dilate_h: attrs.dilate_h,
+                    dilate_w: attrs.dilate_w,
+                    pad_mode: attrs.pad_mode,
+                    pad_x: attrs.pad_x,
+                    pad_y: attrs.pad_y,
+                    pads: attrs.pads,
+                    group: attrs.group,
                     out_channels,
                     activation: FusedActivation::None,
                     is_depthwise,
+                })
+            }
+
+            "ConvInteger" => {
+                let attrs = parse_onnx_conv_attrs(&onnx_node.attribute);
+                let kshape = find_attr("kernel_shape").map(|a| &a.ints[..]).unwrap_or(&[]);
+                let w_shape = onnx_node
+                    .input
+                    .get(1)
+                    .and_then(|name| initializers.get(name.as_str()))
+                    .map(|t| t.shape())
+                    .unwrap_or(&[]);
+                let kh = kshape
+                    .first()
+                    .map(|&v| v.max(1) as usize)
+                    .or_else(|| w_shape.get(2).copied())
+                    .unwrap_or(1);
+                let kw = kshape
+                    .get(1)
+                    .map(|&v| v.max(1) as usize)
+                    .or_else(|| w_shape.get(3).copied())
+                    .unwrap_or(1);
+                let has_x_zp = onnx_node.input.get(2).is_some_and(|s| !s.is_empty());
+                let has_w_zp = onnx_node.input.get(3).is_some_and(|s| !s.is_empty());
+
+                OpKind::ConvInteger(ConvIntegerParams {
+                    kernel_h: kh,
+                    kernel_w: kw,
+                    stride_h: attrs.stride_h,
+                    stride_w: attrs.stride_w,
+                    dilate_h: attrs.dilate_h,
+                    dilate_w: attrs.dilate_w,
+                    pad_mode: attrs.pad_mode,
+                    pad_x: attrs.pad_x,
+                    pad_y: attrs.pad_y,
+                    pads: attrs.pads,
+                    group: attrs.group,
+                    has_x_zp,
+                    has_w_zp,
                 })
             }
 
@@ -413,24 +501,37 @@ pub fn load_onnx(slice: &[u8]) -> Result<Graph, MnnError> {
             "Clip" => {
                 let mut min_val = f32::NEG_INFINITY;
                 let mut max_val = f32::INFINITY;
+                let mut has_min_input = false;
+                let mut has_max_input = false;
 
                 if let Some(min_attr) = find_attr("min").and_then(|a| a.f) {
                     min_val = min_attr;
-                } else if let Some(min_name) = onnx_node.input.get(1) {
+                } else if let Some(min_name) = onnx_node.input.get(1).filter(|s| !s.is_empty()) {
                     if let Some(t) = initializers.get(min_name) {
                         min_val = t.to_f32_vec().first().copied().unwrap_or(min_val);
+                    } else {
+                        has_min_input = true;
                     }
                 }
 
                 if let Some(max_attr) = find_attr("max").and_then(|a| a.f) {
                     max_val = max_attr;
-                } else if let Some(max_name) = onnx_node.input.get(2) {
+                } else if let Some(max_name) = onnx_node.input.get(2).filter(|s| !s.is_empty()) {
                     if let Some(t) = initializers.get(max_name) {
                         max_val = t.to_f32_vec().first().copied().unwrap_or(max_val);
+                    } else {
+                        has_max_input = true;
                     }
                 }
 
-                if min_val == 0.0 && max_val == 6.0 {
+                if has_min_input || has_max_input {
+                    OpKind::Clip {
+                        min_val,
+                        max_val,
+                        has_min_input,
+                        has_max_input,
+                    }
+                } else if min_val == 0.0 && max_val == 6.0 {
                     OpKind::Relu6 { min_val: 0.0, max_val: 6.0 }
                 } else {
                     OpKind::Unary(UnaryParams {
@@ -778,8 +879,8 @@ pub fn load_onnx(slice: &[u8]) -> Result<Graph, MnnError> {
             }
 
             "Slice" => {
-                let starts = find_attr("starts").map(|a| a.ints.iter().map(|&x| x as i32).collect());
-                let ends = find_attr("ends").map(|a| a.ints.iter().map(|&x| x as i32).collect());
+                let starts = find_attr("starts").map(|a| a.ints.iter().map(|&x| clamp_i64_to_i32(x)).collect());
+                let ends = find_attr("ends").map(|a| a.ints.iter().map(|&x| clamp_i64_to_i32(x)).collect());
                 let axes = find_attr("axes").map(|a| a.ints.iter().map(|&x| x as i32).collect());
                 let steps = find_attr("steps").map(|a| a.ints.iter().map(|&x| x as i32).collect());
                 OpKind::StridedSlice {
@@ -855,9 +956,23 @@ pub fn load_onnx(slice: &[u8]) -> Result<Graph, MnnError> {
                 OpKind::Gather { axis }
             }
 
-            "Cast" => OpKind::Cast {
-                dst_type: DataType::Float,
-            },
+            "Cast" => {
+                let dst_type = match find_attr("to").and_then(|a| a.i).unwrap_or(1) {
+                    2 => DataType::UInt8,
+                    3 => DataType::Int8,
+                    6 | 7 => DataType::Int32,
+                    _ => DataType::Float,
+                };
+                OpKind::Cast { dst_type }
+            }
+
+            "DynamicQuantizeLinear" => OpKind::DynamicQuant { signed: false },
+
+            "MatMulInteger" => {
+                let has_a_zp = onnx_node.input.get(2).is_some_and(|s| !s.is_empty());
+                let has_b_zp = onnx_node.input.get(3).is_some_and(|s| !s.is_empty());
+                OpKind::MatMulInteger(MatMulIntegerParams { has_a_zp, has_b_zp })
+            }
 
             "Where" => OpKind::Select,
 
@@ -990,13 +1105,15 @@ pub fn load_onnx(slice: &[u8]) -> Result<Graph, MnnError> {
             }
 
             "ConstantOfShape" => {
-                let val = if let Some(tp) = find_attr("value").and_then(|a| a.t.as_ref()) {
+                let (value, int_value) = if let Some(tp) = find_attr("value").and_then(|a| a.t.as_ref()) {
                     let val_t = extract_tensor_proto(tp);
-                    val_t.to_f32_vec().first().copied().unwrap_or(0.0)
+                    let f = val_t.to_f32_vec().first().copied().unwrap_or(0.0);
+                    let i = val_t.as_ints().and_then(|v| v.first().copied());
+                    (f, i)
                 } else {
-                    0.0
+                    (0.0, None)
                 };
-                OpKind::ConstantOfShape { value: val }
+                OpKind::ConstantOfShape { value, int_value }
             }
 
             "Expand" => OpKind::Expand,

@@ -4,7 +4,7 @@ Official Kotlin / Android AAR bindings for **RustO!** — a high-performance, pu
 
 ## Features
 
-- **Zero-Config Indra OCR**: `RustO.initialize(context)` automatically downloads and caches the default `indraocr` pipeline from Hugging Face Hub in `context.cacheDir/rusto/models` — or extracts bundled `det.mnn` (or `det.rten`) / `rec.mnn` (or `rec.rten`) / `dict.txt` from APK `assets/` when present.
+- **Zero-Config PP-OCRv6 Tiny**: `RustO.initialize(context)` automatically downloads and caches the default `ppocrv6-tiny` (FP32, Apache 2.0) pipeline from Hugging Face Hub in `context.cacheDir/rusto/models` — or extracts bundled `det.mnn` (or `det.rten`) / `rec.mnn` (or `rec.rten`) / `dict.txt` from APK `assets/` when present.
 - **Native Prebuilt JNI Slices**: Ships precompiled `librusto.so` binaries inside the AAR (`arm64-v8a`, `armeabi-v7a`, `x86_64`) for Android API 21+.
 - **Document Intelligence**: UVDoc 3D unwarping (`withAutoUnwarp()`), 4-way page orientation correction (`withOrientationDetection()`), semantic layout analysis, and neural reading-order recovery (`withLayoutReading()`).
 - **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, `.asTsv()`, or `.withOutput(...)` into a single `.run()` call returning a sealed `DetectTextResult`.
@@ -89,7 +89,7 @@ suspend fun scanInvoice(context: Context, imagePathOrContentUri: String) =
 import com.byrizki.rusto.InitializeConfig
 import com.byrizki.rusto.RustO
 
-// Default high-accuracy Indra OCR preset
+// Optional DataLab Indra OCR preset
 val indraOcr = RustO.initialize(context, InitializeConfig.indra())
 
 // Lightweight PP-OCRv6 Tiny preset (auto-downloaded if not cached)
@@ -118,8 +118,8 @@ You can also pre-download models ahead of time:
 
 ```kotlin
 val downloadedPaths = RustO.downloadModel(
-    model = "indraocr",
-    lang = "latin",
+    model = "ppocrv6-tiny",
+    lang = null,
     cacheDir = context.cacheDir.resolve("rusto/models").absolutePath,
 )
 ```

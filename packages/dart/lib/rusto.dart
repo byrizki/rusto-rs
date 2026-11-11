@@ -121,7 +121,7 @@ class RustO {
   }
 
   /// Initialize engine with optional JSON config string or structured InitializeConfig.
-  /// Defaults to '{}' (IndraOCR auto-download).
+  /// Defaults to '{}' (PP-OCRv6 Tiny FP32 auto-download).
   static RustO initialize([dynamic config = '{}', Object? bindings]) {
     _initBindingsIfNeeded();
     if (config == null) {

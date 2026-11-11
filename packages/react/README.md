@@ -1,12 +1,12 @@
 # @rustors/react
 
-Official React hooks, context provider, and UI components for **RustO!** — client-side WebAssembly OCR powered by [`@rustors/web`](../web/README.md), Indra OCR, and PaddleOCR.
+Official React hooks, context provider, and UI components for **RustO!** — client-side WebAssembly OCR powered by [`@rustors/web`](../web/README.md), PaddleOCR, and Indra OCR.
 
 ## Features
 
 - **Zero-Backend Privacy**: Runs OCR in the browser via WebAssembly + Web Workers (`@rustors/web`).
 - **Standalone Model URLs**: Load model files directly from `public/models/`, your CDN, or Hugging Face Hub (`byrizki/rusto-models`) — no npm model wrapper packages required.
-- **Indra OCR & PP-OCRv6 Presets**: Supports `'indra'` alongside `'ppv6'`, `'ppv5'`, `'ppv4'`, and `'ppv3'`, plus optional `unwarp`, `orientation`, `layout`, and `order` models.
+- **PP-OCRv6 & Indra OCR Presets**: Supports `'ppv6'` (default PP-OCRv6 Tiny FP32), `'ppv5'`, `'ppv4'`, `'ppv3'`, and `'indra'`, plus optional `unwarp`, `orientation`, `layout`, and `order` models.
 - **Hooks & Ready-Made Components**: `<RustoProvider>`, `useOcr()`, `useRusto()`, `<OcrDropzone>`, `<OcrOverlay>`, and direct fluent `DetectTextBuilder` access (`.asLines().run()`, `.asWords().run()`, `.asSpatial().run()`).
 
 ## Installation
@@ -30,17 +30,17 @@ export function App() {
   return (
     <RustoProvider
       config={{
-        preset: 'indra', // or 'ppv6' for lightweight PP-OCRv6 Tiny
+        preset: 'ppv6', // or 'indra' (DataLab Indra OCR, modified OpenRAIL-M weights)
         enableReadingOrder: true,
         models: {
-          detection: `${HF_BASE}/indra_det.rten`,
-          recognition: `${HF_BASE}/indra_rec.rten`,
-          dictionary: `${HF_BASE}/indra_meta.json`,
+          detection: `${HF_BASE}/ppocrv6-tiny/det.rten`,
+          recognition: `${HF_BASE}/ppocrv6-tiny/rec.rten`,
+          dictionary: `${HF_BASE}/ppocrv6-tiny/dict.txt`,
           // Optional auxiliary document models:
-          unwarp: `${HF_BASE}/uvdoc.rten`,
-          orientation: `${HF_BASE}/indra_orient.rten`,
-          layout: `${HF_BASE}/layout_cdla.rten`,
-          order: `${HF_BASE}/indra_order.rten`,
+          unwarp: `${HF_BASE}/modules/uvdoc.rten`,
+          orientation: `${HF_BASE}/modules/orient.rten`,
+          layout: `${HF_BASE}/modules/layout_cdla.rten`,
+          order: `${HF_BASE}/indraocr/order.rten`,
         },
       }}
     >

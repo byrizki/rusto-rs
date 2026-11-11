@@ -8,7 +8,7 @@
 
 ## Strategy 1: Zero-Config On-Demand Download (Recommended Default)
 
-Calling `await initialize()` with no file paths automatically downloads and caches the default **Indra OCR** (`indraocr`) `.rten` assets on first run:
+Calling `await initialize()` with no file paths automatically downloads and caches the default **PP-OCRv6 Tiny (FP32)** (`ppocrv6-tiny`) assets on first run:
 
 - **Android cache location**: `<context.cacheDir>/rusto/models`
 - **iOS cache location**: `<Library/Caches>/rusto/models`
@@ -18,12 +18,12 @@ Subsequent app launches load directly from the on-device cache with zero network
 ```ts
 import { close, detectText, initialize } from '@rustors/react-native';
 
-// Default high-accuracy Indra OCR pipeline
+// Default PP-OCRv6 Tiny (FP32) pipeline
 await initialize();
 
-// Or select lightweight PP-OCRv6 Tiny for minimal download size (~8 MB total)
+// Or explicitly select DataLab Indra OCR (note: modified OpenRAIL-M weights)
 await initialize({
-  model: 'ppocrv6-tiny',
+  model: 'indraocr',
   lang: 'latin',
 });
 

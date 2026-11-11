@@ -2,11 +2,11 @@
 use crate::par::prelude::*;
 
 /// Permute (transpose) multidimensional tensor
-pub fn permute(
-    input: &[f32],
+pub fn permute<T: Copy + Send + Sync>(
+    input: &[T],
     in_shape: &[usize],
     perm: &[usize],
-    output: &mut [f32],
+    output: &mut [T],
 ) {
     let ndim = in_shape.len();
     assert_eq!(ndim, perm.len());
@@ -22,7 +22,7 @@ pub fn permute(
         let hw = h * w;
         let hw_c = hw * c;
 
-        let process_batch = |b: usize, out_b: &mut [f32]| {
+        let process_batch = |b: usize, out_b: &mut [T]| {
             let in_b = &input[b * hw_c..(b + 1) * hw_c];
             for ch in 0..c {
                 let in_ch = &in_b[ch * hw..(ch + 1) * hw];
@@ -58,7 +58,7 @@ pub fn permute(
         };
         let rc = rows * cols;
 
-        let process_matrix = |b: usize, out_b: &mut [f32]| {
+        let process_matrix = |b: usize, out_b: &mut [T]| {
             let in_b = &input[b * rc..(b + 1) * rc];
             for r in 0..rows {
                 let in_row = &in_b[r * cols..(r + 1) * cols];
@@ -119,10 +119,10 @@ pub fn permute(
 }
 
 /// Concatenate multiple tensors along specified axis
-pub fn concat(
-    inputs: &[(&[f32], &[usize])],
+pub fn concat<T: Copy + Send + Sync>(
+    inputs: &[(&[T], &[usize])],
     axis: usize,
-    output: &mut [f32],
+    output: &mut [T],
 ) {
     if inputs.is_empty() {
         return;
@@ -149,7 +149,7 @@ pub fn concat(
             && inputs.len() >= 2
         {
             let mut rem = &mut output[..out_stride_outer];
-            let mut slices: Vec<(&[f32], &mut [f32])> = Vec::with_capacity(inputs.len());
+            let mut slices: Vec<(&[T], &mut [T])> = Vec::with_capacity(inputs.len());
             for (data, shape) in inputs {
                 let len = shape[axis] * inner_size;
                 let (head, tail) = rem.split_at_mut(len);
@@ -181,14 +181,14 @@ pub fn concat(
     }
 }
 
-fn copy_strided_nd(
-    input: &[f32],
+fn copy_strided_nd<T: Copy>(
+    input: &[T],
     in_shape: &[usize],
     actual_begins: &[usize],
     actual_steps: &[usize],
     out_shape: &[usize],
     out_len: usize,
-    output: &mut [f32],
+    output: &mut [T],
 ) {
     let ndim = in_shape.len();
     if out_len == 0 || input.is_empty() {
@@ -280,12 +280,12 @@ fn copy_strided_nd(
 }
 
 /// TensorFlow-style Slice: begins and sizes
-pub fn slice_tf(
-    input: &[f32],
+pub fn slice_tf<T: Copy>(
+    input: &[T],
     in_shape: &[usize],
     begins: &[usize],
     sizes: &[usize],
-    output: &mut [f32],
+    output: &mut [T],
 ) {
     let ndim = in_shape.len();
     assert_eq!(ndim, begins.len());
@@ -355,11 +355,11 @@ pub fn scatter_nd(
 }
 
 /// Broadcast / expand a tensor to a target shape
-pub fn expand(
-    input: &[f32],
+pub fn expand<T: Copy>(
+    input: &[T],
     in_shape: &[usize],
     target_shape: &[usize],
-    output: &mut [f32],
+    output: &mut [T],
 ) -> Vec<usize> {
     let out_ndim = target_shape.len();
     let in_ndim = in_shape.len();
@@ -416,14 +416,14 @@ pub fn expand(
 }
 
 /// Strided slice along arbitrary dimensions
-pub fn strided_slice(
-    input: &[f32],
+pub fn strided_slice<T: Copy + Default>(
+    input: &[T],
     in_shape: &[usize],
     begins: &[i32],
     ends: &[i32],
     strides: &[i32],
     out_shape: &mut Vec<usize>,
-    output: &mut Vec<f32>,
+    output: &mut Vec<T>,
 ) {
     let ndim = in_shape.len();
     out_shape.clear();
@@ -468,7 +468,7 @@ pub fn strided_slice(
 
     let out_len = out_shape.iter().product::<usize>();
     output.clear();
-    output.resize(out_len, 0.0);
+    output.resize(out_len, T::default());
 
     copy_strided_nd(
         input,
@@ -482,14 +482,14 @@ pub fn strided_slice(
 }
 
 /// Gather slices along specified axis
-pub fn gather(
-    input: &[f32],
+pub fn gather<T: Copy + Default>(
+    input: &[T],
     in_shape: &[usize],
     indices: &[i32],
     indices_shape: &[usize],
     axis: usize,
     out_shape: &mut Vec<usize>,
-    output: &mut Vec<f32>,
+    output: &mut Vec<T>,
 ) {
     let ndim = in_shape.len();
     assert!(axis < ndim);
@@ -506,7 +506,7 @@ pub fn gather(
     let num_indices = indices.len();
     let out_len = outer_size * num_indices * inner_size;
     output.clear();
-    output.resize(out_len, 0.0);
+    output.resize(out_len, T::default());
 
     for outer in 0..outer_size {
         for (i, &idx) in indices.iter().enumerate() {

@@ -402,6 +402,7 @@ pub fn softmax_inplace_row(row: &mut [f32]) {
             return;
         }
     }
+    #[allow(unreachable_code)]
     softmax_row_scalar_inplace(row);
 }
 

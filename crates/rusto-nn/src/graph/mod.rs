@@ -1,19 +1,23 @@
 use crate::error::MnnError;
-use crate::kernels::activation::apply_activation_slice;
-use crate::kernels::binary::{binary_op, try_binary_op_inplace_lhs};
+use crate::kernels::activation::{apply_activation_i32, apply_activation_slice};
+use crate::kernels::binary::{binary_op, binary_op_i32, try_binary_op_inplace_lhs};
 use crate::kernels::classification::{argmax, log_softmax, softmax, topk};
 use crate::kernels::conv::{conv2d, conv2d_output_dims, Conv2dConfig};
 use crate::kernels::deconv::{deconv2d, deconv2d_output_dims, Deconv2dConfig};
 use crate::kernels::depthwise::{depthwise_conv2d_nchw, depthwise_conv2d_output_dims, DepthwiseConv2dConfig};
 use crate::kernels::interp::{interp2d, InterpConfig};
 use crate::kernels::pool::{pool2d, pool2d_output_dims, Pool2dConfig};
+use crate::kernels::quant::{
+    conv_int8_postprocess, conv_integer_accumulate_i32, dynamic_quantize_f32, float_to_int8_nchw, int8_to_float_nchw,
+    matmul_integer_i32, ConvIntConfig,
+};
 use crate::kernels::reduction::reduce;
 use crate::kernels::tensor_ops::{
     compute_reshape_dims, concat, gather, grid_sample_2d, pad_tensor, permute, slice_tf, strided_slice,
 };
 use crate::kernels::unary::unary_op;
 use crate::schema::{BorderMode, Op, SampleMode};
-use crate::tensor::{Tensor, TensorLayout};
+use crate::tensor::{DataType, Tensor, TensorLayout};
 
 pub mod ir;
 pub mod loader;
@@ -282,6 +286,238 @@ impl GraphContext {
             return None;
         }
         self.tensors[tid].take()?.into_owned_floats()
+    }
+}
+
+#[inline(always)]
+fn eval_unary_i32(op: crate::kernels::unary::UnaryOpType, x: i32) -> Option<i32> {
+    use crate::kernels::unary::UnaryOpType;
+    match op {
+        UnaryOpType::Identity | UnaryOpType::Floor | UnaryOpType::Ceil | UnaryOpType::Round => Some(x),
+        UnaryOpType::Abs => Some(x.wrapping_abs()),
+        UnaryOpType::Neg => Some(x.wrapping_neg()),
+        UnaryOpType::Square => Some(x.wrapping_mul(x)),
+        UnaryOpType::Sign => Some(x.signum()),
+        UnaryOpType::Not => Some(i32::from(x == 0)),
+        _ => None,
+    }
+}
+
+fn exec_clip_float(
+    ctx: &mut GraphContext,
+    in_tid: usize,
+    out_idx: usize,
+    op_idx: usize,
+    last_use: Option<&[usize]>,
+    min_val: f32,
+    max_val: f32,
+) -> Result<(), MnnError> {
+    let (in_shape, in_layout) = {
+        let t = ctx.get_tensor(in_tid)?;
+        (t.shape().to_vec(), t.layout())
+    };
+    let mut out_data = if let Some(buf) = ctx.take_unique_dead_float_buffer(in_tid, op_idx, last_use) {
+        buf
+    } else {
+        let in_floats = ctx.get_tensor(in_tid)?.as_f32_cow();
+        let mut buf = alloc_tensor_buffer_overwrite(in_floats.len());
+        buf.copy_from_slice(&in_floats);
+        buf
+    };
+    if min_val == 0.0 && max_val == 6.0 {
+        apply_activation_slice(&mut out_data, FusedActivation::Relu6);
+    } else {
+        for v in &mut out_data {
+            *v = v.max(min_val).min(max_val);
+        }
+    }
+    ctx.set_tensor(out_idx, Tensor::from_floats(&in_shape, out_data, in_layout));
+    Ok(())
+}
+
+fn split_slice_data<T: Copy + Default>(
+    in_data: &[T],
+    in_shape: &[usize],
+    actual_axis: usize,
+    split_sizes: &[usize],
+    out_indices: &[usize],
+    mut build_tensor: impl FnMut(Vec<usize>, Vec<T>) -> Tensor,
+    ctx: &mut GraphContext,
+) {
+    let outside: usize = in_shape[..actual_axis].iter().product();
+    let inside: usize = in_shape[actual_axis + 1..].iter().product();
+    let axis_len = in_shape[actual_axis];
+
+    let mut offset = 0;
+    for (i, &out_idx) in out_indices.iter().enumerate() {
+        let cur_size = split_sizes.get(i).copied().unwrap_or(0);
+        let mut out_shape = in_shape.to_vec();
+        out_shape[actual_axis] = cur_size;
+
+        let out_len = outside * cur_size * inside;
+        let mut out_data = vec![T::default(); out_len];
+
+        for o in 0..outside {
+            for a in 0..cur_size {
+                let src_a = offset + a;
+                let src_idx = (o * axis_len + src_a) * inside;
+                let dst_idx = (o * cur_size + a) * inside;
+                out_data[dst_idx..dst_idx + inside]
+                    .copy_from_slice(&in_data[src_idx..src_idx + inside]);
+            }
+        }
+
+        offset += cur_size;
+        ctx.set_tensor(out_idx, build_tensor(out_shape, out_data));
+    }
+}
+
+enum SelectCond<'a> {
+    Int(&'a [i32]),
+    Float(&'a [f32]),
+}
+
+impl<'a> SelectCond<'a> {
+    #[inline(always)]
+    fn len(&self) -> usize {
+        match self {
+            Self::Int(s) => s.len(),
+            Self::Float(s) => s.len(),
+        }
+    }
+
+    #[inline(always)]
+    fn is_true(&self, idx: usize) -> bool {
+        match self {
+            Self::Int(s) => s.get(idx).copied().unwrap_or(0) != 0,
+            Self::Float(s) => s.get(idx).copied().unwrap_or(0.0) != 0.0,
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn select_slice<T: Copy + Default>(
+    cond: SelectCond<'_>,
+    cond_shape: &[usize],
+    true_data: &[T],
+    t_shape: &[usize],
+    false_data: &[T],
+    f_shape: &[usize],
+    out_shape: &[usize],
+    out_data: &mut [T],
+) {
+    let ndim = out_shape.len();
+    let total_len = out_data.len();
+
+    let t_is_scalar = true_data.len() == 1;
+    let f_is_scalar = false_data.len() == 1;
+    let t_matches = true_data.len() == total_len;
+    let f_matches = false_data.len() == total_len;
+
+    if (t_matches || t_is_scalar) && (f_matches || f_is_scalar) {
+        let cond_pad = ndim - cond_shape.len();
+        let leading_ones = out_shape[..cond_pad].iter().all(|&d| d == 1);
+        if leading_ones {
+            let mut prefix_end = cond_shape.len();
+            while prefix_end > 0 && cond_shape[prefix_end - 1] == 1 {
+                prefix_end -= 1;
+            }
+            let prefix_matches = (0..prefix_end).all(|d| cond_shape[d] == out_shape[cond_pad + d]);
+            if prefix_matches {
+                let outer = cond.len();
+                let inner = total_len / outer.max(1);
+                if outer * inner == total_len {
+                    if inner == 1 {
+                        match (t_is_scalar, f_is_scalar) {
+                            (false, false) => {
+                                for i in 0..total_len {
+                                    out_data[i] = if cond.is_true(i) { true_data[i] } else { false_data[i] };
+                                }
+                            }
+                            (true, false) => {
+                                let tv = true_data[0];
+                                for i in 0..total_len {
+                                    out_data[i] = if cond.is_true(i) { tv } else { false_data[i] };
+                                }
+                            }
+                            (false, true) => {
+                                let fv = false_data[0];
+                                for i in 0..total_len {
+                                    out_data[i] = if cond.is_true(i) { true_data[i] } else { fv };
+                                }
+                            }
+                            (true, true) => {
+                                let tv = true_data[0];
+                                let fv = false_data[0];
+                                for i in 0..total_len {
+                                    out_data[i] = if cond.is_true(i) { tv } else { fv };
+                                }
+                            }
+                        }
+                    } else {
+                        for o in 0..outer {
+                            let dst = &mut out_data[o * inner..(o + 1) * inner];
+                            if cond.is_true(o) {
+                                if t_is_scalar {
+                                    dst.fill(true_data[0]);
+                                } else {
+                                    dst.copy_from_slice(&true_data[o * inner..(o + 1) * inner]);
+                                }
+                            } else if f_is_scalar {
+                                dst.fill(false_data[0]);
+                            } else {
+                                dst.copy_from_slice(&false_data[o * inner..(o + 1) * inner]);
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    let mut coord = vec![0usize; ndim];
+    for dst in out_data.iter_mut() {
+        let mut c_idx = 0;
+        let mut c_stride = 1;
+        for d in (0..cond_shape.len()).rev() {
+            let out_d = ndim - cond_shape.len() + d;
+            let pos = if cond_shape[d] == 1 { 0 } else { coord[out_d] };
+            c_idx += pos * c_stride;
+            c_stride *= cond_shape[d];
+        }
+
+        let mut t_idx = 0;
+        let mut t_stride = 1;
+        for d in (0..t_shape.len()).rev() {
+            let out_d = ndim - t_shape.len() + d;
+            let pos = if t_shape[d] == 1 { 0 } else { coord[out_d] };
+            t_idx += pos * t_stride;
+            t_stride *= t_shape[d];
+        }
+
+        let mut f_idx = 0;
+        let mut f_stride = 1;
+        for d in (0..f_shape.len()).rev() {
+            let out_d = ndim - f_shape.len() + d;
+            let pos = if f_shape[d] == 1 { 0 } else { coord[out_d] };
+            f_idx += pos * f_stride;
+            f_stride *= f_shape[d];
+        }
+
+        *dst = if cond.is_true(c_idx) {
+            true_data.get(t_idx).copied().unwrap_or_default()
+        } else {
+            false_data.get(f_idx).copied().unwrap_or_default()
+        };
+
+        for d in (0..ndim).rev() {
+            coord[d] += 1;
+            if coord[d] < out_shape[d] {
+                break;
+            }
+            coord[d] = 0;
+        }
     }
 }
 
@@ -573,10 +809,10 @@ pub fn execute_node_with_liveness(
             let rhs_tid = in_indices[1];
             let out_idx = out_indices[0];
 
-            let (lhs_shape, rhs_shape) = {
+            let (lhs_dtype, rhs_dtype, lhs_shape, rhs_shape) = {
                 let lhs = ctx.get_tensor(lhs_tid)?;
                 let rhs = ctx.get_tensor(rhs_tid)?;
-                (lhs.shape().to_vec(), rhs.shape().to_vec())
+                (lhs.dtype(), rhs.dtype(), lhs.shape().to_vec(), rhs.shape().to_vec())
             };
 
             let ndim = lhs_shape.len().max(rhs_shape.len());
@@ -594,6 +830,31 @@ pub fn execute_node_with_liveness(
                 };
 
                 out_shape[d] = l.max(r);
+            }
+
+            if lhs_dtype == DataType::Int32
+                && rhs_dtype == DataType::Int32
+                && p.op_type != crate::kernels::binary::BinaryOpType::MulSilu
+                && apply_activation_i32(0, p.activation).is_some()
+            {
+                let out_len = out_shape.iter().product::<usize>();
+                let mut out_data = vec![0i32; out_len];
+                {
+                    let lhs = ctx.get_tensor(lhs_tid)?;
+                    let rhs = ctx.get_tensor(rhs_tid)?;
+                    binary_op_i32(
+                        &lhs_shape,
+                        lhs.as_ints().unwrap_or(&[]),
+                        &rhs_shape,
+                        rhs.as_ints().unwrap_or(&[]),
+                        &out_shape,
+                        &mut out_data,
+                        p.op_type,
+                        p.activation,
+                    );
+                }
+                ctx.set_tensor(out_idx, Tensor::from_ints(&out_shape, out_data));
+                return Ok(());
             }
 
             if lhs_tid != rhs_tid && lhs_shape == out_shape {
@@ -718,6 +979,23 @@ pub fn execute_node_with_liveness(
             let in_tensor = ctx.get_tensor(in_indices[0])?;
             let out_idx = out_indices[0];
 
+            if in_tensor.dtype() == DataType::Int32
+                && eval_unary_i32(p.op_type, 0).is_some()
+                && apply_activation_i32(0, p.activation).is_some()
+            {
+                let in_ints = in_tensor.as_ints().unwrap_or(&[]);
+                let out_ints: Vec<i32> = in_ints
+                    .iter()
+                    .map(|&v| {
+                        let u = eval_unary_i32(p.op_type, v).unwrap_or(v);
+                        apply_activation_i32(u, p.activation).unwrap_or(u)
+                    })
+                    .collect();
+                let out_tensor = Tensor::from_ints(in_tensor.shape(), out_ints);
+                ctx.set_tensor(out_idx, out_tensor);
+                return Ok(());
+            }
+
             let in_floats = in_tensor.as_f32_cow();
             let mut out_data = alloc_tensor_buffer_overwrite(in_floats.len());
             unary_op(&in_floats, &mut out_data, p.op_type);
@@ -736,6 +1014,16 @@ pub fn execute_node_with_liveness(
             }
             let in_tid = in_indices[0];
             let out_idx = out_indices[0];
+            {
+                let t = ctx.get_tensor(in_tid)?;
+                if t.dtype() == DataType::Int32 && *slope == 0.0 {
+                    let out_ints: Vec<i32> =
+                        t.as_ints().unwrap_or(&[]).iter().map(|&v| v.max(0)).collect();
+                    let out_shape = t.shape().to_vec();
+                    ctx.set_tensor(out_idx, Tensor::from_ints(&out_shape, out_ints));
+                    return Ok(());
+                }
+            }
             let (in_shape, in_layout) = {
                 let t = ctx.get_tensor(in_tid)?;
                 (t.shape().to_vec(), t.layout())
@@ -771,31 +1059,97 @@ pub fn execute_node_with_liveness(
             }
             let in_tid = in_indices[0];
             let out_idx = out_indices[0];
-            let (in_shape, in_layout) = {
-                let t = ctx.get_tensor(in_tid)?;
-                (t.shape().to_vec(), t.layout())
-            };
-
-            let mut out_data = if let Some(buf) =
-                ctx.take_unique_dead_float_buffer(in_tid, op_idx, last_use)
             {
-                buf
-            } else {
-                let in_floats = ctx.get_tensor(in_tid)?.as_f32_cow();
-                let mut buf = alloc_tensor_buffer_overwrite(in_floats.len());
-                buf.copy_from_slice(&in_floats);
-                buf
-            };
-            if *min_val == 0.0 && *max_val == 6.0 {
-                apply_activation_slice(&mut out_data, FusedActivation::Relu6);
-            } else {
-                for v in &mut out_data {
-                    *v = v.max(*min_val).min(*max_val);
+                let t = ctx.get_tensor(in_tid)?;
+                if t.dtype() == DataType::Int32 {
+                    let act = FusedActivation::Clip(*min_val, *max_val);
+                    let out_ints: Vec<i32> = t
+                        .as_ints()
+                        .unwrap_or(&[])
+                        .iter()
+                        .map(|&v| apply_activation_i32(v, act).unwrap_or(v))
+                        .collect();
+                    let out_shape = t.shape().to_vec();
+                    ctx.set_tensor(out_idx, Tensor::from_ints(&out_shape, out_ints));
+                    return Ok(());
                 }
             }
-            let out_tensor = Tensor::from_floats(&in_shape, out_data, in_layout);
-            ctx.set_tensor(out_idx, out_tensor);
-            Ok(())
+            exec_clip_float(ctx, in_tid, out_idx, op_idx, last_use, *min_val, *max_val)
+        }
+
+        OpKind::Clip {
+            min_val,
+            max_val,
+            has_min_input,
+            has_max_input,
+        } => {
+            if in_indices.is_empty() || out_indices.is_empty() {
+                return Ok(());
+            }
+            let in_tid = in_indices[0];
+            let out_idx = out_indices[0];
+            let mut next_idx = 1usize;
+            let min_tid = if *has_min_input {
+                let id = in_indices.get(next_idx).copied();
+                next_idx += 1;
+                id
+            } else {
+                None
+            };
+            let max_tid = if *has_max_input {
+                in_indices.get(next_idx).copied()
+            } else {
+                None
+            };
+
+            let x_dtype = ctx.get_tensor(in_tid)?.dtype();
+            if x_dtype == DataType::Int32 {
+                let min_bound = if let Some(tid) = min_tid {
+                    ctx.get_tensor(tid)?
+                        .to_i32_vec()
+                        .first()
+                        .copied()
+                        .map(|v| v as f64)
+                        .unwrap_or(*min_val as f64)
+                } else {
+                    *min_val as f64
+                };
+                let max_bound = if let Some(tid) = max_tid {
+                    ctx.get_tensor(tid)?
+                        .to_i32_vec()
+                        .first()
+                        .copied()
+                        .map(|v| v as f64)
+                        .unwrap_or(*max_val as f64)
+                } else {
+                    *max_val as f64
+                };
+                let x = ctx.get_tensor(in_tid)?;
+                let out_shape = x.shape().to_vec();
+                let out_ints: Vec<i32> = x
+                    .as_ints()
+                    .unwrap_or(&[])
+                    .iter()
+                    .map(|&v| {
+                        let clamped = (v as f64).max(min_bound).min(max_bound);
+                        clamped.clamp(i32::MIN as f64, i32::MAX as f64) as i32
+                    })
+                    .collect();
+                ctx.set_tensor(out_idx, Tensor::from_ints(&out_shape, out_ints));
+                return Ok(());
+            }
+
+            let min_f = if let Some(tid) = min_tid {
+                ctx.get_tensor(tid)?.to_f32_vec().first().copied().unwrap_or(*min_val)
+            } else {
+                *min_val
+            };
+            let max_f = if let Some(tid) = max_tid {
+                ctx.get_tensor(tid)?.to_f32_vec().first().copied().unwrap_or(*max_val)
+            } else {
+                *max_val
+            };
+            exec_clip_float(ctx, in_tid, out_idx, op_idx, last_use, min_f, max_f)
         }
 
         OpKind::PRelu { slopes } => {
@@ -1020,12 +1374,20 @@ pub fn execute_node_with_liveness(
                 dims
             };
 
-            let in_floats = in_tensor.as_f32_cow();
+            let out_shape: Vec<usize> = effective_dims.iter().map(|&d| in_shape[d]).collect();
             let total_elems: usize = in_shape.iter().product();
+            if in_tensor.dtype() == DataType::Int32 {
+                let in_ints = in_tensor.as_ints().unwrap_or(&[]);
+                let mut out_data = vec![0i32; total_elems.max(in_ints.len())];
+                permute(in_ints, in_shape, effective_dims, &mut out_data);
+                ctx.set_tensor(out_idx, Tensor::from_ints(&out_shape, out_data));
+                return Ok(());
+            }
+
+            let in_floats = in_tensor.as_f32_cow();
             let mut out_data = alloc_tensor_buffer(total_elems.max(in_floats.len()));
             permute(&in_floats, in_shape, effective_dims, &mut out_data);
 
-            let out_shape: Vec<usize> = effective_dims.iter().map(|&d| in_shape[d]).collect();
             let out_tensor = Tensor::from_floats(&out_shape, out_data, TensorLayout::NCHW);
             ctx.set_tensor(out_idx, out_tensor);
             Ok(())
@@ -1038,8 +1400,13 @@ pub fn execute_node_with_liveness(
             let out_idx = out_indices[0];
 
             let mut in_shapes: Vec<Vec<usize>> = Vec::new();
+            let mut all_int32 = true;
             for &idx in in_indices.iter() {
-                in_shapes.push(ctx.get_tensor(idx)?.shape().to_vec());
+                let t = ctx.get_tensor(idx)?;
+                if t.dtype() != DataType::Int32 {
+                    all_int32 = false;
+                }
+                in_shapes.push(t.shape().to_vec());
             }
 
             let rank = in_shapes.first().map(|s| s.len()).unwrap_or(1);
@@ -1062,6 +1429,26 @@ pub fn execute_node_with_liveness(
                 }
             }
 
+            let mut out_shape = in_shapes[0].clone();
+            out_shape[actual_axis] = in_shapes.iter().map(|s| s[actual_axis]).sum();
+            let out_len = out_shape.iter().product::<usize>();
+
+            if all_int32 {
+                let mut int_slices: Vec<&[i32]> = Vec::with_capacity(in_indices.len());
+                for &idx in in_indices.iter() {
+                    int_slices.push(ctx.get_tensor(idx)?.as_ints().unwrap_or(&[]));
+                }
+                let in_data_shapes: Vec<(&[i32], &[usize])> = int_slices
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &s)| (s, in_shapes[i].as_slice()))
+                    .collect();
+                let mut out_data = vec![0i32; out_len];
+                concat(&in_data_shapes, actual_axis, &mut out_data);
+                ctx.set_tensor(out_idx, Tensor::from_ints(&out_shape, out_data));
+                return Ok(());
+            }
+
             let mut flat_buffers = Vec::new();
             for &idx in in_indices.iter() {
                 let t = ctx.get_tensor(idx)?;
@@ -1073,14 +1460,6 @@ pub fn execute_node_with_liveness(
                 in_data_shapes.push((flat_buffers[i].as_ref(), in_shapes[i].as_slice()));
             }
 
-            let mut out_shape = in_data_shapes[0].1.to_vec();
-            let mut axis_sum = 0;
-            for (_, s) in &in_data_shapes {
-                axis_sum += s[actual_axis];
-            }
-            out_shape[actual_axis] = axis_sum;
-
-            let out_len = out_shape.iter().product::<usize>();
             let mut out_data = alloc_tensor_buffer(out_len);
             concat(&in_data_shapes, actual_axis, &mut out_data);
 
@@ -1093,9 +1472,9 @@ pub fn execute_node_with_liveness(
             if in_indices.is_empty() || out_indices.is_empty() {
                 return Ok(());
             }
-            let (in_shape, in_floats) = {
+            let (in_shape, in_dtype) = {
                 let in_t = ctx.get_tensor(in_indices[0])?;
-                (in_t.shape().to_vec(), in_t.to_f32_vec())
+                (in_t.shape().to_vec(), in_t.dtype())
             };
             let ndim = in_shape.len();
             let raw_axis = *axis;
@@ -1127,32 +1506,28 @@ pub fn execute_node_with_liveness(
                 }
             }
 
-            let outside: usize = in_shape[..actual_axis].iter().product();
-            let inside: usize = in_shape[actual_axis + 1..].iter().product();
-            let axis_len = in_shape[actual_axis];
-
-            let mut offset = 0;
-            for (i, &out_idx) in out_indices.iter().enumerate() {
-                let cur_size = split_sizes.get(i).copied().unwrap_or(0);
-                let mut out_shape = in_shape.clone();
-                out_shape[actual_axis] = cur_size;
-
-                let out_len = outside * cur_size * inside;
-                let mut out_data = vec![0.0f32; out_len];
-
-                for o in 0..outside {
-                    for a in 0..cur_size {
-                        let src_a = offset + a;
-                        let src_idx = (o * axis_len + src_a) * inside;
-                        let dst_idx = (o * cur_size + a) * inside;
-                        out_data[dst_idx..dst_idx + inside]
-                            .copy_from_slice(&in_floats[src_idx..src_idx + inside]);
-                    }
-                }
-
-                offset += cur_size;
-                let out_tensor = Tensor::from_floats(&out_shape, out_data, TensorLayout::NCHW);
-                ctx.set_tensor(out_idx, out_tensor);
+            if in_dtype == DataType::Int32 {
+                let in_ints = ctx.get_tensor(in_indices[0])?.to_i32_vec();
+                split_slice_data(
+                    &in_ints,
+                    &in_shape,
+                    actual_axis,
+                    &split_sizes,
+                    out_indices,
+                    |shape, data| Tensor::from_ints(&shape, data),
+                    ctx,
+                );
+            } else {
+                let in_floats = ctx.get_tensor(in_indices[0])?.to_f32_vec();
+                split_slice_data(
+                    &in_floats,
+                    &in_shape,
+                    actual_axis,
+                    &split_sizes,
+                    out_indices,
+                    |shape, data| Tensor::from_floats(&shape, data, TensorLayout::NCHW),
+                    ctx,
+                );
             }
             Ok(())
         }
@@ -1200,8 +1575,16 @@ pub fn execute_node_with_liveness(
                 sizes.push(1);
             }
 
-            let in_floats = in_tensor.as_f32_cow();
             let out_len = sizes.iter().product::<usize>();
+            if in_tensor.dtype() == DataType::Int32 {
+                let in_ints = in_tensor.as_ints().unwrap_or(&[]);
+                let mut out_data = vec![0i32; out_len];
+                slice_tf(in_ints, in_shape, &begins, &sizes, &mut out_data);
+                ctx.set_tensor(out_idx, Tensor::from_ints(&sizes, out_data));
+                return Ok(());
+            }
+
+            let in_floats = in_tensor.as_f32_cow();
             let mut out_data = alloc_tensor_buffer(out_len);
 
             slice_tf(&in_floats, in_shape, &begins, &sizes, &mut out_data);
@@ -1283,8 +1666,24 @@ pub fn execute_node_with_liveness(
                 }
             }
 
-            let in_floats = in_tensor.as_f32_cow();
             let mut out_shape = Vec::new();
+            if in_tensor.dtype() == DataType::Int32 {
+                let in_ints = in_tensor.as_ints().unwrap_or(&[]);
+                let mut out_data = Vec::new();
+                strided_slice(
+                    in_ints,
+                    in_tensor.shape(),
+                    &begins,
+                    &ends,
+                    &strides,
+                    &mut out_shape,
+                    &mut out_data,
+                );
+                ctx.set_tensor(out_idx, Tensor::from_ints(&out_shape, out_data));
+                return Ok(());
+            }
+
+            let in_floats = in_tensor.as_f32_cow();
             let mut out_data = Vec::new();
 
             strided_slice(
@@ -1800,10 +2199,39 @@ pub fn execute_node_with_liveness(
             if in_indices.len() < 3 || out_indices.is_empty() {
                 return Ok(());
             }
-            let start = ctx.get_tensor(in_indices[0])?.to_f32_vec().first().copied().unwrap_or(0.0);
-            let limit = ctx.get_tensor(in_indices[1])?.to_f32_vec().first().copied().unwrap_or(0.0);
-            let delta = ctx.get_tensor(in_indices[2])?.to_f32_vec().first().copied().unwrap_or(1.0);
+            let t0 = ctx.get_tensor(in_indices[0])?;
+            let t1 = ctx.get_tensor(in_indices[1])?;
+            let t2 = ctx.get_tensor(in_indices[2])?;
             let out_idx = out_indices[0];
+
+            if t0.dtype() == DataType::Int32
+                && t1.dtype() == DataType::Int32
+                && t2.dtype() == DataType::Int32
+            {
+                let start = t0.to_i32_vec().first().copied().unwrap_or(0);
+                let limit = t1.to_i32_vec().first().copied().unwrap_or(0);
+                let delta = t2.to_i32_vec().first().copied().unwrap_or(1);
+                let mut values = Vec::new();
+                let mut cur = start;
+                if delta > 0 {
+                    while cur < limit {
+                        values.push(cur);
+                        cur += delta;
+                    }
+                } else if delta < 0 {
+                    while cur > limit {
+                        values.push(cur);
+                        cur += delta;
+                    }
+                }
+                let len = values.len();
+                ctx.set_tensor(out_idx, Tensor::from_ints(&[len], values));
+                return Ok(());
+            }
+
+            let start = t0.to_f32_vec().first().copied().unwrap_or(0.0);
+            let limit = t1.to_f32_vec().first().copied().unwrap_or(0.0);
+            let delta = t2.to_f32_vec().first().copied().unwrap_or(1.0);
 
             let mut values = Vec::new();
             let mut cur = start;
@@ -1825,7 +2253,7 @@ pub fn execute_node_with_liveness(
             Ok(())
         }
 
-        OpKind::ConstantOfShape { value } => {
+        OpKind::ConstantOfShape { value, int_value } => {
             if out_indices.is_empty() {
                 return Ok(());
             }
@@ -1836,15 +2264,31 @@ pub fn execute_node_with_liveness(
             } else {
                 vec![1]
             };
-            let fill_val = if in_indices.len() >= 2 {
-                let val_tensor = ctx.get_tensor(in_indices[1])?;
-                val_tensor.to_f32_vec().first().copied().unwrap_or(*value)
-            } else {
-                *value
-            };
             let out_len: usize = out_shape.iter().product();
-            let out_tensor = Tensor::from_floats(&out_shape, vec![fill_val; out_len], TensorLayout::NCHW);
-            ctx.set_tensor(out_idx, out_tensor);
+            if in_indices.len() >= 2 {
+                let val_tensor = ctx.get_tensor(in_indices[1])?;
+                if val_tensor.dtype() == DataType::Int32 {
+                    let fill = val_tensor
+                        .to_i32_vec()
+                        .first()
+                        .copied()
+                        .unwrap_or(int_value.unwrap_or(0));
+                    ctx.set_tensor(out_idx, Tensor::from_ints(&out_shape, vec![fill; out_len]));
+                } else {
+                    let fill_val = val_tensor.to_f32_vec().first().copied().unwrap_or(*value);
+                    ctx.set_tensor(
+                        out_idx,
+                        Tensor::from_floats(&out_shape, vec![fill_val; out_len], TensorLayout::NCHW),
+                    );
+                }
+            } else if let Some(fill) = int_value {
+                ctx.set_tensor(out_idx, Tensor::from_ints(&out_shape, vec![*fill; out_len]));
+            } else {
+                ctx.set_tensor(
+                    out_idx,
+                    Tensor::from_floats(&out_shape, vec![*value; out_len], TensorLayout::NCHW),
+                );
+            }
             Ok(())
         }
 
@@ -1862,7 +2306,6 @@ pub fn execute_node_with_liveness(
                 .map(|&x| x.max(1) as usize)
                 .collect();
 
-            let in_floats = in_tensor.as_f32_cow();
             let max_ndim = target_shape.len().max(in_tensor.shape().len());
             let mut resolved_out = vec![1usize; max_ndim];
             let out_offset = max_ndim - target_shape.len();
@@ -1875,6 +2318,20 @@ pub fn execute_node_with_liveness(
             }
             let out_len: usize = resolved_out.iter().product();
 
+            if in_tensor.dtype() == DataType::Int32 {
+                let in_ints = in_tensor.as_ints().unwrap_or(&[]);
+                let mut out_data = vec![0i32; out_len];
+                let final_shape = crate::kernels::tensor_ops::expand(
+                    in_ints,
+                    in_tensor.shape(),
+                    &target_shape,
+                    &mut out_data,
+                );
+                ctx.set_tensor(out_idx, Tensor::from_ints(&final_shape, out_data));
+                return Ok(());
+            }
+
+            let in_floats = in_tensor.as_f32_cow();
             let mut out_data = alloc_tensor_buffer(out_len);
             let final_shape = crate::kernels::tensor_ops::expand(
                 &in_floats,
@@ -2013,133 +2470,59 @@ pub fn execute_node_with_liveness(
                 out_shape[d] = c.max(t).max(f);
             }
 
-            let cond_floats = cond_tensor.as_f32_cow();
-            let true_floats = true_tensor.as_f32_cow();
-            let false_floats = false_tensor.as_f32_cow();
-
+            let out_is_int32 =
+                true_tensor.dtype() == DataType::Int32 && false_tensor.dtype() == DataType::Int32;
             let total_len: usize = out_shape.iter().product();
             if total_len == 0 {
-                let out_tensor = Tensor::from_floats(&out_shape, Vec::new(), TensorLayout::NCHW);
+                let out_tensor = if out_is_int32 {
+                    Tensor::from_ints(&out_shape, Vec::new())
+                } else {
+                    Tensor::from_floats(&out_shape, Vec::new(), TensorLayout::NCHW)
+                };
                 ctx.set_tensor(out_idx, out_tensor);
                 return Ok(());
             }
-            let mut out_data = alloc_tensor_buffer(total_len);
 
-            let t_is_scalar = true_floats.len() == 1;
-            let f_is_scalar = false_floats.len() == 1;
-            let t_matches = true_floats.len() == total_len;
-            let f_matches = false_floats.len() == total_len;
+            let cond_floats;
+            let cond_ref = if let Some(ints) = cond_tensor.as_ints() {
+                SelectCond::Int(ints)
+            } else {
+                cond_floats = cond_tensor.as_f32_cow();
+                SelectCond::Float(&cond_floats)
+            };
 
-            if (t_matches || t_is_scalar) && (f_matches || f_is_scalar) {
-                let cond_pad = ndim - cond_shape.len();
-                let leading_ones = out_shape[..cond_pad].iter().all(|&d| d == 1);
-                if leading_ones {
-                    let mut prefix_end = cond_shape.len();
-                    while prefix_end > 0 && cond_shape[prefix_end - 1] == 1 {
-                        prefix_end -= 1;
-                    }
-                    let prefix_matches = (0..prefix_end).all(|d| cond_shape[d] == out_shape[cond_pad + d]);
-                    if prefix_matches {
-                        let outer = cond_floats.len();
-                        let inner = total_len / outer.max(1);
-                        if outer * inner == total_len {
-                            if inner == 1 {
-                                match (t_is_scalar, f_is_scalar) {
-                                    (false, false) => {
-                                        for i in 0..total_len {
-                                            out_data[i] = if cond_floats[i] != 0.0 { true_floats[i] } else { false_floats[i] };
-                                        }
-                                    }
-                                    (true, false) => {
-                                        let tv = true_floats[0];
-                                        for i in 0..total_len {
-                                            out_data[i] = if cond_floats[i] != 0.0 { tv } else { false_floats[i] };
-                                        }
-                                    }
-                                    (false, true) => {
-                                        let fv = false_floats[0];
-                                        for i in 0..total_len {
-                                            out_data[i] = if cond_floats[i] != 0.0 { true_floats[i] } else { fv };
-                                        }
-                                    }
-                                    (true, true) => {
-                                        let tv = true_floats[0];
-                                        let fv = false_floats[0];
-                                        for i in 0..total_len {
-                                            out_data[i] = if cond_floats[i] != 0.0 { tv } else { fv };
-                                        }
-                                    }
-                                }
-                            } else {
-                                for o in 0..outer {
-                                    let dst = &mut out_data[o * inner..(o + 1) * inner];
-                                    if cond_floats[o] != 0.0 {
-                                        if t_is_scalar {
-                                            dst.fill(true_floats[0]);
-                                        } else {
-                                            dst.copy_from_slice(&true_floats[o * inner..(o + 1) * inner]);
-                                        }
-                                    } else if f_is_scalar {
-                                        dst.fill(false_floats[0]);
-                                    } else {
-                                        dst.copy_from_slice(&false_floats[o * inner..(o + 1) * inner]);
-                                    }
-                                }
-                            }
-                            let out_tensor = Tensor::from_floats(&out_shape, out_data, TensorLayout::NCHW);
-                            ctx.set_tensor(out_idx, out_tensor);
-                            return Ok(());
-                        }
-                    }
-                }
+            if out_is_int32 {
+                let mut out_data = vec![0i32; total_len];
+                select_slice(
+                    cond_ref,
+                    cond_shape,
+                    true_tensor.as_ints().unwrap_or(&[]),
+                    t_shape,
+                    false_tensor.as_ints().unwrap_or(&[]),
+                    f_shape,
+                    &out_shape,
+                    &mut out_data,
+                );
+                ctx.set_tensor(out_idx, Tensor::from_ints(&out_shape, out_data));
+            } else {
+                let true_floats = true_tensor.as_f32_cow();
+                let false_floats = false_tensor.as_f32_cow();
+                let mut out_data = alloc_tensor_buffer(total_len);
+                select_slice(
+                    cond_ref,
+                    cond_shape,
+                    &true_floats,
+                    t_shape,
+                    &false_floats,
+                    f_shape,
+                    &out_shape,
+                    &mut out_data,
+                );
+                ctx.set_tensor(
+                    out_idx,
+                    Tensor::from_floats(&out_shape, out_data, TensorLayout::NCHW),
+                );
             }
-
-            let mut coord = vec![0usize; ndim];
-            for i in 0..total_len {
-                let mut c_idx = 0;
-                let mut c_stride = 1;
-                for d in (0..cond_shape.len()).rev() {
-                    let out_d = ndim - cond_shape.len() + d;
-                    let pos = if cond_shape[d] == 1 { 0 } else { coord[out_d] };
-                    c_idx += pos * c_stride;
-                    c_stride *= cond_shape[d];
-                }
-
-                let mut t_idx = 0;
-                let mut t_stride = 1;
-                for d in (0..t_shape.len()).rev() {
-                    let out_d = ndim - t_shape.len() + d;
-                    let pos = if t_shape[d] == 1 { 0 } else { coord[out_d] };
-                    t_idx += pos * t_stride;
-                    t_stride *= t_shape[d];
-                }
-
-                let mut f_idx = 0;
-                let mut f_stride = 1;
-                for d in (0..f_shape.len()).rev() {
-                    let out_d = ndim - f_shape.len() + d;
-                    let pos = if f_shape[d] == 1 { 0 } else { coord[out_d] };
-                    f_idx += pos * f_stride;
-                    f_stride *= f_shape[d];
-                }
-
-                let condition = cond_floats.get(c_idx).copied().unwrap_or(0.0) != 0.0;
-                out_data[i] = if condition {
-                    true_floats.get(t_idx).copied().unwrap_or(0.0)
-                } else {
-                    false_floats.get(f_idx).copied().unwrap_or(0.0)
-                };
-
-                for d in (0..ndim).rev() {
-                    coord[d] += 1;
-                    if coord[d] < out_shape[d] {
-                        break;
-                    }
-                    coord[d] = 0;
-                }
-            }
-            let out_tensor = Tensor::from_floats(&out_shape, out_data, TensorLayout::NCHW);
-            ctx.set_tensor(out_idx, out_tensor);
             Ok(())
         }
 
@@ -2164,9 +2547,25 @@ pub fn execute_node_with_liveness(
                 raw_axis as usize
             };
 
-            let in_floats = in_tensor.as_f32_cow();
             let indices = indices_tensor.to_i32_vec();
             let mut out_shape = Vec::new();
+            if in_tensor.dtype() == DataType::Int32 {
+                let in_ints = in_tensor.as_ints().unwrap_or(&[]);
+                let mut out_data = Vec::new();
+                gather(
+                    in_ints,
+                    in_tensor.shape(),
+                    &indices,
+                    indices_tensor.shape(),
+                    actual_axis,
+                    &mut out_shape,
+                    &mut out_data,
+                );
+                ctx.set_tensor(out_idx, Tensor::from_ints(&out_shape, out_data));
+                return Ok(());
+            }
+
+            let in_floats = in_tensor.as_f32_cow();
             let mut out_data = Vec::new();
 
             gather(
@@ -2184,12 +2583,49 @@ pub fn execute_node_with_liveness(
             Ok(())
         }
 
-        OpKind::Cast { dst_type: _ } => {
+        OpKind::Cast { dst_type } => {
             if in_indices.is_empty() || out_indices.is_empty() {
                 return Ok(());
             }
+            let src = ctx.get_tensor_mut(in_indices[0])?;
             let out_idx = out_indices[0];
-            let out_t = ctx.get_tensor_mut(in_indices[0])?.share();
+            let shape = src.shape().to_vec();
+            let layout = src.layout();
+
+            let out_t = match dst_type {
+                crate::tensor::DataType::Float => {
+                    if src.as_floats().is_some() {
+                        src.share()
+                    } else {
+                        let floats: Vec<f32> = src.as_ints().unwrap_or(&[]).iter().map(|&v| v as f32).collect();
+                        Tensor::from_floats(&shape, floats, layout)
+                    }
+                }
+                crate::tensor::DataType::Int32 => {
+                    if let Some(f) = src.as_floats() {
+                        let ints: Vec<i32> = f.iter().map(|&v| v as i32).collect();
+                        Tensor::from_ints(&shape, ints)
+                    } else {
+                        src.share()
+                    }
+                }
+                crate::tensor::DataType::UInt8 => {
+                    let ints: Vec<i32> = if let Some(f) = src.as_floats() {
+                        f.iter().map(|&v| ((v as i32) as u8) as i32).collect()
+                    } else {
+                        src.as_ints().unwrap_or(&[]).iter().map(|&v| (v as u8) as i32).collect()
+                    };
+                    Tensor::from_ints(&shape, ints)
+                }
+                crate::tensor::DataType::Int8 => {
+                    let ints: Vec<i32> = if let Some(f) = src.as_floats() {
+                        f.iter().map(|&v| ((v as i32) as i8) as i32).collect()
+                    } else {
+                        src.as_ints().unwrap_or(&[]).iter().map(|&v| (v as i8) as i32).collect()
+                    };
+                    Tensor::from_ints(&shape, ints)
+                }
+            };
             ctx.set_tensor(out_idx, out_t);
             Ok(())
         }
@@ -2417,6 +2853,274 @@ pub fn execute_node_with_liveness(
 
             let out_tensor = Tensor::from_floats(&out_shape, out_data, TensorLayout::NCHW);
             ctx.set_tensor(out_idx, out_tensor);
+            Ok(())
+        }
+
+        OpKind::DynamicQuant { signed } => {
+            if in_indices.is_empty() || out_indices.is_empty() {
+                return Ok(());
+            }
+            let in_t = ctx.get_tensor(in_indices[0])?;
+            let in_shape = in_t.shape().to_vec();
+            let in_floats = in_t.as_f32_cow();
+            let res = dynamic_quantize_f32(&in_floats, *signed);
+            let scalar_shape: &[usize] = if *signed { &[1] } else { &[] };
+
+            ctx.set_tensor(out_indices[0], Tensor::from_ints(&in_shape, res.quant));
+            if out_indices.len() > 1 {
+                ctx.set_tensor(
+                    out_indices[1],
+                    Tensor::from_floats(scalar_shape, vec![res.scale], TensorLayout::NCHW),
+                );
+            }
+            if out_indices.len() > 2 {
+                let zp_tensor = if *signed {
+                    Tensor::from_floats(scalar_shape, vec![res.zp_f32], TensorLayout::NCHW)
+                } else {
+                    Tensor::from_ints(scalar_shape, vec![res.zp_i32])
+                };
+                ctx.set_tensor(out_indices[2], zp_tensor);
+            }
+            Ok(())
+        }
+
+        OpKind::ConvInteger(p) => {
+            if in_indices.len() < 2 || out_indices.is_empty() {
+                return Ok(());
+            }
+            let x_t = ctx.get_tensor(in_indices[0])?;
+            let w_t = ctx.get_tensor(in_indices[1])?;
+            let x_shape = x_t.shape();
+            let w_shape = w_t.shape();
+            if x_shape.len() < 3 || w_shape.len() < 3 {
+                return Err(MnnError::InvalidModel("ConvInteger expects >=3D tensors".into()));
+            }
+            let is_3d = x_shape.len() == 3;
+            let batch = x_shape[0];
+            let in_c = x_shape[1];
+            let (in_h, in_w) = if is_3d { (x_shape[2], 1) } else { (x_shape[2], x_shape[3]) };
+            let out_c = w_shape[0];
+            let ic_pg = w_shape[1];
+            let kh = if w_shape.len() == 3 { w_shape[2] } else { p.kernel_h };
+            let kw = if w_shape.len() == 3 { 1 } else { p.kernel_w };
+
+            let x_ints = x_t.to_i32_vec();
+            let w_ints = w_t.to_i32_vec();
+
+            let mut opt_slot = 2usize;
+            let x_zp = if p.has_x_zp {
+                let val = in_indices
+                    .get(opt_slot)
+                    .and_then(|&id| ctx.get_tensor(id).ok())
+                    .map(|t| t.to_i32_vec().first().copied().unwrap_or(0))
+                    .unwrap_or(0);
+                opt_slot += 1;
+                val
+            } else {
+                0
+            };
+            let w_zp = if p.has_w_zp {
+                in_indices
+                    .get(opt_slot)
+                    .and_then(|&id| ctx.get_tensor(id).ok())
+                    .map(|t| t.to_i32_vec())
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+
+            let (pad_top, pad_left, pad_bottom, pad_right) = compute_conv_padding(
+                in_h,
+                in_w,
+                kh,
+                kw,
+                p.stride_h,
+                p.stride_w,
+                p.dilate_h,
+                p.dilate_w,
+                p.pad_mode,
+                p.pad_x,
+                p.pad_y,
+                p.pads.as_deref(),
+            );
+            let cfg = ConvIntConfig {
+                kernel_h: kh,
+                kernel_w: kw,
+                stride_h: p.stride_h,
+                stride_w: p.stride_w,
+                dilate_h: p.dilate_h,
+                dilate_w: p.dilate_w,
+                pad_top,
+                pad_left,
+                pad_bottom,
+                pad_right,
+                group: p.group,
+            };
+            let (out_data, out_h, out_w) = conv_integer_accumulate_i32(
+                &x_ints,
+                [batch, in_c, in_h, in_w],
+                &w_ints,
+                [out_c, ic_pg, kh, kw],
+                x_zp,
+                &w_zp,
+                &cfg,
+            );
+            let out_shape = if is_3d {
+                vec![batch, out_c, out_h]
+            } else {
+                vec![batch, out_c, out_h, out_w]
+            };
+            ctx.set_tensor(out_indices[0], Tensor::from_ints(&out_shape, out_data));
+            Ok(())
+        }
+
+        OpKind::MatMulInteger(p) => {
+            if in_indices.len() < 2 || out_indices.is_empty() {
+                return Ok(());
+            }
+            let a_t = ctx.get_tensor(in_indices[0])?;
+            let b_t = ctx.get_tensor(in_indices[1])?;
+            let a_ints = a_t.to_i32_vec();
+            let b_ints = b_t.to_i32_vec();
+
+            let mut opt_slot = 2usize;
+            let a_zp_owned = if p.has_a_zp {
+                in_indices.get(opt_slot).and_then(|&id| {
+                    opt_slot += 1;
+                    ctx.get_tensor(id).ok().map(|t| (t.to_i32_vec(), t.shape().to_vec()))
+                })
+            } else {
+                None
+            };
+            let b_zp_owned = if p.has_b_zp {
+                in_indices
+                    .get(opt_slot)
+                    .and_then(|&id| ctx.get_tensor(id).ok().map(|t| (t.to_i32_vec(), t.shape().to_vec())))
+            } else {
+                None
+            };
+
+            let (out_data, out_shape) = matmul_integer_i32(
+                &a_ints,
+                a_t.shape(),
+                &b_ints,
+                b_t.shape(),
+                a_zp_owned.as_ref().map(|(v, _)| v.as_slice()),
+                a_zp_owned.as_ref().map(|(_, s)| s.as_slice()).unwrap_or(&[]),
+                b_zp_owned.as_ref().map(|(v, _)| v.as_slice()),
+                b_zp_owned.as_ref().map(|(_, s)| s.as_slice()).unwrap_or(&[]),
+            );
+            ctx.set_tensor(out_indices[0], Tensor::from_ints(&out_shape, out_data));
+            Ok(())
+        }
+
+        OpKind::ConvInt8(p) => {
+            if in_indices.is_empty() || out_indices.is_empty() {
+                return Ok(());
+            }
+            let x_t = ctx.get_tensor(in_indices[0])?;
+            let x_shape = x_t.shape();
+            if x_shape.len() < 3 {
+                return Err(MnnError::InvalidModel("ConvInt8 expects >=3D input".into()));
+            }
+            let is_3d = x_shape.len() == 3;
+            let batch = x_shape[0];
+            let in_c = x_shape[1];
+            let (in_h, in_w) = if is_3d { (x_shape[2], 1) } else { (x_shape[2], x_shape[3]) };
+            let (pad_top, pad_left, pad_bottom, pad_right) = compute_conv_padding(
+                in_h,
+                in_w,
+                p.kernel_h,
+                p.kernel_w,
+                p.stride_h,
+                p.stride_w,
+                p.dilate_h,
+                p.dilate_w,
+                p.pad_mode,
+                p.pad_x,
+                p.pad_y,
+                p.pads.as_deref(),
+            );
+            let cfg = ConvIntConfig {
+                kernel_h: p.kernel_h,
+                kernel_w: p.kernel_w,
+                stride_h: p.stride_h,
+                stride_w: p.stride_w,
+                dilate_h: p.dilate_h,
+                dilate_w: p.dilate_w,
+                pad_top,
+                pad_left,
+                pad_bottom,
+                pad_right,
+                group: p.group,
+            };
+            let ic_pg = (in_c / p.group.max(1)).max(1);
+            let x_ints = x_t.to_i32_vec();
+            let w_ints: Vec<i32> = p.weight.iter().map(|&w| w as i32).collect();
+            let (acc, out_h, out_w) = conv_integer_accumulate_i32(
+                &x_ints,
+                [batch, in_c, in_h, in_w],
+                &w_ints,
+                [p.out_channels, ic_pg, p.kernel_h, p.kernel_w],
+                p.zero_point,
+                &[],
+                &cfg,
+            );
+            let (out_f, out_i) = conv_int8_postprocess(
+                &acc,
+                batch,
+                p.out_channels,
+                out_h * out_w,
+                &p.bias,
+                &p.scale,
+                p.output_float,
+                p.output_zero_point,
+                p.clamp_min,
+                p.clamp_max,
+            );
+            let out_shape = if is_3d {
+                vec![batch, p.out_channels, out_h]
+            } else {
+                vec![batch, p.out_channels, out_h, out_w]
+            };
+            let out_t = if let Some(f) = out_f {
+                Tensor::from_floats(&out_shape, f, TensorLayout::NCHW)
+            } else {
+                Tensor::from_ints(&out_shape, out_i.unwrap_or_default())
+            };
+            ctx.set_tensor(out_indices[0], out_t);
+            Ok(())
+        }
+
+        OpKind::Int8ToFloat(p) => {
+            if in_indices.is_empty() || out_indices.is_empty() {
+                return Ok(());
+            }
+            let x_t = ctx.get_tensor(in_indices[0])?;
+            let x_ints = x_t.to_i32_vec();
+            let out_f = int8_to_float_nchw(&x_ints, x_t.shape(), &p.scale, &p.zero_points);
+            ctx.set_tensor(
+                out_indices[0],
+                Tensor::from_floats(x_t.shape(), out_f, x_t.layout()),
+            );
+            Ok(())
+        }
+
+        OpKind::FloatToInt8(p) => {
+            if in_indices.is_empty() || out_indices.is_empty() {
+                return Ok(());
+            }
+            let x_t = ctx.get_tensor(in_indices[0])?;
+            let x_floats = x_t.as_f32_cow();
+            let out_i = float_to_int8_nchw(
+                &x_floats,
+                x_t.shape(),
+                &p.scale,
+                &p.zero_points,
+                p.clamp_min,
+                p.clamp_max,
+            );
+            ctx.set_tensor(out_indices[0], Tensor::from_ints(x_t.shape(), out_i));
             Ok(())
         }
 

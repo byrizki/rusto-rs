@@ -38,6 +38,13 @@ describe('WebOcrEngine & singleton API', () => {
     expect(isInitialized()).toBe(false);
     expect(version()).toBe('0.4.0');
 
+    const defaultUrls = await downloadModel();
+    expect(defaultUrls).toEqual([
+      'https://huggingface.co/byrizki/rusto-models/resolve/main/ppocrv6-tiny/det.rten',
+      'https://huggingface.co/byrizki/rusto-models/resolve/main/ppocrv6-tiny/rec.rten',
+      'https://huggingface.co/byrizki/rusto-models/resolve/main/ppocrv6-tiny/dict.txt',
+    ]);
+
     const modelUrls = await downloadModel('indraocr');
     expect(Array.isArray(modelUrls)).toBe(true);
     expect(modelUrls.length).toBeGreaterThan(0);

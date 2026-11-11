@@ -190,10 +190,10 @@ namespace RustODotnet
         public LayoutConfig Layout { get; set; }
 
         /// <summary>Creates a configuration for a canonical model identifier with optional language and model directory.</summary>
-        public static InitializeConfig ForModel(string model = "indraocr", string lang = null, string modelPath = null) =>
+        public static InitializeConfig ForModel(string model = "ppocrv6-tiny", string lang = null, string modelPath = null) =>
             new() { Model = model, Lang = lang, ModelPath = modelPath };
 
-        /// <summary>Creates a preset configuration for IndraOCR (high-accuracy default).</summary>
+        /// <summary>Creates a preset configuration for IndraOCR.</summary>
         public static InitializeConfig Indra(string detModelPath = null, string recModelPath = null, string dictPath = null) =>
             CreatePreset("indra", detModelPath, recModelPath, dictPath, recBatchNum: 1);
 

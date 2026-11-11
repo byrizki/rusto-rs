@@ -7,8 +7,9 @@ use rten_model_file::schema::root_as_model;
 
 use crate::error::MnnError;
 use crate::graph::ir::{
-    BinaryParams, FusedActivation, Graph, GridSampleParams, InterpParams, LayerNormParams, MatMulParams, Node, OpKind,
-    PoolParams, PrepackedConv, PrepackedDeconv, ResizeType, UnaryParams,
+    BinaryParams, ConvIntegerParams, FusedActivation, Graph, GridSampleParams, InterpParams, LayerNormParams,
+    MatMulIntegerParams, MatMulParams, Node, OpKind, PoolParams, PrepackedConv, PrepackedDeconv, ResizeType,
+    UnaryParams,
 };
 use crate::kernels::binary::BinaryOpType;
 use crate::kernels::pool::PoolType;
@@ -131,6 +132,49 @@ fn get_pad_pair<V: IntoIterator<Item = u32>>(pads: Option<V>) -> (usize, usize) 
         }
     } else {
         (0, 0)
+    }
+}
+
+struct RtenConvAttrs {
+    stride_h: usize,
+    stride_w: usize,
+    dilate_h: usize,
+    dilate_w: usize,
+    pad_mode: PadMode,
+    pad_x: usize,
+    pad_y: usize,
+    pads: Option<Vec<i32>>,
+    group: usize,
+}
+
+fn parse_rten_conv_attrs(attrs: Option<sg::ConvAttrs<'_>>) -> RtenConvAttrs {
+    let group = attrs.as_ref().map(|a| a.groups() as usize).unwrap_or(1).max(1);
+    let strides = attrs.as_ref().and_then(|a| a.strides());
+    let (stride_h, stride_w) = get_dim_pair(strides, 1);
+
+    let dilations = attrs.as_ref().and_then(|a| a.dilations());
+    let (dilate_h, dilate_w) = get_dim_pair(dilations, 1);
+
+    let pads = attrs.as_ref().and_then(|a| a.pads());
+    let (pad_y, pad_x) = get_pad_pair(pads);
+
+    let auto_pad = attrs.as_ref().map(|a| a.auto_pad()).unwrap_or(sg::AutoPad::NotSet);
+    let pad_mode = match auto_pad {
+        sg::AutoPad::Same => PadMode::SAME,
+        _ => PadMode::CAFFE,
+    };
+    let pads_vec = pads.map(|p| p.iter().map(|x| x as i32).collect());
+
+    RtenConvAttrs {
+        stride_h,
+        stride_w,
+        dilate_h,
+        dilate_w,
+        pad_mode,
+        pad_x,
+        pad_y,
+        pads: pads_vec,
+        group,
     }
 }
 
@@ -278,6 +322,12 @@ pub fn load_rten(slice: &[u8]) -> Result<Graph, MnnError> {
             if is_absorbed_op && idx >= 1 {
                 continue;
             }
+            if op.type_() == sg::OperatorType::Clip
+                && idx >= 1
+                && constants.contains_key(&(in_idx as usize))
+            {
+                continue;
+            }
             in_indices.push(in_idx as usize);
         }
 
@@ -306,43 +356,58 @@ pub fn load_rten(slice: &[u8]) -> Result<Graph, MnnError> {
                 let kh = if w_shape.len() > 2 { w_shape[2] } else { 1 };
                 let kw = if w_shape.len() > 3 { w_shape[3] } else { 1 };
 
-                let group = attrs.as_ref().map(|a| a.groups() as usize).unwrap_or(1).max(1);
-                let in_channels = in_channels_per_group * group;
-                let is_depthwise = group == in_channels && in_channels == out_channels && in_channels > 1;
-
-                let strides = attrs.as_ref().and_then(|a| a.strides());
-                let (stride_h, stride_w) = get_dim_pair(strides, 1);
-
-                let dilations = attrs.as_ref().and_then(|a| a.dilations());
-                let (dilate_h, dilate_w) = get_dim_pair(dilations, 1);
-
-                let pads = attrs.as_ref().and_then(|a| a.pads());
-                let (pad_y, pad_x) = get_pad_pair(pads);
-
-                let auto_pad = attrs.as_ref().map(|a| a.auto_pad()).unwrap_or(sg::AutoPad::NotSet);
-                let pad_mode = match auto_pad {
-                    sg::AutoPad::Same => PadMode::SAME,
-                    _ => PadMode::CAFFE,
-                };
-                let pads_vec = pads.map(|p| p.iter().map(|x| x as i32).collect());
+                let attrs_parsed = parse_rten_conv_attrs(attrs);
+                let in_channels = in_channels_per_group * attrs_parsed.group;
+                let is_depthwise =
+                    attrs_parsed.group == in_channels && in_channels == out_channels && in_channels > 1;
 
                 OpKind::Conv(PrepackedConv {
                     weight: weight_vec,
                     bias: bias_vec,
                     kernel_h: kh,
                     kernel_w: kw,
-                    stride_h,
-                    stride_w,
-                    dilate_h,
-                    dilate_w,
-                    pad_mode,
-                    pad_x,
-                    pad_y,
-                    pads: pads_vec,
-                    group,
+                    stride_h: attrs_parsed.stride_h,
+                    stride_w: attrs_parsed.stride_w,
+                    dilate_h: attrs_parsed.dilate_h,
+                    dilate_w: attrs_parsed.dilate_w,
+                    pad_mode: attrs_parsed.pad_mode,
+                    pad_x: attrs_parsed.pad_x,
+                    pad_y: attrs_parsed.pad_y,
+                    pads: attrs_parsed.pads,
+                    group: attrs_parsed.group,
                     out_channels,
                     activation: FusedActivation::None,
                     is_depthwise,
+                })
+            }
+
+            sg::OperatorType::ConvInteger => {
+                let attrs_parsed = parse_rten_conv_attrs(op.attrs_as_conv_attrs());
+                let w_idx = op_inputs.get(1).copied().unwrap_or(-1);
+                let w_shape = if w_idx >= 0 {
+                    constants.get(&(w_idx as usize)).map(|t| t.shape()).unwrap_or(&[])
+                } else {
+                    &[]
+                };
+                let kh = w_shape.get(2).copied().unwrap_or(1);
+                let kw = w_shape.get(3).copied().unwrap_or(1);
+                let has_x_zp = op_inputs.get(2).copied().unwrap_or(-1) >= 0;
+                let has_w_zp = op_inputs.get(3).copied().unwrap_or(-1) >= 0;
+
+                OpKind::ConvInteger(ConvIntegerParams {
+                    kernel_h: kh,
+                    kernel_w: kw,
+                    stride_h: attrs_parsed.stride_h,
+                    stride_w: attrs_parsed.stride_w,
+                    dilate_h: attrs_parsed.dilate_h,
+                    dilate_w: attrs_parsed.dilate_w,
+                    pad_mode: attrs_parsed.pad_mode,
+                    pad_x: attrs_parsed.pad_x,
+                    pad_y: attrs_parsed.pad_y,
+                    pads: attrs_parsed.pads,
+                    group: attrs_parsed.group,
+                    has_x_zp,
+                    has_w_zp,
                 })
             }
 
@@ -541,11 +606,15 @@ pub fn load_rten(slice: &[u8]) -> Result<Graph, MnnError> {
             sg::OperatorType::Clip => {
                 let mut min_val = f32::NEG_INFINITY;
                 let mut max_val = f32::INFINITY;
+                let mut has_min_input = false;
+                let mut has_max_input = false;
 
                 if let Some(&min_id) = op_inputs.get(1) {
                     if min_id >= 0 {
                         if let Some(t) = constants.get(&(min_id as usize)) {
                             min_val = t.to_f32_vec().first().copied().unwrap_or(min_val);
+                        } else {
+                            has_min_input = true;
                         }
                     }
                 }
@@ -553,11 +622,20 @@ pub fn load_rten(slice: &[u8]) -> Result<Graph, MnnError> {
                     if max_id >= 0 {
                         if let Some(t) = constants.get(&(max_id as usize)) {
                             max_val = t.to_f32_vec().first().copied().unwrap_or(max_val);
+                        } else {
+                            has_max_input = true;
                         }
                     }
                 }
 
-                if min_val == 0.0 && max_val == 6.0 {
+                if has_min_input || has_max_input {
+                    OpKind::Clip {
+                        min_val,
+                        max_val,
+                        has_min_input,
+                        has_max_input,
+                    }
+                } else if min_val == 0.0 && max_val == 6.0 {
                     OpKind::Relu6 { min_val: 0.0, max_val: 6.0 }
                 } else {
                     OpKind::Unary(UnaryParams {
@@ -875,7 +953,26 @@ pub fn load_rten(slice: &[u8]) -> Result<Graph, MnnError> {
                 OpKind::Gather { axis }
             }
 
-            sg::OperatorType::Cast => OpKind::Cast { dst_type: DataType::Float },
+            sg::OperatorType::Cast => {
+                let dst_type = op
+                    .attrs_as_cast_attrs()
+                    .map(|a| match a.to() {
+                        sg::DataType::Int32 => DataType::Int32,
+                        sg::DataType::Int8 => DataType::Int8,
+                        sg::DataType::UInt8 => DataType::UInt8,
+                        _ => DataType::Float,
+                    })
+                    .unwrap_or(DataType::Float);
+                OpKind::Cast { dst_type }
+            }
+
+            sg::OperatorType::DynamicQuantizeLinear => OpKind::DynamicQuant { signed: false },
+
+            sg::OperatorType::MatMulInteger => {
+                let has_a_zp = op_inputs.get(2).copied().unwrap_or(-1) >= 0;
+                let has_b_zp = op_inputs.get(3).copied().unwrap_or(-1) >= 0;
+                OpKind::MatMulInteger(MatMulIntegerParams { has_a_zp, has_b_zp })
+            }
 
             sg::OperatorType::Where => OpKind::Select,
 
@@ -1022,15 +1119,15 @@ pub fn load_rten(slice: &[u8]) -> Result<Graph, MnnError> {
 
             sg::OperatorType::ConstantOfShape => {
                 let attrs = op.attrs_as_constant_of_shape_attrs();
-                let val = attrs
+                let int_value = attrs
                     .as_ref()
-                    .and_then(|a| {
-                        a.value_as_float_scalar()
-                            .map(|v| v.value())
-                            .or_else(|| a.value_as_int_scalar().map(|v| v.value() as f32))
-                    })
+                    .and_then(|a| a.value_as_int_scalar().map(|v| v.value()));
+                let value = attrs
+                    .as_ref()
+                    .and_then(|a| a.value_as_float_scalar().map(|v| v.value()))
+                    .or_else(|| int_value.map(|v| v as f32))
                     .unwrap_or(0.0);
-                OpKind::ConstantOfShape { value: val }
+                OpKind::ConstantOfShape { value, int_value }
             }
 
             sg::OperatorType::Expand => OpKind::Expand,

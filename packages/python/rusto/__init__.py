@@ -1,11 +1,11 @@
 """RustO - High performance, pure-Rust OCR engine for Python.
 
-RustO provides fast, memory-safe text extraction powered by Indra OCR and PaddleOCR
-architectures on the pure-Rust RTen deep learning inference engine.
+RustO provides fast, memory-safe text extraction powered by PaddleOCR and Indra OCR
+architectures on pure-Rust MNN (`rusto-nn`) and RTen (`rusto-rten`) inference engines.
 
 Quick Start:
     >>> from rusto import RustO, InitializeConfig
-    >>> engine = RustO.initialize(InitializeConfig.indra())
+    >>> engine = RustO.initialize()
     >>> result = engine.detect_text("receipt.jpg").with_auto_unwarp().with_layout_reading().as_lines().run()
     >>> if result.is_STRUCTURED():
     ...     for item in result.results:
@@ -443,7 +443,7 @@ class InitializeConfig(_GeneratedInitializeConfig):
     @classmethod
     def for_model(
         cls,
-        model: str | None = "indraocr",
+        model: str | None = "ppocrv6-tiny",
         lang: str | None = None,
         model_path: str | None = None,
     ) -> InitializeConfig:

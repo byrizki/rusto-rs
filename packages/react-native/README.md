@@ -13,7 +13,7 @@ Official React Native SDK (iOS & Android, Legacy & New Architecture) for **RustO
 ```ts
 import { close, detectText, initialize } from '@rustors/react-native';
 
-await initialize(); // Zero-config: auto-downloads Indra OCR models from Hugging Face on first run
+await initialize(); // Zero-config: auto-downloads PP-OCRv6 Tiny (FP32, Apache 2.0) from Hugging Face on first run
 
 const lines = await detectText({ uri })
   .withAutoUnwarp()
@@ -113,7 +113,7 @@ export async function scanInvoice(uri: string): Promise<{
 Initializes or replaces the native OCR session.
 
 ```ts
-// Zero-config Indra OCR default (auto-downloads models from Hugging Face on first run)
+// Zero-config PP-OCRv6 Tiny (FP32) default (auto-downloads models from Hugging Face on first run)
 await initialize();
 
 // Offline bundled .mnn / .rten assets (Android assets/models/* & iOS bundle resources)
@@ -133,7 +133,7 @@ await initialize({
 | Field | Values | Description |
 | :--- | :--- | :--- |
 | `preset` | `'indra'`, `'ppv6'`, `'ppv5'`, `'ppv4'`, `'ppv3'` | Architecture preset |
-| `model` | `'indraocr'`, `'ppocrv6-tiny'`, `'ppocrv6-small'`, `'ppocrv5-mobile'`, etc. | Canonical pipeline name for auto-download |
+| `model` | `'ppocrv6-tiny'`, `'ppocrv6-tiny-fp16'`, `'ppocrv6-small'`, `'indraocr'`, `'ppocrv5-mobile'`, etc. | Canonical pipeline name for auto-download (`'ppocrv6-tiny'` default) |
 | `lang` | `'latin'`, `'cjk'`, `'ja'`, `'korean'`, `'ar'`, `'cyrillic'`, etc. | Target recognition script/language |
 | `modelPath` / `cacheDir` | `string` | Custom model directory or writable download cache directory |
 | `enableReadingOrder` | `boolean` | Load neural reading-order transformer |

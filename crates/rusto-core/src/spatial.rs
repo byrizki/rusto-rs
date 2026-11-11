@@ -237,7 +237,7 @@ pub fn cluster_line_segments(
         let gap = next.frame.left - (current.frame.left + current.frame.width);
         let max_gap = avg_h * word_x_threshold;
 
-        if gap <= max_gap {
+        if gap >= 0.0 && gap <= max_gap {
             // Merge into current
             current.text.push(' ');
             current.text.push_str(&next.text);
@@ -663,7 +663,7 @@ pub fn cluster_text_results_into_lines(
                     let gap = entry.frame.left - prev_right;
                     let avg_height = (prev.frame.height + entry.frame.height) / 2.0;
                     let max_gap = (avg_height * word_x_threshold).max(1.0);
-                    if gap <= max_gap {
+                    if gap >= 0.0 && gap <= max_gap {
                         prev.text.push(' ');
                         prev.text.push_str(&entry.text);
                         prev.score = prev.score.min(entry.score);
@@ -736,5 +736,35 @@ pub fn build_word_results(
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cluster_text_results_prevents_negative_gap_merge() {
+        let word1 = TextResult::from_coords(10.0, 10.0, 50.0, 30.0, "Hello".to_string(), 0.95);
+        let word2 = TextResult::from_coords(55.0, 10.0, 100.0, 30.0, "World".to_string(), 0.95);
+        let overlapping = TextResult::from_coords(20.0, 12.0, 80.0, 32.0, "Overlap".to_string(), 0.90);
+
+        let entries = vec![word1, overlapping, word2];
+        let clustered = cluster_text_results_into_lines(entries, 0.5, 0.4);
+
+        assert!(clustered.iter().any(|r| r.text == "Overlap"));
+    }
+
+    #[test]
+    fn test_cluster_line_segments_prevents_negative_gap_merge() {
+        let seg1 = TextResult::from_coords(10.0, 10.0, 50.0, 30.0, "Part1".to_string(), 0.95);
+        let seg_overlap = TextResult::from_coords(20.0, 10.0, 60.0, 30.0, "Part2".to_string(), 0.90);
+
+        let line = vec![seg1, seg_overlap];
+        let clustered = cluster_line_segments(&line, 0.4);
+        assert_eq!(clustered.len(), 2);
+        assert_eq!(clustered[0].text, "Part1");
+        assert_eq!(clustered[1].text, "Part2");
+    }
+}
+
 
 

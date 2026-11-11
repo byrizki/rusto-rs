@@ -4,7 +4,7 @@ Official C# / .NET bindings for **RustO!** — a high-performance, pure-Rust OCR
 
 ## Features
 
-- **Zero-Config Indra OCR**: `using var ocr = RustO.Initialize();` automatically downloads and caches the default `indraocr` models on first run from Hugging Face Hub — no separate NuGet model packages required.
+- **Zero-Config PP-OCRv6 Tiny**: `using var ocr = RustO.Initialize();` automatically downloads and caches the default `ppocrv6-tiny` (FP32, Apache 2.0) models on first run from Hugging Face Hub — no separate NuGet model packages required.
 - **Standalone Model Support**: Load local `.mnn` or `.rten` models directly for offline or air-gapped deployments, or pre-warm caches via `RustO.DownloadModel(...)`.
 - **Document Intelligence**: Built-in UVDoc document unwarping (`WithAutoUnwarp()`), 4-way page orientation detection (`WithOrientationDetection()`), and neural reading-order recovery (`WithLayoutReading()`).
 - **Fluent Builder API**: Chain `.AsLines()`, `.AsWords()`, `.AsSpatial()`, `.AsTsv()`, or `.WithOutput(...)` into a single `.Run()` terminal method.
@@ -18,7 +18,7 @@ dotnet add package RustODotnet
 
 ## Quick Start (Zero-Config)
 
-`RustO.Initialize()` uses the **Indra OCR** pipeline by default and automatically downloads assets from Hugging Face Hub into your user cache (`~/.cache/rusto/models` or `RUSTO_CACHE_DIR`) on first use:
+`RustO.Initialize()` uses the **PP-OCRv6 Tiny (FP32)** pipeline by default and automatically downloads assets from Hugging Face Hub into your user cache (`~/.cache/rusto/models` or `RUSTO_CACHE_DIR`) on first use:
 
 ```csharp
 using System;
@@ -90,7 +90,7 @@ using var offlineOcr = RustO.Initialize(offlineConfig);
 For container builds or CI environments, download model assets ahead of time:
 
 ```csharp
-string[] cachedFiles = RustO.DownloadModel(model: "indraocr", lang: "latin", cacheDir: "./models-cache");
+string[] cachedFiles = RustO.DownloadModel(model: "ppocrv6-tiny", cacheDir: "./models-cache");
 ```
 
 ## Byte Buffers & Raw RGB Pixels

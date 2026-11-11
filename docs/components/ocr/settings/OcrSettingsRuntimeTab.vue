@@ -2,7 +2,11 @@
 import { computed, ref } from 'vue';
 import type { OcrConfig } from '../../../types/ocrConfig';
 import type { OcrModelOption } from '../../../types/ocrModels';
-import { getModelCandidateUrls, HUGGINGFACE_REPO } from '../../../utils/ocrReleaseModels';
+import {
+  getModelCandidateUrls,
+  HUGGINGFACE_REPO,
+  isModelSupportedByBackend,
+} from '../../../utils/ocrReleaseModels';
 import OcrInfoPopover from './OcrInfoPopover.vue';
 import OcrSettingsCollapsibleSection from './OcrSettingsCollapsibleSection.vue';
 
@@ -29,7 +33,13 @@ function onToggle(section: RuntimeSection, nextValue: boolean) {
   }
 }
 
-const candidateUrls = computed(() => getModelCandidateUrls(props.selectedModelId, props.baseURL));
+const candidateUrls = computed(() =>
+  getModelCandidateUrls(props.selectedModelId, props.baseURL, props.config.inferenceBackend)
+);
+
+function isEngineCompatible(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu'): boolean {
+  return isModelSupportedByBackend(props.selectedModelId, id);
+}
 
 interface EngineOption {
   id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu';
@@ -76,6 +86,7 @@ const engines: EngineOption[] = [
 ];
 
 function selectEngine(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu') {
+  if (!isEngineCompatible(id)) return;
   props.config.inferenceBackend = id;
   props.config.useWebGpu = id === 'rusto-webgpu';
   emit('backendChanged', id);
@@ -97,11 +108,13 @@ function selectEngine(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu') {
           v-for="engine in engines"
           :key="engine.id"
           @click="selectEngine(engine.id)"
-          class="p-2.5 rounded-lg border transition-all cursor-pointer relative"
+          class="p-2.5 rounded-lg border transition-all relative"
           :class="[
-            config.inferenceBackend === engine.id
-              ? 'border-primary bg-primary/5 dark:bg-primary/10'
-              : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700',
+            !isEngineCompatible(engine.id)
+              ? 'opacity-55 cursor-not-allowed border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50'
+              : config.inferenceBackend === engine.id
+                ? 'cursor-pointer border-primary bg-primary/5 dark:bg-primary/10'
+                : 'cursor-pointer border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700',
           ]"
         >
           <div class="flex items-center justify-between gap-2">
@@ -111,7 +124,8 @@ function selectEngine(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu') {
                 :name="'ocr-inference-engine'"
                 :value="engine.id"
                 :checked="config.inferenceBackend === engine.id"
-                class="accent-primary cursor-pointer w-3.5 h-3.5 shrink-0"
+                :disabled="!isEngineCompatible(engine.id)"
+                class="accent-primary cursor-pointer disabled:cursor-not-allowed w-3.5 h-3.5 shrink-0"
                 @change="selectEngine(engine.id)"
               />
               <span class="font-mono font-semibold text-zinc-900 dark:text-zinc-100 text-xs">
@@ -123,7 +137,7 @@ function selectEngine(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu') {
               class="px-1.5 py-0.5 rounded text-[10px] font-medium border"
               :class="engine.badgeClass"
             >
-              {{ engine.badge }}
+              {{ isEngineCompatible(engine.id) ? engine.badge : 'MNN/ONNX Only' }}
             </span>
           </div>
 

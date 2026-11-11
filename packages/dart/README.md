@@ -6,7 +6,7 @@ Official Dart FFI bindings for **RustO!** — a high-performance, pure-Rust OCR 
 
 ## Features
 
-- **Zero-Config Indra OCR**: `RustO.initialize()` automatically downloads and caches the default `indraocr` models on first run from Hugging Face Hub.
+- **Zero-Config PP-OCRv6 Tiny**: `RustO.initialize()` automatically downloads and caches the default `ppocrv6-tiny` (FP32, Apache 2.0) models on first run from Hugging Face Hub.
 - **Pure-Rust FFI**: Low-overhead synchronous UniFFI bindings with automatic `librusto` discovery and `RUSTO_LIB_PATH` override support.
 - **Document Intelligence**: UVDoc document unwarping (`withAutoUnwarp()`), 4-way page orientation correction (`withOrientationDetection()`), and neural layout reading-order recovery (`withLayoutReading()`).
 - **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, `.asTsv()`, or `.withOutput(...)` into a single `.run()` terminal call.
@@ -29,7 +29,7 @@ Build or install the native `librusto` library (`librusto.so`, `librusto.dylib`,
 import 'package:rusto/rusto.dart';
 
 void main() {
-  // Initializes Indra OCR and auto-downloads models from Hugging Face Hub if not cached
+  // Initializes PP-OCRv6 Tiny (FP32) and auto-downloads models from Hugging Face Hub if not cached
   final engine = RustO.initialize();
 
   try {
@@ -105,8 +105,7 @@ Pre-download models ahead of time:
 
 ```dart
 final cachedPaths = RustO.downloadModel(
-  model: 'indraocr',
-  lang: 'latin',
+  model: 'ppocrv6-tiny',
   cacheDir: './models-cache',
 );
 ```

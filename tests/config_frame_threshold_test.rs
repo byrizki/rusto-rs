@@ -166,14 +166,15 @@ fn test_rusto_config_grouped_json() {
 
 #[test]
 fn test_rusto_config_templates_and_presets() {
-    use rusto::{INDRA_MODEL_CONFIG, PPV3_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG};
+    use rusto::{PPV3_MODEL_CONFIG, PPV4_MODEL_CONFIG, PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG};
 
     let default_config = InitializeConfig::default();
     assert_eq!(
         default_config.det.limit_side_len,
-        INDRA_MODEL_CONFIG.det_limit_side_len
+        PPV6_MODEL_CONFIG.det_limit_side_len
     );
-    assert_eq!(default_config.det.box_thresh, INDRA_MODEL_CONFIG.det_box_thresh);
+    assert_eq!(default_config.det.box_thresh, PPV6_MODEL_CONFIG.det_box_thresh);
+    assert_eq!(default_config.rec.rec_batch_num, PPV6_MODEL_CONFIG.rec_batch_num);
     assert_eq!(default_config.det.score_mode, "slow");
 
     let v6_config = InitializeConfig::ppv6("det6.rten", "rec6.rten", "dict.txt");

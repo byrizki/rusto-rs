@@ -221,7 +221,7 @@ data class InitializeConfig(
     }
 
     companion object {
-        fun forModel(model: String = "indraocr", lang: String? = null, modelPath: String? = null): InitializeConfig =
+        fun forModel(model: String = "ppocrv6-tiny", lang: String? = null, modelPath: String? = null): InitializeConfig =
             InitializeConfig(model = model, lang = lang, modelPath = modelPath)
 
         fun indra(detModelPath: String? = null, recModelPath: String? = null, dictPath: String? = null): InitializeConfig =

@@ -18,6 +18,7 @@ EXTENSIONS = [".mnn", ".onnx", ".rten"]
 V6_TIERS = [
     ("ppocrv6-tiny", "PPOCR_v6_tiny", "ppocrv6_tiny", "PPOCR_v6_tiny/dict.txt"),
     ("ppocrv6-tiny-int8", "PPOCR_v6_tiny_int8", "ppocrv6_tiny_int8", "PPOCR_v6_tiny/dict.txt"),
+    ("ppocrv6-tiny-fp16", "PPOCR_v6_tiny_fp16", "ppocrv6_tiny_fp16", "PPOCR_v6_tiny/dict.txt"),
     ("ppocrv6-small", "PPOCR_v6_small", "ppocrv6_small", "PPOCR_v6_small/dict.txt"),
     ("ppocrv6-small-int8", "PPOCR_v6_small_int8", "ppocrv6_small_int8", "PPOCR_v6_small/dict.txt"),
     ("ppocrv6-medium", "PPOCR_v6_medium", "ppocrv6_medium", "PPOCR_v6_medium/dict.txt"),

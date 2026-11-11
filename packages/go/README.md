@@ -4,7 +4,7 @@ Official Go bindings (via Cgo) for **RustO!** — a high-performance, pure-Rust 
 
 ## Features
 
-- **Zero-Config Indra OCR**: `rusto.Initialize()` automatically downloads and caches the default `indraocr` models on first run from Hugging Face Hub.
+- **Zero-Config PP-OCRv6 Tiny**: `rusto.Initialize()` automatically downloads and caches the default `ppocrv6-tiny` (FP32, Apache 2.0) models on first run from Hugging Face Hub.
 - **Thread-Safe Native Handle**: Concurrent-safe `rusto.Engine` (`rusto.RustO`) synchronized with `sync.RWMutex` and deterministic `Close()`.
 - **Document Intelligence**: Enable UVDoc unwarping (`WithAutoUnwarp(true)`), 4-way orientation detection (`WithOrientationDetection(true)`), and neural reading-order recovery (`WithLayoutReading(true)`).
 - **Fluent Builder API**: Select `.AsLines()`, `.AsWords()`, `.AsSpatial()`, `.AsTsv()`, or `.WithOutput(...)` and execute with a single `.Run()` terminal call.
@@ -39,7 +39,7 @@ import (
 )
 
 func main() {
-	// Zero-config: initializes Indra OCR and auto-downloads models from Hugging Face Hub if missing
+	// Zero-config: initializes PP-OCRv6 Tiny (FP32) and auto-downloads models from Hugging Face Hub if missing
 	engine, err := rusto.Initialize()
 	if err != nil {
 		log.Fatalf("failed to initialize RustO: %v", err)

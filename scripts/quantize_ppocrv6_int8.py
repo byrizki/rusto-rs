@@ -39,6 +39,15 @@ def get_rten_convert_cmd():
     return None
 
 
+def get_mnn_convert_bin():
+    """Find the MNNConvert executable."""
+    repo_root = Path(__file__).resolve().parent.parent
+    local_bin = repo_root / "crates" / "rusto-nn" / "tools" / "bin" / "MNNConvert"
+    if local_bin.is_file():
+        return str(local_bin)
+    return shutil.which("MNNConvert")
+
+
 def quantize_det(in_path: str, out_path: str):
     """Quantize detection model using dynamic int8."""
     from onnxruntime.quantization import quantize_dynamic, QuantType
@@ -81,7 +90,25 @@ def convert_to_rten(in_path: str, out_path: str, rten_cmd):
     print(f"  ✓ RTen model: {out_size:.2f} MB")
 
 
-def quantize_tier(tier: str, input_dir: Path, output_dir: Path, convert_rten: bool = True, clean_onnx: bool = False):
+def convert_to_mnn(in_path: str, out_path: str, mnn_bin: str, weight_quant_bits=None):
+    """Convert an ONNX model to .mnn format (optionally weight-quantized)."""
+    print(f"  Converting to MNN: {in_path} -> {out_path}...")
+    cmd = [mnn_bin, "-f", "ONNX", "--modelFile", in_path, "--MNNModel", out_path, "--bizCode", "MNN"]
+    if weight_quant_bits is not None:
+        cmd.extend(["--weightQuantBits", str(weight_quant_bits)])
+    subprocess.check_call(cmd)
+    out_size = os.path.getsize(out_path) / (1024 * 1024)
+    print(f"  ✓ MNN model: {out_size:.2f} MB")
+
+
+def quantize_tier(
+    tier: str,
+    input_dir: Path,
+    output_dir: Path,
+    convert_rten: bool = True,
+    convert_mnn: bool = True,
+    clean_onnx: bool = False,
+):
     """Quantize a single tier."""
     print(f"\n==========================================")
     print(f"  Quantizing PP-OCRv6 {tier.upper()} to INT8")
@@ -125,10 +152,18 @@ def quantize_tier(tier: str, input_dir: Path, output_dir: Path, convert_rten: bo
             convert_to_rten(str(det_onnx_out), str(det_rten_out), rten_cmd)
             convert_to_rten(str(rec_onnx_out), str(rec_rten_out), rten_cmd)
 
-            if clean_onnx:
-                det_onnx_out.unlink(missing_ok=True)
-                rec_onnx_out.unlink(missing_ok=True)
-                print("  ✓ Removed intermediate quantized ONNX files")
+    if convert_mnn:
+        mnn_bin = get_mnn_convert_bin()
+        if mnn_bin is None:
+            print("  Warning: MNNConvert not found. Skipping MNN conversion.", file=sys.stderr)
+        else:
+            convert_to_mnn(str(det_in), str(output_dir / "det.mnn"), mnn_bin, weight_quant_bits=8)
+            convert_to_mnn(str(rec_onnx_out), str(output_dir / "rec.mnn"), mnn_bin)
+
+    if clean_onnx and (convert_rten or convert_mnn):
+        det_onnx_out.unlink(missing_ok=True)
+        rec_onnx_out.unlink(missing_ok=True)
+        print("  ✓ Removed intermediate quantized ONNX files")
 
     return True
 
@@ -164,9 +199,14 @@ def main():
         help="Skip RTen conversion",
     )
     parser.add_argument(
+        "--no-mnn",
+        action="store_true",
+        help="Skip MNN conversion",
+    )
+    parser.add_argument(
         "--clean-onnx",
         action="store_true",
-        help="Remove intermediate quantized ONNX files after RTen conversion",
+        help="Remove intermediate quantized ONNX files after conversion",
     )
 
     args = parser.parse_args()
@@ -192,6 +232,7 @@ def main():
             input_dir=in_dir,
             output_dir=out_dir,
             convert_rten=not args.no_rten,
+            convert_mnn=not args.no_mnn,
             clean_onnx=args.clean_onnx,
         )
         if not ok:

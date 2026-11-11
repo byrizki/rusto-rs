@@ -4,7 +4,7 @@ Official Python bindings for **RustO!** — a high-performance, pure-Rust OCR en
 
 ## Features
 
-- **Zero-Config Indra OCR**: `RustO.initialize()` automatically downloads and caches the default `indraocr` models on first run from Hugging Face Hub.
+- **Zero-Config PP-OCRv6 Tiny Default**: `RustO.initialize()` automatically downloads and caches the default `ppocrv6-tiny` (FP32, Apache 2.0) models on first run from Hugging Face Hub.
 - **Context Manager Support**: Deterministic native resource cleanup with `with RustO.initialize() as engine:` or `engine.close()`.
 - **Full Document Pipeline**: Neural document unwarping (`with_auto_unwarp()`), page orientation detection (`with_orientation_detection()`), semantic layout analysis, and reading-order recovery (`with_layout_reading()`).
 - **Fluent Builder API**: Chain `.as_lines()`, `.as_words()`, `.as_spatial()`, `.as_tsv()`, or `.with_output(...)` into a single `.run()` terminal method.
@@ -21,7 +21,7 @@ pip install rusto
 ```python
 from rusto import RustO
 
-# Zero-config initialization (auto-downloads Indra OCR models from Hugging Face Hub if not cached)
+# Zero-config initialization (auto-downloads PP-OCRv6 Tiny FP32 models from Hugging Face Hub if not cached)
 with RustO.initialize() as engine:
     result = (
         engine.detect_text("invoice.png")
@@ -99,7 +99,7 @@ Pre-download models into a target cache directory ahead of time (e.g., during Do
 ```python
 from rusto import download_model
 
-paths = download_model(model="indraocr", lang="latin", cache_dir="./models-cache")
+paths = download_model(model="ppocrv6-tiny", cache_dir="./models-cache")
 ```
 
 ## Input Sources & Raw RGB Buffers

@@ -2,10 +2,10 @@ use smallvec::SmallVec;
 
 use crate::error::MnnError;
 use crate::graph::ir::{
-    BinaryParams, Graph, GridSampleParams, InterpParams, LayerNormParams, MatMulParams, Node, OpKind, PoolParams,
-    UnaryParams,
+    BinaryParams, ConvInt8Params, Graph, GridSampleParams, Int8ScaleParams, InterpParams, LayerNormParams,
+    MatMulParams, Node, OpKind, PoolParams, UnaryParams,
 };
-use crate::graph::prepack::prepack_op;
+use crate::graph::prepack::{blob_to_tensor, decode_idst_quan, prepack_op};
 use crate::kernels::activation::FusedActivation;
 use crate::kernels::binary::BinaryOpType;
 use crate::kernels::interp::ResizeType;
@@ -85,30 +85,10 @@ pub fn load_mnn(slice: &[u8]) -> Result<Graph, MnnError> {
                 OpType::Input => OpKind::Input,
 
                 OpType::Const => {
-                    let tensor = if let Some(blob) = op.main_as_blob() {
-                        let dims: Vec<usize> = blob
-                            .dims()
-                            .map(|d| d.iter().map(|v| v.max(0) as usize).collect())
-                            .unwrap_or_else(|| vec![1]);
-
-                        if let Some(floats) = blob.float32s() {
-                            let v: Vec<f32> = floats.safe_slice().to_vec();
-                            Tensor::from_floats(&dims, v, TensorLayout::NCHW)
-                        } else if let Some(ints) = blob.int32s() {
-                            let v: Vec<i32> = ints.safe_slice().to_vec();
-                            Tensor::from_ints(&dims, v)
-                        } else if let Some(i64s) = blob.int64s() {
-                            let v: Vec<i32> = i64s.iter().map(|x| x as i32).collect();
-                            Tensor::from_ints(&dims, v)
-                        } else if let Some(u8s) = blob.uint8s() {
-                            let v: Vec<i32> = u8s.iter().map(|&x| x as i32).collect();
-                            Tensor::from_ints(&dims, v)
-                        } else {
-                            Tensor::zeros(&dims, TensorLayout::NCHW)
-                        }
-                    } else {
-                        Tensor::zeros(&[1], TensorLayout::NCHW)
-                    };
+                    let tensor = op
+                        .main_as_blob()
+                        .map(|blob| blob_to_tensor(&blob))
+                        .unwrap_or_else(|| Tensor::zeros(&[1], TensorLayout::NCHW));
                     OpKind::Const(tensor.into_shared())
                 }
 
@@ -510,7 +490,7 @@ pub fn load_mnn(slice: &[u8]) -> Result<Graph, MnnError> {
                 OpType::Rank => OpKind::Rank,
                 OpType::Range => OpKind::Range,
                 OpType::Select | OpType::Where => OpKind::Select,
-                OpType::Fill => OpKind::ConstantOfShape { value: 0.0 },
+                OpType::Fill => OpKind::ConstantOfShape { value: 0.0, int_value: None },
                 OpType::BroadcastTo => OpKind::Expand,
 
                 OpType::Gather | OpType::GatherV2 => {
@@ -518,9 +498,111 @@ pub fn load_mnn(slice: &[u8]) -> Result<Graph, MnnError> {
                     OpKind::Gather { axis }
                 }
 
-                OpType::Cast | OpType::CastLike => OpKind::Cast {
-                    dst_type: DataType::Float,
-                },
+                OpType::Cast | OpType::CastLike => {
+                    let dst_type = op
+                        .main_as_cast_param()
+                        .map(|c| match c.dstT() {
+                            schema::DataType::DT_INT32 | schema::DataType::DT_INT64 => DataType::Int32,
+                            schema::DataType::DT_UINT8 => DataType::UInt8,
+                            schema::DataType::DT_INT8 => DataType::Int8,
+                            _ => DataType::Float,
+                        })
+                        .unwrap_or(DataType::Float);
+                    OpKind::Cast { dst_type }
+                }
+
+                OpType::DynamicQuant => OpKind::DynamicQuant { signed: true },
+
+                OpType::ConvInt8 | OpType::DepthwiseConvInt8 => {
+                    if let Some(conv) = op.main_as_convolution_2d() {
+                        if let (Some(common), Some(sq)) = (conv.common(), conv.symmetricQuan()) {
+                            let out_channels = common.outputCount().max(1) as usize;
+                            let group = (common.group() as usize).max(1);
+                            let is_depthwise = op.type_() == OpType::DepthwiseConvInt8
+                                || (group > 1 && group == out_channels);
+                            let weight = if let Some(w) = sq.weight() {
+                                w.to_vec()
+                            } else if let Some(quan) = conv.quanParameter() {
+                                let _ = decode_idst_quan(&quan);
+                                quan.buffer().map(|b| b.to_vec()).unwrap_or_default()
+                            } else {
+                                Vec::new()
+                            };
+                            let bias = sq.bias().map(|b| b.iter().collect()).unwrap_or_default();
+                            let scale = sq.scale().map(|s| s.iter().collect()).unwrap_or_default();
+                            let pads = common.pads().map(|p| p.safe_slice().to_vec());
+                            OpKind::ConvInt8(ConvInt8Params {
+                                weight,
+                                bias,
+                                scale,
+                                zero_point: sq.zeroPoint() as i32,
+                                output_zero_point: sq.outputZeroPoint() as i32,
+                                clamp_min: sq.clampMin(),
+                                clamp_max: sq.clampMax(),
+                                output_float: sq.outputDataType() == schema::DataType::DT_FLOAT,
+                                kernel_h: common.kernelY().max(1) as usize,
+                                kernel_w: common.kernelX().max(1) as usize,
+                                stride_h: common.strideY().max(1) as usize,
+                                stride_w: common.strideX().max(1) as usize,
+                                dilate_h: common.dilateY().max(1) as usize,
+                                dilate_w: common.dilateX().max(1) as usize,
+                                pad_mode: common.padMode(),
+                                pad_x: common.padX().max(0) as usize,
+                                pad_y: common.padY().max(0) as usize,
+                                pads,
+                                group,
+                                out_channels,
+                                is_depthwise,
+                            })
+                        } else {
+                            OpKind::NoOp
+                        }
+                    } else {
+                        OpKind::NoOp
+                    }
+                }
+
+                OpType::Int8ToFloat => {
+                    if let Some(q) = op.main_as_quantized_float_param() {
+                        let scale = q.tensorScale().map(|s| s.iter().collect()).unwrap_or_default();
+                        let zero_points = q
+                            .floatzeros()
+                            .map(|z| z.iter().collect())
+                            .filter(|z: &Vec<f32>| !z.is_empty())
+                            .unwrap_or_else(|| vec![q.zeroPoint() as f32]);
+                        OpKind::Int8ToFloat(Int8ScaleParams {
+                            scale,
+                            zero_points,
+                            clamp_min: q.clampMin(),
+                            clamp_max: q.clampMax(),
+                        })
+                    } else {
+                        OpKind::Cast {
+                            dst_type: DataType::Float,
+                        }
+                    }
+                }
+
+                OpType::FloatToInt8 => {
+                    if let Some(q) = op.main_as_quantized_float_param() {
+                        let scale = q.tensorScale().map(|s| s.iter().collect()).unwrap_or_default();
+                        let zero_points = q
+                            .floatzeros()
+                            .map(|z| z.iter().collect())
+                            .filter(|z: &Vec<f32>| !z.is_empty())
+                            .unwrap_or_else(|| vec![q.zeroPoint() as f32]);
+                        OpKind::FloatToInt8(Int8ScaleParams {
+                            scale,
+                            zero_points,
+                            clamp_min: q.clampMin(),
+                            clamp_max: q.clampMax(),
+                        })
+                    } else {
+                        OpKind::Cast {
+                            dst_type: DataType::Int8,
+                        }
+                    }
+                }
 
                 OpType::GridSample => {
                     let (mode, padding_mode, align_corners) = if let Some(param) = op.main_as_grid_sample() {

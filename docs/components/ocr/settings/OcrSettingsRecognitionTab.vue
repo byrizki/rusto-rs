@@ -48,7 +48,7 @@ const preRecognitionActiveCount = computed<number>(() => {
 
 const recognitionActiveCount = computed<number>(() => {
   let count = 0;
-  const expectedBatch = props.currentModel.preset === 'indra' ? 1 : 4;
+  const expectedBatch = props.currentModel.recommendedBatchSize;
   if (props.config.recBatchNum !== expectedBatch) count++;
   return count;
 });

@@ -31,6 +31,20 @@ pub fn apply_activation_scalar(x: f32, act: FusedActivation) -> f32 {
     }
 }
 
+#[inline(always)]
+pub fn apply_activation_i32(x: i32, act: FusedActivation) -> Option<i32> {
+    match act {
+        FusedActivation::None => Some(x),
+        FusedActivation::Relu => Some(x.max(0)),
+        FusedActivation::Relu6 => Some(x.clamp(0, 6)),
+        FusedActivation::Clip(min, max) => {
+            let v = (x as f64).max(min as f64).min(max as f64);
+            Some(v.clamp(i32::MIN as f64, i32::MAX as f64) as i32)
+        }
+        _ => None,
+    }
+}
+
 /// Vectorized in-place elementwise activation
 pub fn apply_activation_slice(slice: &mut [f32], act: FusedActivation) {
     if act == FusedActivation::None {

@@ -25,7 +25,7 @@ extension RustO {
     }
 
 
-    /// Initialize RustO with zero configuration (uses bundled models if present, otherwise auto-downloads IndraOCR into the app cache).
+    /// Initialize RustO with zero configuration (uses bundled models if present, otherwise auto-downloads PP-OCRv6 Tiny FP32 into the app cache).
     public static func initialize() throws -> RustO {
         try initializeWithBundledModels()
     }
@@ -367,7 +367,7 @@ extension InitializeConfig {
         )
     }
 
-    public static func forModel(model: String? = "indraocr", lang: String? = nil, modelPath: String? = nil) -> InitializeConfig {
+    public static func forModel(model: String? = "ppocrv6-tiny", lang: String? = nil, modelPath: String? = nil) -> InitializeConfig {
         createInitializeConfigForModel(model: model, lang: lang, modelPath: modelPath)
     }
 

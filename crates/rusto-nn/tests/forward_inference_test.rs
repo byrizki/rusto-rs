@@ -309,7 +309,7 @@ fn test_forward_indra_det_onnx() {
 
     println!("indra det.onnx output shape: {:?}", output.shape());
     assert_eq!(output.shape()[0], 1);
-    assert_eq!(output.shape()[1], 2);
+    assert_eq!(output.shape()[1], 3);
     assert_eq!(output.shape()[2], 32);
     assert_eq!(output.shape()[3], 32);
 
@@ -852,5 +852,78 @@ fn test_forward_ppocrv5_models() {
         let input = Tensor::zeros(in_shape, TensorLayout::NCHW);
         let out = session.run(&[(&in_name, &input)]).unwrap_or_else(|e| panic!("Run {}: {:?}", rel_path, e));
         assert!(!out.is_empty(), "Model {} returned no outputs", rel_path);
+    }
+}
+
+#[cfg(all(feature = "onnx", feature = "rten"))]
+#[test]
+fn test_forward_indra_rec_int32_widths_parity_against_rten() {
+    use rten_tensor::AsView;
+
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
+    let rten_model_path = repo_root.join("models/indra/rec.rten");
+    assert!(rten_model_path.exists());
+
+    let ref_model = rten::Model::load_file(&rten_model_path).expect("Load official rten indra rec");
+    let ref_x_id = ref_model.find_node("x").expect("rten x input");
+    let ref_w_id = ref_model.find_node("widths").expect("rten widths input");
+    let ref_ids_id = ref_model.find_node("ids").expect("rten ids output");
+    let ref_conf_id = ref_model.find_node("conf").expect("rten conf output");
+    let ref_len_id = ref_model.find_node("lengths").expect("rten lengths output");
+
+    // Batch of 2 with width=160 and valid widths [116, 160]:
+    // (116 + 3) / 4 == 29 (float div gives 29.75), testing Int32 Div/Less/Clip/Range preservation.
+    let b = 2usize;
+    let h = 96usize;
+    let w = 160usize;
+    let x_data: Vec<f32> = (0..(b * h * w))
+        .map(|i| (((i * 37 + 13) % 251) as f32) / 251.0 - 0.5)
+        .collect();
+    let widths_i32 = vec![116i32, 160i32];
+
+    let ref_x = rten_tensor::Tensor::<f32>::from_data(&[b, 1, h, w], x_data.clone());
+    let ref_w = rten_tensor::Tensor::<i32>::from_data(&[b], widths_i32.clone());
+    let ref_outs = ref_model
+        .run(
+            vec![(ref_x_id, ref_x.view().into()), (ref_w_id, ref_w.view().into())],
+            &[ref_ids_id, ref_conf_id, ref_len_id],
+            None,
+        )
+        .expect("Run official rten reference");
+    let rten::Value::Int32Tensor(ref_ids_t) = &ref_outs[0] else {
+        panic!("Expected Int32Tensor ids");
+    };
+    let rten::Value::FloatTensor(ref_conf_t) = &ref_outs[1] else {
+        panic!("Expected FloatTensor conf");
+    };
+    let rten::Value::Int32Tensor(ref_lens_t) = &ref_outs[2] else {
+        panic!("Expected Int32Tensor lengths");
+    };
+    let ref_ids = ref_ids_t.to_vec();
+    let ref_conf = ref_conf_t.to_vec();
+    let ref_lens = ref_lens_t.to_vec();
+    assert_eq!(ref_lens, vec![29, 40]);
+
+    let x_t = Tensor::from_floats(&[b, 1, h, w], x_data, TensorLayout::NCHW);
+    let w_t = Tensor::from_ints(&[b], widths_i32);
+
+    for rel in ["models/indra/rec.mnn", "models/indra/rec.onnx", "models/indra/rec.rten"] {
+        let model = Model::from_file(&repo_root.join(rel)).expect(rel);
+        let session = Session::new(&model).expect(rel);
+        let out = session.run(&[("x", &x_t), ("widths", &w_t)]).expect(rel);
+        let got_ids = out["ids"].to_i32_vec();
+        let got_conf = out["conf"].to_f32_vec();
+        let got_lens = out["lengths"].to_i32_vec();
+        assert_eq!(got_lens, ref_lens, "{rel} lengths diverged from official rten");
+        assert_eq!(got_ids, ref_ids, "{rel} ids diverged from official rten");
+        let max_conf_diff = got_conf
+            .iter()
+            .zip(ref_conf.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0f32, f32::max);
+        assert!(
+            max_conf_diff < 1e-4,
+            "{rel} conf max diff too high: {max_conf_diff}"
+        );
     }
 }

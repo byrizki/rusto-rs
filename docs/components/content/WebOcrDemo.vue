@@ -34,7 +34,7 @@ const {
   isPresetActive,
 } = useWebOcrSettings();
 
-const selectedModel = ref<string>('indraocr');
+const selectedModel = ref<string>('ppocrv6-tiny');
 const currentModel = computed<OcrModelOption>(
   () => availableModels.find((m) => m.id === selectedModel.value) ?? defaultModel
 );

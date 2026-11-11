@@ -85,7 +85,7 @@ jobs:
         run: |
           chmod +x scripts/download_models.sh
           chmod +x scripts/quantize_ppocrv6_int8.py
-          python3 -m pip install --upgrade rten-convert onnx onnxruntime --break-system-packages || python3 -m pip install rten-convert onnx onnxruntime || true
+          python3 -m pip install --upgrade rten-convert onnx onnxruntime numpy --break-system-packages || python3 -m pip install rten-convert onnx onnxruntime numpy || true
 
           # 1. Download all models in source ONNX format
           bash scripts/download_models.sh --all
@@ -93,15 +93,30 @@ jobs:
           # 2. Quantize PP-OCRv6 models to INT8 ONNX format
           python3 scripts/quantize_ppocrv6_int8.py --all --no-rten
 
-          # 3. Convert all ONNX models to RTen format in parallel and clean up .onnx
-          find models -name "*.onnx" | xargs -r -P 4 -I {} bash -c '
+          # 3. Generate PP-OCRv6 Tiny FP16 ONNX (+ MNN if MNNConvert is available)
+          python3 -c '
+          import shutil, sys
+          from pathlib import Path
+          sys.path.insert(0, "scripts")
+          import convert_models_all_formats as cm
+          src, dst = Path("models/PPOCR_v6_tiny"), Path("models/PPOCR_v6_tiny_fp16")
+          dst.mkdir(parents=True, exist_ok=True)
+          for name in ("det", "rec"):
+              assert cm.convert_onnx_to_fp16(src / f"{name}.onnx", dst / f"{name}.onnx")
+              if cm.MNN_CONVERT.is_file():
+                  cm.convert_to_mnn(src / f"{name}.onnx", dst / f"{name}.mnn", fp16=True)
+          shutil.copy2(src / "dict.txt", dst / "dict.txt")
+          '
+
+          # 4. Convert FP32/INT8 ONNX models to RTen format in parallel and clean up source .onnx
+          find models -name "*.onnx" ! -path "models/PPOCR_v6_tiny_fp16/*" ! -name "*_tract.onnx" | xargs -r -P 4 -I {} bash -c '
             onnx_path="{}"
             rten_path="${onnx_path%.onnx}.rten"
             echo "Converting $onnx_path -> $rten_path..."
             rten-convert "$onnx_path" "$rten_path" || python3 -c "import sys; from rten_convert.converter import main; sys.argv=[\"rten-convert\", sys.argv[1], sys.argv[2]]; sys.exit(main())" "$onnx_path" "$rten_path"
             rm -f "$onnx_path"
           '
-          echo "✓ All models downloaded, quantized, and converted to .rten"
+          echo "✓ All models downloaded, quantized, and converted"
 
       - name: Stage Organized Model Release Files
         run: |
@@ -183,8 +198,9 @@ jobs:
             Also available on Hugging Face Hub: [byrizki/rusto-models](https://huggingface.co/byrizki/rusto-models) with native CORS support.
 
             ### Base OCR Pipelines (Detection + Recognition + Dictionary)
-            - **Indra OCR (Default Flagship)**: `indra_det.rten`, `indra_rec.rten`, `indra_meta.json`
-            - **PP-OCRv6 Tiny**: `ppocrv6_tiny_det.rten`, `ppocrv6_tiny_rec.rten`, `ppocrv6_dict.txt`
+            - **PP-OCRv6 Tiny (Default FP32)**: `ppocrv6_tiny_det.rten`, `ppocrv6_tiny_rec.rten`, `ppocrv6_dict.txt`
+            - **Indra OCR (DataLab — OpenRAIL-M weights)**: `indra_det.rten`, `indra_rec.rten`, `indra_meta.json`
+            - **PP-OCRv6 Tiny FP16**: `ppocrv6_tiny_fp16_det.onnx`, `ppocrv6_tiny_fp16_rec.onnx` (`.mnn` on HF)
             - **PP-OCRv6 Tiny INT8**: `ppocrv6_tiny_int8_det.rten`, `ppocrv6_tiny_int8_rec.rten`
             - **PP-OCRv6 Small**: `ppocrv6_small_det.rten`, `ppocrv6_small_rec.rten`
             - **PP-OCRv6 Small INT8**: `ppocrv6_small_int8_det.rten`, `ppocrv6_small_int8_rec.rten`

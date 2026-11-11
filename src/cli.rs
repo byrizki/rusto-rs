@@ -19,7 +19,7 @@ pub enum EngineKind {
 
 #[derive(Parser)]
 #[command(version)]
-#[command(about = "RustO! - Fast, memory-safe OCR powered by Indra OCR and PaddleOCR engines", long_about = None)]
+#[command(about = "RustO! - Fast, memory-safe OCR powered by PaddleOCR and Indra OCR engines", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -34,8 +34,8 @@ pub struct OcrArgs {
     #[arg(value_name = "IMAGE")]
     pub image: Option<PathBuf>,
 
-    /// OCR model pipeline: "indraocr" (default), "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4", etc.
-    #[arg(short, long, default_value = "indraocr")]
+    /// OCR model pipeline: "ppocrv6-tiny" (default), "ppocrv6-tiny-fp16", "ppocrv6-tiny-int8", "ppocrv6-small", "indraocr", "ppocrv5", "ppocrv4", etc.
+    #[arg(short, long, default_value = "ppocrv6-tiny")]
     pub model: String,
 
     /// Base model directory containing det, rec, and dict files (overridden by --det-model, --rec-model, --dict)
@@ -145,8 +145,8 @@ pub enum Commands {
 
 #[derive(Args)]
 pub struct DownloadArgs {
-    /// OCR model pipeline to download: "indraocr" (default), "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4", etc.
-    #[arg(short, long, default_value = "indraocr")]
+    /// OCR model pipeline to download: "ppocrv6-tiny" (default), "ppocrv6-tiny-fp16", "ppocrv6-tiny-int8", "ppocrv6-small", "indraocr", "ppocrv5", "ppocrv4", etc.
+    #[arg(short, long, default_value = "ppocrv6-tiny")]
     pub model: String,
 
     /// Target language: "latin" (default), "ja", "ko", "ar", "cyrillic", "devanagari", "chinese-cht", etc.

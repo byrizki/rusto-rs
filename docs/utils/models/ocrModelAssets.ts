@@ -64,49 +64,58 @@ export const MODEL_RELEASE_ASSETS: Record<string, ModelAssetFiles> = {
     'ppocrv6_tiny_rec.mnn',
     'ppocrv6_dict.txt'
   ),
+  'ppocrv6-tiny-fp16': makeModelAsset(
+    'ppocrv6-tiny-fp16',
+    'det.mnn',
+    'rec.mnn',
+    'dict.txt',
+    'ppocrv6_tiny_fp16_det.mnn',
+    'ppocrv6_tiny_fp16_rec.mnn',
+    'ppocrv6_dict.txt'
+  ),
   'ppocrv6-tiny-int8': makeModelAsset(
     'ppocrv6-tiny-int8',
-    'det.onnx',
-    'rec.onnx',
+    'det.mnn',
+    'rec.mnn',
     'dict.txt',
-    'ppocrv6_tiny_int8_det.onnx',
-    'ppocrv6_tiny_int8_rec.onnx',
+    'ppocrv6_tiny_int8_det.mnn',
+    'ppocrv6_tiny_int8_rec.mnn',
     'ppocrv6_dict.txt'
   ),
   'ppocrv6-small': makeModelAsset(
     'ppocrv6-small',
-    'det.onnx',
-    'rec.onnx',
+    'det.mnn',
+    'rec.mnn',
     'dict.txt',
-    'ppocrv6_small_det.onnx',
-    'ppocrv6_small_rec.onnx',
+    'ppocrv6_small_det.mnn',
+    'ppocrv6_small_rec.mnn',
     'ppocrv6_dict.txt'
   ),
   'ppocrv6-small-int8': makeModelAsset(
     'ppocrv6-small-int8',
-    'det.onnx',
-    'rec.onnx',
+    'det.mnn',
+    'rec.mnn',
     'dict.txt',
-    'ppocrv6_small_int8_det.onnx',
-    'ppocrv6_small_int8_rec.onnx',
+    'ppocrv6_small_int8_det.mnn',
+    'ppocrv6_small_int8_rec.mnn',
     'ppocrv6_dict.txt'
   ),
   'ppocrv6-medium': makeModelAsset(
     'ppocrv6-medium',
-    'det.onnx',
-    'rec.onnx',
+    'det.mnn',
+    'rec.mnn',
     'dict.txt',
-    'ppocrv6_medium_det.onnx',
-    'ppocrv6_medium_rec.onnx',
+    'ppocrv6_medium_det.mnn',
+    'ppocrv6_medium_rec.mnn',
     'ppocrv6_dict.txt'
   ),
   'ppocrv6-medium-int8': makeModelAsset(
     'ppocrv6-medium-int8',
-    'det.onnx',
-    'rec.onnx',
+    'det.mnn',
+    'rec.mnn',
     'dict.txt',
-    'ppocrv6_medium_int8_det.onnx',
-    'ppocrv6_medium_int8_rec.onnx',
+    'ppocrv6_medium_int8_det.mnn',
+    'ppocrv6_medium_int8_rec.mnn',
     'ppocrv6_dict.txt'
   ),
 

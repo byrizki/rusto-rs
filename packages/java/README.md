@@ -6,7 +6,7 @@ Pure Java / JVM bindings (via JNA) for **RustO!** — a high-performance, pure-R
 
 ## Features
 
-- **Zero-Config Indra OCR**: `RustO.initialize()` automatically downloads and caches the default `indraocr` models on first run from Hugging Face Hub.
+- **Zero-Config PP-OCRv6 Tiny**: `RustO.initialize()` automatically downloads and caches the default `ppocrv6-tiny` (FP32, Apache 2.0) models on first run from Hugging Face Hub.
 - **`AutoCloseable` Lifecycle**: Safe, deterministic native handle cleanup with Java `try-with-resources`.
 - **Document Intelligence**: Enable UVDoc unwarping (`withAutoUnwarp()`), 4-way page orientation correction (`withOrientationDetection()`), and neural layout reading order (`withLayoutReading()`).
 - **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, `.asTsv()`, or `.withOutput(...)` into a single `.run()` terminal method returning `RustO.DetectTextResult`.

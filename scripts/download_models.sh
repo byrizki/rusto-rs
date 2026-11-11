@@ -118,8 +118,12 @@ download_ppocrv6() {
 
     local pids=()
     local folder="ppocrv6-$tier"
+    local exts=(mnn onnx rten)
+    if [ "$tier" = "tiny-fp16" ]; then
+        exts=(mnn onnx)
+    fi
 
-    for ext in mnn onnx rten; do
+    for ext in "${exts[@]}"; do
         download_file_to "$dir" "det.$ext" "$folder/det.$ext" &
         pids+=($!)
         download_file_to "$dir" "rec.$ext" "$folder/rec.$ext" &
@@ -301,7 +305,8 @@ elif [ "$DOWNLOAD_ALL" = true ]; then
     download_modules "${OUTPUT_DIR:-$REPO_ROOT/models}"
     download_indra "${OUTPUT_DIR:-$REPO_ROOT/models/indra}"
 else
-    TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_$TIER}"
+    LOCAL_TIER="${TIER//-/_}"
+    TARGET_DIR="${OUTPUT_DIR:-$REPO_ROOT/models/PPOCR_v6_$LOCAL_TIER}"
     case "$MODEL_TYPE" in
         ppocrv6)
             download_ppocrv6 "$TIER" "$TARGET_DIR"

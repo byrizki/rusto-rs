@@ -14,7 +14,10 @@ pub mod threads;
 
 pub use backend::{active_backend, clear_backend, register_backend, DeviceBackend};
 pub use error::MnnError;
-pub use graph::{alloc_tensor_buffer_overwrite, clear_tensor_buffer_pool, recycle_tensor_buffer};
+pub use graph::{
+    alloc_tensor_buffer, alloc_tensor_buffer_overwrite, clear_tensor_buffer_pool,
+    recycle_tensor_buffer,
+};
 pub use model::Model;
 pub use session::Session;
 pub use tensor::{DataType, Shape, Tensor, TensorLayout};

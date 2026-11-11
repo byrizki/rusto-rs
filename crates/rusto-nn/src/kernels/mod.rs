@@ -8,6 +8,7 @@ pub mod gemm;
 pub mod interp;
 pub mod norm;
 pub mod pool;
+pub mod quant;
 pub mod reduction;
 pub mod tensor_ops;
 pub mod unary;

@@ -1,12 +1,12 @@
 # @rustors/web
 
-Official Browser & WebAssembly SDK for **RustO!** — client-side, privacy-preserving OCR powered by Indra OCR, PaddleOCR, and the pure-Rust RTen WebAssembly runtime.
+Official Browser & WebAssembly SDK for **RustO!** — client-side, privacy-preserving OCR powered by PaddleOCR, Indra OCR, and the pure-Rust `rusto-nn` & RTen WebAssembly runtimes.
 
 ## Features
 
 - **100% Client-Side WebAssembly**: Runs in a dedicated Web Worker by default so your main UI thread stays responsive and images never leave the browser.
 - **Standalone Model Assets**: Load lightweight models directly from Hugging Face Hub (`byrizki/rusto-models`), your CDN, or local `/models/` static assets — no npm model wrapper packages required.
-- **Indra OCR & PP-OCRv6 Presets**: First-class support for `'indra'` (high-accuracy document OCR) alongside `'ppv6'`, `'ppv5'`, `'ppv4'`, and `'ppv3'`.
+- **PP-OCRv6 Tiny Default & Presets**: Defaults to Apache 2.0 `'ppv6'` (`ppocrv6-tiny` FP32) alongside `'ppocrv6-tiny-fp16'`, `'ppv6'`, `'ppv5'`, `'ppv4'`, `'ppv3'`, and `'indra'`.
 - **Document Intelligence**: Configure optional `unwarp`, `orientation`, `layout`, and `order` `.rten` models and enable them per call with `.withAutoUnwarp()` and `.withLayoutReading()`.
 - **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, or `.withOutput(...)` into a single `await ...run()` call.
 
@@ -26,9 +26,9 @@ pnpm add @rustors/web
 
 | Pipeline / Stage | Canonical Asset Filenames |
 | :--- | :--- |
-| **Indra OCR (`preset: 'indra'`)** | `indra_det.rten`, `indra_rec.rten`, `indra_meta.json` |
-| **PP-OCRv6 Tiny (`preset: 'ppv6'`)** | `ppocrv6_tiny_det.rten`, `ppocrv6_tiny_rec.rten`, `ppocrv6_dict.txt` |
-| **Optional Document Stages** | `uvdoc.rten` (`unwarp`), `indra_orient.rten` or `ppocr_orient.rten` (`orientation`), `layout_cdla.rten` (`layout`), `indra_order.rten` (`order`) |
+| **PP-OCRv6 Tiny (`preset: 'ppv6'`, Default)** | `ppocrv6-tiny/det.rten`, `ppocrv6-tiny/rec.rten`, `ppocrv6-tiny/dict.txt` |
+| **Indra OCR (`preset: 'indra'`)** | `indraocr/det.rten`, `indraocr/rec.rten`, `indraocr/meta.json` |
+| **Optional Document Stages** | `modules/uvdoc.rten` (`unwarp`), `modules/orient.rten` (`orientation`), `modules/layout_cdla.rten` (`layout`), `indraocr/order.rten` (`order`) |
 
 ## Quick Start
 
@@ -39,17 +39,17 @@ const HF_BASE = 'https://huggingface.co/byrizki/rusto-models/resolve/main';
 
 // 1. Initialize once (runs inside a dedicated Web Worker by default)
 await initialize({
-  preset: 'indra',
+  preset: 'ppv6',
   enableReadingOrder: true,
   models: {
-    detection: `${HF_BASE}/indra_det.rten`,
-    recognition: `${HF_BASE}/indra_rec.rten`,
-    dictionary: `${HF_BASE}/indra_meta.json`,
+    detection: `${HF_BASE}/ppocrv6-tiny/det.rten`,
+    recognition: `${HF_BASE}/ppocrv6-tiny/rec.rten`,
+    dictionary: `${HF_BASE}/ppocrv6-tiny/dict.txt`,
     // Optional auxiliary .rten models:
-    unwarp: `${HF_BASE}/uvdoc.rten`,
-    orientation: `${HF_BASE}/indra_orient.rten`,
-    layout: `${HF_BASE}/layout_cdla.rten`,
-    order: `${HF_BASE}/indra_order.rten`,
+    unwarp: `${HF_BASE}/modules/uvdoc.rten`,
+    orientation: `${HF_BASE}/modules/orient.rten`,
+    layout: `${HF_BASE}/modules/layout_cdla.rten`,
+    order: `${HF_BASE}/indraocr/order.rten`,
   },
 });
 

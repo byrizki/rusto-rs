@@ -1180,7 +1180,7 @@ func (_ FfiDestroyerFrame) Destroy(value Frame) {
 
 // Engine initialization configuration specifying model paths, preset, and optional extensions.
 type InitializeConfig struct {
-	// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
+	// Model identifier or directory (e.g. "ppocrv6-tiny", "ppocrv6-tiny-fp16", "ppocrv6-small", "indraocr", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
 	Model *string
 	// Base model directory containing det, rec, and dict files.
 	ModelPath *string

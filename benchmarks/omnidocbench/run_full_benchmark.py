@@ -827,6 +827,26 @@ RAW_OCR_TARGETS = [
     ("(raw-j)", "rusto_rten_indra", "RTen OCR (Rusto Binding) + Indra OCR (Base)"),
     ("(raw-k)", "rusto_mnn_indra", "MNN OCR (Rusto Binding) + Indra OCR (Base)"),
     ("(raw-l)", "tesseract_raw", "Tesseract OCR (v5 / PSM 6 Uniform Block)"),
+    ("(raw-m)", "rusto_nn_tiny_fp16", "Rusto NN OCR (Pure-Rust MNN) + PP-OCRv6 Tiny FP16"),
+    ("(raw-n)", "rusto_nn_tiny_int8", "Rusto NN OCR (Pure-Rust MNN) + PP-OCRv6 Tiny INT8"),
+    ("(raw-o)", "rusto_rten_tiny_int8", "RTen OCR (Rusto Binding) + PP-OCRv6 Tiny INT8"),
+    ("(raw-p)", "rusto_nn_small_int8", "Rusto NN OCR (Pure-Rust MNN) + PP-OCRv6 Small INT8"),
+    ("(raw-q)", "rusto_nn_medium_int8", "Rusto NN OCR (Pure-Rust MNN) + PP-OCRv6 Medium INT8"),
+    ("(raw-r)", "rapidocr_tiny_fp16", "Python RapidOCR + PP-OCRv6 Tiny FP16"),
+    ("(raw-s)", "rapidocr_tiny_int8", "Python RapidOCR + PP-OCRv6 Tiny INT8"),
+]
+
+PRECISION_COMPARISON_SPECS = [
+    ("rusto_nn_ppocr", "PP-OCRv6 Tiny (FP32)", "FP32", "Pure-Rust MNN (`rusto-nn`)"),
+    ("rusto_rten_tiny", "PP-OCRv6 Tiny (FP32)", "FP32", "Pure-Rust RTen (`rusto-rten`)"),
+    ("rusto_nn_tiny_fp16", "PP-OCRv6 Tiny (FP16)", "FP16", "Pure-Rust MNN (`rusto-nn`)"),
+    ("rusto_nn_tiny_int8", "PP-OCRv6 Tiny (INT8)", "INT8", "Pure-Rust MNN (`rusto-nn`)"),
+    ("rusto_rten_tiny_int8", "PP-OCRv6 Tiny (INT8)", "INT8", "Pure-Rust RTen (`rusto-rten`)"),
+    ("rusto_nn_small_int8", "PP-OCRv6 Small (INT8)", "INT8", "Pure-Rust MNN (`rusto-nn`)"),
+    ("rusto_nn_medium_int8", "PP-OCRv6 Medium (INT8)", "INT8", "Pure-Rust MNN (`rusto-nn`)"),
+    ("rapidocr_tiny", "RapidOCR Tiny (FP32)", "FP32", "Python (ONNX Runtime)"),
+    ("rapidocr_tiny_fp16", "RapidOCR Tiny (FP16)", "FP16", "Python (ONNX Runtime)"),
+    ("rapidocr_tiny_int8", "RapidOCR Tiny (INT8)", "INT8", "Python (ONNX Runtime)"),
 ]
 
 FULL_PIPELINE_TARGETS = [
@@ -997,12 +1017,40 @@ def generate_markdown_report(results, report_path):
     rss_paddle = round(get_stat("paddleocr_tiny", "peak_rss_mb", 659.3))
     rss_ocrs = round(get_stat("ocrs", "peak_rss_mb", 1900.4))
 
-    takeaway_nn_bin = get_stat("rusto_nn_ppocr", "binary_size_mb", 2.0)
-    takeaway_rten_rss = get_stat("rusto_rten_tiny", "peak_rss_mb", 178.0)
-    takeaway_nn_rss = get_stat("rusto_nn_ppocr", "peak_rss_mb", 253.1)
-    takeaway_rapid_rss = get_stat("rapidocr_tiny", "peak_rss_mb", 392.5)
-    takeaway_paddle_rss = get_stat("paddleocr_tiny", "peak_rss_mb", 659.3)
-    takeaway_rten_lat = get_stat("rusto_rten_tiny", "mean_latency_ms", 976.0)
+    takeaway_nn_bin = get_stat("rusto_nn_ppocr", "binary_size_mb", 2.8)
+    takeaway_rten_rss = min(
+        get_stat("rusto_rten_tiny", "peak_rss_mb", 193.2),
+        get_stat("rusto_rten_indra", "peak_rss_mb", 155.3),
+    )
+    takeaway_nn_rss_min = min(
+        get_stat("rusto_nn_ppocr", "peak_rss_mb", 307.7),
+        get_stat("rusto_nn_indra", "peak_rss_mb", 188.5),
+    )
+    takeaway_nn_rss_max = max(
+        get_stat("rusto_nn_ppocr", "peak_rss_mb", 307.7),
+        get_stat("rusto_nn_indra", "peak_rss_mb", 188.5),
+    )
+    takeaway_rapid_rss = get_stat("rapidocr_tiny", "peak_rss_mb", 397.1)
+    takeaway_paddle_rss = get_stat("paddleocr_tiny", "peak_rss_mb", 694.8)
+    takeaway_nn_indra_lat = get_stat("rusto_nn_indra", "mean_latency_ms", 561.1)
+    takeaway_nn_ppocr_lat = get_stat("rusto_nn_ppocr", "mean_latency_ms", 1080.1)
+    takeaway_nn_ppocr_acc = get_stat("rusto_nn_ppocr", "accuracy_pct", 46.66)
+    takeaway_indra_full_lat = get_stat("rusto_indra_full", "mean_latency_ms", 638.3)
+    takeaway_indra_full_rss = get_stat("rusto_indra_full", "peak_rss_mb", 184.9)
+    takeaway_indra_full_acc = get_stat("rusto_indra_full", "accuracy_pct", 63.90)
+    takeaway_indra_full_ned = get_stat("rusto_indra_full", "mean_ned", 0.3610)
+    takeaway_py_indra_lat = get_stat("indra_ocr", "mean_latency_ms", 3111.6)
+    takeaway_py_indra_rss = get_stat("indra_ocr", "peak_rss_mb", 472.2)
+    takeaway_py_indra_acc = get_stat("indra_ocr", "accuracy_pct", 63.76)
+    takeaway_fp16_lat = get_stat("rusto_nn_tiny_fp16", "mean_latency_ms", 0.0)
+    takeaway_fp16_acc = get_stat("rusto_nn_tiny_fp16", "accuracy_pct", 0.0)
+    takeaway_fp16_size = get_stat("rusto_nn_tiny_fp16", "model_size_mb", 0.0)
+    takeaway_int8_lat = get_stat("rusto_nn_tiny_int8", "mean_latency_ms", 0.0)
+    takeaway_int8_acc = get_stat("rusto_nn_tiny_int8", "accuracy_pct", 0.0)
+    takeaway_int8_size = get_stat("rusto_nn_tiny_int8", "model_size_mb", 0.0)
+    takeaway_rten_int8_lat = get_stat("rusto_rten_tiny_int8", "mean_latency_ms", 0.0)
+    takeaway_rten_int8_rss = get_stat("rusto_rten_tiny_int8", "peak_rss_mb", 0.0)
+    takeaway_rten_int8_acc = get_stat("rusto_rten_tiny_int8", "accuracy_pct", 0.0)
 
     report_lines.extend([
         "",
@@ -1037,6 +1085,39 @@ def generate_markdown_report(results, report_path):
         f'    y-axis "Peak RSS (MB)" 0 --> {max(2000, round(max(rss_rten_tiny, rss_rten_indra, rss_nn_tiny, rss_nn_indra, rss_rapid, rss_paddle, rss_ocrs) * 1.15))}',
         f'    bar [{rss_rten_tiny}, {rss_rten_indra}, {rss_nn_tiny}, {rss_nn_indra}, {rss_rapid}, {rss_paddle}, {rss_ocrs}]',
         "```",
+    ])
+
+    precision_entries = [
+        (spec, resolve_result_entry(results, key))
+        for spec in PRECISION_COMPARISON_SPECS
+        for key in [spec[0]]
+        if resolve_result_entry(results, key) is not None
+    ]
+    if precision_entries:
+        baseline_tiny = resolve_result_entry(results, "rusto_nn_ppocr")
+        baseline_acc = baseline_tiny.get("accuracy_pct", 0.0) if baseline_tiny else None
+        report_lines.extend([
+            "",
+            "### PP-OCRv6 Precision & Quantization Comparison (FP32 vs FP16 vs INT8)",
+            "",
+            "*Compares full-precision (`FP32`), half-precision (`FP16`), and 8-bit integer (`INT8`) weights across RustO! pure-Rust runtimes and ONNX Runtime on the identical OmniDocBench sample.*",
+            "",
+            "| Tier & Precision | Precision | Engine / Runtime | Model Weights | Mean Latency ↓ | P95 Latency ↓ | Peak RSS ↓ | Mean NED ↓ | Accuracy ↑ | Δ vs Tiny FP32 |",
+            "|:---|:---:|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|",
+        ])
+        for (_, label, prec, runtime), data in precision_entries:
+            delta_str = (
+                f"{data['accuracy_pct'] - baseline_acc:+.2f} pp"
+                if baseline_acc is not None
+                else "—"
+            )
+            report_lines.append(
+                f"| {label} | **{prec}** | {runtime} | {data.get('model_size_mb', 0.0):.1f} MB | "
+                f"{data['mean_latency_ms']:.1f} ms | {data['p95_latency_ms']:.1f} ms | "
+                f"{data['peak_rss_mb']:.1f} MB | {data['mean_ned']:.4f} | {data['accuracy_pct']:.2f}% | {delta_str} |"
+            )
+
+    report_lines.extend([
         "",
         "---",
         "",
@@ -1109,13 +1190,21 @@ def generate_markdown_report(results, report_path):
         f"   - By decoupling `rusto-rten` and `rusto-mnn` into separate specialized binaries, the default `rusto` CLI shrinks from **8.2 MB to {takeaway_nn_bin:.1f} MB** (~{round((1.0 - takeaway_nn_bin / 8.2) * 100)}% reduction).",
         "   - Pure-Rust MNN standalone runtime contains native AVX2/AVX-512/NEON vector kernels and loaders for `.mnn`, `.onnx`, and `.rten` without requiring external C++ libraries.",
         "2. **Raw OCR Parity & Memory Efficiency Leaders**:",
-        f"   - Native RTen binding (`rusto-rten`) achieves the lowest peak RSS memory at **{takeaway_rten_rss:.1f} MB**, followed by Pure-Rust MNN at **{takeaway_nn_rss:.1f} MB**.",
+        f"   - Native RTen binding (`rusto-rten`) achieves the lowest peak RSS memory at **{takeaway_rten_rss:.1f} MB**, followed by Pure-Rust MNN at **{takeaway_nn_rss_min:.1f} MB - {takeaway_nn_rss_max:.1f} MB**.",
         f"   - RapidOCR consumes **{takeaway_rapid_rss:.1f} MB** and PaddleOCR requires **{takeaway_paddle_rss:.1f} MB**.",
-        f"   - Sub-second inference on PP-OCRv6 Tiny (**{takeaway_rten_lat:.1f} ms**).",
+        f"   - Pure-Rust MNN inference on Indra models executes in sub-second latency at **{takeaway_nn_indra_lat:.1f} ms** (**{takeaway_indra_full_lat:.1f} ms** in Full Pipeline), while PP-OCRv6 Tiny executes at **{takeaway_nn_ppocr_lat:.1f} ms** (**{takeaway_nn_ppocr_acc:.2f}%** accuracy).",
         "3. **Full Pipeline Reading Order & Layout Accuracy Gains**:",
-        "   - On complex multi-column layouts (newspapers, slides, textbooks), Raw OCR 1D spatial sorting yields ~45% document accuracy due to column interleaving.",
-        f"   - Integrating neural reading order recovery (`order.onnx` / `order.rten`) or CDLA layout segmentation (`layout_cdla.mnn`) jumps transcription accuracy to **{acc_indra}% (NED drops to 0.36)** while adding negligible latency overhead.",
+        "   - On complex multi-column layouts (newspapers, slides, textbooks), Raw OCR 1D spatial sorting yields ~45%–47% document accuracy due to column interleaving.",
+        f"   - Integrating neural reading order recovery (`order.onnx` / `order.rten`) jumps transcription accuracy to **{takeaway_indra_full_acc:.2f}% (NED drops to {takeaway_indra_full_ned:.4f})** while maintaining **{takeaway_indra_full_rss:.1f} MB peak RSS**, strictly outperforming the official Python Indra pipeline (**{takeaway_py_indra_acc:.2f}% / {takeaway_py_indra_rss:.1f} MB**) with {takeaway_py_indra_lat / max(takeaway_indra_full_lat, 1e-6):.2f}x lower latency and {round((1.0 - takeaway_indra_full_rss / max(takeaway_py_indra_rss, 1e-6)) * 100)}% less memory.",
     ])
+
+    if takeaway_fp16_lat > 0 and takeaway_int8_lat > 0:
+        report_lines.extend([
+            "4. **FP16 & INT8 Precision / Quantization Tradeoffs**:",
+            f"   - **PP-OCRv6 Tiny FP16 (`rusto-nn`)** halves weight footprint to **{takeaway_fp16_size:.1f} MB** with virtually identical latency (**{takeaway_fp16_lat:.1f} ms** vs **{takeaway_nn_ppocr_lat:.1f} ms** FP32) and **{takeaway_fp16_acc:.2f}%** accuracy ({takeaway_fp16_acc - takeaway_nn_ppocr_acc:+.2f} pp vs FP32).",
+            f"   - **PP-OCRv6 Tiny INT8 (`rusto-nn`)** compresses weights to **{takeaway_int8_size:.1f} MB** with **{takeaway_int8_acc:.2f}%** accuracy ({takeaway_int8_acc - takeaway_nn_ppocr_acc:+.2f} pp vs FP32) at **{takeaway_int8_lat:.1f} ms** CPU latency (dequantization overhead matches RapidOCR INT8 slowdown).",
+            f"   - **PP-OCRv6 Tiny INT8 (`rusto-rten`)** runs at **{takeaway_rten_int8_lat:.1f} ms** with the lowest quantized RSS (**{takeaway_rten_int8_rss:.1f} MB**) and **{takeaway_rten_int8_acc:.2f}%** accuracy.",
+        ])
 
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(report_lines) + "\n")
@@ -1329,6 +1418,41 @@ def main():
         MODELS_DIR / "PPOCR_v6_tiny" / "det.mnn",
         MODELS_DIR / "PPOCR_v6_tiny" / "rec.mnn",
         MODELS_DIR / "PPOCR_v6_tiny" / "dict.txt",
+    ]
+    models_ppocr_tiny_fp16_mnn = [
+        MODELS_DIR / "PPOCR_v6_tiny_fp16" / "det.mnn",
+        MODELS_DIR / "PPOCR_v6_tiny_fp16" / "rec.mnn",
+        MODELS_DIR / "PPOCR_v6_tiny_fp16" / "dict.txt",
+    ]
+    models_ppocr_tiny_fp16_onnx = [
+        MODELS_DIR / "PPOCR_v6_tiny_fp16" / "det.onnx",
+        MODELS_DIR / "PPOCR_v6_tiny_fp16" / "rec.onnx",
+        MODELS_DIR / "PPOCR_v6_tiny_fp16" / "dict.txt",
+    ]
+    models_ppocr_tiny_int8_mnn = [
+        MODELS_DIR / "PPOCR_v6_tiny_int8" / "det.mnn",
+        MODELS_DIR / "PPOCR_v6_tiny_int8" / "rec.mnn",
+        MODELS_DIR / "PPOCR_v6_tiny_int8" / "dict.txt",
+    ]
+    models_ppocr_tiny_int8_onnx = [
+        MODELS_DIR / "PPOCR_v6_tiny_int8" / "det.onnx",
+        MODELS_DIR / "PPOCR_v6_tiny_int8" / "rec.onnx",
+        MODELS_DIR / "PPOCR_v6_tiny_int8" / "dict.txt",
+    ]
+    models_ppocr_tiny_int8_rten = [
+        MODELS_DIR / "PPOCR_v6_tiny_int8" / "det.rten",
+        MODELS_DIR / "PPOCR_v6_tiny_int8" / "rec.rten",
+        MODELS_DIR / "PPOCR_v6_tiny_int8" / "dict.txt",
+    ]
+    models_ppocr_small_int8_mnn = [
+        MODELS_DIR / "PPOCR_v6_small_int8" / "det.mnn",
+        MODELS_DIR / "PPOCR_v6_small_int8" / "rec.mnn",
+        MODELS_DIR / "PPOCR_v6_small_int8" / "dict.txt",
+    ]
+    models_ppocr_medium_int8_mnn = [
+        MODELS_DIR / "PPOCR_v6_medium_int8" / "det.mnn",
+        MODELS_DIR / "PPOCR_v6_medium_int8" / "rec.mnn",
+        MODELS_DIR / "PPOCR_v6_medium_int8" / "dict.txt",
     ]
     models_opts_mnn = [
         MODELS_DIR / "PPOCR_v6_tiny" / "cls.mnn",
@@ -1704,6 +1828,55 @@ def main():
             "model_size_mb": get_model_size_mb(models_ppocr_tiny_rten),
             "engine_runtime": "Native Rust (RTen)",
         },
+        "rusto_nn_tiny_fp16": {
+            "name": "RustO NN + PP-OCRv6 Tiny (FP16)",
+            "target": "(raw-m) Pure-Rust MNN Tiny FP16",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_fp16_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rusto_nn_tiny_int8": {
+            "name": "RustO NN + PP-OCRv6 Tiny (INT8)",
+            "target": "(raw-n) Pure-Rust MNN Tiny INT8",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_int8_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rusto_rten_tiny_int8": {
+            "name": "RustO RTen + PP-OCRv6 Tiny (INT8)",
+            "target": "(raw-o) Native Rust RTen Tiny INT8",
+            "binary_size_mb": get_binary_size_mb(RUSTO_RTEN_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_int8_rten),
+            "engine_runtime": "Native Rust (rusto-rten)",
+        },
+        "rusto_nn_small_int8": {
+            "name": "RustO NN + PP-OCRv6 Small (INT8)",
+            "target": "(raw-p) Pure-Rust MNN Small INT8",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_small_int8_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rusto_nn_medium_int8": {
+            "name": "RustO NN + PP-OCRv6 Medium (INT8)",
+            "target": "(raw-q) Pure-Rust MNN Medium INT8",
+            "binary_size_mb": get_binary_size_mb(RUSTO_BIN),
+            "model_size_mb": get_model_size_mb(models_ppocr_medium_int8_mnn),
+            "engine_runtime": "Pure-Rust MNN (rusto-nn)",
+        },
+        "rapidocr_tiny_fp16": {
+            "name": "Python RapidOCR + PP-OCRv6 Tiny (FP16)",
+            "target": "(raw-r) Python RapidOCR Tiny FP16",
+            "binary_size_mb": 22.7,
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_fp16_onnx),
+            "engine_runtime": "Python (ONNX Runtime)",
+        },
+        "rapidocr_tiny_int8": {
+            "name": "Python RapidOCR + PP-OCRv6 Tiny (INT8)",
+            "target": "(raw-s) Python RapidOCR Tiny INT8",
+            "binary_size_mb": 22.7,
+            "model_size_mb": get_model_size_mb(models_ppocr_tiny_int8_onnx),
+            "engine_runtime": "Python (ONNX Runtime)",
+        },
     }
 
     # Helper function to check if target is requested
@@ -1937,6 +2110,49 @@ def main():
         stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
         results["rusto_nn_indra"] = stats
         results["rusto_indra_base"] = dict(stats)
+
+    # -------------------------------------------------------------------------
+    # Targets m-q: RustO FP16 & INT8 Quantized Precision Tiers
+    # -------------------------------------------------------------------------
+    precision_cli_specs = [
+        ("rusto_nn_tiny_fp16", RUSTO_BIN, MODELS_DIR / "PPOCR_v6_tiny_fp16", "mnn"),
+        ("rusto_nn_tiny_int8", RUSTO_BIN, MODELS_DIR / "PPOCR_v6_tiny_int8", "mnn"),
+        ("rusto_rten_tiny_int8", RUSTO_RTEN_BIN, MODELS_DIR / "PPOCR_v6_tiny_int8", "rten"),
+        ("rusto_nn_small_int8", RUSTO_BIN, MODELS_DIR / "PPOCR_v6_small_int8", "mnn"),
+        ("rusto_nn_medium_int8", RUSTO_BIN, MODELS_DIR / "PPOCR_v6_medium_int8", "mnn"),
+    ]
+    for target_key, bin_path, model_dir, ext in precision_cli_specs:
+        if not is_target_active(target_key):
+            continue
+        def make_precision_cmd(path, b_path=bin_path, m_dir=model_dir, m_ext=ext):
+            return [
+                str(b_path),
+                "--det-model", str(m_dir / f"det.{m_ext}"),
+                "--rec-model", str(m_dir / f"rec.{m_ext}"),
+                "--dict", str(m_dir / "dict.txt"),
+                "--det-limit", "960",
+                "--format", "text",
+                path,
+            ]
+        timings, neds, rss, page_neds = runner.run_cli_pipeline(target_key, make_precision_cmd, warmup_img)
+        stats = compute_stats(timings, neds)
+        stats.update(pipeline_metadata[target_key])
+        stats["peak_rss_mb"] = round(rss, 1)
+        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+        results[target_key] = stats
+
+    for rapid_key, rapid_tier in [
+        ("rapidocr_tiny_fp16", "tiny_fp16"),
+        ("rapidocr_tiny_int8", "tiny_int8"),
+    ]:
+        if not is_target_active(rapid_key):
+            continue
+        timings, neds, rss, page_neds = runner.run_rapidocr(rapid_key, rapid_tier, warmup_img)
+        stats = compute_stats(timings, neds)
+        stats.update(pipeline_metadata[rapid_key])
+        stats["peak_rss_mb"] = round(rss, 1)
+        stats["usatoday_ned"] = round(page_neds.get(warmup_img, 1.0), 4)
+        results[rapid_key] = stats
 
     # -------------------------------------------------------------------------
     # Target raw-l: Tesseract OCR (v5 / Raw PSM 6 Uniform Block)

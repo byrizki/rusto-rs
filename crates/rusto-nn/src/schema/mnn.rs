@@ -371,6 +371,16 @@ pub enum QuantizeAlgo {
 
 impl_contiguous_enum_scalar!(QuantizeAlgo, i8, 2, Self::DEFAULT, from_i8);
 
+#[allow(non_camel_case_types)]
+#[repr(i8)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub enum ScaleStorageType {
+    FP32 = 0,
+    FP16 = 1,
+}
+
+impl_contiguous_enum_scalar!(ScaleStorageType, i8, 1, Self::FP32, from_i8);
+
 /// MNN operator opcode stored as an `i32` FlatBuffers wire scalar.
 #[allow(non_camel_case_types)]
 #[repr(transparent)]
@@ -765,6 +775,7 @@ define_table!(GridSample);
 define_table!(MatMul);
 define_table!(LayerNorm);
 define_table!(SqueezeParam);
+define_table!(CastParam);
 define_table!(IDSTQuan);
 define_table!(QuantizedFloatParam);
 
@@ -900,6 +911,8 @@ define_op_main_as!(
     main_as_grid_sample => GridSample: GridSample,
     main_as_mat_mul => MatMul: MatMul,
     main_as_layer_norm => LayerNorm: LayerNorm,
+    main_as_cast_param => CastParam: CastParam,
+    main_as_quantized_float_param => QuantizedFloatParam: QuantizedFloatParam,
 );
 
 // --- Input Methods ---
@@ -1590,14 +1603,38 @@ impl<'a> SqueezeParam<'a> {
     }
 }
 
+// --- CastParam Methods ---
+impl<'a> CastParam<'a> {
+    pub const VT_SRCT: usize = 4;
+    pub const VT_DSTT: usize = 6;
+
+    pub fn srcT(&self) -> DataType {
+        self._tab.get_scalar(Self::VT_SRCT, DataType::DT_INVALID)
+    }
+
+    pub fn dstT(&self) -> DataType {
+        self._tab.get_scalar(Self::VT_DSTT, DataType::DT_INVALID)
+    }
+}
+
 // --- IDSTQuan Methods ---
 impl<'a> IDSTQuan<'a> {
     pub const VT_BUFFER: usize = 4;
     pub const VT_ALPHA: usize = 6;
     pub const VT_TYPE_: usize = 8;
+    pub const VT_USEINT32: usize = 10;
     pub const VT_QUANTSCALE: usize = 12;
     pub const VT_SCALEIN: usize = 14;
     pub const VT_SCALEOUT: usize = 16;
+    pub const VT_AMAXORBITS: usize = 18;
+    pub const VT_AMIN: usize = 20;
+    pub const VT_READTYPE: usize = 22;
+    pub const VT_HAS_SCALEINT: usize = 24;
+    pub const VT_SHAPEINT32: usize = 26;
+    pub const VT_WEIGHTSIZE: usize = 28;
+    pub const VT_INDEX: usize = 30;
+    pub const VT_ALPHAFP16: usize = 32;
+    pub const VT_SCALESTORAGE: usize = 34;
 
     pub fn buffer(&self) -> Option<&'a [i8]> {
         self._tab.get_i8_slice(Self::VT_BUFFER)
@@ -1611,6 +1648,10 @@ impl<'a> IDSTQuan<'a> {
         self._tab.get_scalar(Self::VT_TYPE_, 0)
     }
 
+    pub fn useInt32(&self) -> bool {
+        self._tab.get_scalar(Self::VT_USEINT32, false)
+    }
+
     pub fn quantScale(&self) -> f32 {
         self._tab.get_scalar(Self::VT_QUANTSCALE, 0.0)
     }
@@ -1621,6 +1662,42 @@ impl<'a> IDSTQuan<'a> {
 
     pub fn scaleOut(&self) -> f32 {
         self._tab.get_scalar(Self::VT_SCALEOUT, 0.0)
+    }
+
+    pub fn aMaxOrBits(&self) -> i32 {
+        self._tab.get_scalar(Self::VT_AMAXORBITS, 0)
+    }
+
+    pub fn aMin(&self) -> i32 {
+        self._tab.get_scalar(Self::VT_AMIN, 0)
+    }
+
+    pub fn readType(&self) -> i32 {
+        self._tab.get_scalar(Self::VT_READTYPE, 0)
+    }
+
+    pub fn has_scaleInt(&self) -> bool {
+        self._tab.get_scalar(Self::VT_HAS_SCALEINT, false)
+    }
+
+    pub fn shapeInt32(&self) -> bool {
+        self._tab.get_scalar(Self::VT_SHAPEINT32, false)
+    }
+
+    pub fn weightSize(&self) -> u32 {
+        self._tab.get_scalar(Self::VT_WEIGHTSIZE, 0)
+    }
+
+    pub fn index(&self) -> Option<ScalarVec<'a, u32>> {
+        self._tab.get_scalar_vec(Self::VT_INDEX)
+    }
+
+    pub fn alphaFp16(&self) -> Option<ScalarVec<'a, u16>> {
+        self._tab.get_scalar_vec(Self::VT_ALPHAFP16)
+    }
+
+    pub fn scaleStorage(&self) -> ScaleStorageType {
+        self._tab.get_scalar(Self::VT_SCALESTORAGE, ScaleStorageType::FP32)
     }
 }
 
@@ -1636,6 +1713,9 @@ impl<'a> QuantizedFloatParam<'a> {
     pub const VT_OUTPUTZEROPOINT: usize = 18;
     pub const VT_CLAMPMIN: usize = 20;
     pub const VT_CLAMPMAX: usize = 22;
+    pub const VT_WINOGRADATTR: usize = 24;
+    pub const VT_OUTPUTDATATYPE: usize = 26;
+    pub const VT_FLOATZEROS: usize = 28;
 
     pub fn weight(&self) -> Option<&'a [i8]> {
         self._tab.get_i8_slice(Self::VT_WEIGHT)
@@ -1675,6 +1755,18 @@ impl<'a> QuantizedFloatParam<'a> {
 
     pub fn clampMax(&self) -> i8 {
         self._tab.get_scalar(Self::VT_CLAMPMAX, 127)
+    }
+
+    pub fn winogradAttr(&self) -> Option<ScalarVec<'a, i32>> {
+        self._tab.get_scalar_vec(Self::VT_WINOGRADATTR)
+    }
+
+    pub fn outputDataType(&self) -> DataType {
+        self._tab.get_scalar(Self::VT_OUTPUTDATATYPE, DataType::DT_INT8)
+    }
+
+    pub fn floatzeros(&self) -> Option<ScalarVec<'a, f32>> {
+        self._tab.get_scalar_vec(Self::VT_FLOATZEROS)
     }
 }
 
@@ -1746,6 +1838,13 @@ mod tests {
             }
         }
         assert_eq!(BinaryOpOperation::from_i32(30), BinaryOpOperation::ADD);
+
+        for v in 0..=1i8 {
+            let s = ScaleStorageType::from_i8(v);
+            assert_eq!(s as i8, v);
+            assert_eq!(ScaleStorageType::from_bits(s.to_bits()), s);
+        }
+        assert_eq!(ScaleStorageType::from_i8(2), ScaleStorageType::FP32);
 
         for v in 0..=104u8 {
             let p = OpParameter::from_u8(v);

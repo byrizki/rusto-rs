@@ -749,7 +749,7 @@ pub fn build_rec_batch(
     let batch_img_width = (img_h as f32 * max_wh_ratio).round() as usize;
     let item_len = img_c * img_h * batch_img_width;
     let total_len = n * item_len;
-    let raw_buf = rusto_nn::alloc_tensor_buffer_overwrite(total_len);
+    let raw_buf = rusto_nn::alloc_tensor_buffer(total_len);
     let mut batch = Array4::<f32>::from_shape_vec((n, img_c, img_h, batch_img_width), raw_buf)
         .map_err(|e| CoreError::InvalidShape(format!("Failed to build batch shape: {}", e)))?;
     let batch_slice = batch.as_mut_slice();
@@ -1177,6 +1177,40 @@ mod tests {
                 assert!((got[2 * th * tw + idx] - (r / 255.0 - mean[2]) / std[2]).abs() < 1e-5);
             }
         }
+    }
+
+    #[test]
+    fn test_build_rec_batch_zeroes_recycled_padding() {
+        rusto_nn::clear_tensor_buffer_pool();
+        let narrow = Mat::from_rgb8(10, 48, vec![128; 10 * 48 * 3]).unwrap();
+        let wide = Mat::from_rgb8(96, 48, vec![128; 96 * 48 * 3]).unwrap();
+        let crops = [narrow, wide];
+
+        let img_c = 3usize;
+        let img_h = 48usize;
+        let max_wh_ratio = 2.0f32;
+        let batch_w = (img_h as f32 * max_wh_ratio).round() as usize;
+        let total_len = crops.len() * img_c * img_h * batch_w;
+
+        rusto_nn::recycle_tensor_buffer(vec![999.0f32; total_len]);
+        let batch = build_rec_batch(&crops, &[0, 1], img_c, img_h, max_wh_ratio).unwrap();
+        let slice = batch.as_slice();
+        let item_len = img_c * img_h * batch_w;
+        let plane_len = img_h * batch_w;
+
+        for ch in 0..img_c {
+            for y in 0..img_h {
+                for x in 12..batch_w {
+                    assert_eq!(
+                        slice[ch * plane_len + y * batch_w + x],
+                        0.0,
+                        "right padding for narrow crop must be zeroed at ch={ch} y={y} x={x}"
+                    );
+                }
+            }
+        }
+        assert_eq!(slice.len(), 2 * item_len);
+        rusto_nn::clear_tensor_buffer_pool();
     }
 }
 

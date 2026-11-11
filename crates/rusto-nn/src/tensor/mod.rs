@@ -322,3 +322,48 @@ impl fmt::Debug for Tensor {
         )
     }
 }
+
+/// Decode an IEEE 754 binary16 (FP16) bit pattern into `f32`.
+#[inline]
+pub fn f16_to_f32(bits: u16) -> f32 {
+    let sign = ((bits & 0x8000) as u32) << 16;
+    let exp = ((bits >> 10) & 0x1F) as u32;
+    let mant = (bits & 0x03FF) as u32;
+
+    let out_bits = if exp == 0 {
+        if mant == 0 {
+            sign
+        } else {
+            let shift = mant.leading_zeros() - 21;
+            let norm_mant = (mant << shift) & 0x03FF;
+            let f32_exp = 113 - shift;
+            sign | (f32_exp << 23) | (norm_mant << 13)
+        }
+    } else if exp == 0x1F {
+        sign | 0x7F80_0000 | (mant << 13)
+    } else {
+        sign | ((exp + 112) << 23) | (mant << 13)
+    };
+    f32::from_bits(out_bits)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::f16_to_f32;
+
+    #[test]
+    fn test_f16_to_f32_edge_cases() {
+        assert_eq!(f16_to_f32(0x0000).to_bits(), 0.0f32.to_bits());
+        assert_eq!(f16_to_f32(0x8000).to_bits(), (-0.0f32).to_bits());
+        assert_eq!(f16_to_f32(0x0001), 2.0f32.powi(-24));
+        assert_eq!(f16_to_f32(0x03FF), 1023.0 / 1024.0 * 2.0f32.powi(-14));
+        assert_eq!(f16_to_f32(0x0400), 2.0f32.powi(-14));
+        assert_eq!(f16_to_f32(0x3C00), 1.0f32);
+        assert_eq!(f16_to_f32(0xBC00), -1.0f32);
+        assert_eq!(f16_to_f32(0x7BFF), 65504.0f32);
+        assert_eq!(f16_to_f32(0x7C00), f32::INFINITY);
+        assert_eq!(f16_to_f32(0xFC00), f32::NEG_INFINITY);
+        assert!(f16_to_f32(0x7E00).is_nan());
+        assert!(f16_to_f32(0x7C01).is_nan());
+    }
+}

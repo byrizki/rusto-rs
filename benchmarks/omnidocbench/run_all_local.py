@@ -27,6 +27,13 @@ RAW_TARGETS = [
     ("rusto_rten_indra", "(raw-j) RTen OCR (Rusto Binding) + Indra OCR (Base)"),
     ("rusto_mnn_indra", "(raw-k) MNN OCR (Rusto Binding) + Indra OCR (Base)"),
     ("tesseract3", "(raw-l) Tesseract OCR (v5 / PSM 3 Fully Automatic)"),
+    ("rusto_nn_tiny_fp16", "(raw-m) Rusto NN OCR (Pure-Rust MNN) + PP-OCRv6 Tiny FP16"),
+    ("rusto_nn_tiny_int8", "(raw-n) Rusto NN OCR (Pure-Rust MNN) + PP-OCRv6 Tiny INT8"),
+    ("rusto_rten_tiny_int8", "(raw-o) RTen OCR (Rusto Binding) + PP-OCRv6 Tiny INT8"),
+    ("rusto_nn_small_int8", "(raw-p) Rusto NN OCR (Pure-Rust MNN) + PP-OCRv6 Small INT8"),
+    ("rusto_nn_medium_int8", "(raw-q) Rusto NN OCR (Pure-Rust MNN) + PP-OCRv6 Medium INT8"),
+    ("rapidocr_tiny_fp16", "(raw-r) Python RapidOCR + PP-OCRv6 Tiny FP16"),
+    ("rapidocr_tiny_int8", "(raw-s) Python RapidOCR + PP-OCRv6 Tiny INT8"),
 ]
 
 FULL_PIPELINE_TARGETS = [

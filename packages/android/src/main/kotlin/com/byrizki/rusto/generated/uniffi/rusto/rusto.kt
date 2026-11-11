@@ -1855,7 +1855,7 @@ public object FfiConverterTypeFrame: FfiConverterRustBuffer<Frame> {
  */
 data class InitializeConfig (
     /**
-     * Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
+     * Model identifier or directory (e.g. "ppocrv6-tiny", "ppocrv6-tiny-fp16", "ppocrv6-small", "indraocr", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
      */
     var `model`: kotlin.String?
     , 

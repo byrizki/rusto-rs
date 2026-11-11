@@ -106,7 +106,7 @@ pub struct InitializeConfig {
 
 impl Default for InitializeConfig {
     fn default() -> Self {
-        Self::from_preset(INDRA_MODEL_CONFIG, "det.rten", "rec.rten", "meta.json")
+        Self::from_preset(PPV6_MODEL_CONFIG, "det.rten", "rec.rten", "dict.txt")
     }
 }
 

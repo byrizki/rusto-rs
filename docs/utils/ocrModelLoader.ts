@@ -1,6 +1,11 @@
 import { type ModelSourceConfig, initialize } from '@rustors/web';
 import { type LayoutModelId, type OcrModelOption } from '../types/ocrModels';
-import { getLayoutModelCandidateUrls, getModelCandidateUrls } from './ocrReleaseModels';
+import {
+  getLayoutModelCandidateUrls,
+  getModelCandidateUrls,
+  isModelSupportedByBackend,
+  type InferenceBackend,
+} from './ocrReleaseModels';
 
 export interface ModelDownloadProgress {
   stageText: string;
@@ -138,15 +143,37 @@ function downloadLayoutAsset(
   baseURL: string,
   totalSteps: number,
   onProgress?: (progress: ModelDownloadProgress) => void,
-  progressRange: [number, number] = [0, 100]
+  progressRange: [number, number] = [0, 100],
+  backend: InferenceBackend = 'rusto-nn'
 ): Promise<Uint8Array | undefined> {
-  const layoutUrls = getLayoutModelCandidateUrls(layoutModelId, baseURL);
+  const layoutUrls = getLayoutModelCandidateUrls(layoutModelId, baseURL, backend);
   if (layoutUrls.length === 0) return Promise.resolve();
   const label =
-    layoutModelId === 'indra'
-      ? 'Indra Neural Reading Layout'
-      : `${layoutModelId} (layout.mnn)`;
+    layoutModelId === 'indra' ? 'Indra Neural Reading Layout' : `${layoutModelId} (layout)`;
   return downloadBinaryWithProgress(layoutUrls, label, 3, totalSteps, onProgress, progressRange);
+}
+
+async function downloadModelWeights(
+  candidates: ReturnType<typeof getModelCandidateUrls>,
+  modelName: string,
+  totalSteps: number,
+  backend: InferenceBackend,
+  onProgress?: (progress: ModelDownloadProgress) => void,
+  progressRange: [number, number] = [0, 100]
+): Promise<{ detection: Uint8Array; recognition: Uint8Array }> {
+  const ext = backend === 'rusto-rten' ? 'rten' : 'mnn';
+  const fetchStage = (stage: 'det' | 'rec', urls: string[], step: number) =>
+    downloadBinaryWithProgress(
+      urls,
+      `${modelName} (${stage}.${ext})`,
+      step,
+      totalSteps,
+      onProgress,
+      progressRange
+    );
+  const detection = await fetchStage('det', candidates.detection, 1);
+  const recognition = await fetchStage('rec', candidates.recognition, 2);
+  return { detection, recognition };
 }
 
 export async function fetchModelAssets(
@@ -154,41 +181,43 @@ export async function fetchModelAssets(
   onProgress?: (progress: ModelDownloadProgress) => void,
   progressRange: [number, number] = [0, 100],
   baseURL: string = '/',
-  layoutModelId?: LayoutModelId
+  layoutModelId?: LayoutModelId,
+  backend: InferenceBackend = 'rusto-nn'
 ): Promise<LoadedModelAssets> {
-  const candidates = getModelCandidateUrls(model.id, baseURL);
-  const isLayoutNeeded =
+  if (!isModelSupportedByBackend(model.id, backend)) {
+    throw new Error(
+      `${model.name} is not compatible with ${backend}. Use rusto-nn or rusto-webgpu.`
+    );
+  }
+  const candidates = getModelCandidateUrls(model.id, baseURL, backend);
+  const needsLayout =
     layoutModelId !== undefined && layoutModelId !== 'none' && layoutModelId !== 'heuristic';
-  const totalSteps = isLayoutNeeded ? 3 : 2;
-
-  const detBuffer = await downloadBinaryWithProgress(
-    candidates.detection,
-    `${model.name} (det.mnn)`,
-    1,
+  const totalSteps = needsLayout ? 3 : 2;
+  const { detection, recognition } = await downloadModelWeights(
+    candidates,
+    model.name,
     totalSteps,
+    backend,
     onProgress,
     progressRange
   );
-  const recBuffer = await downloadBinaryWithProgress(
-    candidates.recognition,
-    `${model.name} (rec.mnn)`,
-    2,
-    totalSteps,
-    onProgress,
-    progressRange
-  );
-  const dictText = await downloadTextAsset(candidates.dictionary);
-  const layoutBuffer = isLayoutNeeded
-    ? await downloadLayoutAsset(layoutModelId, baseURL, totalSteps, onProgress, progressRange)
+  const dictionary = await downloadTextAsset(candidates.dictionary);
+  const layout = needsLayout
+    ? await downloadLayoutAsset(
+        layoutModelId,
+        baseURL,
+        totalSteps,
+        onProgress,
+        progressRange,
+        backend
+      )
     : undefined;
-
-  const assets: LoadedModelAssets = {
-    detection: detBuffer,
-    recognition: recBuffer,
-    dictionary: dictText,
+  return {
+    detection,
+    recognition,
+    dictionary,
+    ...(layout ? { layout } : {}),
   };
-  if (layoutBuffer) assets.layout = layoutBuffer;
-  return assets;
 }
 
 export async function loadAndInitModel(
@@ -197,9 +226,16 @@ export async function loadAndInitModel(
   progressRange: [number, number] = [0, 100],
   onProgress?: (progress: ModelDownloadProgress) => void,
   layoutModelId?: LayoutModelId,
-  backend: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu' = 'rusto-nn'
+  backend: InferenceBackend = 'rusto-nn'
 ): Promise<void> {
-  const assets = await fetchModelAssets(model, onProgress, progressRange, baseURL, layoutModelId);
+  const assets = await fetchModelAssets(
+    model,
+    onProgress,
+    progressRange,
+    baseURL,
+    layoutModelId,
+    backend
+  );
   const wasmFileName =
     backend === 'rusto-rten'
       ? 'rusto_rten_bg.wasm'

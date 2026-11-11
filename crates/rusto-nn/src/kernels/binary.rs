@@ -1,7 +1,9 @@
 #[cfg(feature = "parallel")]
 use crate::par::prelude::*;
 
-use crate::kernels::activation::{apply_activation_scalar, apply_activation_slice, FusedActivation};
+use crate::kernels::activation::{
+    apply_activation_i32, apply_activation_scalar, apply_activation_slice, FusedActivation,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOpType {
@@ -829,6 +831,158 @@ pub fn binary_scalar_lhs(a: f32, rhs: &[f32], out: &mut [f32], op: BinaryOpType,
     }
 }
 
+#[inline(always)]
+fn floor_div_i32(a: i32, b: i32) -> i32 {
+    let q = a.wrapping_div(b);
+    let r = a.wrapping_rem(b);
+    if r != 0 && ((r < 0) != (b < 0)) {
+        q.wrapping_sub(1)
+    } else {
+        q
+    }
+}
+
+#[inline(always)]
+fn eval_binary_i32(a: i32, b: i32, op: BinaryOpType) -> i32 {
+    match op {
+        BinaryOpType::Add => a.wrapping_add(b),
+        BinaryOpType::Sub => a.wrapping_sub(b),
+        BinaryOpType::Mul => a.wrapping_mul(b),
+        BinaryOpType::Div => {
+            if b != 0 {
+                a.wrapping_div(b)
+            } else {
+                0
+            }
+        }
+        BinaryOpType::Pow => {
+            if b >= 0 {
+                a.wrapping_pow(b as u32)
+            } else {
+                (a as f64).powi(b) as i32
+            }
+        }
+        BinaryOpType::Min => a.min(b),
+        BinaryOpType::Max => a.max(b),
+        BinaryOpType::Greater => i32::from(a > b),
+        BinaryOpType::GreaterEqual => i32::from(a >= b),
+        BinaryOpType::Less => i32::from(a < b),
+        BinaryOpType::LessEqual => i32::from(a <= b),
+        BinaryOpType::Equal => i32::from(a == b),
+        BinaryOpType::NotEqual => i32::from(a != b),
+        BinaryOpType::FloorDiv => {
+            if b != 0 {
+                floor_div_i32(a, b)
+            } else {
+                0
+            }
+        }
+        BinaryOpType::FloorMod => {
+            if b != 0 {
+                a.wrapping_sub(floor_div_i32(a, b).wrapping_mul(b))
+            } else {
+                0
+            }
+        }
+        BinaryOpType::SquaredDifference => {
+            let d = a.wrapping_sub(b);
+            d.wrapping_mul(d)
+        }
+        BinaryOpType::MulSilu => {
+            let bf = b as f32;
+            ((a as f32) * (bf / (1.0 + (-bf).exp()))) as i32
+        }
+        BinaryOpType::LogicalAnd => i32::from(a != 0 && b != 0),
+        BinaryOpType::LogicalOr => i32::from(a != 0 || b != 0),
+        BinaryOpType::LogicalXor => i32::from((a != 0) ^ (b != 0)),
+    }
+}
+
+/// Elementwise binary operation on `i32` tensors with NumPy-style broadcasting.
+pub fn binary_op_i32(
+    lhs_shape: &[usize],
+    lhs_data: &[i32],
+    rhs_shape: &[usize],
+    rhs_data: &[i32],
+    out_shape: &[usize],
+    out_data: &mut [i32],
+    op_type: BinaryOpType,
+    act: FusedActivation,
+) {
+    let out_len = out_shape.iter().product::<usize>();
+    if out_len == 0 || out_data.is_empty() || lhs_data.is_empty() || rhs_data.is_empty() {
+        return;
+    }
+    assert!(out_data.len() >= out_len);
+
+    let act_i32 = |v: i32| apply_activation_i32(v, act).unwrap_or(v);
+    let lhs_expected = lhs_shape.iter().product::<usize>();
+    let rhs_expected = rhs_shape.iter().product::<usize>();
+
+    if lhs_shape == out_shape
+        && rhs_shape == out_shape
+        && lhs_data.len() >= out_len
+        && rhs_data.len() >= out_len
+    {
+        for i in 0..out_len {
+            out_data[i] = act_i32(eval_binary_i32(lhs_data[i], rhs_data[i], op_type));
+        }
+        return;
+    }
+    if rhs_expected == 1 && lhs_shape == out_shape && lhs_data.len() >= out_len {
+        let r = rhs_data[0];
+        for i in 0..out_len {
+            out_data[i] = act_i32(eval_binary_i32(lhs_data[i], r, op_type));
+        }
+        return;
+    }
+    if lhs_expected == 1 && rhs_shape == out_shape && rhs_data.len() >= out_len {
+        let l = lhs_data[0];
+        for i in 0..out_len {
+            out_data[i] = act_i32(eval_binary_i32(l, rhs_data[i], op_type));
+        }
+        return;
+    }
+
+    let ndim = out_shape.len();
+    let mut coord = vec![0usize; ndim];
+    let mut lhs_padded = vec![1usize; ndim];
+    lhs_padded[ndim.saturating_sub(lhs_shape.len())..].copy_from_slice(lhs_shape);
+    let mut rhs_padded = vec![1usize; ndim];
+    rhs_padded[ndim.saturating_sub(rhs_shape.len())..].copy_from_slice(rhs_shape);
+
+    let mut lhs_strides = vec![1usize; ndim];
+    let mut rhs_strides = vec![1usize; ndim];
+    for i in (0..ndim.saturating_sub(1)).rev() {
+        lhs_strides[i] = lhs_strides[i + 1] * lhs_padded[i + 1];
+        rhs_strides[i] = rhs_strides[i + 1] * rhs_padded[i + 1];
+    }
+
+    for idx in 0..out_len {
+        let mut lhs_idx = 0;
+        let mut rhs_idx = 0;
+        for d in 0..ndim {
+            if lhs_padded[d] != 1 {
+                lhs_idx += coord[d] * lhs_strides[d];
+            }
+            if rhs_padded[d] != 1 {
+                rhs_idx += coord[d] * rhs_strides[d];
+            }
+        }
+        let l_val = lhs_data.get(lhs_idx).copied().unwrap_or(0);
+        let r_val = rhs_data.get(rhs_idx).copied().unwrap_or(0);
+        out_data[idx] = act_i32(eval_binary_i32(l_val, r_val, op_type));
+
+        for d in (0..ndim).rev() {
+            coord[d] += 1;
+            if coord[d] < out_shape[d] {
+                break;
+            }
+            coord[d] = 0;
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum BcastMode {
     Match,
@@ -1562,5 +1716,59 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_binary_op_i32_div_mod_and_broadcast() {
+        let mut out = vec![0i32; 4];
+        binary_op_i32(
+            &[4],
+            &[163, 119, -7, 7],
+            &[1],
+            &[4],
+            &[4],
+            &mut out,
+            BinaryOpType::Div,
+            FusedActivation::None,
+        );
+        assert_eq!(out, [40, 29, -1, 1]);
+
+        binary_op_i32(
+            &[4],
+            &[-7, 7, 163, -1],
+            &[1],
+            &[4],
+            &[4],
+            &mut out,
+            BinaryOpType::FloorDiv,
+            FusedActivation::None,
+        );
+        assert_eq!(out, [-2, 1, 40, -1]);
+
+        binary_op_i32(
+            &[4],
+            &[-1, 5, 4, -5],
+            &[1],
+            &[4],
+            &[4],
+            &mut out,
+            BinaryOpType::FloorMod,
+            FusedActivation::None,
+        );
+        assert_eq!(out, [3, 1, 0, 3]);
+
+        // Broadcast [1, 4] < [2, 1] -> [2, 4]
+        let mut mask = vec![0i32; 8];
+        binary_op_i32(
+            &[1, 4],
+            &[0, 1, 2, 3],
+            &[2, 1],
+            &[2, 4],
+            &[2, 4],
+            &mut mask,
+            BinaryOpType::Less,
+            FusedActivation::None,
+        );
+        assert_eq!(mask, [1, 1, 0, 0, 1, 1, 1, 1]);
     }
 }

@@ -65,6 +65,62 @@ pub struct GridSampleParams {
 }
 
 #[derive(Clone, Debug)]
+pub struct ConvIntegerParams {
+    pub kernel_h: usize,
+    pub kernel_w: usize,
+    pub stride_h: usize,
+    pub stride_w: usize,
+    pub dilate_h: usize,
+    pub dilate_w: usize,
+    pub pad_mode: PadMode,
+    pub pad_x: usize,
+    pub pad_y: usize,
+    pub pads: Option<Vec<i32>>,
+    pub group: usize,
+    pub has_x_zp: bool,
+    pub has_w_zp: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct MatMulIntegerParams {
+    pub has_a_zp: bool,
+    pub has_b_zp: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct ConvInt8Params {
+    pub weight: Vec<i8>,
+    pub bias: Vec<i32>,
+    pub scale: Vec<f32>,
+    pub zero_point: i32,
+    pub output_zero_point: i32,
+    pub clamp_min: i8,
+    pub clamp_max: i8,
+    pub output_float: bool,
+    pub kernel_h: usize,
+    pub kernel_w: usize,
+    pub stride_h: usize,
+    pub stride_w: usize,
+    pub dilate_h: usize,
+    pub dilate_w: usize,
+    pub pad_mode: PadMode,
+    pub pad_x: usize,
+    pub pad_y: usize,
+    pub pads: Option<Vec<i32>>,
+    pub group: usize,
+    pub out_channels: usize,
+    pub is_depthwise: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct Int8ScaleParams {
+    pub scale: Vec<f32>,
+    pub zero_points: Vec<f32>,
+    pub clamp_min: i8,
+    pub clamp_max: i8,
+}
+
+#[derive(Clone, Debug)]
 pub struct LayerNormParams {
     pub axis: i32,
     pub epsilon: f32,
@@ -85,6 +141,12 @@ pub enum OpKind {
     Unary(UnaryParams),
     Relu { slope: f32 },
     Relu6 { min_val: f32, max_val: f32 },
+    Clip {
+        min_val: f32,
+        max_val: f32,
+        has_min_input: bool,
+        has_max_input: bool,
+    },
     Reduction { op: ReductionOp, axes: Vec<i32>, keep_dims: bool },
     Interp(InterpParams),
     Reshape { dims: Option<Vec<i32>> },
@@ -122,10 +184,16 @@ pub enum OpKind {
     GridSample(GridSampleParams),
     MatMul(MatMulParams),
     PRelu { slopes: Option<Vec<f32>> },
-    ConstantOfShape { value: f32 },
+    ConstantOfShape { value: f32, int_value: Option<i32> },
     LayerNorm(LayerNormParams),
     Expand,
     ScatterND,
+    DynamicQuant { signed: bool },
+    ConvInteger(ConvIntegerParams),
+    MatMulInteger(MatMulIntegerParams),
+    ConvInt8(ConvInt8Params),
+    Int8ToFloat(Int8ScaleParams),
+    FloatToInt8(Int8ScaleParams),
     NoOp,
 }
 
@@ -142,6 +210,7 @@ impl OpKind {
             Self::Unary(_) => "UnaryOp",
             Self::Relu { .. } => "ReLU",
             Self::Relu6 { .. } => "ReLU6",
+            Self::Clip { .. } => "Clip",
             Self::Reduction { .. } => "Reduction",
             Self::Interp(_) => "Interp",
             Self::Reshape { .. } => "Reshape",
@@ -173,6 +242,12 @@ impl OpKind {
             Self::LayerNorm(_) => "LayerNorm",
             Self::Expand => "Expand",
             Self::ScatterND => "ScatterND",
+            Self::DynamicQuant { .. } => "DynamicQuant",
+            Self::ConvInteger(_) => "ConvInteger",
+            Self::MatMulInteger(_) => "MatMulInteger",
+            Self::ConvInt8(c) => if c.is_depthwise { "DepthwiseConvInt8" } else { "ConvInt8" },
+            Self::Int8ToFloat(_) => "Int8ToFloat",
+            Self::FloatToInt8(_) => "FloatToInt8",
             Self::NoOp => "NoOp",
         }
     }

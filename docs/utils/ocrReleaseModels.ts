@@ -27,44 +27,75 @@ function dedupeStrings(items: (string | undefined)[]): string[] {
   return result;
 }
 
+export type InferenceBackend = 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu';
+
+export function isModelSupportedByBackend(modelId: string, backend: InferenceBackend): boolean {
+  // FP16 weights are published in MNN/ONNX only; RTen (.rten) does not support FP16 models.
+  return !(backend === 'rusto-rten' && modelId === 'ppocrv6-tiny-fp16');
+}
+
+function replaceModelExtension(path: string, ext: 'mnn' | 'onnx' | 'rten'): string {
+  return path.replace(/\.(mnn|onnx|rten)$/u, `.${ext}`);
+}
+
+function buildWeightCandidateUrls(
+  modelId: string,
+  baseKind: 'det' | 'rec',
+  assetPath: string,
+  legacyPath: string | undefined,
+  cleanBase: string,
+  backend: InferenceBackend
+): string[] {
+  const exts: ('mnn' | 'onnx' | 'rten')[] =
+    backend === 'rusto-rten' ? ['rten'] : ['mnn', 'onnx', 'rten'];
+
+  const hfUrls = exts.flatMap((ext) => [
+    `${HUGGINGFACE_BASE}/${replaceModelExtension(assetPath, ext)}`,
+    `${HUGGINGFACE_BASE}/${modelId}/${baseKind}.${ext}`,
+  ]);
+  const localUrls = exts.flatMap((ext) => [
+    `${cleanBase}/models/${replaceModelExtension(assetPath, ext)}`,
+    `${cleanBase}/models/${modelId}/${baseKind}.${ext}`,
+    legacyPath ? `${cleanBase}/models/${replaceModelExtension(legacyPath, ext)}` : undefined,
+  ]);
+
+  const preferredHf = backend === 'rusto-rten' ? undefined : `${HUGGINGFACE_BASE}/${assetPath}`;
+  const preferredLocal = backend === 'rusto-rten' ? undefined : `${cleanBase}/models/${assetPath}`;
+
+  return dedupeStrings([preferredHf, ...hfUrls, preferredLocal, ...localUrls]);
+}
+
 export function getModelCandidateUrls(
   modelId: string,
-  baseURL: string = '/'
+  baseURL: string = '/',
+  backend: InferenceBackend = 'rusto-nn'
 ): {
   detection: string[];
   recognition: string[];
   dictionary: string[];
 } {
-  const assetItem = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['indraocr']!;
+  const assetItem = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['ppocrv6-tiny']!;
   const cleanBase = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
   const isIndra = modelId.startsWith('indra');
   const defaultDict = isIndra ? 'meta.json' : 'dict.txt';
 
   return {
-    detection: dedupeStrings([
-      `${HUGGINGFACE_BASE}/${assetItem.detection}`,
-      `${HUGGINGFACE_BASE}/${modelId}/det.mnn`,
-      `${HUGGINGFACE_BASE}/${modelId}/det.onnx`,
-      `${HUGGINGFACE_BASE}/${modelId}/det.rten`,
-      `${cleanBase}/models/${assetItem.detection}`,
-      `${cleanBase}/models/${modelId}/det.mnn`,
-      `${cleanBase}/models/${modelId}/det.onnx`,
-      `${cleanBase}/models/${modelId}/det.rten`,
-      assetItem.legacyDetection ? `${cleanBase}/models/${assetItem.legacyDetection}` : undefined,
-    ]),
-    recognition: dedupeStrings([
-      `${HUGGINGFACE_BASE}/${assetItem.recognition}`,
-      `${HUGGINGFACE_BASE}/${modelId}/rec.mnn`,
-      `${HUGGINGFACE_BASE}/${modelId}/rec.onnx`,
-      `${HUGGINGFACE_BASE}/${modelId}/rec.rten`,
-      `${cleanBase}/models/${assetItem.recognition}`,
-      `${cleanBase}/models/${modelId}/rec.mnn`,
-      `${cleanBase}/models/${modelId}/rec.onnx`,
-      `${cleanBase}/models/${modelId}/rec.rten`,
-      assetItem.legacyRecognition
-        ? `${cleanBase}/models/${assetItem.legacyRecognition}`
-        : undefined,
-    ]),
+    detection: buildWeightCandidateUrls(
+      modelId,
+      'det',
+      assetItem.detection,
+      assetItem.legacyDetection,
+      cleanBase,
+      backend
+    ),
+    recognition: buildWeightCandidateUrls(
+      modelId,
+      'rec',
+      assetItem.recognition,
+      assetItem.legacyRecognition,
+      cleanBase,
+      backend
+    ),
     dictionary: dedupeStrings([
       `${HUGGINGFACE_BASE}/${assetItem.dictionary}`,
       `${HUGGINGFACE_BASE}/${modelId}/${defaultDict}`,
@@ -80,7 +111,7 @@ export function getModelCdnUrls(modelId: string): {
   recognition: string;
   dictionary: string;
 } {
-  const assetItem = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['indraocr']!;
+  const assetItem = MODEL_RELEASE_ASSETS[modelId] || MODEL_RELEASE_ASSETS['ppocrv6-tiny']!;
   return {
     detection: `${HUGGINGFACE_BASE}/${assetItem.detection}`,
     recognition: `${HUGGINGFACE_BASE}/${assetItem.recognition}`,
@@ -90,11 +121,13 @@ export function getModelCdnUrls(modelId: string): {
 
 export function getLayoutModelCandidateUrls(
   layoutModelId: string,
-  baseURL: string = '/'
+  baseURL: string = '/',
+  backend: InferenceBackend = 'rusto-nn'
 ): string[] {
   const cleanBase = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+  let urls: string[] = [];
   if (layoutModelId === 'indra') {
-    return dedupeStrings([
+    urls = dedupeStrings([
       `${cleanBase}/models/indraocr/order.mnn`,
       `${cleanBase}/models/indraocr/order.rten`,
       `${cleanBase}/models/indraocr/order.onnx`,
@@ -107,9 +140,8 @@ export function getLayoutModelCandidateUrls(
       `${HUGGINGFACE_BASE}/indraocr/order.rten`,
       `${HUGGINGFACE_BASE}/indraocr/order.onnx`,
     ]);
-  }
-  if (layoutModelId === 'cdla') {
-    return dedupeStrings([
+  } else if (layoutModelId === 'cdla') {
+    urls = dedupeStrings([
       `${HUGGINGFACE_BASE}/modules/layout_cdla.mnn`,
       `${HUGGINGFACE_BASE}/modules/layout_cdla.onnx`,
       `${HUGGINGFACE_BASE}/modules/layout_cdla.rten`,
@@ -117,9 +149,8 @@ export function getLayoutModelCandidateUrls(
       `${cleanBase}/models/modules/layout_cdla.onnx`,
       `${cleanBase}/models/modules/layout_cdla.rten`,
     ]);
-  }
-  if (layoutModelId === 'publaynet') {
-    return dedupeStrings([
+  } else if (layoutModelId === 'publaynet') {
+    urls = dedupeStrings([
       `${HUGGINGFACE_BASE}/modules/layout_publaynet.mnn`,
       `${HUGGINGFACE_BASE}/modules/layout_publaynet.onnx`,
       `${HUGGINGFACE_BASE}/modules/layout_publaynet.rten`,
@@ -128,7 +159,7 @@ export function getLayoutModelCandidateUrls(
       `${cleanBase}/models/modules/layout_publaynet.rten`,
     ]);
   }
-  return [];
+  return backend === 'rusto-rten' ? urls.filter((url) => url.endsWith('.rten')) : urls;
 }
 
 let cachedHfIndex: HfModelAssetInfo[] | null = null;

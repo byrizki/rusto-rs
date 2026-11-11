@@ -78,7 +78,7 @@ export const defaultOcrConfig: OcrConfig = {
   layoutReading: false,
   enableReadingOrder: false,
   layoutModel: 'heuristic',
-  recBatchNum: 1,
+  recBatchNum: 6,
   autoUnwarp: false,
   lineClassification: false,
   classification: false,

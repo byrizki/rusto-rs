@@ -140,7 +140,7 @@ public class RustO implements AutoCloseable {
     }
 
     /**
-     * Initializes the RustO OCR engine with default IndraOCR configuration (auto-downloads models if needed).
+     * Initializes the RustO OCR engine with default PP-OCRv6 Tiny (FP32) configuration (auto-downloads models if needed).
      *
      * @return Initialized RustO engine instance.
      */
@@ -191,7 +191,7 @@ public class RustO implements AutoCloseable {
     /**
      * Downloads model assets for a specific OCR pipeline ahead of time.
      *
-     * @param model Model identifier (e.g. "indraocr"), or null for default.
+     * @param model Model identifier (e.g. "ppocrv6-tiny", "indraocr"), or null for default.
      * @param lang Language code (e.g. "latin"), or null for default.
      * @param cacheDir Destination cache directory, or null for default.
      * @return List of downloaded model asset file paths.
@@ -215,10 +215,10 @@ public class RustO implements AutoCloseable {
     }
 
     /**
-     * Downloads default IndraOCR model assets ahead of time.
+     * Downloads default PP-OCRv6 Tiny (FP32) model assets ahead of time.
      */
     public static List<String> downloadModel() {
-        return downloadModel("indraocr", "latin", null);
+        return downloadModel("ppocrv6-tiny", null, null);
     }
 
     private void ensureOpen() {

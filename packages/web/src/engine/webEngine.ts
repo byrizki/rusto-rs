@@ -271,11 +271,13 @@ export class WebOcrEngine {
   /**
    * Downloads or pre-fetches model asset URLs for a specific pipeline ahead of time.
    */
-  public async downloadModel(model = 'indraocr', _lang?: string, _cacheDir?: string): Promise<string[]> {
+  public async downloadModel(model = 'ppocrv6-tiny', _lang?: string, _cacheDir?: string): Promise<string[]> {
+    const ext = model.includes('fp16') ? 'mnn' : 'rten';
+    const dict = model.startsWith('indra') ? 'meta.json' : 'dict.txt';
     return [
-      `https://huggingface.co/byrizki/rusto-models/resolve/main/${model}/det.rten`,
-      `https://huggingface.co/byrizki/rusto-models/resolve/main/${model}/rec.rten`,
-      `https://huggingface.co/byrizki/rusto-models/resolve/main/${model}/meta.json`,
+      `https://huggingface.co/byrizki/rusto-models/resolve/main/${model}/det.${ext}`,
+      `https://huggingface.co/byrizki/rusto-models/resolve/main/${model}/rec.${ext}`,
+      `https://huggingface.co/byrizki/rusto-models/resolve/main/${model}/${dict}`,
     ];
   }
 

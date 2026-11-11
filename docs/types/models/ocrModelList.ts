@@ -31,26 +31,26 @@ function model(
 }
 
 const coreModels: OcrModelOption[] = [
-  // --- Flagship Architecture (DataLab) ---
+  // --- Indra OCR (DataLab) ---
   model(
     'indraocr',
-    'Indra OCR (Flagship)',
+    'Indra OCR (Base)',
     'indra',
-    'flagship',
-    'Flagship Architecture',
+    'indra',
+    'Indra OCR (DataLab)',
     '~5.5 MB',
     5680573,
     'DataLab Linenet (rec_batch=1)',
-    'High-performance 1-channel pipeline tuned for complex documents, forms, receipts & ID cards.',
+    '1-channel low-latency pipeline tuned for complex documents, forms, receipts & ID cards.',
     1,
-    ['Flagship', 'Low Latency', 'ID & Docs']
+    ['DataLab', 'Low Latency', 'ID & Docs']
   ),
   model(
     'indraocr-cjk',
     'Indra OCR (CJK Script)',
     'indra',
-    'flagship',
-    'Flagship Architecture',
+    'indra',
+    'Indra OCR (DataLab)',
     '~10.6 MB',
     10811581,
     'Indra CJK Extension',
@@ -62,8 +62,8 @@ const coreModels: OcrModelOption[] = [
     'indraocr-world',
     'Indra OCR (World Script)',
     'indra',
-    'flagship',
-    'Flagship Architecture',
+    'indra',
+    'Indra OCR (DataLab)',
     '~6.1 MB',
     6263549,
     'Indra World Extension',
@@ -78,13 +78,26 @@ const coreModels: OcrModelOption[] = [
     'PP-OCRv6 Tiny (FP32)',
     'ppv6',
     'ppocrv6',
-    'PP-OCRv6 Series',
+    'PP-OCRv6 Series (Default)',
     '~6.4 MB',
     6386492,
-    'Ultra-lightweight FP32',
-    'Ultra-fast lightweight model for browser and client-side devices.',
+    'Default · Lightweight FP32',
+    'Default general-purpose Apache 2.0 model for fast browser, server, and mobile OCR.',
     6,
-    ['PPv6', 'Lightweight', 'Fast']
+    ['Default', 'PPv6', 'Fast']
+  ),
+  model(
+    'ppocrv6-tiny-fp16',
+    'PP-OCRv6 Tiny (FP16)',
+    'ppv6',
+    'ppocrv6',
+    'PP-OCRv6 Series',
+    '~3.1 MB',
+    3208688,
+    'Half-precision FP16',
+    'Smallest PP-OCRv6 footprint (~3.1 MB) with half-precision FP16 MNN/ONNX weights and near-FP32 accuracy (rusto-nn & WebGPU).',
+    6,
+    ['PPv6', 'FP16', 'Fast']
   ),
   model(
     'ppocrv6-tiny-int8',
@@ -185,4 +198,5 @@ const coreModels: OcrModelOption[] = [
 
 export const availableModels: OcrModelOption[] = [...coreModels, ...multilingualModels];
 
-export const defaultModel: OcrModelOption = availableModels[0] as OcrModelOption;
+export const defaultModel: OcrModelOption = (availableModels.find((m) => m.id === 'ppocrv6-tiny') ??
+  availableModels[0]) as OcrModelOption;

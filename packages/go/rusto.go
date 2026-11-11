@@ -74,7 +74,7 @@ type Engine struct {
 type RustO = Engine
 
 // Initialize creates and initializes a new OCR engine instance using optional JSON configuration.
-// When omitted, defaults to "{}" which initializes IndraOCR (auto-downloading models if needed).
+// When omitted, defaults to "{}" which initializes PP-OCRv6 Tiny FP32 (auto-downloading models if needed).
 func Initialize(configJSON ...string) (*RustO, error) {
 	return New(configJSON...)
 }

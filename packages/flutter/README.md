@@ -6,7 +6,7 @@ Official Flutter FFI plugin for **RustO!** — a high-performance, pure-Rust OCR
 
 ## Features
 
-- **Zero-Config or Offline Models**: Auto-download the default **Indra OCR** pipeline from Hugging Face Hub into your app cache directory, or extract bundled `.mnn` / `.rten` assets from Flutter `rootBundle` for 100% offline mobile execution.
+- **Zero-Config or Offline Models**: Auto-download the default **PP-OCRv6 Tiny (FP32)** (`ppocrv6-tiny`, Apache 2.0) pipeline from Hugging Face Hub into your app cache directory, or extract bundled `.mnn` / `.rten` assets from Flutter `rootBundle` for 100% offline mobile execution.
 - **Fluent Builder API**: Chain `.asLines()`, `.asWords()`, `.asSpatial()`, `.asTsv()`, or `.withOutput(...)` into a single `.run()` call on `RustO`.
 - **Document Intelligence**: UVDoc document unwarping (`withAutoUnwarp()`), 4-way orientation detection (`withOrientationDetection()`), and neural layout reading-order recovery (`withLayoutReading()`).
 - **UI-Smooth Isolate Execution**: Run synchronous FFI inference inside `Isolate.run(...)` to keep Flutter animations at 60/120 FPS.

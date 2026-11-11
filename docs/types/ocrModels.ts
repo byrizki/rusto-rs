@@ -1,6 +1,6 @@
 import type { ModelPreset } from '@rustors/web';
 
-export type ModelCategory = 'flagship' | 'ppocrv6' | 'ppocrv5' | 'ppocrv4' | 'multilingual';
+export type ModelCategory = 'ppocrv6' | 'indra' | 'ppocrv5' | 'ppocrv4' | 'multilingual';
 
 export interface ModelCategoryMeta {
   id: ModelCategory;
@@ -10,14 +10,16 @@ export interface ModelCategoryMeta {
 
 export const modelCategories: ModelCategoryMeta[] = [
   {
-    id: 'flagship',
-    name: 'Flagship Architecture',
-    description: 'Indra OCR DataLab Linenet with 1-channel low-latency recognition',
+    id: 'ppocrv6',
+    name: 'PP-OCRv6 Series (Default)',
+    description:
+      'Apache 2.0 PaddleOCR v6 models in FP32, FP16, INT8 quantized, Small, and Medium tiers',
   },
   {
-    id: 'ppocrv6',
-    name: 'PP-OCRv6 Series',
-    description: 'Latest ultra-lightweight and high-precision variants',
+    id: 'indra',
+    name: 'Indra OCR (DataLab)',
+    description:
+      'DataLab Linenet 1-channel low-latency recognition (weights under modified OpenRAIL-M)',
   },
   {
     id: 'ppocrv5',
@@ -79,8 +81,7 @@ export const availableLayoutModels: LayoutModelOption[] = [
       'Sequences multi-column text lines into natural human reading flow using coordinate transformer.',
     size: '2.9 MB',
     assetFile: 'indraocr/order.rten',
-    downloadUrl:
-      'https://huggingface.co/byrizki/rusto-models/resolve/main/indraocr/order.rten',
+    downloadUrl: 'https://huggingface.co/byrizki/rusto-models/resolve/main/indraocr/order.rten',
   },
   {
     id: 'cdla',

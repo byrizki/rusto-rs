@@ -386,7 +386,7 @@ class Frame {
 /// Engine initialization configuration specifying model paths, preset, and optional extensions.
 class InitializeConfig {
   const InitializeConfig({
-    /// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
+    /// Model identifier or directory (e.g. "ppocrv6-tiny", "ppocrv6-tiny-fp16", "ppocrv6-small", "indraocr", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
     required this.model,
     /// Base model directory containing det, rec, and dict files.
     required this.modelPath,
@@ -414,7 +414,7 @@ class InitializeConfig {
     required this.layout,
   });
 
-  /// Model identifier or directory (e.g. "indraocr", "ppocrv6-tiny", "ppocrv6-small", "ppocrv5", "ppocrv4"). Default: "indraocr".
+  /// Model identifier or directory (e.g. "ppocrv6-tiny", "ppocrv6-tiny-fp16", "ppocrv6-small", "indraocr", "ppocrv5", "ppocrv4"). Default: "ppocrv6-tiny".
   final String? model;
   /// Base model directory containing det, rec, and dict files.
   final String? modelPath;
