@@ -45,6 +45,18 @@ fn run_rusto_nn(path: &Path, shape: &[usize], data: &[f32]) -> (Vec<usize>, Vec<
 }
 
 #[cfg(feature = "rten")]
+fn rten_oracle_non_saturating() -> bool {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        std::arch::is_x86_feature_detected!("avx512vnni")
+    }
+    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
+    {
+        true
+    }
+}
+
+#[cfg(feature = "rten")]
 fn run_rten_oracle(path: &Path, shape: &[usize], data: &[f32]) -> (Vec<usize>, Vec<f32>) {
     use rten::{ModelOptions, Value};
     use rten_tensor::prelude::*;
@@ -137,7 +149,21 @@ fn test_ppocrv6_int8_det_parity_across_tiers() {
         #[cfg(feature = "rten")]
         {
             let rten_path = int8_base.join("det.rten");
+            let fp32_rten_path = root.join("models").join(fp32_dir).join("det.rten");
             let (nn_rten_shape, nn_rten_out) = run_rusto_nn(&rten_path, &shape, &input);
+            let (fp32_rten_shape, fp32_rten_out) = run_rusto_nn(&fp32_rten_path, &shape, &input);
+            assert_eq!(nn_rten_shape, fp32_rten_shape);
+            let (int8_fp32_max, int8_fp32_mean) = diff_stats(
+                &nn_rten_out,
+                &fp32_rten_out,
+                &format!("{int8_dir}/det.rten vs fp32"),
+            );
+            println!("[{int8_dir}/det.rten vs fp32] max_abs={int8_fp32_max:.6} mean_abs={int8_fp32_mean:.6}");
+            assert!(
+                int8_fp32_mean < 0.05,
+                "{int8_dir}/det.rten diverged from fp32: mean_abs={int8_fp32_mean}"
+            );
+
             let (oracle_shape, oracle_out) = run_rten_oracle(&rten_path, &shape, &input);
             assert_eq!(nn_rten_shape, oracle_shape);
             let (rten_max, rten_mean) =
@@ -145,15 +171,23 @@ fn test_ppocrv6_int8_det_parity_across_tiers() {
             println!("[{int8_dir}/det.rten vs rten] max_abs={rten_max:.6} mean_abs={rten_mean:.6}");
             // Note: rten 0.27.0 diverges from ORT by ~1.8e-3 on tiny and ~0.057 (mean ~0.0016) on
             // the 122-layer medium det, whereas rusto-nn stays within ~1.2e-7 (tiny) / ~0.0053 (med) of ORT.
+            // On x86_64 CPUs without AVX-512 VNNI (such as GitHub Actions runners), rten falls back to
+            // Avx2Int8Kernel (`may_saturate() == true`), which saturates i16 ConvInteger accumulators.
             let (max_tol, mean_tol) = if int8_dir == "PPOCR_v6_medium_int8" {
                 (0.08, 3e-3)
             } else {
                 (5e-3, 1e-4)
             };
-            assert!(
-                rten_max < max_tol && rten_mean < mean_tol,
-                "{int8_dir}/det.rten oracle mismatch: max={rten_max}, mean={rten_mean}"
-            );
+            if rten_oracle_non_saturating() {
+                assert!(
+                    rten_max < max_tol && rten_mean < mean_tol,
+                    "{int8_dir}/det.rten oracle mismatch: max={rten_max}, mean={rten_mean}"
+                );
+            } else {
+                eprintln!(
+                    "[{int8_dir}/det.rten vs rten] skipping oracle parity assert without avx512vnni (rten Avx2Int8Kernel may saturate i16)"
+                );
+            }
 
             #[cfg(feature = "onnx")]
             {
