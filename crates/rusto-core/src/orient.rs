@@ -152,14 +152,22 @@ pub fn preprocess_indra_orient_image(
     Ok(arr.insert_axis(Axis(0)))
 }
 
-/// Postprocess model output logits into an orientation and confidence score.
+/// Postprocess model output logits (or already-softmaxed probabilities) into an orientation and confidence score.
 pub fn postprocess_orient_logits(logits: &[f32]) -> Result<(Orientation, f32), CoreError> {
     if logits.is_empty() {
         return Err(CoreError::Postprocess("No logits found".to_string()));
     }
-    let max_logit = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-    let exp_sum: f32 = logits.iter().map(|&x| (x - max_logit).exp()).sum();
-    let probs: Vec<f32> = logits.iter().map(|&x| (x - max_logit).exp() / exp_sum).collect();
+    let prob_sum: f32 = logits.iter().sum();
+    let already_probs = logits.iter().all(|&x| x.is_finite() && (0.0..=1.0).contains(&x))
+        && (prob_sum - 1.0).abs() <= 1e-3;
+
+    let probs: Vec<f32> = if already_probs {
+        logits.to_vec()
+    } else {
+        let max_logit = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let exp_sum: f32 = logits.iter().map(|&x| (x - max_logit).exp()).sum();
+        logits.iter().map(|&x| (x - max_logit).exp() / exp_sum).collect()
+    };
 
     let (class_id, &confidence) = probs
         .iter()
@@ -254,6 +262,27 @@ mod tests {
         Orientation::Rotate270.rotate_box_points_back(&mut pts, 200.0, 100.0);
         assert_eq!(pts[0].x, 10.0);
         assert_eq!(pts[0].y, 179.0);
+    }
+
+    #[test]
+    fn test_postprocess_orient_logits_already_softmaxed_2class() {
+        let (orient, conf) = postprocess_orient_logits(&[0.02, 0.98]).expect("valid probs");
+        assert_eq!(orient, Orientation::Rotate180);
+        assert!((conf - 0.98).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_postprocess_orient_logits_already_softmaxed_4class() {
+        let (orient, conf) = postprocess_orient_logits(&[0.01, 0.01, 0.02, 0.96]).expect("valid probs");
+        assert_eq!(orient, Orientation::Rotate270);
+        assert!((conf - 0.96).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_postprocess_orient_logits_raw_logits() {
+        let (orient, conf) = postprocess_orient_logits(&[-2.0, 2.0]).expect("valid logits");
+        assert_eq!(orient, Orientation::Rotate180);
+        assert!(conf > 0.98);
     }
 }
 
