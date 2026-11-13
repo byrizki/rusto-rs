@@ -281,6 +281,11 @@ download_ci_fixtures() {
 
     download_ppocrv6 "tiny" "$ppocr_dir"
     download_ppocrv6 "small" "$ppocr_small_dir"
+    download_ppocrv6 "medium" "$REPO_ROOT/models/PPOCR_v6_medium"
+    download_ppocrv6 "tiny-fp16" "$REPO_ROOT/models/PPOCR_v6_tiny_fp16"
+    download_ppocrv6 "tiny-int8" "$REPO_ROOT/models/PPOCR_v6_tiny_int8"
+    download_ppocrv6 "small-int8" "$REPO_ROOT/models/PPOCR_v6_small_int8"
+    download_ppocrv6 "medium-int8" "$REPO_ROOT/models/PPOCR_v6_medium_int8"
     download_modules "$ppocr_dir"
     download_indra "$indra_dir"
 
