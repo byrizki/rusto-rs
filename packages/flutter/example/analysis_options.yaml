@@ -9,6 +9,12 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  errors:
+    # Flutter >= 3.47 deprecates package:flutter/material.dart in favor of package:material_ui,
+    # which requires Flutter >= 3.47 / Dart ^3.13; keep material.dart for broader SDK support.
+    deprecated_member_use: ignore
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`
