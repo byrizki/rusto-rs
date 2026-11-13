@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/rusto-core", "crates/rusto-cpp", "crates/rusto-nn", "crates/rusto-nn-webgpu", "crates/rusto-nn-cuda", "crates/rusto-rten", "crates/rusto-mnn", "crates/rusto-wasm", "crates/rusto-node"]
+members = [".", "crates/rusto-core", "crates/rusto-cpp", "crates/rusto-nn", "crates/rusto-nn-webgpu", "crates/rusto-nn-cuda", "crates/rusto-rten", "crates/rusto-mnn", "crates/rusto-wasm", "crates/rusto-node", "crates/rusto-server"]
 
 [package]
 name = "rusto-rs"
