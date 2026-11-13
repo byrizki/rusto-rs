@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { OcrDemoStrings } from '../../types/ocrDemoI18n';
-import { availableModels, modelCategories, type OcrModelOption } from '../../types/ocrModels';
+import type { OcrModelOption } from '../../types/ocrModels';
 
 const props = defineProps<{
-  selectedModel: string;
   currentModel: OcrModelOption;
   status: 'idle' | 'initializing' | 'ready' | 'error';
   statusMessage: string;
@@ -24,104 +23,106 @@ const activeBackend = computed<'rusto-nn' | 'rusto-rten' | 'rusto-webgpu'>(
 );
 
 const emit = defineEmits<{
-  'update:selectedModel': [modelId: string];
   retryInit: [];
   openRuntimeSettings: [];
   toggleSettings: [];
   toggleExpand: [];
   runOcr: [];
 }>();
-
-function onModelChange(event: Event) {
-  const target = event.target as HTMLSelectElement;
-  emit('update:selectedModel', target.value);
-}
 </script>
 
 <template>
   <header
     class="relative flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/90 dark:bg-zinc-950/90"
   >
-    <div class="flex flex-wrap items-center gap-2 min-w-0">
-      <div class="inline-flex items-center gap-2 min-w-0">
-        <label
-          for="ocr-model-select"
-          class="text-xs font-medium text-zinc-500 dark:text-zinc-400 hidden sm:inline"
+    <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+      <div
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-900 dark:text-zinc-100 min-w-0 max-w-[230px]"
+        :title="`${currentModel.name} (${currentModel.size})`"
+      >
+        <svg
+          class="w-3.5 h-3.5 text-primary shrink-0"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
         >
-          {{ strings.modelLabel }}
-        </label>
-
-        <div class="relative inline-flex items-center">
-          <select
-            id="ocr-model-select"
-            :value="selectedModel"
-            :disabled="status === 'initializing' || isScanning"
-            @change="onModelChange"
-            class="appearance-none pl-2.5 pr-7 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 hover:border-zinc-300 dark:hover:border-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors enabled:cursor-pointer max-w-[220px] sm:max-w-[250px] truncate"
-          >
-            <optgroup v-for="cat in modelCategories" :key="cat.id" :label="cat.name">
-              <option
-                v-for="model in availableModels.filter((m) => m.category === cat.id)"
-                :key="model.id"
-                :value="model.id"
-              >
-                {{ model.name }} ({{ model.size }})
-              </option>
-            </optgroup>
-          </select>
-          <span
-            class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-zinc-400"
-          >
-            <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path
-                fill-rule="evenodd"
-                d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
-                clip-rule="evenodd"
-              />
-            </svg>
-          </span>
-        </div>
+          <path d="M12 2 2 7l10 5 10-5-10-5Z" />
+          <path d="m2 17 10 5 10-5" />
+          <path d="m2 12 10 5 10-5" />
+        </svg>
+        <span class="truncate">{{ currentModel.name }}</span>
       </div>
 
-      <div class="inline-flex items-center gap-1.5" :title="statusMessage">
-        <span
-          v-if="status === 'ready'"
-          class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-900/60"
+      <span
+        v-if="status === 'ready'"
+        class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200/70 dark:border-emerald-900/60"
+        :title="statusMessage || strings.statusReady"
+        :aria-label="strings.statusReady"
+      >
+        <svg
+          class="w-3.5 h-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
         >
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          {{ strings.statusReady }}
-        </span>
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      </span>
 
-        <span
-          v-else-if="status === 'initializing'"
-          class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200/70 dark:border-amber-900/60"
+      <span
+        v-else-if="status === 'initializing'"
+        class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200/70 dark:border-amber-900/60"
+        :title="statusMessage || strings.statusLoading"
+        :aria-label="strings.statusLoading"
+      >
+        <svg
+          class="w-3.5 h-3.5 animate-spin"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          aria-hidden="true"
         >
-          <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-          {{ strings.statusLoading }}
-        </span>
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        </svg>
+      </span>
 
-        <button
-          v-else-if="status === 'error'"
-          type="button"
-          @click="emit('retryInit')"
-          class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
+      <button
+        v-else-if="status === 'error'"
+        type="button"
+        @click="emit('retryInit')"
+        class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 hover:bg-red-100 dark:hover:bg-red-950 transition-colors cursor-pointer"
+        :title="`${statusMessage || strings.statusError} — ${strings.retry}`"
+        :aria-label="strings.retry"
+      >
+        <svg
+          class="w-3.5 h-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
         >
-          <span class="w-1.5 h-1.5 rounded-full bg-red-500" />
-          {{ strings.retry }}
-        </button>
-
-        <span
-          v-else
-          class="hidden md:inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800 tabular-nums"
-        >
-          {{ currentModel.size }}
-        </span>
-      </div>
+          <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+          <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+        </svg>
+      </button>
 
       <button
         type="button"
         @click="emit('openRuntimeSettings')"
-        class="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        class="hidden sm:inline-flex items-center justify-center w-7 h-7 rounded-lg border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         :class="
           activeBackend === 'rusto-webgpu'
             ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-900/70 text-purple-700 dark:text-purple-300 hover:bg-purple-100/70 dark:hover:bg-purple-950/70'
@@ -129,19 +130,44 @@ function onModelChange(event: Event) {
               ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/70 text-blue-700 dark:text-blue-300 hover:bg-blue-100/70 dark:hover:bg-blue-950/70'
               : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/70 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/70 dark:hover:bg-emerald-950/70'
         "
-        :title="`Inference Engine: ${activeBackend}. Click to switch.`"
+        :title="`Runtime: ${activeBackend === 'rusto-webgpu' ? 'WebGPU' : activeBackend}`"
+        :aria-label="`Runtime: ${activeBackend}`"
       >
-        <span
-          class="w-1.5 h-1.5 rounded-full"
-          :class="
-            activeBackend === 'rusto-webgpu'
-              ? 'bg-purple-500'
-              : activeBackend === 'rusto-rten'
-                ? 'bg-blue-500'
-                : 'bg-emerald-500'
-          "
-        />
-        <span>{{ activeBackend === 'rusto-webgpu' ? 'WebGPU' : activeBackend }}</span>
+        <svg
+          v-if="activeBackend === 'rusto-webgpu'"
+          class="w-3.5 h-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        </svg>
+        <svg
+          v-else
+          class="w-3.5 h-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <rect x="9" y="9" width="6" height="6" />
+          <path d="M15 2v2" />
+          <path d="M15 20v2" />
+          <path d="M2 15h2" />
+          <path d="M2 9h2" />
+          <path d="M20 15h2" />
+          <path d="M20 9h2" />
+          <path d="M9 2v2" />
+          <path d="M9 20v2" />
+        </svg>
       </button>
     </div>
 
@@ -166,16 +192,17 @@ function onModelChange(event: Event) {
       <button
         type="button"
         @click="emit('toggleSettings')"
-        class="relative inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all cursor-pointer active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+        class="relative inline-flex items-center justify-center p-1.5 rounded-lg border transition-all cursor-pointer active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         :class="
           isConfigOpen
             ? 'border-primary bg-primary/10 text-primary'
             : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
         "
         :title="strings.settings"
+        :aria-label="strings.settings"
       >
         <svg
-          class="w-3.5 h-3.5 shrink-0"
+          class="w-4 h-4 shrink-0"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -194,10 +221,9 @@ function onModelChange(event: Event) {
           <line x1="10" x2="14" y1="8" y2="8" />
           <line x1="18" x2="22" y1="16" y2="16" />
         </svg>
-        <span class="hidden sm:inline">{{ strings.settings }}</span>
         <span
           v-if="isCustomConfig || isConfigModified"
-          class="w-1.5 h-1.5 rounded-full bg-primary shrink-0"
+          class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary border border-white dark:border-zinc-900"
         />
       </button>
 

@@ -2,7 +2,6 @@ export type OcrDemoLocale = 'en' | 'id';
 
 export interface OcrDemoStrings {
   toolbar: {
-    modelLabel: string;
     statusReady: string;
     statusLoading: string;
     statusError: string;

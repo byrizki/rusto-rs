@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 const baseURL = process.env.NUXT_APP_BASE_URL || '/rusto-rs/';
 
 export default defineNuxtConfig({
+  extends: ['docus'],
   alias: {
     '@rustors/web': fileURLToPath(new URL('../packages/web/src/index.ts', import.meta.url)),
   },

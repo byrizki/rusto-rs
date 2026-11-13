@@ -4,6 +4,20 @@ import type { OcrProfilePreset } from '../types/ocrPresets';
 
 export type OcrSettingsTab = 'detection' | 'recognition' | 'runtime';
 
+function mergeWithRuntimeConfig(
+  current: OcrConfig,
+  presetConfig?: Partial<OcrConfig>,
+  overrides?: Partial<OcrConfig>
+): OcrConfig {
+  return {
+    ...defaultOcrConfig,
+    ...presetConfig,
+    ...overrides,
+    inferenceBackend: current.inferenceBackend,
+    useWebGpu: current.useWebGpu,
+  };
+}
+
 export function useWebOcrSettings() {
   const ocrConfig = ref<OcrConfig>({ ...defaultOcrConfig });
   const isConfigOpen = ref<boolean>(false);
@@ -23,18 +37,15 @@ export function useWebOcrSettings() {
   }
 
   function resetConfigDefaults() {
-    ocrConfig.value = { ...defaultOcrConfig };
+    ocrConfig.value = mergeWithRuntimeConfig(ocrConfig.value);
   }
 
-  function applyPreset(preset: OcrProfilePreset) {
-    ocrConfig.value = {
-      ...defaultOcrConfig,
-      ...preset.config,
-      useWebGpu: ocrConfig.value.useWebGpu,
-    };
+  function applyPreset(preset: OcrProfilePreset, overrides?: Partial<OcrConfig>) {
+    ocrConfig.value = mergeWithRuntimeConfig(ocrConfig.value, preset.config, overrides);
   }
 
-  function isPresetActive(preset: OcrProfilePreset): boolean {
+  function isPresetActive(preset: OcrProfilePreset, selectedModelId?: string): boolean {
+    if (selectedModelId && preset.modelId !== selectedModelId) return false;
     return Object.entries(preset.config).every(
       ([k, v]) => (ocrConfig.value as unknown as Record<string, unknown>)[k] === v
     );

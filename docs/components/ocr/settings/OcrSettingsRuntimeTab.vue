@@ -44,8 +44,7 @@ function isEngineCompatible(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu'): boo
 interface EngineOption {
   id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu';
   name: string;
-  badge: string;
-  badgeClass: string;
+  label: string;
   description: string;
   wasmFile: string;
   requiresWebGpu?: boolean;
@@ -55,9 +54,7 @@ const engines: EngineOption[] = [
   {
     id: 'rusto-nn',
     name: 'rusto-nn',
-    badge: 'Default · Pure-Rust',
-    badgeClass:
-      'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+    label: 'Default Pure-Rust MNN',
     description:
       '100% pure-Rust Alibaba MNN execution graph. Zero native C++ bloat, ultra-low memory, optimal SIMD.',
     wasmFile: 'rusto_nn_bg.wasm',
@@ -65,9 +62,7 @@ const engines: EngineOption[] = [
   {
     id: 'rusto-rten',
     name: 'rusto-rten',
-    badge: 'RTen Engine',
-    badgeClass:
-      'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    label: 'Pure-Rust RTen',
     description:
       'Pure-Rust neural network inference engine optimized for ONNX & RTen tensor models.',
     wasmFile: 'rusto_rten_bg.wasm',
@@ -75,9 +70,7 @@ const engines: EngineOption[] = [
   {
     id: 'rusto-webgpu',
     name: 'rusto-webgpu',
-    badge: 'Hardware Compute',
-    badgeClass:
-      'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+    label: 'WebGPU Hardware Compute',
     description:
       'Offloads matrix & convolution ops to GPU via WGSL compute shaders (rusto-nn-webgpu).',
     wasmFile: 'rusto_webgpu_bg.wasm',
@@ -134,10 +127,72 @@ function selectEngine(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu') {
               <OcrInfoPopover :text="engine.description" />
             </div>
             <span
-              class="px-1.5 py-0.5 rounded text-[10px] font-medium border"
-              :class="engine.badgeClass"
+              class="inline-flex items-center justify-center w-6 h-6 rounded-md border"
+              :class="
+                !isEngineCompatible(engine.id)
+                  ? 'border-zinc-200 dark:border-zinc-700 text-zinc-400'
+                  : engine.id === 'rusto-webgpu'
+                    ? 'border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-300'
+                    : engine.id === 'rusto-rten'
+                      ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300'
+                      : 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-300'
+              "
+              :title="isEngineCompatible(engine.id) ? engine.label : 'MNN/ONNX Only'"
+              :aria-label="isEngineCompatible(engine.id) ? engine.label : 'MNN/ONNX Only'"
             >
-              {{ isEngineCompatible(engine.id) ? engine.badge : 'MNN/ONNX Only' }}
+              <svg
+                v-if="!isEngineCompatible(engine.id)"
+                class="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+              </svg>
+              <svg
+                v-else-if="engine.id === 'rusto-webgpu'"
+                class="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+              <svg
+                v-else-if="engine.id === 'rusto-rten'"
+                class="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 2 2 7l10 5 10-5-10-5Z" />
+                <path d="m2 17 10 5 10-5" />
+                <path d="m2 12 10 5 10-5" />
+              </svg>
+              <svg
+                v-else
+                class="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+              </svg>
             </span>
           </div>
 
@@ -172,23 +227,16 @@ function selectEngine(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu') {
       </div>
     </OcrSettingsCollapsibleSection>
 
-    <!-- Active Model Info (Collapsible) -->
+    <!-- Active Weights Info (Collapsible) -->
     <OcrSettingsCollapsibleSection
       :model-value="activeSection === 'model'"
       @update:model-value="(val) => onToggle('model', val)"
-      :title="`Model: ${currentModel.name}`"
+      :title="currentModel.name"
       :badge="currentModel.size"
       :description="currentModel.description"
     >
-      <div class="pt-1">
-        <div class="flex flex-wrap items-center gap-2 text-[11px]">
-          <span class="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono text-[10px]">
-            preset: {{ currentModel.preset }}
-          </span>
-          <span class="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono text-[10px]">
-            {{ currentModel.trait }}
-          </span>
-        </div>
+      <div class="pt-1 text-[11px] text-zinc-600 dark:text-zinc-400">
+        {{ currentModel.trait }} · {{ currentModel.size }}
       </div>
     </OcrSettingsCollapsibleSection>
 
@@ -196,7 +244,7 @@ function selectEngine(id: 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu') {
     <OcrSettingsCollapsibleSection
       :model-value="activeSection === 'weights'"
       @update:model-value="(val) => onToggle('weights', val)"
-      title="Model Weights & Asset Endpoints"
+      title="Weights & Asset Endpoints"
       badge="Hugging Face"
       description="Remote CDN and local asset fallback URLs for weights & dictionaries"
     >

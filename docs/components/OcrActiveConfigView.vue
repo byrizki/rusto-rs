@@ -15,13 +15,24 @@ const copied = ref<boolean>(false);
 const codeTab = ref<'builder' | 'options' | 'json'>('builder');
 
 const displayConfig = computed(() => {
-  if (props.activeRun && !props.isModifiedSinceRun) {
+  const isSnapshot = Boolean(props.activeRun && !props.isModifiedSinceRun);
+  const rawConfig =
+    isSnapshot && props.activeRun ? props.activeRun.rawConfig : props.currentOcrConfig;
+  const backendLabel =
+    rawConfig.useWebGpu || rawConfig.inferenceBackend === 'rusto-webgpu'
+      ? 'WebGPU'
+      : rawConfig.inferenceBackend === 'rusto-rten'
+        ? 'RTen'
+        : 'WASM SIMD';
+
+  if (isSnapshot && props.activeRun) {
     return {
       isSnapshot: true,
       modelName: props.activeRun.modelName,
       outputMode: props.activeRun.outputMode,
       durationMs: props.activeRun.durationMs,
       itemsCount: props.activeRun.itemsCount,
+      backendLabel,
       options: props.activeRun.options,
     };
   }
@@ -31,6 +42,7 @@ const displayConfig = computed(() => {
     outputMode: props.currentOutputMode,
     durationMs: props.activeRun?.durationMs ?? null,
     itemsCount: props.activeRun?.itemsCount ?? 0,
+    backendLabel,
     options: buildDetectTextOptions(props.currentOcrConfig, props.currentOutputMode),
   };
 });
@@ -169,13 +181,13 @@ async function copyActiveCode() {
       <div class="flex justify-between gap-2">
         <span class="text-zinc-500">Backend</span>
         <span class="font-mono font-medium text-zinc-800 dark:text-zinc-200">
-          {{ displayConfig.options.webgpu ? 'WebGPU' : 'WASM SIMD' }}
+          {{ displayConfig.backendLabel }}
         </span>
       </div>
       <div class="flex justify-between gap-2">
         <span class="text-zinc-500">Detector Limit</span>
         <span class="font-mono font-medium text-zinc-800 dark:text-zinc-200 tabular-nums">
-          {{ displayConfig.options.detection?.limitSideLen ?? 960 }}px
+          {{ displayConfig.options.detection?.limitSideLen ?? 736 }}px
         </span>
       </div>
       <div class="flex justify-between gap-2">

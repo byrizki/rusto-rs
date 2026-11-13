@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { OcrConfig } from '../../../types/ocrConfig';
+import { defaultOcrConfig, type OcrConfig } from '../../../types/ocrConfig';
 import OcrInfoPopover from './OcrInfoPopover.vue';
 import OcrSettingsCollapsibleSection from './OcrSettingsCollapsibleSection.vue';
 
@@ -8,7 +8,7 @@ const props = defineProps<{
   config: OcrConfig;
 }>();
 
-const sidePresets = [640, 960, 1280, 1920] as const;
+const sidePresets = [640, 736, 960, 1536, 1920] as const;
 
 type DetectionSection = 'pre' | 'core' | 'post';
 const activeSection = ref<DetectionSection | null>('core');
@@ -25,24 +25,24 @@ const preDetectionActiveCount = computed<number>(() => {
   let count = 0;
   if (props.config.autoUnwarp) count++;
   if (props.config.orientationDetection) count++;
-  if (props.config.descreenBackground) count++;
+  if (props.config.calibrationEnabled && props.config.descreenBackground) count++;
   if (props.config.optimizationEnabled) count++;
   return count;
 });
 
 const detectionActiveCount = computed<number>(() => {
   let count = 0;
-  if (props.config.detectionLimitSideLen !== 960) count++;
-  if (props.config.detectionLimitType !== 'max') count++;
+  if (props.config.detectionLimitSideLen !== defaultOcrConfig.detectionLimitSideLen) count++;
+  if (props.config.detectionLimitType !== defaultOcrConfig.detectionLimitType) count++;
   return count;
 });
 
 const postDetectionActiveCount = computed<number>(() => {
   let count = 0;
   if (props.config.enableResize) count++;
-  if (props.config.postprocessUseDilation) count++;
-  if (props.config.postprocessThreshold !== 0.3) count++;
-  if (props.config.postprocessBoxThreshold !== 0.5) count++;
+  if (props.config.postprocessUseDilation !== defaultOcrConfig.postprocessUseDilation) count++;
+  if (props.config.postprocessThreshold !== defaultOcrConfig.postprocessThreshold) count++;
+  if (props.config.postprocessBoxThreshold !== defaultOcrConfig.postprocessBoxThreshold) count++;
   return count;
 });
 </script>

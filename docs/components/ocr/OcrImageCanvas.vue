@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch, type CSSProperties } from 'vue';
 import type { TextResult } from '@rustors/web';
 import type { OcrDemoStrings } from '../../types/ocrDemoI18n';
 
@@ -63,7 +63,7 @@ function resetZoom() {
   zoom.value = 1;
 }
 
-const zoomedStyle = computed<Record<string, string>>(() => {
+const zoomedStyle = computed<CSSProperties>(() => {
   if (zoom.value === 1 || fittedWidth.value <= 0) return {};
   return {
     width: `${Math.round(fittedWidth.value * zoom.value)}px`,

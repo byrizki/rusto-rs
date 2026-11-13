@@ -4,7 +4,6 @@ import type { OcrDemoLocale, OcrDemoStrings } from '../types/ocrDemoI18n';
 
 const enStrings: OcrDemoStrings = {
   toolbar: {
-    modelLabel: 'Model',
     statusReady: 'Ready',
     statusLoading: 'Loading',
     statusError: 'Load failed',
@@ -85,7 +84,6 @@ const enStrings: OcrDemoStrings = {
 
 const idStrings: OcrDemoStrings = {
   toolbar: {
-    modelLabel: 'Model',
     statusReady: 'Siap',
     statusLoading: 'Memuat',
     statusError: 'Gagal memuat',

@@ -138,7 +138,7 @@ export async function downloadTextAsset(urlOrUrls: string | string[]): Promise<s
   throw lastError ?? new Error('Failed to load text asset');
 }
 
-function downloadLayoutAsset(
+async function downloadLayoutAsset(
   layoutModelId: LayoutModelId,
   baseURL: string,
   totalSteps: number,
@@ -147,10 +147,17 @@ function downloadLayoutAsset(
   backend: InferenceBackend = 'rusto-nn'
 ): Promise<Uint8Array | undefined> {
   const layoutUrls = getLayoutModelCandidateUrls(layoutModelId, baseURL, backend);
-  if (layoutUrls.length === 0) return Promise.resolve();
+  if (layoutUrls.length === 0) return;
   const label =
     layoutModelId === 'indra' ? 'Indra Neural Reading Layout' : `${layoutModelId} (layout)`;
-  return downloadBinaryWithProgress(layoutUrls, label, 3, totalSteps, onProgress, progressRange);
+  return await downloadBinaryWithProgress(
+    layoutUrls,
+    label,
+    3,
+    totalSteps,
+    onProgress,
+    progressRange
+  );
 }
 
 async function downloadModelWeights(

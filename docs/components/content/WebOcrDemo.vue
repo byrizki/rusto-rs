@@ -5,6 +5,7 @@ import { useOcrDemoI18n } from '../../composables/useOcrDemoI18n';
 import { useWebOcrExecution } from '../../composables/useWebOcrExecution';
 import { useWebOcrSettings } from '../../composables/useWebOcrSettings';
 import { availableModels, defaultModel, type OcrModelOption } from '../../types/ocrModels';
+import { getPresetById, type OcrProfilePreset } from '../../types/ocrPresets';
 import { getSampleImages, type SampleImage } from '../../types/ocrSamples';
 import { fetchHuggingFaceModelIndex } from '../../utils/ocrReleaseModels';
 import { isRunConfigModified } from '../../utils/ocrResultFormatter';
@@ -34,7 +35,10 @@ const {
   isPresetActive,
 } = useWebOcrSettings();
 
-const selectedModel = ref<string>('ppocrv6-tiny');
+const initialPreset = getPresetById(defaultSample.presetId);
+applyPreset(initialPreset, defaultSample.configOverrides);
+
+const selectedModel = ref<string>(initialPreset.modelId);
 const currentModel = computed<OcrModelOption>(
   () => availableModels.find((m) => m.id === selectedModel.value) ?? defaultModel
 );
@@ -83,12 +87,35 @@ function revokeCustomUrl() {
   }
 }
 
-function pickSample(sample: SampleImage) {
+async function pickSample(sample: SampleImage) {
   resetResults();
   revokeCustomUrl();
   customFileName.value = null;
   selectedSample.value = sample.id;
   imageSrc.value = sample.url;
+
+  const preset = getPresetById(sample.presetId);
+  applyPreset(preset, sample.configOverrides);
+  if (selectedModel.value !== preset.modelId) {
+    await switchModel(preset.modelId);
+  }
+}
+
+async function handleApplyPreset(preset: OcrProfilePreset) {
+  applyPreset(preset);
+  resetResults();
+  if (selectedModel.value !== preset.modelId) {
+    await switchModel(preset.modelId);
+  }
+}
+
+async function handleResetDefaults() {
+  resetConfigDefaults();
+  resetResults();
+  const basePreset = getPresetById('ppv6');
+  if (selectedModel.value !== basePreset.modelId) {
+    await switchModel(basePreset.modelId);
+  }
 }
 
 function loadCustomImageFile(file: File) {
@@ -214,7 +241,6 @@ onUnmounted(() => {
       <OcrLoadingOverlay :progress="progress" />
 
       <OcrDemoToolbar
-        :selected-model="selectedModel"
         :current-model="currentModel"
         :status="status"
         :status-message="statusMessage"
@@ -227,7 +253,6 @@ onUnmounted(() => {
         :is-config-modified="isConfigModifiedSinceRun"
         :is-expanded="isExpanded"
         :strings="strings.toolbar"
-        @update:selected-model="switchModel"
         @retry-init="initEngine(selectedModel)"
         @open-runtime-settings="openConfigTab('runtime')"
         @toggle-settings="toggleConfigPopover"
@@ -292,8 +317,8 @@ onUnmounted(() => {
         :is-preset-active="isPresetActive"
         :strings="strings.settings"
         @close="isConfigOpen = false"
-        @reset-defaults="resetConfigDefaults"
-        @apply-preset="applyPreset"
+        @reset-defaults="handleResetDefaults"
+        @apply-preset="handleApplyPreset"
         @layout-model-changed="resetResults"
         @backend-changed="resetResults"
         @apply-and-run="handleApplyAndRun"

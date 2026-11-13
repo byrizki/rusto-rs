@@ -407,11 +407,6 @@ watch(
           <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 max-w-[270px] leading-relaxed">
             {{ strings.idleDescription }}
           </p>
-          <span
-            class="mt-3 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 border border-zinc-200/80 dark:border-zinc-700/80"
-          >
-            {{ currentModel.name }} • {{ currentModel.size }}
-          </span>
           <button
             type="button"
             @click="emit('runOcr')"
@@ -458,9 +453,22 @@ watch(
             </div>
             <span
               v-if="copiedRowIdx === idx"
-              class="text-[10px] px-1.5 py-0.5 rounded font-medium bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 shrink-0"
+              class="inline-flex items-center justify-center w-6 h-5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 shrink-0"
+              :title="strings.copied"
+              :aria-label="strings.copied"
             >
-              ✓ {{ strings.copied }}
+              <svg
+                class="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
             </span>
             <span
               v-else
@@ -608,7 +616,6 @@ watch(
           v-if="activeRunConfig"
           class="truncate font-mono text-[10px] text-zinc-600 dark:text-zinc-300 tabular-nums"
         >
-          {{ activeRunConfig.modelName }} •
           {{ activeRunConfig.outputMode === 'words' ? 'asWords()' : 'asLines()' }} • ≥{{
             activeScorePercent
           }}%
@@ -619,9 +626,11 @@ watch(
 
         <span
           v-if="isConfigModified"
-          class="inline-flex items-center text-[10px] px-1.5 py-0.2 rounded bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 shrink-0 font-medium"
+          class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0"
+          :title="strings.footerModified"
+          :aria-label="strings.footerModified"
         >
-          {{ strings.footerModified }}
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-500" />
         </span>
       </div>
 
