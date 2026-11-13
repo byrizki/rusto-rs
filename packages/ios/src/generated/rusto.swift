@@ -2161,6 +2161,14 @@ public struct RecognitionConfig: Equatable, Hashable {
      * Recognition batch size. Default: 6.
      */
     public var recBatchNum: Int32?
+    /**
+     * Number of parallel worker threads for recognition. `None` = auto (up to max_rec_workers).
+     */
+    public var recWorkers: UInt32?
+    /**
+     * Maximum recognition worker thread count clamp. Default: 8.
+     */
+    public var maxRecWorkers: UInt32?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -2176,11 +2184,19 @@ public struct RecognitionConfig: Equatable, Hashable {
          */dictPath: String?, 
         /**
          * Recognition batch size. Default: 6.
-         */recBatchNum: Int32?) {
+         */recBatchNum: Int32?, 
+        /**
+         * Number of parallel worker threads for recognition. `None` = auto (up to max_rec_workers).
+         */recWorkers: UInt32?, 
+        /**
+         * Maximum recognition worker thread count clamp. Default: 8.
+         */maxRecWorkers: UInt32?) {
         self.enabled = enabled
         self.modelPath = modelPath
         self.dictPath = dictPath
         self.recBatchNum = recBatchNum
+        self.recWorkers = recWorkers
+        self.maxRecWorkers = maxRecWorkers
     }
 
     
@@ -2202,7 +2218,9 @@ public struct FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer {
                 enabled: FfiConverterOptionBool.read(from: &buf), 
                 modelPath: FfiConverterOptionString.read(from: &buf), 
                 dictPath: FfiConverterOptionString.read(from: &buf), 
-                recBatchNum: FfiConverterOptionInt32.read(from: &buf)
+                recBatchNum: FfiConverterOptionInt32.read(from: &buf), 
+                recWorkers: FfiConverterOptionUInt32.read(from: &buf), 
+                maxRecWorkers: FfiConverterOptionUInt32.read(from: &buf)
         )
     }
 
@@ -2211,6 +2229,8 @@ public struct FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.modelPath, into: &buf)
         FfiConverterOptionString.write(value.dictPath, into: &buf)
         FfiConverterOptionInt32.write(value.recBatchNum, into: &buf)
+        FfiConverterOptionUInt32.write(value.recWorkers, into: &buf)
+        FfiConverterOptionUInt32.write(value.maxRecWorkers, into: &buf)
     }
 }
 
@@ -2238,14 +2258,30 @@ public struct RecognitionRunOptions: Equatable, Hashable {
      * Recognition batch size. Default: 10.
      */
     public var batchSize: Int32?
+    /**
+     * Number of parallel worker threads for recognition inference. `None` = auto (up to max_workers).
+     */
+    public var workers: UInt32?
+    /**
+     * Maximum worker thread count clamp for recognition inference. `None` = use engine default (8).
+     */
+    public var maxWorkers: UInt32?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         /**
          * Recognition batch size. Default: 10.
-         */batchSize: Int32?) {
+         */batchSize: Int32?, 
+        /**
+         * Number of parallel worker threads for recognition inference. `None` = auto (up to max_workers).
+         */workers: UInt32?, 
+        /**
+         * Maximum worker thread count clamp for recognition inference. `None` = use engine default (8).
+         */maxWorkers: UInt32?) {
         self.batchSize = batchSize
+        self.workers = workers
+        self.maxWorkers = maxWorkers
     }
 
     
@@ -2264,12 +2300,16 @@ public struct FfiConverterTypeRecognitionRunOptions: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RecognitionRunOptions {
         return
             try RecognitionRunOptions(
-                batchSize: FfiConverterOptionInt32.read(from: &buf)
+                batchSize: FfiConverterOptionInt32.read(from: &buf), 
+                workers: FfiConverterOptionUInt32.read(from: &buf), 
+                maxWorkers: FfiConverterOptionUInt32.read(from: &buf)
         )
     }
 
     public static func write(_ value: RecognitionRunOptions, into buf: inout [UInt8]) {
         FfiConverterOptionInt32.write(value.batchSize, into: &buf)
+        FfiConverterOptionUInt32.write(value.workers, into: &buf)
+        FfiConverterOptionUInt32.write(value.maxWorkers, into: &buf)
     }
 }
 

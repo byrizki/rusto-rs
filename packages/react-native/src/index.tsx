@@ -112,11 +112,15 @@ export interface PreRecognitionOptions {
 }
 
 /**
- * Phase 5: Recognition inference options (batch size).
+ * Phase 5: Recognition inference options (batch size and worker concurrency).
  */
 export interface RecognitionRunOptions {
   /** Recognition batch size (number of text crops processed concurrently). */
   batchSize?: number;
+  /** Number of parallel worker threads for recognition inference (undefined = auto). */
+  workers?: number;
+  /** Maximum worker thread count clamp for recognition inference (undefined = engine default 8). */
+  maxWorkers?: number;
 }
 
 /**
@@ -211,6 +215,10 @@ export interface InitializeConfig {
   layoutVariant?: 'cdla' | 'publaynet';
   /** Optional recognition batch size override. Default: 6. */
   recBatchNum?: number;
+  /** Number of parallel worker threads for recognition (undefined = auto). */
+  recWorkers?: number;
+  /** Maximum worker thread count clamp for recognition (undefined = engine default 8). */
+  maxRecWorkers?: number;
   /** Custom model asset file paths (bundled in app or downloaded). */
   models?: {
     /** Detection model path (.rten or .onnx). */
@@ -274,7 +282,7 @@ const POST_DETECTION_KEYS = [
   'widthHeightRatio',
 ] as const;
 const PRE_RECOGNITION_KEYS = ['lineYThreshold', 'wordXThreshold'] as const;
-const RECOGNITION_KEYS = ['batchSize'] as const;
+const RECOGNITION_KEYS = ['batchSize', 'workers', 'maxWorkers'] as const;
 const POST_RECOGNITION_KEYS = ['scoreThreshold'] as const;
 const PRESETS = ['indra', 'ppv6', 'ppv5', 'ppv4', 'ppv3'] as const;
 
@@ -463,9 +471,12 @@ function normalizeRecognitionOptions(recognition: unknown): void {
     RECOGNITION_KEYS,
     'OcrRunOptions.recognition contains an unknown key.'
   );
-  const batchSize = recognition.batchSize;
-  if (batchSize !== undefined && (typeof batchSize !== 'number' || !Number.isInteger(batchSize) || batchSize < 1))
-    throw new TypeError('OcrRunOptions.recognition.batchSize must be an integer >= 1.');
+  for (const key of RECOGNITION_KEYS) {
+    const value = recognition[key];
+    if (value !== undefined && (typeof value !== 'number' || !Number.isInteger(value) || value < 1)) {
+      throw new TypeError(`OcrRunOptions.recognition.${key} must be an integer >= 1.`);
+    }
+  }
 }
 
 function normalizePostRecognitionOptions(postRecognition: unknown): void {
@@ -528,6 +539,8 @@ function normalizeInitializeConfig(config: InitializeConfig | undefined): Initia
       'layoutVariant',
       'models',
       'recBatchNum',
+      'recWorkers',
+      'maxRecWorkers',
     ],
     'InitializeConfig contains an unknown key.'
   );
@@ -546,11 +559,12 @@ function normalizeInitializeConfig(config: InitializeConfig | undefined): Initia
     config.layoutVariant !== 'publaynet'
   )
     throw new TypeError('InitializeConfig.layoutVariant must be "cdla" or "publaynet".');
-  if (
-    config.recBatchNum !== undefined &&
-    (typeof config.recBatchNum !== 'number' || !Number.isInteger(config.recBatchNum) || config.recBatchNum < 1)
-  )
-    throw new TypeError('InitializeConfig.recBatchNum must be an integer >= 1.');
+  for (const intKey of ['recBatchNum', 'recWorkers', 'maxRecWorkers'] as const) {
+    const val = config[intKey];
+    if (val !== undefined && (typeof val !== 'number' || !Number.isInteger(val) || val < 1)) {
+      throw new TypeError(`InitializeConfig.${intKey} must be an integer >= 1.`);
+    }
+  }
   if (config.models !== undefined) {
     if (!isObject(config.models)) throw new TypeError('InitializeConfig.models must be an object.');
     requireOnlyKeys(config.models, MODEL_KEYS, 'InitializeConfig.models contains an unknown key.');

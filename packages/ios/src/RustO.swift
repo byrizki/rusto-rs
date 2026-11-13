@@ -468,7 +468,9 @@ extension RecognitionConfig {
             enabled: nil,
             modelPath: nil,
             dictPath: nil,
-            recBatchNum: nil
+            recBatchNum: nil,
+            recWorkers: nil,
+            maxRecWorkers: nil
         )
     }
 }
@@ -553,7 +555,9 @@ extension PreRecognitionOptions {
 extension RecognitionRunOptions {
     public init() {
         self.init(
-            batchSize: nil
+            batchSize: nil,
+            workers: nil,
+            maxWorkers: nil
         )
     }
 }

@@ -126,6 +126,14 @@ pub struct OcrArgs {
     #[arg(long, alias = "batch-num")]
     pub rec_batch_num: Option<i32>,
 
+    /// Number of parallel workers for text recognition (default: auto, up to max-rec-workers)
+    #[arg(long)]
+    pub rec_workers: Option<usize>,
+
+    /// Maximum parallel workers clamp for text recognition (default: 8)
+    #[arg(long)]
+    pub max_rec_workers: Option<usize>,
+
     /// Minimum recognition confidence score threshold [0.0 - 1.0]
     #[arg(long, alias = "text-score")]
     pub score_threshold: Option<f32>,
@@ -449,6 +457,12 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(batch_num) = cli.rec_batch_num {
         config = config.with_rec_batch_num(batch_num);
     }
+    if let Some(workers) = cli.rec_workers {
+        config = config.with_rec_workers(workers);
+    }
+    if let Some(max_workers) = cli.max_rec_workers {
+        config = config.with_max_rec_workers(max_workers);
+    }
 
     let mut ocr = RustO::initialize(config)?;
 
@@ -477,6 +491,14 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(batch_num) = cli.rec_batch_num {
         let rec_opts = options.recognition.get_or_insert_with(Default::default);
         rec_opts.batch_size = Some(batch_num);
+    }
+    if let Some(workers) = cli.rec_workers {
+        let rec_opts = options.recognition.get_or_insert_with(Default::default);
+        rec_opts.workers = Some(workers);
+    }
+    if let Some(max_workers) = cli.max_rec_workers {
+        let rec_opts = options.recognition.get_or_insert_with(Default::default);
+        rec_opts.max_workers = Some(max_workers);
     }
     if let Some(score_thresh) = cli.score_threshold {
         let post_rec = options.post_recognition.get_or_insert_with(Default::default);

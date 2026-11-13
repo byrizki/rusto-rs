@@ -260,6 +260,16 @@ struct RecognitionConfigJson {
     pub rec_batch_num_snake: Option<i32>,
     #[nserde(rename = "batch_num")]
     pub batch_num_snake: Option<i32>,
+
+    #[nserde(rename = "recWorkers")]
+    pub rec_workers_camel: Option<usize>,
+    #[nserde(rename = "rec_workers")]
+    pub rec_workers_snake: Option<usize>,
+
+    #[nserde(rename = "maxRecWorkers")]
+    pub max_rec_workers_camel: Option<usize>,
+    #[nserde(rename = "max_rec_workers")]
+    pub max_rec_workers_snake: Option<usize>,
 }
 
 impl RecognitionConfigJson {
@@ -292,6 +302,12 @@ impl RecognitionConfigJson {
             .or(self.batch_num_camel)
             .or(self.rec_batch_num_snake)
             .or(self.batch_num_snake)
+    }
+    fn rec_workers(&self) -> Option<usize> {
+        self.rec_workers_camel.or(self.rec_workers_snake)
+    }
+    fn max_rec_workers(&self) -> Option<usize> {
+        self.max_rec_workers_camel.or(self.max_rec_workers_snake)
     }
 }
 
@@ -665,6 +681,16 @@ struct FlatConfig {
     #[nserde(rename = "batch_num")]
     pub batch_num_snake: Option<i32>,
 
+    #[nserde(rename = "recWorkers")]
+    pub rec_workers_camel: Option<usize>,
+    #[nserde(rename = "rec_workers")]
+    pub rec_workers_snake: Option<usize>,
+
+    #[nserde(rename = "maxRecWorkers")]
+    pub max_rec_workers_camel: Option<usize>,
+    #[nserde(rename = "max_rec_workers")]
+    pub max_rec_workers_snake: Option<usize>,
+
     #[nserde(rename = "useDet")]
     pub use_det_camel: Option<bool>,
     #[nserde(rename = "use_det")]
@@ -808,6 +834,12 @@ impl FlatConfig {
             .or(self.batch_num_camel)
             .or(self.rec_batch_num_snake)
             .or(self.batch_num_snake)
+    }
+    fn rec_workers(&self) -> Option<usize> {
+        self.rec_workers_camel.or(self.rec_workers_snake)
+    }
+    fn max_rec_workers(&self) -> Option<usize> {
+        self.max_rec_workers_camel.or(self.max_rec_workers_snake)
     }
     fn use_det(&self) -> Option<bool> {
         self.use_det_camel.or(self.use_det_snake)
@@ -1203,6 +1235,12 @@ impl InitializeConfig {
         if let Some(batch_num) = flat.rec_batch_num().or_else(|| flat.recognition.as_ref().and_then(|r| r.rec_batch_num())) {
             config.rec.rec_batch_num = batch_num;
         }
+        if let Some(workers) = flat.rec_workers().or_else(|| flat.recognition.as_ref().and_then(|r| r.rec_workers())) {
+            config.rec.rec_workers = Some(workers);
+        }
+        if let Some(max_workers) = flat.max_rec_workers().or_else(|| flat.recognition.as_ref().and_then(|r| r.max_rec_workers())) {
+            config.rec.max_rec_workers = max_workers;
+        }
         if let Some(y_mult) = flat.layout.as_ref().and_then(|l| l.y_threshold_multiplier()) {
             config.global.y_threshold_multiplier = Some(y_mult);
         }
@@ -1430,6 +1468,18 @@ impl InitializeConfig {
     /// Set recognition batch size
     pub fn with_rec_batch_num(mut self, batch_num: i32) -> Self {
         self.rec.rec_batch_num = batch_num;
+        self
+    }
+
+    /// Set number of parallel workers for text recognition
+    pub fn with_rec_workers(mut self, workers: usize) -> Self {
+        self.rec.rec_workers = Some(workers);
+        self
+    }
+
+    /// Set maximum parallel workers clamp for text recognition (default: 8)
+    pub fn with_max_rec_workers(mut self, max_workers: usize) -> Self {
+        self.rec.max_rec_workers = max_workers;
         self
     }
 

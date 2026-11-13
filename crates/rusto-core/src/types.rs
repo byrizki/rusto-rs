@@ -227,6 +227,8 @@ pub struct RecConfig {
     pub rec_keys_path: Option<PathBuf>,
     pub rec_img_shape: [i32; 3],
     pub rec_batch_num: i32,
+    pub rec_workers: Option<usize>,
+    pub max_rec_workers: usize,
     pub engine_cfg: EngineConfig,
 }
 
@@ -246,6 +248,8 @@ impl RecConfig {
             rec_keys_path,
             rec_img_shape: [3, 48, 320],
             rec_batch_num: 6,
+            rec_workers: None,
+            max_rec_workers: 8,
             engine_cfg: EngineConfig::default(),
         }
     }
@@ -261,6 +265,8 @@ impl RecConfig {
             rec_keys_path,
             rec_img_shape: [3, 48, 320],
             rec_batch_num: 6,
+            rec_workers: None,
+            max_rec_workers: 8,
             engine_cfg: EngineConfig::default(),
         }
     }
@@ -276,6 +282,8 @@ impl RecConfig {
             rec_keys_path,
             rec_img_shape: [3, 48, 320],
             rec_batch_num: 6,
+            rec_workers: None,
+            max_rec_workers: 8,
             engine_cfg: EngineConfig::default(),
         }
     }
@@ -563,6 +571,16 @@ pub enum DetectTextResult {
     Spatial(String),
 }
 
+impl DetectTextResult {
+    /// Aggregates structured text lines into document blocks based on layout regions.
+    pub fn to_blocks(&self) -> Vec<crate::block::BlockResult> {
+        match self {
+            Self::Structured(lines) => crate::block::cluster_text_results_into_blocks(lines),
+            Self::Spatial(_) => Vec::new(),
+        }
+    }
+}
+
 /// Pre-detection image conditioning and resolution optimization options.
 #[derive(Clone, Debug, Default, DeJson, SerJson, PartialEq)]
 pub struct PreDetectionOptions {
@@ -653,6 +671,9 @@ pub struct PreRecognitionOptions {
 pub struct RecognitionRunOptions {
     #[nserde(rename = "batchSize")]
     pub batch_size: Option<i32>,
+    pub workers: Option<usize>,
+    #[nserde(rename = "maxWorkers")]
+    pub max_workers: Option<usize>,
 }
 
 /// Post-recognition confidence score filtering.

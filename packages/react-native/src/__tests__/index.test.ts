@@ -43,7 +43,7 @@ describe('React Native API', () => {
       detection: { limitType: 'min' as const },
       postDetection: { useDilation: false },
       preRecognition: { lineYThreshold: 0.5 },
-      recognition: { batchSize: 8 },
+      recognition: { batchSize: 8, workers: 2, maxWorkers: 4 },
       postRecognition: { scoreThreshold: 0.3 },
     };
     await detectText({ uri: '/tmp/image.png' }, options);

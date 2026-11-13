@@ -155,6 +155,8 @@ pub struct OcrPipeline {
     pub global: GlobalConfig,
     pub det_config: DetConfig,
     pub rec_batch_num: usize,
+    pub rec_workers: Option<usize>,
+    pub max_rec_workers: usize,
     pub orient: Option<Box<dyn InferenceSession>>,
     pub cls: Option<Box<dyn InferenceSession>>,
     pub unwarp: Option<Box<dyn InferenceSession>>,
@@ -180,6 +182,8 @@ impl OcrPipeline {
             global,
             det_config: DetConfig::default(PathBuf::new()),
             rec_batch_num: 6,
+            rec_workers: None,
+            max_rec_workers: 8,
             orient: None,
             cls: None,
             unwarp: None,
@@ -260,9 +264,17 @@ impl OcrPipeline {
         }
 
         let orig_rec_batch_num = self.rec_batch_num;
+        let orig_rec_workers = self.rec_workers;
+        let orig_max_rec_workers = self.max_rec_workers;
         if let Some(rec) = &options.recognition {
             if let Some(batch_num) = rec.batch_size {
                 self.rec_batch_num = batch_num.max(1) as usize;
+            }
+            if let Some(workers) = rec.workers {
+                self.rec_workers = Some(workers);
+            }
+            if let Some(max_w) = rec.max_workers {
+                self.max_rec_workers = max_w;
             }
         }
         let postprocess_options = options.post_detection.as_ref().map(|p| p.to_postprocess_run_options());
@@ -273,6 +285,8 @@ impl OcrPipeline {
             postprocess_options.as_ref(),
         );
         self.rec_batch_num = orig_rec_batch_num;
+        self.rec_workers = orig_rec_workers;
+        self.max_rec_workers = orig_max_rec_workers;
         result
     }
 
@@ -709,12 +723,10 @@ impl OcrPipeline {
 
             #[cfg(not(target_arch = "wasm32"))]
             let mut worker_sessions: Vec<Box<dyn InferenceSession>> = {
-                let num_workers = if let Ok(val) = std::env::var("RUSTO_REC_WORKERS") {
-                    val.parse::<usize>().unwrap_or(1).min(total_chunks).max(1)
-                } else if std::env::var("RUSTO_SERIAL_REC").is_ok() {
-                    1
+                let num_workers = if let Some(workers) = self.rec_workers {
+                    workers.min(total_chunks).max(1)
                 } else if total_chunks > 1 {
-                    rusto_nn::par::current_num_threads().min(total_chunks).clamp(1, 8)
+                    rusto_nn::par::current_num_threads().min(total_chunks).clamp(1, self.max_rec_workers.max(1))
                 } else {
                     1
                 };
@@ -817,12 +829,10 @@ impl OcrPipeline {
 
             #[cfg(not(target_arch = "wasm32"))]
             let mut worker_sessions: Vec<Box<dyn InferenceSession>> = {
-                let num_workers = if let Ok(val) = std::env::var("RUSTO_REC_WORKERS") {
-                    val.parse::<usize>().unwrap_or(1).min(total_batches).max(1)
-                } else if std::env::var("RUSTO_SERIAL_REC").is_ok() {
-                    1
+                let num_workers = if let Some(workers) = self.rec_workers {
+                    workers.min(total_batches).max(1)
                 } else if total_batches > 1 {
-                    rusto_nn::par::current_num_threads().min(total_batches).clamp(1, 8)
+                    rusto_nn::par::current_num_threads().min(total_batches).clamp(1, self.max_rec_workers.max(1))
                 } else {
                     1
                 };

@@ -495,9 +495,14 @@ type PreRecognitionOptions struct {
 	WordXThreshold *float32 `json:"wordXThreshold,omitempty"`
 }
 
-// RecognitionRunOptions contains recognition batching parameters.
+// RecognitionRunOptions contains recognition batching and worker concurrency parameters.
 type RecognitionRunOptions struct {
+	// BatchSize is the number of text crops processed concurrently.
 	BatchSize *int32 `json:"batchSize,omitempty"`
+	// Workers is the number of parallel worker threads for recognition inference (nil = auto).
+	Workers *uint32 `json:"workers,omitempty"`
+	// MaxWorkers is the maximum worker thread count clamp for recognition inference (nil = engine default 8).
+	MaxWorkers *uint32 `json:"maxWorkers,omitempty"`
 }
 
 // PostRecognitionOptions contains recognition score filtering.

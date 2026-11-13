@@ -3577,6 +3577,12 @@ class FfiConverterTypePreRecognitionOptions : FfiConverterRustBuffer<PreRecognit
 /// <param name="RecBatchNum">
 /// Recognition batch size. Default: 6.
 /// </param>
+/// <param name="RecWorkers">
+/// Number of parallel worker threads for recognition. `None` = auto (up to max_rec_workers).
+/// </param>
+/// <param name="MaxRecWorkers">
+/// Maximum recognition worker thread count clamp. Default: 8.
+/// </param>
 public record RecognitionConfig(
     /// <summary>
     /// Whether recognition stage is enabled.
@@ -3593,7 +3599,15 @@ public record RecognitionConfig(
     /// <summary>
     /// Recognition batch size. Default: 6.
     /// </summary>
-    int? RecBatchNum
+    int? RecBatchNum,
+    /// <summary>
+    /// Number of parallel worker threads for recognition. `None` = auto (up to max_rec_workers).
+    /// </summary>
+    uint? RecWorkers,
+    /// <summary>
+    /// Maximum recognition worker thread count clamp. Default: 8.
+    /// </summary>
+    uint? MaxRecWorkers
 ) { }
 
 class FfiConverterTypeRecognitionConfig : FfiConverterRustBuffer<RecognitionConfig>
@@ -3607,7 +3621,9 @@ class FfiConverterTypeRecognitionConfig : FfiConverterRustBuffer<RecognitionConf
             Enabled: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             ModelPath: FfiConverterOptionalString.INSTANCE.Read(stream),
             DictPath: FfiConverterOptionalString.INSTANCE.Read(stream),
-            RecBatchNum: FfiConverterOptionalInt32.INSTANCE.Read(stream)
+            RecBatchNum: FfiConverterOptionalInt32.INSTANCE.Read(stream),
+            RecWorkers: FfiConverterOptionalUInt32.INSTANCE.Read(stream),
+            MaxRecWorkers: FfiConverterOptionalUInt32.INSTANCE.Read(stream)
         );
     }
 
@@ -3617,7 +3633,9 @@ class FfiConverterTypeRecognitionConfig : FfiConverterRustBuffer<RecognitionConf
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.Enabled)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.ModelPath)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.DictPath)
-            + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.RecBatchNum);
+            + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.RecBatchNum)
+            + FfiConverterOptionalUInt32.INSTANCE.AllocationSize(value.RecWorkers)
+            + FfiConverterOptionalUInt32.INSTANCE.AllocationSize(value.MaxRecWorkers);
     }
 
     public override void Write(RecognitionConfig value, BigEndianStream stream)
@@ -3626,6 +3644,8 @@ class FfiConverterTypeRecognitionConfig : FfiConverterRustBuffer<RecognitionConf
         FfiConverterOptionalString.INSTANCE.Write(value.ModelPath, stream);
         FfiConverterOptionalString.INSTANCE.Write(value.DictPath, stream);
         FfiConverterOptionalInt32.INSTANCE.Write(value.RecBatchNum, stream);
+        FfiConverterOptionalUInt32.INSTANCE.Write(value.RecWorkers, stream);
+        FfiConverterOptionalUInt32.INSTANCE.Write(value.MaxRecWorkers, stream);
     }
 }
 
@@ -3635,11 +3655,25 @@ class FfiConverterTypeRecognitionConfig : FfiConverterRustBuffer<RecognitionConf
 /// <param name="BatchSize">
 /// Recognition batch size. Default: 10.
 /// </param>
+/// <param name="Workers">
+/// Number of parallel worker threads for recognition inference. `None` = auto (up to max_workers).
+/// </param>
+/// <param name="MaxWorkers">
+/// Maximum worker thread count clamp for recognition inference. `None` = use engine default (8).
+/// </param>
 public record RecognitionRunOptions(
     /// <summary>
     /// Recognition batch size. Default: 10.
     /// </summary>
-    int? BatchSize
+    int? BatchSize,
+    /// <summary>
+    /// Number of parallel worker threads for recognition inference. `None` = auto (up to max_workers).
+    /// </summary>
+    uint? Workers,
+    /// <summary>
+    /// Maximum worker thread count clamp for recognition inference. `None` = use engine default (8).
+    /// </summary>
+    uint? MaxWorkers
 ) { }
 
 class FfiConverterTypeRecognitionRunOptions : FfiConverterRustBuffer<RecognitionRunOptions>
@@ -3650,18 +3684,25 @@ class FfiConverterTypeRecognitionRunOptions : FfiConverterRustBuffer<Recognition
     public override RecognitionRunOptions Read(BigEndianStream stream)
     {
         return new RecognitionRunOptions(
-            BatchSize: FfiConverterOptionalInt32.INSTANCE.Read(stream)
+            BatchSize: FfiConverterOptionalInt32.INSTANCE.Read(stream),
+            Workers: FfiConverterOptionalUInt32.INSTANCE.Read(stream),
+            MaxWorkers: FfiConverterOptionalUInt32.INSTANCE.Read(stream)
         );
     }
 
     public override int AllocationSize(RecognitionRunOptions value)
     {
-        return 0 + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.BatchSize);
+        return 0
+            + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.BatchSize)
+            + FfiConverterOptionalUInt32.INSTANCE.AllocationSize(value.Workers)
+            + FfiConverterOptionalUInt32.INSTANCE.AllocationSize(value.MaxWorkers);
     }
 
     public override void Write(RecognitionRunOptions value, BigEndianStream stream)
     {
         FfiConverterOptionalInt32.INSTANCE.Write(value.BatchSize, stream);
+        FfiConverterOptionalUInt32.INSTANCE.Write(value.Workers, stream);
+        FfiConverterOptionalUInt32.INSTANCE.Write(value.MaxWorkers, stream);
     }
 }
 

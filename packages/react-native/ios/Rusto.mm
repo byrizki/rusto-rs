@@ -208,7 +208,7 @@ static NSError *makeValidationError(NSString *message) {
 
     NSSet *allowed = [NSSet setWithObjects:@"preset", @"model", @"modelPath", @"lang",
                                            @"cacheDir", @"enableReadingOrder", @"layoutVariant",
-                                           @"recBatchNum", @"models", nil];
+                                           @"recBatchNum", @"recWorkers", @"maxRecWorkers", @"models", nil];
     NSSet *keys = [NSSet setWithArray:config.allKeys];
     if (![keys isSubsetOfSet:allowed]) {
         if (error) *error = makeValidationError(@"unknown key");
@@ -249,16 +249,18 @@ static NSError *makeValidationError(NSString *message) {
         }
     }
 
-    if (config[@"recBatchNum"] != nil) {
-        id val = config[@"recBatchNum"];
-        if (!isJsonNumber(val)) {
-            if (error) *error = makeValidationError(@"recBatchNum is invalid");
-            return nil;
-        }
-        double d = [val doubleValue];
-        if (!isfinite(d) || d < 1.0 || floor(d) != d) {
-            if (error) *error = makeValidationError(@"recBatchNum is invalid");
-            return nil;
+    for (NSString *intKey in @[@"recBatchNum", @"recWorkers", @"maxRecWorkers"]) {
+        if (config[intKey] != nil) {
+            id val = config[intKey];
+            if (!isJsonNumber(val)) {
+                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ is invalid", intKey]);
+                return nil;
+            }
+            double d = [val doubleValue];
+            if (!isfinite(d) || d < 1.0 || floor(d) != d) {
+                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ is invalid", intKey]);
+                return nil;
+            }
         }
     }
 
@@ -490,20 +492,22 @@ static NSError *makeValidationError(NSString *message) {
         return nil;
     }
     NSDictionary *rec = (NSDictionary *)raw;
-    NSSet *allowed = [NSSet setWithObjects:@"batchSize", nil];
+    NSSet *allowed = [NSSet setWithObjects:@"batchSize", @"workers", @"maxWorkers", nil];
     if (![[NSSet setWithArray:rec.allKeys] isSubsetOfSet:allowed]) {
         if (error) *error = makeValidationError(@"recognition contains an unknown key");
         return nil;
     }
     NSMutableDictionary *result = [NSMutableDictionary dictionary];
-    if (rec[@"batchSize"] != nil) {
-        id val = rec[@"batchSize"];
-        double d = isJsonNumber(val) ? [val doubleValue] : -1.0;
-        if (!isfinite(d) || d < 1.0 || floor(d) != d) {
-            if (error) *error = makeValidationError(@"batchSize is invalid");
-            return nil;
+    for (NSString *key in allowed) {
+        if (rec[key] != nil) {
+            id val = rec[key];
+            double d = isJsonNumber(val) ? [val doubleValue] : -1.0;
+            if (!isfinite(d) || d < 1.0 || floor(d) != d) {
+                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ is invalid", key]);
+                return nil;
+            }
+            result[key] = val;
         }
-        result[@"batchSize"] = val;
     }
     return result;
 }
@@ -701,11 +705,13 @@ RCT_EXPORT_METHOD(initialize:(nullable NSDictionary *)configDict
     if (detModel != nil) {
         resolvedConfig[@"detection"] = @{ @"modelPath": detModel };
     }
-    if (recModel != nil || dictPath != nil || config[@"recBatchNum"] != nil) {
+    if (recModel != nil || dictPath != nil || config[@"recBatchNum"] != nil || config[@"recWorkers"] != nil || config[@"maxRecWorkers"] != nil) {
         NSMutableDictionary *recDict = [NSMutableDictionary dictionary];
         if (recModel != nil) recDict[@"modelPath"] = recModel;
         if (dictPath != nil) recDict[@"dictPath"] = dictPath;
         if (config[@"recBatchNum"] != nil) recDict[@"recBatchNum"] = config[@"recBatchNum"];
+        if (config[@"recWorkers"] != nil) recDict[@"recWorkers"] = config[@"recWorkers"];
+        if (config[@"maxRecWorkers"] != nil) recDict[@"maxRecWorkers"] = config[@"maxRecWorkers"];
         resolvedConfig[@"recognition"] = recDict;
     }
 

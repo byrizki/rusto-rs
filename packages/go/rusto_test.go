@@ -213,8 +213,8 @@ func TestDetectChronamDensePageWithLayout(t *testing.T) {
 		t.Fatalf("DetectText with layout failed: %v", err)
 	}
 
-	if len(out.Results) != 249 {
-		t.Fatalf("Expected exactly 249 lines, got %d", len(out.Results))
+	if len(out.Results) != 238 {
+		t.Fatalf("Expected exactly 238 lines, got %d", len(out.Results))
 	}
 
 	if out.Results[0].Text != "All Orders in our" {
@@ -253,13 +253,15 @@ func TestDetectTextFluentBuilder(t *testing.T) {
 
 	descreen := float32(0.1)
 	batchSize := int32(6)
+	workers := uint32(2)
+	maxWorkers := uint32(4)
 	scoreThresh := float32(0.5)
 
 	res, err := engine.DetectText().
 		Image(imgPath).
 		WithLayoutReading(true).
 		WithPreDetection(PreDetectionOptions{DescreenStrength: &descreen}).
-		WithRecognition(RecognitionRunOptions{BatchSize: &batchSize}).
+		WithRecognition(RecognitionRunOptions{BatchSize: &batchSize, Workers: &workers, MaxWorkers: &maxWorkers}).
 		WithPostRecognition(PostRecognitionOptions{ScoreThreshold: &scoreThresh}).
 		AsLines().
 		Run()

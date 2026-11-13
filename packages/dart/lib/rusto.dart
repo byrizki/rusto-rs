@@ -399,13 +399,18 @@ class DetectTextBuilder {
     return this;
   }
 
+  /// Configure recognition inference parameters (`batchSize`, `workers`, `maxWorkers`).
   DetectTextBuilder withRecognition({
     int? batchSize,
+    int? workers,
+    int? maxWorkers,
     generated.RecognitionRunOptions? options,
   }) {
     _recognition = options ??
         generated.RecognitionRunOptions(
           batchSize: batchSize,
+          workers: workers,
+          maxWorkers: maxWorkers,
         );
     return this;
   }

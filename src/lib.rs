@@ -55,6 +55,7 @@ pub use rusto_core::config::{
     PPV5_MODEL_CONFIG, PPV6_MODEL_CONFIG,
 };
 pub use rusto_core::doc::{DocBlock, DocResult};
+pub use rusto_core::block::{cluster_text_results_into_blocks, BlockResult};
 pub use rusto_core::engine::{
     CoreError, DocPipeline, DocPipelineConfig, DocUnwarper, EngineError, EngineSession,
     InferenceSession, LayoutDetector, MnnSession, OrientClassifier, OrientationExt,
@@ -166,6 +167,20 @@ impl<'a> DetectTextBuilder<'a> {
         self
     }
 
+    /// Set number of parallel recognition workers for this run
+    pub fn with_rec_workers(mut self, workers: usize) -> Self {
+        let rec = self.options.recognition.get_or_insert_with(Default::default);
+        rec.workers = Some(workers);
+        self
+    }
+
+    /// Set maximum recognition workers clamp for this run
+    pub fn with_max_rec_workers(mut self, max_workers: usize) -> Self {
+        let rec = self.options.recognition.get_or_insert_with(Default::default);
+        rec.max_workers = Some(max_workers);
+        self
+    }
+
     pub fn with_post_recognition(mut self, opts: PostRecognitionOptions) -> Self {
         self.options.post_recognition = Some(opts);
         self
@@ -213,6 +228,12 @@ impl<'a> DetectTextBuilder<'a> {
                 .engine
                 .detect_text_rgb(pixels, width, height, stride, &self.options),
         }
+    }
+
+    /// Executes OCR and aggregates output lines into hierarchical document blocks.
+    pub fn run_blocks(self) -> Result<Vec<BlockResult>, rusto_core::engine::EngineError> {
+        let result = self.run()?;
+        Ok(result.to_blocks())
     }
 }
 
@@ -328,6 +349,7 @@ mod tests {
             })
             .with_recognition(RecognitionRunOptions {
                 batch_size: Some(8),
+                ..Default::default()
             })
             .with_post_recognition(PostRecognitionOptions {
                 score_threshold: Some(0.7),

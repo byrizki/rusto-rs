@@ -56,6 +56,16 @@ data class DetectionConfig(
 
 /**
  * Text recognition model configuration.
+ *
+ * @property enabled Whether recognition stage is enabled.
+ * @property modelPath Filesystem path to recognition model (.rten or .onnx).
+ * @property dictPath Filesystem path to dictionary vocabulary file (.txt).
+ * @property scoreThresh Minimum confidence score threshold.
+ * @property returnWordBox Whether to return word-level bounding boxes.
+ * @property returnSingleCharBox Whether to return single-character bounding boxes.
+ * @property recBatchNum Recognition batch size. Default: 6.
+ * @property recWorkers Number of parallel worker threads for recognition (`null` = auto).
+ * @property maxRecWorkers Maximum worker thread count clamp for recognition (`null` = engine default 8).
  */
 data class RecognitionConfig(
     val enabled: Boolean? = null,
@@ -64,7 +74,9 @@ data class RecognitionConfig(
     val scoreThresh: Float? = null,
     val returnWordBox: Boolean? = null,
     val returnSingleCharBox: Boolean? = null,
-    val recBatchNum: Int? = null
+    val recBatchNum: Int? = null,
+    val recWorkers: Int? = null,
+    val maxRecWorkers: Int? = null
 )
 
 /**
@@ -165,6 +177,8 @@ data class InitializeConfig(
             recognition?.returnWordBox?.let { recObj.put("returnWordBox", it) }
             recognition?.returnSingleCharBox?.let { recObj.put("returnSingleCharBox", it) }
             recognition?.recBatchNum?.let { recObj.put("recBatchNum", it) }
+            recognition?.recWorkers?.let { recObj.put("recWorkers", it) }
+            recognition?.maxRecWorkers?.let { recObj.put("maxRecWorkers", it) }
             json.put("recognition", recObj)
         }
 
@@ -317,10 +331,16 @@ data class PreRecognitionOptions(
 )
 
 /**
- * Phase 5: Recognition inference options (batch size).
+ * Phase 5: Recognition inference options (batch size and worker concurrency).
+ *
+ * @property batchSize Recognition batch size. Default: 10.
+ * @property workers Number of parallel worker threads for recognition inference (`null` = auto).
+ * @property maxWorkers Maximum worker thread count clamp for recognition inference (`null` = engine default 8).
  */
 data class RecognitionRunOptions(
     val batchSize: Int? = null,
+    val workers: Int? = null,
+    val maxWorkers: Int? = null,
 )
 
 /**
@@ -394,6 +414,8 @@ data class OcrRunOptions(
             recognition?.let { r ->
                 put("recognition", JSONObject().apply {
                     r.batchSize?.let { put("batchSize", it) }
+                    r.workers?.let { put("workers", it) }
+                    r.maxWorkers?.let { put("maxWorkers", it) }
                 })
             }
             postRecognition?.let { pr ->
@@ -660,6 +682,8 @@ class RustO private constructor(
             recognition = options.recognition?.let { r ->
                 uniffi.rusto.RecognitionRunOptions(
                     batchSize = r.batchSize,
+                    workers = r.workers?.toUInt(),
+                    maxWorkers = r.maxWorkers?.toUInt(),
                 )
             },
             postRecognition = options.postRecognition?.let { pr ->

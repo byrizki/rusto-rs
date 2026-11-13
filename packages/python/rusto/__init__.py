@@ -169,14 +169,24 @@ class PreRecognitionOptions(_GeneratedPreRecognitionOptions):
 
 
 class RecognitionRunOptions(_GeneratedRecognitionRunOptions):
-    """Phase 5: Recognition inference options."""
+    """Phase 5: Recognition inference options.
+
+    Args:
+        batch_size: Recognition batch size (number of text crops processed concurrently).
+        workers: Number of parallel worker threads for recognition inference (`None` = auto).
+        max_workers: Maximum worker thread count clamp for recognition inference (`None` = engine default 8).
+    """
     def __init__(
         self,
         *,
         batch_size: int | None = None,
+        workers: int | None = None,
+        max_workers: int | None = None,
     ):
         super().__init__(
             batch_size=batch_size,
+            workers=workers,
+            max_workers=max_workers,
         )
 
 
@@ -220,19 +230,32 @@ class DetectionConfig(_GeneratedDetectionConfig):
 
 
 class RecognitionConfig(_GeneratedRecognitionConfig):
-    """Text recognition model configuration."""
+    """Text recognition model configuration.
+
+    Args:
+        enabled: Whether recognition stage is enabled.
+        model_path: Filesystem path to recognition model (.rten or .onnx).
+        dict_path: Filesystem path to dictionary vocabulary file (.txt).
+        rec_batch_num: Recognition batch size. Default: 6.
+        rec_workers: Number of parallel worker threads for recognition (`None` = auto).
+        max_rec_workers: Maximum worker thread count clamp (`None` = engine default 8).
+    """
     def __init__(
         self,
         enabled: bool | None = None,
         model_path: str | None = None,
         dict_path: str | None = None,
         rec_batch_num: int | None = None,
+        rec_workers: int | None = None,
+        max_rec_workers: int | None = None,
     ):
         super().__init__(
             enabled=enabled,
             model_path=model_path,
             dict_path=dict_path,
             rec_batch_num=rec_batch_num,
+            rec_workers=rec_workers,
+            max_rec_workers=max_rec_workers,
         )
 
 
@@ -660,12 +683,18 @@ class DetectTextBuilder:
         options: RecognitionRunOptions | None = None,
         *,
         batch_size: int | None = None,
+        workers: int | None = None,
+        max_workers: int | None = None,
     ) -> DetectTextBuilder:
         """Configure recognition inference options."""
         if options is not None:
             self._recognition = options
         else:
-            self._recognition = RecognitionRunOptions(batch_size=batch_size)
+            self._recognition = RecognitionRunOptions(
+                batch_size=batch_size,
+                workers=workers,
+                max_workers=max_workers,
+            )
         return self
 
     def with_post_recognition(

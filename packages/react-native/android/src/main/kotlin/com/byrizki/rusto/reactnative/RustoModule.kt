@@ -72,7 +72,19 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
         if (map == null) return InitializeConfig()
         requireOnlyKeys(
             map,
-            setOf("preset", "models", "recBatchNum", "model", "modelPath", "lang", "cacheDir", "enableReadingOrder", "layoutVariant"),
+            setOf(
+                "preset",
+                "models",
+                "recBatchNum",
+                "recWorkers",
+                "maxRecWorkers",
+                "model",
+                "modelPath",
+                "lang",
+                "cacheDir",
+                "enableReadingOrder",
+                "layoutVariant"
+            ),
             "InitializeConfig contains an unknown key."
         )
         val template = if (map.hasKey("preset") && !map.isNull("preset")) {
@@ -94,12 +106,17 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
             return map.getBoolean(key)
         }
 
-        val recBatchNum = if (map.hasKey("recBatchNum") && !map.isNull("recBatchNum")) {
-            require(map.getType("recBatchNum") == ReadableType.Number) { "InitializeConfig.recBatchNum must be a number." }
-            map.getDouble("recBatchNum").also {
-                require(it.isFinite() && it >= 1.0 && it % 1.0 == 0.0) { "InitializeConfig.recBatchNum must be an integer >= 1." }
+        fun optPositiveInt(key: String): Int? {
+            if (!map.hasKey(key) || map.isNull(key)) return null
+            require(map.getType(key) == ReadableType.Number) { "InitializeConfig.$key must be a number." }
+            return map.getDouble(key).also {
+                require(it.isFinite() && it >= 1.0 && it % 1.0 == 0.0) { "InitializeConfig.$key must be an integer >= 1." }
             }.toInt()
-        } else null
+        }
+
+        val recBatchNum = optPositiveInt("recBatchNum")
+        val recWorkers = optPositiveInt("recWorkers")
+        val maxRecWorkers = optPositiveInt("maxRecWorkers")
 
         val models = if (map.hasKey("models") && !map.isNull("models")) {
             require(map.getType("models") == ReadableType.Map) { "InitializeConfig.models must be an object." }
@@ -130,8 +147,14 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
             layoutVariant = optString("layoutVariant"),
             template = template,
             detection = if (detModel != null) DetectionConfig(modelPath = detModel) else null,
-            recognition = if (recModel != null || dictPath != null || recBatchNum != null) {
-                RecognitionConfig(modelPath = recModel, dictPath = dictPath, recBatchNum = recBatchNum)
+            recognition = if (recModel != null || dictPath != null || recBatchNum != null || recWorkers != null || maxRecWorkers != null) {
+                RecognitionConfig(
+                    modelPath = recModel,
+                    dictPath = dictPath,
+                    recBatchNum = recBatchNum,
+                    recWorkers = recWorkers,
+                    maxRecWorkers = maxRecWorkers
+                )
             } else null,
             classification = model("classification")?.let { ClassificationConfig(enabled = true, modelPath = it) },
             orientation = model("orientation")?.let { OrientationConfig(enabled = true, modelPath = it) },
@@ -339,12 +362,20 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
     }
 
     private fun parseRecognition(map: ReadableMap): RecognitionRunOptions {
-        requireOnlyKeys(map, setOf("batchSize"), "OcrRunOptions.recognition contains an unknown key.")
-        val batchSize = if (!map.hasKey("batchSize") || map.isNull("batchSize")) null else {
-            require(map.getType("batchSize") == ReadableType.Number) { "batchSize must be a number." }
-            map.getDouble("batchSize").also { require(it.isFinite() && it >= 1.0 && it % 1.0 == 0.0) { "batchSize must be >= 1." } }.toInt()
+        val allowed = setOf("batchSize", "workers", "maxWorkers")
+        requireOnlyKeys(map, allowed, "OcrRunOptions.recognition contains an unknown key.")
+        fun optPositiveInt(key: String): Int? {
+            if (!map.hasKey(key) || map.isNull(key)) return null
+            require(map.getType(key) == ReadableType.Number) { "$key must be a number." }
+            return map.getDouble(key).also {
+                require(it.isFinite() && it >= 1.0 && it % 1.0 == 0.0) { "$key must be >= 1." }
+            }.toInt()
         }
-        return RecognitionRunOptions(batchSize = batchSize)
+        return RecognitionRunOptions(
+            batchSize = optPositiveInt("batchSize"),
+            workers = optPositiveInt("workers"),
+            maxWorkers = optPositiveInt("maxWorkers")
+        )
     }
 
     private fun parsePostRecognition(map: ReadableMap): PostRecognitionOptions {

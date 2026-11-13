@@ -92,14 +92,25 @@ namespace RustODotnet
 
     public class RecognitionConfig
     {
+        /// <summary>Filesystem path to recognition model (.rten or .onnx).</summary>
         [JsonPropertyName("model_path")]
         public string ModelPath { get; set; }
 
+        /// <summary>Filesystem path to dictionary vocabulary file (.txt).</summary>
         [JsonPropertyName("dict_path")]
         public string DictPath { get; set; }
 
+        /// <summary>Recognition batch size. Default: 6.</summary>
         [JsonPropertyName("rec_batch_num")]
         public int? RecBatchNum { get; set; }
+
+        /// <summary>Number of parallel worker threads for recognition. Null = auto.</summary>
+        [JsonPropertyName("rec_workers")]
+        public int? RecWorkers { get; set; }
+
+        /// <summary>Maximum worker thread count clamp for recognition. Null = engine default (8).</summary>
+        [JsonPropertyName("max_rec_workers")]
+        public int? MaxRecWorkers { get; set; }
     }
 
     public class ClassificationConfig
@@ -318,12 +329,21 @@ namespace RustODotnet
     }
 
     /// <summary>
-    /// Phase 5: Recognition inference options (batch size).
+    /// Phase 5: Recognition inference options (batch size and worker concurrency).
     /// </summary>
     public class RecognitionRunOptions
     {
+        /// <summary>Recognition batch size. Default: 10.</summary>
         [JsonPropertyName("batchSize")]
         public int? BatchSize { get; set; }
+
+        /// <summary>Number of parallel worker threads for recognition inference. Null = auto.</summary>
+        [JsonPropertyName("workers")]
+        public int? Workers { get; set; }
+
+        /// <summary>Maximum worker thread count clamp for recognition inference. Null = engine default (8).</summary>
+        [JsonPropertyName("maxWorkers")]
+        public int? MaxWorkers { get; set; }
     }
 
     /// <summary>
@@ -989,7 +1009,9 @@ namespace RustODotnet
                     options.PreRecognition.WordXThreshold
                 ) : defaultOpts.PreRecognition,
                 Recognition = options.Recognition != null ? new RustODotnet.Generated.RecognitionRunOptions(
-                    options.Recognition.BatchSize
+                    options.Recognition.BatchSize,
+                    (uint?)options.Recognition.Workers,
+                    (uint?)options.Recognition.MaxWorkers
                 ) : defaultOpts.Recognition,
                 PostRecognition = options.PostRecognition != null ? new RustODotnet.Generated.PostRecognitionOptions(
                     options.PostRecognition.ScoreThreshold
@@ -1052,6 +1074,10 @@ namespace RustODotnet
             {
                 if (options.Recognition.BatchSize.HasValue && options.Recognition.BatchSize.Value < 1)
                     throw new RustOException("BatchSize must be at least one.");
+                if (options.Recognition.Workers.HasValue && options.Recognition.Workers.Value < 1)
+                    throw new RustOException("Workers must be at least one.");
+                if (options.Recognition.MaxWorkers.HasValue && options.Recognition.MaxWorkers.Value < 1)
+                    throw new RustOException("MaxWorkers must be at least one.");
             }
             if (options.PostRecognition != null)
             {

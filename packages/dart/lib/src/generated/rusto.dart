@@ -1142,6 +1142,10 @@ class RecognitionConfig {
     required this.dictPath,
     /// Recognition batch size. Default: 6.
     required this.recBatchNum,
+    /// Number of parallel worker threads for recognition. `None` = auto (up to max_rec_workers).
+    required this.recWorkers,
+    /// Maximum recognition worker thread count clamp. Default: 8.
+    required this.maxRecWorkers,
   });
 
   /// Whether recognition stage is enabled.
@@ -1152,6 +1156,10 @@ class RecognitionConfig {
   final String? dictPath;
   /// Recognition batch size. Default: 6.
   final int? recBatchNum;
+  /// Number of parallel worker threads for recognition. `None` = auto (up to max_rec_workers).
+  final int? recWorkers;
+  /// Maximum recognition worker thread count clamp. Default: 8.
+  final int? maxRecWorkers;
 
   Map<String, dynamic> toJson() {
     return {
@@ -1159,6 +1167,8 @@ class RecognitionConfig {
       'modelPath': this.modelPath,
       'dictPath': this.dictPath,
       'recBatchNum': this.recBatchNum,
+      'recWorkers': this.recWorkers,
+      'maxRecWorkers': this.maxRecWorkers,
     };
   }
 
@@ -1168,6 +1178,8 @@ class RecognitionConfig {
       modelPath: json['modelPath'] == null ? null : json['modelPath'] as String,
       dictPath: json['dictPath'] == null ? null : json['dictPath'] as String,
       recBatchNum: json['recBatchNum'] == null ? null : (json['recBatchNum'] as num).toInt(),
+      recWorkers: json['recWorkers'] == null ? null : (json['recWorkers'] as num).toInt(),
+      maxRecWorkers: json['maxRecWorkers'] == null ? null : (json['maxRecWorkers'] as num).toInt(),
     );
   }
 
@@ -1176,27 +1188,31 @@ class RecognitionConfig {
     Object? modelPath = _sentinel,
     Object? dictPath = _sentinel,
     Object? recBatchNum = _sentinel,
+    Object? recWorkers = _sentinel,
+    Object? maxRecWorkers = _sentinel,
   }) {
     return RecognitionConfig(
       enabled: enabled == _sentinel ? this.enabled : enabled as bool?,
       modelPath: modelPath == _sentinel ? this.modelPath : modelPath as String?,
       dictPath: dictPath == _sentinel ? this.dictPath : dictPath as String?,
       recBatchNum: recBatchNum == _sentinel ? this.recBatchNum : recBatchNum as int?,
+      recWorkers: recWorkers == _sentinel ? this.recWorkers : recWorkers as int?,
+      maxRecWorkers: maxRecWorkers == _sentinel ? this.maxRecWorkers : maxRecWorkers as int?,
     );
   }
 
   @override
   String toString() {
-    return 'RecognitionConfig(enabled: $enabled, modelPath: $modelPath, dictPath: $dictPath, recBatchNum: $recBatchNum)';
+    return 'RecognitionConfig(enabled: $enabled, modelPath: $modelPath, dictPath: $dictPath, recBatchNum: $recBatchNum, recWorkers: $recWorkers, maxRecWorkers: $maxRecWorkers)';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is RecognitionConfig && enabled == other.enabled && modelPath == other.modelPath && dictPath == other.dictPath && recBatchNum == other.recBatchNum;
+      other is RecognitionConfig && enabled == other.enabled && modelPath == other.modelPath && dictPath == other.dictPath && recBatchNum == other.recBatchNum && recWorkers == other.recWorkers && maxRecWorkers == other.maxRecWorkers;
 
   @override
-  int get hashCode => Object.hash(enabled, modelPath, dictPath, recBatchNum);
+  int get hashCode => Object.hash(enabled, modelPath, dictPath, recBatchNum, recWorkers, maxRecWorkers);
 }
 
 /// Text recognition inference parameters.
@@ -1204,43 +1220,59 @@ class RecognitionRunOptions {
   const RecognitionRunOptions({
     /// Recognition batch size. Default: 10.
     required this.batchSize,
+    /// Number of parallel worker threads for recognition inference. `None` = auto (up to max_workers).
+    required this.workers,
+    /// Maximum worker thread count clamp for recognition inference. `None` = use engine default (8).
+    required this.maxWorkers,
   });
 
   /// Recognition batch size. Default: 10.
   final int? batchSize;
+  /// Number of parallel worker threads for recognition inference. `None` = auto (up to max_workers).
+  final int? workers;
+  /// Maximum worker thread count clamp for recognition inference. `None` = use engine default (8).
+  final int? maxWorkers;
 
   Map<String, dynamic> toJson() {
     return {
       'batchSize': this.batchSize,
+      'workers': this.workers,
+      'maxWorkers': this.maxWorkers,
     };
   }
 
   factory RecognitionRunOptions.fromJson(Map<String, dynamic> json) {
     return RecognitionRunOptions(
       batchSize: json['batchSize'] == null ? null : (json['batchSize'] as num).toInt(),
+      workers: json['workers'] == null ? null : (json['workers'] as num).toInt(),
+      maxWorkers: json['maxWorkers'] == null ? null : (json['maxWorkers'] as num).toInt(),
     );
   }
 
   RecognitionRunOptions copyWith({
     Object? batchSize = _sentinel,
+    Object? workers = _sentinel,
+    Object? maxWorkers = _sentinel,
   }) {
     return RecognitionRunOptions(
       batchSize: batchSize == _sentinel ? this.batchSize : batchSize as int?,
+      workers: workers == _sentinel ? this.workers : workers as int?,
+      maxWorkers: maxWorkers == _sentinel ? this.maxWorkers : maxWorkers as int?,
     );
   }
 
   @override
   String toString() {
-    return 'RecognitionRunOptions(batchSize: $batchSize)';
+    return 'RecognitionRunOptions(batchSize: $batchSize, workers: $workers, maxWorkers: $maxWorkers)';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is RecognitionRunOptions && batchSize == other.batchSize;
+      other is RecognitionRunOptions && batchSize == other.batchSize && workers == other.workers && maxWorkers == other.maxWorkers;
 
   @override
-  int get hashCode => batchSize.hashCode;
+  int get hashCode => Object.hash(batchSize, workers, maxWorkers);
 }
 
 /// Recognized OCR text result containing text, confidence score, bounding polygon, and frame.
@@ -2890,6 +2922,18 @@ void _uniffiWriteRecognitionConfig(RecognitionConfig value, _UniFfiBinaryWriter 
     writer.writeI8(1);
     writer.writeI32(value.recBatchNum!);
   }
+  if (value.recWorkers == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeU32(value.recWorkers!);
+  }
+  if (value.maxRecWorkers == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeU32(value.maxRecWorkers!);
+  }
 }
 
 Uint8List _uniffiEncodeRecognitionConfig(RecognitionConfig value) {
@@ -2904,6 +2948,8 @@ RecognitionConfig _uniffiReadRecognitionConfig(_UniFfiBinaryReader reader) {
     modelPath: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
     dictPath: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
     recBatchNum: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readI32(); })(),
+    recWorkers: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readU32(); })(),
+    maxRecWorkers: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readU32(); })(),
   );
 }
 
@@ -2923,6 +2969,18 @@ void _uniffiWriteRecognitionRunOptions(RecognitionRunOptions value, _UniFfiBinar
     writer.writeI8(1);
     writer.writeI32(value.batchSize!);
   }
+  if (value.workers == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeU32(value.workers!);
+  }
+  if (value.maxWorkers == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeU32(value.maxWorkers!);
+  }
 }
 
 Uint8List _uniffiEncodeRecognitionRunOptions(RecognitionRunOptions value) {
@@ -2934,6 +2992,8 @@ Uint8List _uniffiEncodeRecognitionRunOptions(RecognitionRunOptions value) {
 RecognitionRunOptions _uniffiReadRecognitionRunOptions(_UniFfiBinaryReader reader) {
   return RecognitionRunOptions(
     batchSize: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readI32(); })(),
+    workers: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readU32(); })(),
+    maxWorkers: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readU32(); })(),
   );
 }
 

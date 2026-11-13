@@ -145,6 +145,10 @@ export interface PreRecognitionOptions {
 export interface RecognitionRunOptions {
   /** Recognition batch size (number of text crops processed concurrently). */
   batchSize?: number;
+  /** Number of parallel worker threads for recognition inference (undefined = auto). */
+  workers?: number;
+  /** Maximum worker thread count clamp for recognition inference (undefined = engine default 8). */
+  maxWorkers?: number;
 }
 
 /**
@@ -297,6 +301,12 @@ export interface InitializeConfig {
     dict_path?: string;
     scoreThresh?: number;
     recBatchNum?: number;
+    /** Number of parallel worker threads for recognition (undefined = auto). */
+    recWorkers?: number;
+    rec_workers?: number;
+    /** Maximum worker thread count clamp for recognition (undefined = engine default 8). */
+    maxRecWorkers?: number;
+    max_rec_workers?: number;
   };
   /** Explicit classification model configuration. */
   classification?: {

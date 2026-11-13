@@ -170,6 +170,10 @@ pub struct PreRecognitionOptions {
 pub struct RecognitionRunOptions {
     /// Recognition batch size. Default: 10.
     pub batch_size: Option<i32>,
+    /// Number of parallel worker threads for recognition inference. `None` = auto (up to max_workers).
+    pub workers: Option<u32>,
+    /// Maximum worker thread count clamp for recognition inference. `None` = use engine default (8).
+    pub max_workers: Option<u32>,
 }
 
 /// Post-recognition confidence score filtering.
@@ -242,6 +246,10 @@ pub struct RecognitionConfig {
     pub dict_path: Option<String>,
     /// Recognition batch size. Default: 6.
     pub rec_batch_num: Option<i32>,
+    /// Number of parallel worker threads for recognition. `None` = auto (up to max_rec_workers).
+    pub rec_workers: Option<u32>,
+    /// Maximum recognition worker thread count clamp. Default: 8.
+    pub max_rec_workers: Option<u32>,
 }
 
 /// Line classification configuration (180° rotation detection).
@@ -440,6 +448,7 @@ pub fn create_initialize_config_ppv6(
             model_path: Some(rec_model_path),
             dict_path: Some(dict_path),
             rec_batch_num: None,
+            ..Default::default()
         }),
         ..Default::default()
     }
@@ -464,6 +473,7 @@ pub fn create_initialize_config_indra(
             model_path: Some(rec_model_path),
             dict_path: Some(dict_path),
             rec_batch_num: Some(1),
+            ..Default::default()
         }),
         ..Default::default()
     }
@@ -581,6 +591,8 @@ fn convert_options(opts: &OcrRunOptions) -> Result<rusto_core::types::OcrRunOpti
     });
     let recognition = opts.recognition.as_ref().map(|r| rusto_core::types::RecognitionRunOptions {
         batch_size: r.batch_size,
+        workers: r.workers.map(|w| w as usize),
+        max_workers: r.max_workers.map(|w| w as usize),
     });
     let post_recognition = opts.post_recognition.as_ref().map(|p| rusto_core::types::PostRecognitionOptions {
         score_threshold: p.score_threshold,
@@ -677,7 +689,11 @@ mod tests {
     fn test_uniffi_binding_types() {
         let mut options = default_ocr_run_options();
         assert_eq!(options.output, OutputGranularity::Lines);
-        options.recognition = Some(RecognitionRunOptions { batch_size: Some(12) });
+        options.recognition = Some(RecognitionRunOptions {
+            batch_size: Some(12),
+            workers: Some(4),
+            max_workers: Some(8),
+        });
         options.pre_detection = Some(PreDetectionOptions {
             descreen_strength: None,
             target_max_side: Some(960),
@@ -686,6 +702,8 @@ mod tests {
         });
         let converted = convert_options(&options).expect("convert_options should succeed");
         assert_eq!(converted.recognition.as_ref().unwrap().batch_size, Some(12));
+        assert_eq!(converted.recognition.as_ref().unwrap().workers, Some(4));
+        assert_eq!(converted.recognition.as_ref().unwrap().max_workers, Some(8));
         let opt = converted.pre_detection.expect("pre_detection should be present");
         assert_eq!(opt.target_max_side, Some(960));
         assert_eq!(opt.crop_padding_x, Some(0.05));

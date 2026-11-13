@@ -26,6 +26,7 @@ pub mod order;
 pub mod order_blocks;
 pub mod lines;
 pub mod resample;
+pub mod block;
 pub use pipeline as pipelines;
 
 pub use error::CoreError;
@@ -42,6 +43,7 @@ pub use cal_rec_boxes::*;
 pub use det::TextDetOutput;
 pub use rec::TextRecOutput;
 pub use layout::{BBox, LayoutOutput, LayoutRegion, LayoutType};
+pub use block::{cluster_text_results_into_blocks, BlockResult};
 pub use doc::{DocBlock, DocPipelineConfig, DocResult};
 pub use orient::{OrientOutput, Orientation};
 pub use table::{

@@ -111,11 +111,15 @@ export interface PreRecognitionOptions {
 }
 
 /**
- * Phase 5: Recognition inference options (batch size).
+ * Phase 5: Recognition inference options (batch size and worker concurrency).
  */
 export interface RecognitionRunOptions {
   /** Recognition batch size (number of text crops processed concurrently). */
   batchSize?: number;
+  /** Number of parallel worker threads for recognition inference (undefined = auto). */
+  workers?: number;
+  /** Maximum worker thread count clamp for recognition inference (undefined = engine default 8). */
+  maxWorkers?: number;
 }
 
 /**

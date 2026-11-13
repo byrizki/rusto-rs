@@ -2576,6 +2576,16 @@ data class RecognitionConfig (
      * Recognition batch size. Default: 6.
      */
     var `recBatchNum`: kotlin.Int?
+    , 
+    /**
+     * Number of parallel worker threads for recognition. `None` = auto (up to max_rec_workers).
+     */
+    var `recWorkers`: kotlin.UInt?
+    , 
+    /**
+     * Maximum recognition worker thread count clamp. Default: 8.
+     */
+    var `maxRecWorkers`: kotlin.UInt?
     
 ){
     
@@ -2596,6 +2606,8 @@ public object FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<Recognit
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalInt.read(buf),
+            FfiConverterOptionalUInt.read(buf),
+            FfiConverterOptionalUInt.read(buf),
         )
     }
 
@@ -2603,7 +2615,9 @@ public object FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<Recognit
             FfiConverterOptionalBoolean.allocationSize(value.`enabled`) +
             FfiConverterOptionalString.allocationSize(value.`modelPath`) +
             FfiConverterOptionalString.allocationSize(value.`dictPath`) +
-            FfiConverterOptionalInt.allocationSize(value.`recBatchNum`)
+            FfiConverterOptionalInt.allocationSize(value.`recBatchNum`) +
+            FfiConverterOptionalUInt.allocationSize(value.`recWorkers`) +
+            FfiConverterOptionalUInt.allocationSize(value.`maxRecWorkers`)
     )
 
     override fun write(value: RecognitionConfig, buf: ByteBuffer) {
@@ -2611,6 +2625,8 @@ public object FfiConverterTypeRecognitionConfig: FfiConverterRustBuffer<Recognit
             FfiConverterOptionalString.write(value.`modelPath`, buf)
             FfiConverterOptionalString.write(value.`dictPath`, buf)
             FfiConverterOptionalInt.write(value.`recBatchNum`, buf)
+            FfiConverterOptionalUInt.write(value.`recWorkers`, buf)
+            FfiConverterOptionalUInt.write(value.`maxRecWorkers`, buf)
     }
 }
 
@@ -2624,6 +2640,16 @@ data class RecognitionRunOptions (
      * Recognition batch size. Default: 10.
      */
     var `batchSize`: kotlin.Int?
+    , 
+    /**
+     * Number of parallel worker threads for recognition inference. `None` = auto (up to max_workers).
+     */
+    var `workers`: kotlin.UInt?
+    , 
+    /**
+     * Maximum worker thread count clamp for recognition inference. `None` = use engine default (8).
+     */
+    var `maxWorkers`: kotlin.UInt?
     
 ){
     
@@ -2641,15 +2667,21 @@ public object FfiConverterTypeRecognitionRunOptions: FfiConverterRustBuffer<Reco
     override fun read(buf: ByteBuffer): RecognitionRunOptions {
         return RecognitionRunOptions(
             FfiConverterOptionalInt.read(buf),
+            FfiConverterOptionalUInt.read(buf),
+            FfiConverterOptionalUInt.read(buf),
         )
     }
 
     override fun allocationSize(value: RecognitionRunOptions) = (
-            FfiConverterOptionalInt.allocationSize(value.`batchSize`)
+            FfiConverterOptionalInt.allocationSize(value.`batchSize`) +
+            FfiConverterOptionalUInt.allocationSize(value.`workers`) +
+            FfiConverterOptionalUInt.allocationSize(value.`maxWorkers`)
     )
 
     override fun write(value: RecognitionRunOptions, buf: ByteBuffer) {
             FfiConverterOptionalInt.write(value.`batchSize`, buf)
+            FfiConverterOptionalUInt.write(value.`workers`, buf)
+            FfiConverterOptionalUInt.write(value.`maxWorkers`, buf)
     }
 }
 

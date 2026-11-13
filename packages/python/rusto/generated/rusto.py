@@ -1372,22 +1372,62 @@ class _UniffiFfiConverterOptionalTypeDetectionConfig(_UniffiConverterRustBuffer)
         else:
             raise InternalError("Unexpected flag byte for optional type")
 
+class _UniffiFfiConverterUInt32(_UniffiConverterPrimitiveInt):
+    CLASS_NAME = "u32"
+    VALUE_MIN = 0
+    VALUE_MAX = 2**32
+
+    @staticmethod
+    def read(buf):
+        return buf.read_u32()
+
+    @staticmethod
+    def write(value, buf):
+        buf.write_u32(value)
+
+class _UniffiFfiConverterOptionalUInt32(_UniffiConverterRustBuffer):
+    @classmethod
+    def check_lower(cls, value):
+        if value is not None:
+            _UniffiFfiConverterUInt32.check_lower(value)
+
+    @classmethod
+    def write(cls, value, buf):
+        if value is None:
+            buf.write_u8(0)
+            return
+
+        buf.write_u8(1)
+        _UniffiFfiConverterUInt32.write(value, buf)
+
+    @classmethod
+    def read(cls, buf):
+        flag = buf.read_u8()
+        if flag == 0:
+            return None
+        elif flag == 1:
+            return _UniffiFfiConverterUInt32.read(buf)
+        else:
+            raise InternalError("Unexpected flag byte for optional type")
+
 @dataclass
 class RecognitionConfig:
     """
     Text recognition model configuration.
 """
-    def __init__(self, *, enabled:typing.Optional[bool], model_path:typing.Optional[str], dict_path:typing.Optional[str], rec_batch_num:typing.Optional[int]):
+    def __init__(self, *, enabled:typing.Optional[bool], model_path:typing.Optional[str], dict_path:typing.Optional[str], rec_batch_num:typing.Optional[int], rec_workers:typing.Optional[int], max_rec_workers:typing.Optional[int]):
         self.enabled = enabled
         self.model_path = model_path
         self.dict_path = dict_path
         self.rec_batch_num = rec_batch_num
+        self.rec_workers = rec_workers
+        self.max_rec_workers = max_rec_workers
         
         
 
     
     def __str__(self):
-        return "RecognitionConfig(enabled={}, model_path={}, dict_path={}, rec_batch_num={})".format(self.enabled, self.model_path, self.dict_path, self.rec_batch_num)
+        return "RecognitionConfig(enabled={}, model_path={}, dict_path={}, rec_batch_num={}, rec_workers={}, max_rec_workers={})".format(self.enabled, self.model_path, self.dict_path, self.rec_batch_num, self.rec_workers, self.max_rec_workers)
     def __eq__(self, other):
         if self.enabled != other.enabled:
             return False
@@ -1396,6 +1436,10 @@ class RecognitionConfig:
         if self.dict_path != other.dict_path:
             return False
         if self.rec_batch_num != other.rec_batch_num:
+            return False
+        if self.rec_workers != other.rec_workers:
+            return False
+        if self.max_rec_workers != other.max_rec_workers:
             return False
         return True
 
@@ -1407,6 +1451,8 @@ class _UniffiFfiConverterTypeRecognitionConfig(_UniffiConverterRustBuffer):
             model_path=_UniffiFfiConverterOptionalString.read(buf),
             dict_path=_UniffiFfiConverterOptionalString.read(buf),
             rec_batch_num=_UniffiFfiConverterOptionalInt32.read(buf),
+            rec_workers=_UniffiFfiConverterOptionalUInt32.read(buf),
+            max_rec_workers=_UniffiFfiConverterOptionalUInt32.read(buf),
         )
 
     @staticmethod
@@ -1415,6 +1461,8 @@ class _UniffiFfiConverterTypeRecognitionConfig(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalString.check_lower(value.model_path)
         _UniffiFfiConverterOptionalString.check_lower(value.dict_path)
         _UniffiFfiConverterOptionalInt32.check_lower(value.rec_batch_num)
+        _UniffiFfiConverterOptionalUInt32.check_lower(value.rec_workers)
+        _UniffiFfiConverterOptionalUInt32.check_lower(value.max_rec_workers)
 
     @staticmethod
     def write(value, buf):
@@ -1422,6 +1470,8 @@ class _UniffiFfiConverterTypeRecognitionConfig(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalString.write(value.model_path, buf)
         _UniffiFfiConverterOptionalString.write(value.dict_path, buf)
         _UniffiFfiConverterOptionalInt32.write(value.rec_batch_num, buf)
+        _UniffiFfiConverterOptionalUInt32.write(value.rec_workers, buf)
+        _UniffiFfiConverterOptionalUInt32.write(value.max_rec_workers, buf)
 
 class _UniffiFfiConverterOptionalTypeRecognitionConfig(_UniffiConverterRustBuffer):
     @classmethod
@@ -1871,44 +1921,6 @@ class _UniffiFfiConverterTypeOutputGranularity(_UniffiConverterRustBuffer):
 
 
 
-class _UniffiFfiConverterUInt32(_UniffiConverterPrimitiveInt):
-    CLASS_NAME = "u32"
-    VALUE_MIN = 0
-    VALUE_MAX = 2**32
-
-    @staticmethod
-    def read(buf):
-        return buf.read_u32()
-
-    @staticmethod
-    def write(value, buf):
-        buf.write_u32(value)
-
-class _UniffiFfiConverterOptionalUInt32(_UniffiConverterRustBuffer):
-    @classmethod
-    def check_lower(cls, value):
-        if value is not None:
-            _UniffiFfiConverterUInt32.check_lower(value)
-
-    @classmethod
-    def write(cls, value, buf):
-        if value is None:
-            buf.write_u8(0)
-            return
-
-        buf.write_u8(1)
-        _UniffiFfiConverterUInt32.write(value, buf)
-
-    @classmethod
-    def read(cls, buf):
-        flag = buf.read_u8()
-        if flag == 0:
-            return None
-        elif flag == 1:
-            return _UniffiFfiConverterUInt32.read(buf)
-        else:
-            raise InternalError("Unexpected flag byte for optional type")
-
 @dataclass
 class PreDetectionOptions:
     """
@@ -2191,16 +2203,22 @@ class RecognitionRunOptions:
     """
     Text recognition inference parameters.
 """
-    def __init__(self, *, batch_size:typing.Optional[int]):
+    def __init__(self, *, batch_size:typing.Optional[int], workers:typing.Optional[int], max_workers:typing.Optional[int]):
         self.batch_size = batch_size
+        self.workers = workers
+        self.max_workers = max_workers
         
         
 
     
     def __str__(self):
-        return "RecognitionRunOptions(batch_size={})".format(self.batch_size)
+        return "RecognitionRunOptions(batch_size={}, workers={}, max_workers={})".format(self.batch_size, self.workers, self.max_workers)
     def __eq__(self, other):
         if self.batch_size != other.batch_size:
+            return False
+        if self.workers != other.workers:
+            return False
+        if self.max_workers != other.max_workers:
             return False
         return True
 
@@ -2209,15 +2227,21 @@ class _UniffiFfiConverterTypeRecognitionRunOptions(_UniffiConverterRustBuffer):
     def read(buf):
         return RecognitionRunOptions(
             batch_size=_UniffiFfiConverterOptionalInt32.read(buf),
+            workers=_UniffiFfiConverterOptionalUInt32.read(buf),
+            max_workers=_UniffiFfiConverterOptionalUInt32.read(buf),
         )
 
     @staticmethod
     def check_lower(value):
         _UniffiFfiConverterOptionalInt32.check_lower(value.batch_size)
+        _UniffiFfiConverterOptionalUInt32.check_lower(value.workers)
+        _UniffiFfiConverterOptionalUInt32.check_lower(value.max_workers)
 
     @staticmethod
     def write(value, buf):
         _UniffiFfiConverterOptionalInt32.write(value.batch_size, buf)
+        _UniffiFfiConverterOptionalUInt32.write(value.workers, buf)
+        _UniffiFfiConverterOptionalUInt32.write(value.max_workers, buf)
 
 class _UniffiFfiConverterOptionalTypeRecognitionRunOptions(_UniffiConverterRustBuffer):
     @classmethod

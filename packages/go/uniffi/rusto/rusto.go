@@ -1786,6 +1786,10 @@ type RecognitionConfig struct {
 	DictPath *string
 	// Recognition batch size. Default: 6.
 	RecBatchNum *int32
+	// Number of parallel worker threads for recognition. `None` = auto (up to max_rec_workers).
+	RecWorkers *uint32
+	// Maximum recognition worker thread count clamp. Default: 8.
+	MaxRecWorkers *uint32
 }
 
 func (r *RecognitionConfig) Destroy() {
@@ -1793,6 +1797,8 @@ func (r *RecognitionConfig) Destroy() {
 	FfiDestroyerOptionalString{}.Destroy(r.ModelPath)
 	FfiDestroyerOptionalString{}.Destroy(r.DictPath)
 	FfiDestroyerOptionalInt32{}.Destroy(r.RecBatchNum)
+	FfiDestroyerOptionalUint32{}.Destroy(r.RecWorkers)
+	FfiDestroyerOptionalUint32{}.Destroy(r.MaxRecWorkers)
 }
 
 type FfiConverterRecognitionConfig struct{}
@@ -1809,6 +1815,8 @@ func (c FfiConverterRecognitionConfig) Read(reader io.Reader) RecognitionConfig 
 		FfiConverterOptionalStringINSTANCE.Read(reader),
 		FfiConverterOptionalStringINSTANCE.Read(reader),
 		FfiConverterOptionalInt32INSTANCE.Read(reader),
+		FfiConverterOptionalUint32INSTANCE.Read(reader),
+		FfiConverterOptionalUint32INSTANCE.Read(reader),
 	}
 }
 
@@ -1825,6 +1833,8 @@ func (c FfiConverterRecognitionConfig) Write(writer io.Writer, value Recognition
 	FfiConverterOptionalStringINSTANCE.Write(writer, value.ModelPath)
 	FfiConverterOptionalStringINSTANCE.Write(writer, value.DictPath)
 	FfiConverterOptionalInt32INSTANCE.Write(writer, value.RecBatchNum)
+	FfiConverterOptionalUint32INSTANCE.Write(writer, value.RecWorkers)
+	FfiConverterOptionalUint32INSTANCE.Write(writer, value.MaxRecWorkers)
 }
 
 type FfiDestroyerRecognitionConfig struct{}
@@ -1837,10 +1847,16 @@ func (_ FfiDestroyerRecognitionConfig) Destroy(value RecognitionConfig) {
 type RecognitionRunOptions struct {
 	// Recognition batch size. Default: 10.
 	BatchSize *int32
+	// Number of parallel worker threads for recognition inference. `None` = auto (up to max_workers).
+	Workers *uint32
+	// Maximum worker thread count clamp for recognition inference. `None` = use engine default (8).
+	MaxWorkers *uint32
 }
 
 func (r *RecognitionRunOptions) Destroy() {
 	FfiDestroyerOptionalInt32{}.Destroy(r.BatchSize)
+	FfiDestroyerOptionalUint32{}.Destroy(r.Workers)
+	FfiDestroyerOptionalUint32{}.Destroy(r.MaxWorkers)
 }
 
 type FfiConverterRecognitionRunOptions struct{}
@@ -1854,6 +1870,8 @@ func (c FfiConverterRecognitionRunOptions) Lift(rb RustBufferI) RecognitionRunOp
 func (c FfiConverterRecognitionRunOptions) Read(reader io.Reader) RecognitionRunOptions {
 	return RecognitionRunOptions{
 		FfiConverterOptionalInt32INSTANCE.Read(reader),
+		FfiConverterOptionalUint32INSTANCE.Read(reader),
+		FfiConverterOptionalUint32INSTANCE.Read(reader),
 	}
 }
 
@@ -1867,6 +1885,8 @@ func (c FfiConverterRecognitionRunOptions) LowerExternal(value RecognitionRunOpt
 
 func (c FfiConverterRecognitionRunOptions) Write(writer io.Writer, value RecognitionRunOptions) {
 	FfiConverterOptionalInt32INSTANCE.Write(writer, value.BatchSize)
+	FfiConverterOptionalUint32INSTANCE.Write(writer, value.Workers)
+	FfiConverterOptionalUint32INSTANCE.Write(writer, value.MaxWorkers)
 }
 
 type FfiDestroyerRecognitionRunOptions struct{}

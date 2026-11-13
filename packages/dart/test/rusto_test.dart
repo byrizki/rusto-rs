@@ -131,7 +131,7 @@ void main() {
           .run();
       expect(res, isA<DetectTextResultStructured>());
       final structured = res as DetectTextResultStructured;
-      expect(structured.results.length, equals(249));
+      expect(structured.results.length, equals(238));
       expect(structured.results[0].text, equals('All Orders in our'));
       expect(structured.results[0].regionId, isNotNull);
       expect(structured.results[0].layoutType, isNotNull);
@@ -158,6 +158,7 @@ void main() {
           .image(img.absolute.path)
           .withAutoUnwarp(false)
           .withLayoutReading(false)
+          .withRecognition(batchSize: 6, workers: 2, maxWorkers: 4)
           .asLines()
           .run();
 

@@ -798,6 +798,8 @@ impl RustO {
         )
         .with_det_config(config.det.clone());
         pipeline.rec_batch_num = config.rec.rec_batch_num.max(1) as usize;
+        pipeline.rec_workers = config.rec.rec_workers;
+        pipeline.max_rec_workers = config.rec.max_rec_workers;
 
         if let Some(orient_cfg) = config.orient.take() {
             let session = EngineSession::from_orient_config(&orient_cfg)?;
@@ -853,6 +855,8 @@ impl RustO {
         )
         .with_det_config(config.det.clone());
         pipeline.rec_batch_num = config.rec.rec_batch_num.max(1) as usize;
+        pipeline.rec_workers = config.rec.rec_workers;
+        pipeline.max_rec_workers = config.rec.max_rec_workers;
 
         if let Some(orient_cfg) = config.orient.take() {
             let session = EngineSession::from_orient_config(&orient_cfg)?;
@@ -896,6 +900,8 @@ impl RustO {
         )
         .with_det_config(det.cfg);
         pipeline.rec_batch_num = rec.cfg.rec_batch_num.max(1) as usize;
+        pipeline.rec_workers = rec.cfg.rec_workers;
+        pipeline.max_rec_workers = rec.cfg.max_rec_workers;
         Ok(Self { pipeline })
     }
 

@@ -368,6 +368,118 @@ let result = local_ocr
 
 ---
 
+## Output Types
+
+### `TextResult` — per-line OCR result
+
+```rust
+pub struct TextResult {
+    pub text: String,          // recognized text
+    pub score: f32,            // confidence [0.0 – 1.0]
+    pub box_points: Frame,     // four corner points of the text box
+}
+
+/// Quad bounding box: top-left, top-right, bottom-right, bottom-left
+pub type Frame = [(f32, f32); 4];
+```
+
+`DetectTextResult::Structured(Vec<TextResult>)` is returned by default; use `.as_spatial()` to get `DetectTextResult::Spatial(String)` for 2-D reconstructed layout.
+
+### `BlockResult` — hierarchical document blocks
+
+Block-level output groups `TextResult` lines into their enclosing layout regions (title, paragraph, figure caption, etc.) when a layout model is active, or falls back to a single `Unassigned` block.
+
+```rust
+pub struct BlockResult {
+    pub layout_type: LayoutType,    // region class: Title, Text, Figure, Table, …
+    pub lines: Vec<TextResult>,     // lines within this block
+}
+
+impl BlockResult {
+    /// All text in this block joined with newlines
+    pub fn text(&self) -> String { … }
+}
+
+pub enum LayoutType {
+    Title, Text, Figure, FigureCaption,
+    Table, TableCaption, TableFootnote,
+    Header, Footer, Reference, Equation,
+    Unassigned,
+}
+```
+
+**Usage:**
+
+```rust
+// via builder (recommended)
+let blocks = ocr
+    .detect_text_builder(ImageSource::Path("document.pdf".into()))
+    .with_layout_reading(true)
+    .run_blocks()?;                     // -> Vec<BlockResult>
+
+for block in &blocks {
+    println!("[{:?}] {}", block.layout_type, block.text());
+}
+
+// or from an existing DetectTextResult
+let result = ocr.detect_text(&source, &options)?;
+let blocks = result.to_blocks();
+```
+
+---
+
+## Recognition Parallelism
+
+RustO runs text recognition in parallel worker threads. The defaults (`rec_workers = auto`, `max_rec_workers = 8`) are tuned for desktop/server use. For **embedded or memory-constrained devices** pin the count explicitly.
+
+### Via `InitializeConfig` (engine-wide default)
+
+```rust
+let config = InitializeConfig::ppv6("det.mnn", "rec.mnn", "dict.txt")
+    .with_rec_workers(2)        // use exactly 2 worker threads
+    .with_max_rec_workers(4);   // cap auto-scaling at 4
+
+let mut ocr = RustO::initialize(config)?;
+```
+
+### Via `DetectTextBuilder` (per-image override)
+
+```rust
+let result = ocr
+    .detect_text_builder(ImageSource::Path("page.jpg".into()))
+    .with_rec_workers(1)        // single-threaded recognition for this image
+    .run()?;
+```
+
+### Via JSON config
+
+```json
+{
+  "model": "ppocrv6-tiny",
+  "rec_workers": 2,
+  "max_rec_workers": 4
+}
+```
+
+or inside a `recognition` block:
+
+```json
+{
+  "model": "ppocrv6-tiny",
+  "recognition": { "rec_workers": 2, "max_rec_workers": 4 }
+}
+```
+
+### Via CLI
+
+```sh
+rusto image.jpg --rec-workers 2 --max-rec-workers 4
+```
+
+> **Embedded / IoT tip:** Set `rec_workers = 1` and `max_rec_workers = 1` to eliminate thread-pool overhead entirely and keep latency deterministic. For HTTP server pools, hold multiple `RustO` instances (e.g. 4–8) instead of wrapping one in `Arc<Mutex<RustO>>` — a mutex serialises requests and causes tail-latency spikes.
+
+---
+
 ## OmniDocBench Benchmarks
 
 Measured on [OmniDocBench](benchmarks/omnidocbench/OMNIDOCBENCH_EVALUATION_REPORT.md) (`11th Gen Intel Core i7-1185G7 @ 3.00GHz`, 8 logical cores, 37.9 GB RAM, Linux x86_64):
