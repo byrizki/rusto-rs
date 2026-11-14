@@ -598,14 +598,3 @@ RustO! source code is licensed under the [MIT License](LICENSE). Model weights c
 
 ---
 
-## Citation
-
-```bibtex
-@software{rusto2024,
-  title = {RustO! - Pure Rust OCR Library},
-  author = {Rizki & Contributors},
-  year = {2024},
-  url = {https://github.com/byrizki/rusto-rs},
-  note = {Pure-Rust OCR engine running PaddleOCR and Indra OCR models via rusto-nn and RTen}
-}
-```
