@@ -2,6 +2,7 @@ import unittest
 import sys
 import os
 import json
+import re
 from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -133,7 +134,10 @@ class TestRustOPythonBinding(unittest.TestCase):
         self.assertTrue(callable(RustO.download_model))
         self.assertTrue(callable(version))
         self.assertTrue(callable(is_ready))
-        self.assertEqual(version(), "0.4.0")
+        pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+        m = re.search(r'^version\s*=\s*"([^"]+)"', pyproject.read_text(encoding="utf-8"), re.MULTILINE)
+        self.assertIsNotNone(m)
+        self.assertEqual(version(), m.group(1))
 
     def test_chronam_ad_page_with_layout(self):
         root = Path(__file__).resolve().parents[3]

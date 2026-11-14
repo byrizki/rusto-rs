@@ -257,7 +257,7 @@ export class WebOcrEngine {
    * Returns the Web OCR engine library version string.
    */
   public version(): string {
-    return '0.4.0';
+    return '0.4.1';
   }
 
   /**

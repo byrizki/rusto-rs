@@ -1,5 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { WebOcrEngine } from '../src/engine/webEngine.js';
 import { initialize, detectText, detectTextRgb, isReady, isInitialized, close, version, downloadModel } from '../src/index.js';
+
+const pkgVersion = JSON.parse(
+  readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../package.json'), 'utf8')
+).version as string;
 
 describe('WebOcrEngine & singleton API', () => {
   afterEach(() => {
@@ -36,7 +43,7 @@ describe('WebOcrEngine & singleton API', () => {
   test('singleton functions initialize, detectText, isReady, version, downloadModel, and close work correctly', async () => {
     expect(isReady()).toBe(false);
     expect(isInitialized()).toBe(false);
-    expect(version()).toBe('0.4.0');
+    expect(version()).toBe(pkgVersion);
 
     const defaultUrls = await downloadModel();
     expect(defaultUrls).toEqual([

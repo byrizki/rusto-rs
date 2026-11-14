@@ -862,6 +862,48 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
             staged_files
         )
 
+    # 11b. Fallback version strings in language bindings
+    replace_in_file(
+        REPO_ROOT / "packages" / "go" / "rusto.go",
+        r'(func Version\(\) string \{\s*cV := C\.rocr_version\(\)\s*if cV == nil \{\s*return ")[^"]+(")',
+        rf'\g<1>{new_ver}\g<2>',
+        dry_run,
+        staged_files,
+        warn_if_not_found=False
+    )
+    replace_in_file(
+        REPO_ROOT / "packages" / "web" / "src" / "engine" / "webEngine.ts",
+        r"(public version\(\): string \{\s*return ')[^']+(';)",
+        rf'\g<1>{new_ver}\g<2>',
+        dry_run,
+        staged_files,
+        warn_if_not_found=False
+    )
+    replace_in_file(
+        REPO_ROOT / "packages" / "node" / "index.js",
+        r"(static version\(\) \{\s*return typeof RawRustO\.version === 'function' \? RawRustO\.version\(\) : ')[^']+(';)",
+        rf'\g<1>{new_ver}\g<2>',
+        dry_run,
+        staged_files,
+        warn_if_not_found=False
+    )
+    replace_in_file(
+        REPO_ROOT / "packages" / "react-native" / "src" / "index.tsx",
+        r"(export function version\(\): Promise<string> \{\s*return Rusto\.version \? Rusto\.version\(\) : Promise\.resolve\(')[^']+('\);)",
+        rf'\g<1>{new_ver}\g<2>',
+        dry_run,
+        staged_files,
+        warn_if_not_found=False
+    )
+    replace_in_file(
+        REPO_ROOT / "packages" / "react-native" / "ios" / "Rusto.mm",
+        r'(resolve\(v != NULL \? \[NSString stringWithUTF8String:v\] : @")[^"]+("\);)',
+        rf'\g<1>{new_ver}\g<2>',
+        dry_run,
+        staged_files,
+        warn_if_not_found=False
+    )
+
     # 12. packages/java/build.gradle & packages/java/README.md
     java_build = REPO_ROOT / "packages" / "java" / "build.gradle"
     if java_build.exists():

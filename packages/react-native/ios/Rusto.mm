@@ -765,7 +765,7 @@ RCT_EXPORT_METHOD(version:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
     const char *v = rocr_version();
-    resolve(v != NULL ? [NSString stringWithUTF8String:v] : @"0.4.0");
+    resolve(v != NULL ? [NSString stringWithUTF8String:v] : @"0.4.1");
 }
 
 

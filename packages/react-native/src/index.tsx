@@ -740,7 +740,7 @@ export function isReady(): Promise<boolean> {
  * Returns the underlying RustO engine version string.
  */
 export function version(): Promise<string> {
-  return Rusto.version ? Rusto.version() : Promise.resolve('0.4.0');
+  return Rusto.version ? Rusto.version() : Promise.resolve('0.4.1');
 }
 
 

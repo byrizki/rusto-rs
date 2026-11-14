@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -291,18 +292,33 @@ func TestDetectTextFluentBuilder(t *testing.T) {
 	}
 }
 
+func expectedRepoVersion(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile("../../Cargo.toml")
+	if err != nil {
+		t.Fatalf("Failed to read ../../Cargo.toml: %v", err)
+	}
+	re := regexp.MustCompile(`(?m)^version\s*=\s*"([^"]+)"`)
+	match := re.FindSubmatch(data)
+	if len(match) < 2 {
+		t.Fatal("Could not find package version in ../../Cargo.toml")
+	}
+	return string(match[1])
+}
+
 func TestVersionAndIsReady(t *testing.T) {
+	expected := expectedRepoVersion(t)
 	v := Version()
-	if v != "0.4.0" {
-		t.Fatalf("Expected version '0.4.0', got: %s", v)
+	if v != expected {
+		t.Fatalf("Expected version %q, got: %s", expected, v)
 	}
 
 	e := &Engine{handle: nil}
 	if e.IsReady() {
 		t.Fatal("Expected closed engine IsReady() to be false")
 	}
-	if e.Version() != "0.4.0" {
-		t.Fatalf("Expected e.Version() '0.4.0', got: %s", e.Version())
+	if e.Version() != expected {
+		t.Fatalf("Expected e.Version() %q, got: %s", expected, e.Version())
 	}
 }
 

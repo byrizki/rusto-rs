@@ -201,7 +201,7 @@ class RustO {
    * @returns {string} Version string.
    */
   static version() {
-    return typeof RawRustO.version === 'function' ? RawRustO.version() : '0.4.0';
+    return typeof RawRustO.version === 'function' ? RawRustO.version() : '0.4.1';
   }
 
   /**

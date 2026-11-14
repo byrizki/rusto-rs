@@ -116,7 +116,7 @@ func (e *Engine) Close() {
 func Version() string {
 	cV := C.rocr_version()
 	if cV == nil {
-		return "0.4.0"
+		return "0.4.1"
 	}
 	return C.GoString(cV)
 }
