@@ -186,11 +186,73 @@ def extract_existing_changelog_entries(changelog_path: Path, exclude_version: st
                         core_existing.add(core_norm)
     return existing, core_existing
 
+SEMVER_TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$")
+_TAGS_FETCHED = False
+
+def _parse_tag_sort_key(tag: str) -> Tuple[int, int, int, int, str]:
+    m = SEMVER_TAG_RE.match(tag.strip())
+    if not m:
+        return (0, 0, 0, 0, "")
+    major, minor, patch = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    pre = m.group(4) or ""
+    # Stable releases (no prerelease suffix) sort higher than prereleases for the same X.Y.Z
+    is_stable = 1 if not pre else 0
+    return (major, minor, patch, is_stable, pre)
+
+def fetch_remote_tags_quiet() -> None:
+    """Best-effort fetch of remote tags once per run so the latest version tag is visible locally."""
+    global _TAGS_FETCHED
+    if _TAGS_FETCHED:
+        return
+    _TAGS_FETCHED = True
+    try:
+        subprocess.run(
+            ["git", "fetch", "origin", "--tags", "--force", "--quiet"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+def get_latest_version_tag(reachable_only: bool = True) -> str:
+    """Returns the highest semver version tag (optionally restricted to ancestors of HEAD)."""
+    cmd = ["git", "tag"]
+    if reachable_only:
+        cmd.extend(["--merged", "HEAD"])
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode == 0:
+            version_tags = [
+                t.strip() for t in proc.stdout.splitlines()
+                if t.strip() and SEMVER_TAG_RE.match(t.strip())
+            ]
+            if version_tags:
+                return max(version_tags, key=_parse_tag_sort_key)
+    except Exception:
+        pass
+    return ""
+
 def find_base_commit_for_changelog(current_ver: str) -> str:
     """
-    Finds the base commit/tag from which to collect new changelog items.
+    Finds the latest version tag/commit from which to collect all commits up to HEAD.
     """
-    # 1. Check if git tag exists for current_ver
+    fetch_remote_tags_quiet()
+
+    # 1. Prefer the latest semver version tag reachable from HEAD (covers all pushed & unpushed commits since last tag)
+    latest_reachable_tag = get_latest_version_tag(reachable_only=True)
+    if latest_reachable_tag:
+        return latest_reachable_tag
+
+    # 2. Check if git tag exists for current_ver (even if on another ref)
     if current_ver:
         for tag in [f"v{current_ver}", current_ver]:
             res = subprocess.run(
@@ -202,10 +264,15 @@ def find_base_commit_for_changelog(current_ver: str) -> str:
             if res.returncode == 0:
                 return tag
 
-    # 2. Check recent commit history for release commit of current_ver
+    # 3. Fallback to highest semver version tag in the repo
+    latest_any_tag = get_latest_version_tag(reachable_only=False)
+    if latest_any_tag:
+        return latest_any_tag
+
+    # 4. Check commit history for release commit of current_ver
     if current_ver:
         log_res = subprocess.run(
-            ["git", "log", "--format=%H %s", "-n", "50"],
+            ["git", "log", "--format=%H %s"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True
@@ -218,7 +285,7 @@ def find_base_commit_for_changelog(current_ver: str) -> str:
                 if re.match(pattern, subject, re.IGNORECASE):
                     return commit_hash
 
-    # 3. Fallback to latest tag in git
+    # 5. Fallback to latest reachable git tag
     try:
         tag_proc = subprocess.run(
             ["git", "describe", "--tags", "--abbrev=0"],
@@ -657,7 +724,7 @@ def update_lib_files(new_ver: str, current_ver: str = "", dry_run: bool = False)
         )
 
     # 2. Workspace crates Cargo.toml
-    for crate_dir in ["rusto-core", "rusto-cpp", "rusto-wasm", "rusto-node", "rusto-nn", "rusto-rten", "rusto-nn-webgpu", "rusto-nn-cuda", "rusto-mnn"]:
+    for crate_dir in ["rusto-core", "rusto-cpp", "rusto-wasm", "rusto-node", "rusto-nn", "rusto-rten", "rusto-nn-webgpu", "rusto-nn-cuda", "rusto-mnn", "rusto-server"]:
         crate_cargo = REPO_ROOT / "crates" / crate_dir / "Cargo.toml"
         if crate_cargo.exists():
             replace_in_file(
