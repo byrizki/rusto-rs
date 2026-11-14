@@ -167,6 +167,9 @@ jobs:
     if: >-
       (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') && !startsWith(github.event.release.tag_name, 'models-')) ||
       github.event.inputs.publish_npm == 'true'
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       
@@ -211,8 +214,6 @@ jobs:
             echo "Publishing $pkg_name..."
             npm publish "$abs_pkg" --access public || true
           done
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         continue-on-error: true
 
   # Publish Core to CocoaPods
