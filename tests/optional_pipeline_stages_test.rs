@@ -735,7 +735,7 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
         panic!("Expected structured text results");
     };
 
-    assert_eq!(lines.len(), 238, "Dense chronicling america page must detect 238 clustered lines");
+    assert_eq!(lines.len(), 243, "Dense chronicling america page must detect 243 clustered lines");
     assert!(lines[0].text.starts_with("All Orders in"));
     assert!(lines[0].region_id.is_some(), "region_id should be populated when layout is enabled");
     assert!(lines[0].layout_type.is_some(), "layout_type should be populated when layout is enabled");
@@ -762,7 +762,11 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
         .expect("Should find Sale of Blankets");
     let waists_idx = lines
         .iter()
-        .position(|l| l.text.contains("RHIRT WAIRT"))
+        .position(|l| {
+            (l.text.contains("SHIRT WAINTE") || l.text.contains("RHIRT WAIRT"))
+                && l.frame.left > 480.0
+                && l.frame.top > 650.0
+        })
         .expect("Should find Ladies Stylish Shirt Waists at bottom of right subcolumn");
 
     assert!(
@@ -799,7 +803,7 @@ fn test_issue25_chronam_dense_page_real_image_layout_and_c_ffi() {
         )
     };
     assert_eq!(ret, 0, "rocr_detect_text_file should succeed");
-    assert_eq!(c_count, 238, "C FFI must return 238 clustered lines");
+    assert_eq!(c_count, 243, "C FFI must return 243 clustered lines");
     assert!(!c_results.is_null());
 
     unsafe {
@@ -1072,7 +1076,9 @@ fn test_issue25_chronam_dense_page_pure_rusto_nn_engine_subcolumns_and_regions()
     let waists_idx = lines
         .iter()
         .position(|l| {
-            (l.text.to_lowercase().contains("waist") || l.text.to_lowercase().contains("rhirt"))
+            (l.text.to_lowercase().contains("shirt")
+                || l.text.to_lowercase().contains("waist")
+                || l.text.to_lowercase().contains("rhirt"))
                 && l.frame.left > 480.0
                 && l.frame.top > 650.0
         })

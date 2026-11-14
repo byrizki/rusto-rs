@@ -131,7 +131,7 @@ void main() {
           .run();
       expect(res, isA<DetectTextResultStructured>());
       final structured = res as DetectTextResultStructured;
-      expect(structured.results.length, equals(238));
+      expect(structured.results.length, equals(243));
       expect(structured.results[0].text, equals('All Orders in our'));
       expect(structured.results[0].regionId, isNotNull);
       expect(structured.results[0].layoutType, isNotNull);

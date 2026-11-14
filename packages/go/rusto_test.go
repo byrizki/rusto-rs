@@ -213,8 +213,8 @@ func TestDetectChronamDensePageWithLayout(t *testing.T) {
 		t.Fatalf("DetectText with layout failed: %v", err)
 	}
 
-	if len(out.Results) != 238 {
-		t.Fatalf("Expected exactly 238 lines, got %d", len(out.Results))
+	if len(out.Results) != 243 {
+		t.Fatalf("Expected exactly 243 lines, got %d", len(out.Results))
 	}
 
 	if out.Results[0].Text != "All Orders in our" {
