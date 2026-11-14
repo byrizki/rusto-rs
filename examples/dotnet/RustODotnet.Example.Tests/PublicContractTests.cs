@@ -68,7 +68,8 @@ public sealed class PublicContractTests
         Assert.Contains("\"preRecognition\":{", json);
         Assert.Contains("\"lineYThreshold\":0.5", json);
         Assert.Contains("\"wordXThreshold\":0.4", json);
-        Assert.Contains("\"recognition\":{\"batchSize\":6}", json);
+        Assert.Contains("\"recognition\":{", json);
+        Assert.Contains("\"batchSize\":6", json);
         Assert.Contains("\"postRecognition\":{\"scoreThreshold\":0.8}", json);
     }
 

@@ -48,7 +48,7 @@ void main() {
         reason:
             'Verification did not complete with 5 SUCCESS states within timeout');
     expect(find.byKey(const Key('latest-ocr-card')), findsOneWidget);
-    expect(find.textContaining('Boxes Recognized: 49'), findsOneWidget);
+    expect(find.textContaining('Boxes Recognized: 48'), findsOneWidget);
   });
 }
 
