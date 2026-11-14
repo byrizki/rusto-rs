@@ -22,7 +22,7 @@ pub struct ModelPreset {
 
 /// Default preset configuration for PP-OCRv6 models
 pub const PPV6_MODEL_CONFIG: ModelPreset = ModelPreset {
-    det_limit_side_len: 736,
+    det_limit_side_len: 960,
     det_limit_type: "min",
     det_thresh: 0.3,
     det_box_thresh: 0.6,
@@ -30,13 +30,13 @@ pub const PPV6_MODEL_CONFIG: ModelPreset = ModelPreset {
     det_use_dilation: true,
     det_score_mode: "slow",
     rec_img_shape: [3, 48, 320],
-    rec_batch_num: 6,
+    rec_batch_num: 1,
     text_score: 0.5,
 };
 
 /// Default preset configuration for PP-OCRv5 models
 pub const PPV5_MODEL_CONFIG: ModelPreset = ModelPreset {
-    det_limit_side_len: 736,
+    det_limit_side_len: 960,
     det_limit_type: "min",
     det_thresh: 0.3,
     det_box_thresh: 0.5,
@@ -44,7 +44,7 @@ pub const PPV5_MODEL_CONFIG: ModelPreset = ModelPreset {
     det_use_dilation: true,
     det_score_mode: "slow",
     rec_img_shape: [3, 48, 320],
-    rec_batch_num: 6,
+    rec_batch_num: 1,
     text_score: 0.5,
 };
 
@@ -58,7 +58,7 @@ pub const PPV4_MODEL_CONFIG: ModelPreset = ModelPreset {
     det_use_dilation: false,
     det_score_mode: "slow",
     rec_img_shape: [3, 48, 320],
-    rec_batch_num: 6,
+    rec_batch_num: 1,
     text_score: 0.5,
 };
 
@@ -72,13 +72,13 @@ pub const PPV3_MODEL_CONFIG: ModelPreset = ModelPreset {
     det_use_dilation: false,
     det_score_mode: "slow",
     rec_img_shape: [3, 48, 320],
-    rec_batch_num: 6,
+    rec_batch_num: 1,
     text_score: 0.5,
 };
 
 /// Default preset configuration for Indra OCR models (Linenet dynamic recognition with batch size 1)
 pub const INDRA_MODEL_CONFIG: ModelPreset = ModelPreset {
-    det_limit_side_len: 1024,
+    det_limit_side_len: 960,
     det_limit_type: "max",
     det_thresh: 0.5,
     det_box_thresh: 0.0,
@@ -1253,7 +1253,9 @@ impl InitializeConfig {
 
     /// Serialize configuration to a JSON string
     pub fn to_json(&self) -> Result<String, CoreError> {
-        let template = if self.det.thresh == INDRA_MODEL_CONFIG.det_thresh && self.rec.rec_batch_num == 1 {
+        let template = if self.det.thresh == INDRA_MODEL_CONFIG.det_thresh
+            && self.rec.rec_img_shape == INDRA_MODEL_CONFIG.rec_img_shape
+        {
             "indra"
         } else {
             "ppv6"

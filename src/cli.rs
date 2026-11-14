@@ -118,7 +118,7 @@ pub struct OcrArgs {
     #[arg(long)]
     pub layout_model: Option<PathBuf>,
 
-    /// Maximum detection image dimension (default: configured in model, typically 960 or 736)
+    /// Maximum detection image dimension (default: configured in model preset, 960)
     #[arg(long)]
     pub det_limit: Option<i32>,
 

@@ -187,7 +187,7 @@ async function copyActiveCode() {
       <div class="flex justify-between gap-2">
         <span class="text-zinc-500">Detector Limit</span>
         <span class="font-mono font-medium text-zinc-800 dark:text-zinc-200 tabular-nums">
-          {{ displayConfig.options.detection?.limitSideLen ?? 736 }}px
+          {{ displayConfig.options.detection?.limitSideLen ?? 960 }}px
         </span>
       </div>
       <div class="flex justify-between gap-2">

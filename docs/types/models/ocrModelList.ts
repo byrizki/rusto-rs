@@ -83,7 +83,7 @@ const coreModels: OcrModelOption[] = [
     6386492,
     'Default · Lightweight FP32',
     'Default general-purpose Apache 2.0 model for fast browser, server, and mobile OCR.',
-    6,
+    1,
     ['Default', 'PPv6', 'Fast']
   ),
   model(
@@ -96,7 +96,7 @@ const coreModels: OcrModelOption[] = [
     3208688,
     'Half-precision FP16',
     'Smallest PP-OCRv6 footprint (~3.1 MB) with half-precision FP16 MNN/ONNX weights and near-FP32 accuracy (rusto-nn & WebGPU).',
-    6,
+    1,
     ['PPv6', 'FP16', 'Fast']
   ),
   model(
@@ -108,8 +108,8 @@ const coreModels: OcrModelOption[] = [
     '~3.5 MB',
     3574900,
     'Ultra-lightweight INT8',
-    'Smallest footprint model with INT8 quantized weights for minimal memory consumption.',
-    6,
+    'Smallest footprint model with INT8 quantized weights for minimal memory consumption (rusto-nn & WebGPU; unsupported on RTen).',
+    1,
     ['PPv6', 'INT8']
   ),
   model(
@@ -122,7 +122,7 @@ const coreModels: OcrModelOption[] = [
     31209516,
     'Balanced Speed & Accuracy',
     'High detection precision with moderate memory overhead.',
-    6,
+    1,
     ['PPv6', 'Balanced']
   ),
   model(
@@ -134,8 +134,8 @@ const coreModels: OcrModelOption[] = [
     '~16.7 MB',
     16691876,
     'Balanced INT8',
-    'Quantized version of PP-OCRv6 Small with half the memory footprint.',
-    6,
+    'Quantized version of PP-OCRv6 Small with half the memory footprint (rusto-nn & WebGPU; unsupported on RTen).',
+    1,
     ['PPv6', 'INT8']
   ),
   model(
@@ -148,7 +148,7 @@ const coreModels: OcrModelOption[] = [
     138809964,
     'Highest Accuracy FP32',
     'Deep recognition backbone for challenging irregular text and noisy scans.',
-    6,
+    1,
     ['PPv6', 'High Accuracy']
   ),
   model(
@@ -160,8 +160,8 @@ const coreModels: OcrModelOption[] = [
     '~79 MB',
     79337492,
     'Highest Accuracy INT8',
-    'Quantized Medium model balancing high accuracy with reduced bandwidth.',
-    6,
+    'Quantized Medium model balancing high accuracy with reduced bandwidth (rusto-nn & WebGPU; unsupported on RTen).',
+    1,
     ['PPv6', 'INT8']
   ),
 
@@ -176,7 +176,7 @@ const coreModels: OcrModelOption[] = [
     21554080,
     'Fast Mobile FP32',
     'Proven mobile architecture with broad multilingual vocabulary.',
-    6,
+    1,
     ['PPv5', 'Mobile']
   ),
 
@@ -191,7 +191,7 @@ const coreModels: OcrModelOption[] = [
     15705129,
     'Fast & Compact',
     'Widely used lightweight v4 pipeline for fast document parsing.',
-    6,
+    1,
     ['PPv4', 'Mobile']
   ),
 ];

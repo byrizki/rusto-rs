@@ -236,7 +236,7 @@ class RecognitionConfig(_GeneratedRecognitionConfig):
         enabled: Whether recognition stage is enabled.
         model_path: Filesystem path to recognition model (.rten or .onnx).
         dict_path: Filesystem path to dictionary vocabulary file (.txt).
-        rec_batch_num: Recognition batch size. Default: 6.
+        rec_batch_num: Recognition batch size. Default: 1.
         rec_workers: Number of parallel worker threads for recognition (`None` = auto).
         max_rec_workers: Maximum worker thread count clamp (`None` = engine default 8).
     """

@@ -1,33 +1,40 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import type { OcrConfig } from '../../../types/ocrConfig';
+import { computed, ref, watch } from 'vue';
+import { defaultOcrConfig, type OcrConfig } from '../../../types/ocrConfig';
 import {
   availableLayoutModels,
   type LayoutModelOption,
   type OcrModelOption,
 } from '../../../types/ocrModels';
-import OcrInfoPopover from './OcrInfoPopover.vue';
-import OcrSettingsCollapsibleSection from './OcrSettingsCollapsibleSection.vue';
+import OcrRangeParam from './OcrRangeParam.vue';
+import OcrSettingRow from './OcrSettingRow.vue';
+import OcrSettingsSubTabs, { type SettingsSubTab } from './OcrSettingsSubTabs.vue';
+
+type RecognitionSection = 'pre' | 'core' | 'post';
 
 const props = defineProps<{
   config: OcrConfig;
   currentModel: OcrModelOption;
+  subTab?: RecognitionSection;
 }>();
 
 const emit = defineEmits<{
   layoutModelChanged: [];
+  'update:subTab': [tab: RecognitionSection];
 }>();
 
-type RecognitionSection = 'pre' | 'core' | 'post';
-const activeSection = ref<RecognitionSection | null>('core');
+const activeSection = ref<RecognitionSection>(props.subTab ?? 'core');
 
-function onToggle(section: RecognitionSection, nextValue: boolean) {
-  if (nextValue) {
-    activeSection.value = section;
-  } else if (activeSection.value === section) {
-    activeSection.value = null;
+watch(
+  () => props.subTab,
+  (val) => {
+    if (val) activeSection.value = val;
   }
-}
+);
+
+watch(activeSection, (val) => {
+  emit('update:subTab', val);
+});
 
 const selectedLayoutMeta = computed<LayoutModelOption>(
   () =>
@@ -35,245 +42,263 @@ const selectedLayoutMeta = computed<LayoutModelOption>(
     availableLayoutModels[0]!
 );
 
+const layoutModelBadge = computed<string>(() => {
+  if (props.config.layoutModel === 'heuristic' || props.config.layoutModel === 'none') {
+    return '0 KB · neural +2.9–6.9 MB';
+  }
+  return `+${selectedLayoutMeta.value.size} model`;
+});
+
+const layoutModelHelp = computed<string>(() => {
+  if (props.config.layoutModel === 'heuristic' || props.config.layoutModel === 'none') {
+    return 'Built-in mode adds 0 KB. Neural presets add Indra (+2.9 MB), CDLA (+6.9 MB), or PubLayNet (+6.9 MB).';
+  }
+  return `Downloads extra neural layout weights (+${selectedLayoutMeta.value.size}, ${selectedLayoutMeta.value.assetFile ?? 'neural model'}) on first run.`;
+});
+
 const preRecognitionActiveCount = computed<number>(() => {
   let count = 0;
-  if (props.config.layoutModel !== 'none' && props.config.layoutModel !== 'heuristic') count++;
-  if (props.config.lineClassification) count++;
+  if (props.config.layoutModel !== defaultOcrConfig.layoutModel) count++;
+  if (props.config.lineClassification !== defaultOcrConfig.lineClassification) count++;
   if (props.config.layoutModel === 'heuristic') {
-    if (props.config.lineYThreshold !== 0.5) count++;
-    if (props.config.wordXThreshold !== 0.4) count++;
+    if (props.config.lineYThreshold !== defaultOcrConfig.lineYThreshold) count++;
+    if (props.config.wordXThreshold !== defaultOcrConfig.wordXThreshold) count++;
   }
   return count;
 });
 
-const recognitionActiveCount = computed<number>(() => {
-  let count = 0;
-  const expectedBatch = props.currentModel.recommendedBatchSize;
-  if (props.config.recBatchNum !== expectedBatch) count++;
-  return count;
-});
+const recognitionActiveCount = computed<number>(() =>
+  props.config.recBatchNum === props.currentModel.recommendedBatchSize ? 0 : 1
+);
 
-const postRecognitionActiveCount = computed<number>(() => {
-  let count = 0;
-  if (props.config.textScore !== 0.5) count++;
-  return count;
-});
+const postRecognitionActiveCount = computed<number>(() =>
+  props.config.textScore === defaultOcrConfig.textScore ? 0 : 1
+);
 
 function handleLayoutChange() {
   props.config.enableReadingOrder = props.config.layoutModel !== 'none';
   emit('layoutModelChanged');
 }
+
+function resetGroup(group: 'pre' | 'core' | 'post') {
+  if (group === 'pre') {
+    const prevLayout = props.config.layoutModel;
+    props.config.layoutModel = defaultOcrConfig.layoutModel;
+    props.config.enableReadingOrder = defaultOcrConfig.enableReadingOrder;
+    props.config.lineYThreshold = defaultOcrConfig.lineYThreshold;
+    props.config.wordXThreshold = defaultOcrConfig.wordXThreshold;
+    props.config.lineClassification = defaultOcrConfig.lineClassification;
+    if (prevLayout !== props.config.layoutModel) {
+      emit('layoutModelChanged');
+    }
+  } else if (group === 'core') {
+    props.config.recBatchNum = props.currentModel.recommendedBatchSize;
+  } else {
+    props.config.textScore = defaultOcrConfig.textScore;
+  }
+}
+
+const subTabs = computed<SettingsSubTab[]>(() => [
+  {
+    id: 'pre',
+    label: 'Pre-Recognition',
+    badge: '.withPreRecognition()',
+    description: 'Document layout, reading order, line grouping & 180° classifier',
+    activeCount: preRecognitionActiveCount.value,
+  },
+  {
+    id: 'core',
+    label: 'Text Recognition',
+    badge: '.withRecognition()',
+    description: 'Character recognition batch size and execution tuning',
+    activeCount: recognitionActiveCount.value,
+  },
+  {
+    id: 'post',
+    label: 'Post-Recognition',
+    badge: '.withPostRecognition()',
+    description: 'Minimum confidence score cutoff filtering',
+    activeCount: postRecognitionActiveCount.value,
+  },
+]);
 </script>
 
 <template>
-  <div class="space-y-3 text-xs">
-    <!-- Phase 4: Pre-Recognition & Reading Order (Collapsible) -->
-    <OcrSettingsCollapsibleSection
-      :model-value="activeSection === 'pre'"
-      @update:model-value="(val) => onToggle('pre', val)"
-      title="Phase 4: Pre-Recognition & Reading Order"
-      badge=".withPreRecognition()"
-      description="Document layout, reading order, line grouping & 180° classifier"
-      :active-count="preRecognitionActiveCount"
-    >
-      <!-- Layout & Reading Order -->
-      <div class="space-y-2.5 pt-1">
-        <div class="flex justify-between items-center">
-          <div class="flex items-center gap-1.5">
-            <label class="font-medium text-zinc-800 dark:text-zinc-200">
-              Document Layout & Reading Order
-              <span class="text-[10px] font-mono text-zinc-400 font-normal ml-1"
-                >.withLayoutReading()</span
-              >
-            </label>
-            <OcrInfoPopover :text="selectedLayoutMeta.description" />
-          </div>
-          <span class="font-mono text-[10px] text-primary font-semibold tabular-nums">
-            {{ selectedLayoutMeta.size }}
+  <OcrSettingsSubTabs v-model="activeSection" :tabs="subTabs" class="text-xs">
+    <!-- Phase 4: Pre-Recognition & Reading Order -->
+    <template v-if="activeSection === 'pre'">
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+            Layout &amp; Reading Order
           </span>
+          <button
+            v-if="preRecognitionActiveCount > 0"
+            type="button"
+            @click="resetGroup('pre')"
+            class="text-[10px] font-mono text-zinc-400 hover:text-primary cursor-pointer"
+          >
+            Reset Pre-Recognition
+          </button>
         </div>
 
-        <select
-          v-model="config.layoutModel"
-          @change="handleLayoutChange"
-          class="w-full text-xs font-medium rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 py-1.5 px-2.5 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-primary cursor-pointer"
-        >
-          <optgroup label="Built-in / Zero Download">
-            <option value="heuristic">Geometric Column Flow (0 KB)</option>
-            <option value="none">Linear Raster Scan (Disabled)</option>
-          </optgroup>
-          <optgroup label="Neural Layout Models">
-            <option value="indra">Indra Neural Reading Order (2.9 MB)</option>
-            <option value="cdla">PP-OCR CDLA Document Layout (8.4 MB)</option>
-            <option value="publaynet">PP-OCR PubLayNet Paper Layout (8.4 MB)</option>
-          </optgroup>
-        </select>
-
-        <!-- Heuristic Fine-Tuning Controls (Active when heuristic flow is selected) -->
-        <div
-          v-if="config.layoutModel === 'heuristic'"
-          class="grid grid-cols-2 gap-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800"
-        >
-          <div class="space-y-1">
-            <div class="flex justify-between text-[11px]">
-              <div class="flex items-center gap-1">
-                <span class="text-zinc-600 dark:text-zinc-400">Line Y Tolerance</span>
-                <OcrInfoPopover
-                  text="Normalized Y-distance tolerance for grouping text boxes into a common reading line."
-                />
-              </div>
-              <span class="font-mono font-medium tabular-nums">{{
-                config.lineYThreshold.toFixed(2)
-              }}</span>
-            </div>
-            <input
-              v-model.number="config.lineYThreshold"
-              type="range"
-              min="0.1"
-              max="1.5"
-              step="0.05"
-              class="w-full accent-primary cursor-pointer"
-            />
-          </div>
-          <div class="space-y-1">
-            <div class="flex justify-between text-[11px]">
-              <div class="flex items-center gap-1">
-                <span class="text-zinc-600 dark:text-zinc-400">Word X Gap</span>
-                <OcrInfoPopover
-                  text="Horizontal proximity threshold for grouping adjacent characters and words."
-                />
-              </div>
-              <span class="font-mono font-medium tabular-nums">{{
-                config.wordXThreshold.toFixed(2)
-              }}</span>
-            </div>
-            <input
-              v-model.number="config.wordXThreshold"
-              type="range"
-              min="0.1"
-              max="1.5"
-              step="0.05"
-              class="w-full accent-primary cursor-pointer"
-            />
-          </div>
-        </div>
-
-        <!-- Neural Layout Active Notice -->
-        <div
-          v-else-if="config.layoutModel !== 'none'"
-          class="flex items-center gap-2 p-2 rounded-md bg-primary/5 dark:bg-primary/10 border border-primary/20 text-zinc-600 dark:text-zinc-300 text-[11px]"
-        >
-          <span class="text-primary font-medium shrink-0">Neural Layout Active:</span>
-          <span>Automatic sequence prediction directly via deep layout geometry.</span>
-        </div>
-
-        <!-- Raster Scan Notice -->
-        <div
-          v-else
-          class="flex items-center gap-2 p-2 rounded-md bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-[11px]"
-        >
-          <span class="font-medium shrink-0">Raster Scan:</span>
-          <span>Natural top-to-bottom scan without layout or column reordering.</span>
-        </div>
-      </div>
-
-      <!-- Line Orientation Classifier -->
-      <div class="pt-2 border-t border-zinc-100 dark:border-zinc-800">
-        <label class="flex items-center justify-between gap-3 cursor-pointer">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="font-medium text-zinc-800 dark:text-zinc-200">
-              Upside-Down Line Classifier
-            </span>
-            <span class="text-[10px] font-mono text-zinc-400 font-normal"
-              >.withLineClassification()</span
-            >
-            <OcrInfoPopover
-              text="Identifies and flips 180° inverted text line crops before character recognition."
-            />
-          </div>
-          <input
-            v-model="config.lineClassification"
-            type="checkbox"
-            class="rounded accent-primary w-4 h-4 cursor-pointer shrink-0"
+        <div data-setting-id="layoutModel" class="space-y-2">
+          <OcrSettingRow
+            label="Document Layout &amp; Reading Order"
+            identifier=".withLayoutReading()"
+            :description="selectedLayoutMeta.description"
+            tooltip="Selects geometric heuristic column flow (0 KB), neural layout models (+2.9 MB Indra or +6.9 MB CDLA/PubLayNet), or linear raster scan."
+            :model-badge="layoutModelBadge"
+            :model-help="layoutModelHelp"
+            :is-modified="config.layoutModel !== defaultOcrConfig.layoutModel"
           />
-        </label>
-      </div>
-    </OcrSettingsCollapsibleSection>
 
-    <!-- Phase 5: Core Text Recognition (Collapsible) -->
-    <OcrSettingsCollapsibleSection
-      :model-value="activeSection === 'core'"
-      @update:model-value="(val) => onToggle('core', val)"
-      title="Phase 5: Text Recognition"
-      badge=".withRecognition()"
-      description="Character recognition batch size and execution tuning"
-      :active-count="recognitionActiveCount"
-    >
-      <div class="space-y-1.5 pt-1">
-        <div class="flex justify-between items-center">
-          <div class="flex items-center gap-1.5">
-            <label class="font-medium text-zinc-800 dark:text-zinc-200">
-              Recognition Batch Size
-              <span class="text-[10px] font-mono text-zinc-400 font-normal ml-1">(batchSize)</span>
-            </label>
-            <OcrInfoPopover
-              :text="
-                currentModel.preset === 'indra'
-                  ? 'Indra Linenet processes lines individually with zero padding overhead (batch size 1 recommended).'
-                  : 'PP-OCR models execute best with batch size 4–6 to amortize kernel launch latency.'
-              "
+          <select
+            v-model="config.layoutModel"
+            @change="handleLayoutChange"
+            aria-label="Document Layout and Reading Order"
+            class="w-full text-xs font-medium rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 py-1.5 px-2.5 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-primary cursor-pointer"
+          >
+            <optgroup label="Built-in / Zero Download">
+              <option value="heuristic">Geometric Column Flow (0 KB)</option>
+              <option value="none">Linear Raster Scan (Disabled)</option>
+            </optgroup>
+            <optgroup label="Neural Layout Models">
+              <option value="indra">Indra Neural Reading Order (+2.9 MB)</option>
+              <option value="cdla">PP-OCR CDLA Document Layout (+6.9 MB)</option>
+              <option value="publaynet">PP-OCR PubLayNet Paper Layout (+6.9 MB)</option>
+            </optgroup>
+          </select>
+
+          <div
+            v-if="config.layoutModel === 'heuristic'"
+            data-setting-id="lineThresholds"
+            class="space-y-1 pt-1"
+          >
+            <OcrRangeParam
+              v-model="config.lineYThreshold"
+              label="Line Y Tolerance"
+              identifier="lineYThreshold"
+              tooltip="Normalized Y-distance tolerance for grouping text boxes into a common reading line."
+              :min="0.1"
+              :max="1.5"
+              :step="0.05"
+              :decimals="2"
+              :default-value="defaultOcrConfig.lineYThreshold"
+            />
+            <OcrRangeParam
+              v-model="config.wordXThreshold"
+              label="Word X Gap"
+              identifier="wordXThreshold"
+              tooltip="Horizontal proximity threshold for grouping adjacent characters and words."
+              :min="0.1"
+              :max="1.5"
+              :step="0.05"
+              :decimals="2"
+              :default-value="defaultOcrConfig.wordXThreshold"
             />
           </div>
-          <span class="font-mono text-xs text-primary font-semibold tabular-nums">
-            {{ config.recBatchNum }}
-          </span>
-        </div>
-        <input
-          v-model.number="config.recBatchNum"
-          type="range"
-          min="1"
-          max="16"
-          step="1"
-          class="w-full accent-primary cursor-pointer"
-        />
-      </div>
-    </OcrSettingsCollapsibleSection>
 
-    <!-- Phase 6: Post-Recognition Filtering (Collapsible) -->
-    <OcrSettingsCollapsibleSection
-      :model-value="activeSection === 'post'"
-      @update:model-value="(val) => onToggle('post', val)"
-      title="Phase 6: Post-Recognition Filtering"
-      badge=".withPostRecognition()"
-      description="Minimum confidence score cutoff filtering"
-      :active-count="postRecognitionActiveCount"
-    >
-      <div class="space-y-2 pt-1">
-        <div class="flex justify-between items-center">
-          <div class="flex items-center gap-1.5">
-            <label class="font-medium text-zinc-800 dark:text-zinc-200">
-              Minimum Confidence Cutoff
-              <span class="text-[10px] font-mono text-zinc-400 font-normal ml-1"
-                >(scoreThreshold)</span
-              >
-            </label>
-            <OcrInfoPopover
-              text="Filters out low-confidence recognition character sequences below this probability threshold."
-            />
+          <div
+            v-else-if="config.layoutModel !== 'none'"
+            class="flex items-center gap-2 p-2 rounded-md bg-primary/5 dark:bg-primary/10 border border-primary/20 text-zinc-600 dark:text-zinc-300 text-[11px]"
+          >
+            <span class="text-primary font-medium shrink-0">Neural Layout Active:</span>
+            <span>Automatic sequence prediction via deep layout geometry.</span>
           </div>
-          <span class="font-mono text-xs text-primary font-semibold tabular-nums">
-            {{ Math.round(config.textScore * 100) }}%
+
+          <div
+            v-else
+            class="flex items-center gap-2 p-2 rounded-md bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 text-[11px]"
+          >
+            <span class="font-medium shrink-0">Raster Scan:</span>
+            <span>Natural top-to-bottom scan without layout or column reordering.</span>
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-zinc-200/70 dark:border-zinc-800">
+          <OcrSettingRow
+            setting-id="lineClassification"
+            label="Upside-Down Line Classifier"
+            identifier=".withLineClassification()"
+            description="Identifies and flips 180° inverted text line crops before recognition."
+            tooltip="Runs PP-OCR line orientation classifier on each cropped text line. Enabling downloads an extra cls.mnn neural model (+0.5 MB / 519 KB)."
+            model-badge="+0.5 MB model"
+            model-help="Adds ~0.5 MB (519 KB) line orientation classifier (cls.mnn) download when enabled."
+            :is-modified="config.lineClassification !== defaultOcrConfig.lineClassification"
+          >
+            <input
+              v-model="config.lineClassification"
+              type="checkbox"
+              aria-label="Upside-Down Line Classifier"
+              class="rounded accent-primary w-4 h-4 cursor-pointer"
+            />
+          </OcrSettingRow>
+        </div>
+      </div>
+    </template>
+
+    <!-- Phase 5: Core Text Recognition -->
+    <template v-else-if="activeSection === 'core'">
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+            Batched Sequence Decoding
+          </span>
+          <span class="text-[10px] font-mono text-zinc-400">
+            recommended: {{ currentModel.recommendedBatchSize }}
           </span>
         </div>
-        <input
-          v-model.number="config.textScore"
-          type="range"
-          min="0.1"
-          max="0.95"
-          step="0.05"
-          class="w-full accent-primary cursor-pointer"
+
+        <OcrRangeParam
+          setting-id="recBatchNum"
+          v-model="config.recBatchNum"
+          label="Recognition Batch Size"
+          identifier="batchSize"
+          :tooltip="
+            currentModel.preset === 'indra'
+              ? 'Indra Linenet processes lines individually with zero padding overhead (batch size 1 recommended).'
+              : 'PP-OCR models execute best with batch size 4–6 to amortize kernel launch latency.'
+          "
+          :min="1"
+          :max="16"
+          :step="1"
+          :decimals="0"
+          :default-value="currentModel.recommendedBatchSize"
         />
       </div>
-    </OcrSettingsCollapsibleSection>
-  </div>
+    </template>
+
+    <!-- Phase 6: Post-Recognition Filtering -->
+    <template v-else>
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+            Confidence Filtering
+          </span>
+          <button
+            v-if="postRecognitionActiveCount > 0"
+            type="button"
+            @click="resetGroup('post')"
+            class="text-[10px] font-mono text-zinc-400 hover:text-primary cursor-pointer"
+          >
+            Reset Post-Recognition
+          </button>
+        </div>
+
+        <OcrRangeParam
+          setting-id="textScore"
+          v-model="config.textScore"
+          label="Minimum Confidence Cutoff"
+          identifier="scoreThreshold"
+          tooltip="Filters out low-confidence recognition character sequences below this probability threshold (0.10–0.95)."
+          :min="0.1"
+          :max="0.95"
+          :step="0.05"
+          :decimals="2"
+          :default-value="defaultOcrConfig.textScore"
+        />
+      </div>
+    </template>
+  </OcrSettingsSubTabs>
 </template>

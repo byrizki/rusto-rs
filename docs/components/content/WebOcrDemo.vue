@@ -5,7 +5,8 @@ import { useOcrDemoI18n } from '../../composables/useOcrDemoI18n';
 import { useWebOcrExecution } from '../../composables/useWebOcrExecution';
 import { useWebOcrSettings } from '../../composables/useWebOcrSettings';
 import { availableModels, defaultModel, type OcrModelOption } from '../../types/ocrModels';
-import { getPresetById, type OcrProfilePreset } from '../../types/ocrPresets';
+import { getPresetById } from '../../types/ocrPresets';
+import type { OcrConfig } from '../../types/ocrConfig';
 import { getSampleImages, type SampleImage } from '../../types/ocrSamples';
 import { fetchHuggingFaceModelIndex } from '../../utils/ocrReleaseModels';
 import { isRunConfigModified } from '../../utils/ocrResultFormatter';
@@ -32,7 +33,6 @@ const {
   openConfigTab,
   resetConfigDefaults,
   applyPreset,
-  isPresetActive,
 } = useWebOcrSettings();
 
 const initialPreset = getPresetById(defaultSample.presetId);
@@ -101,11 +101,23 @@ async function pickSample(sample: SampleImage) {
   }
 }
 
-async function handleApplyPreset(preset: OcrProfilePreset) {
-  applyPreset(preset);
+async function handleSelectModel(modelId: string) {
+  const nextModel = availableModels.find((m) => m.id === modelId);
+  if (nextModel && currentModel.value.preset !== nextModel.preset) {
+    applyPreset(getPresetById(nextModel.preset));
+  }
   resetResults();
-  if (selectedModel.value !== preset.modelId) {
-    await switchModel(preset.modelId);
+  if (selectedModel.value !== modelId) {
+    await switchModel(modelId);
+  }
+}
+
+async function handleImportConfig(payload: { modelId?: string; config: Partial<OcrConfig> }) {
+  Object.assign(ocrConfig.value, payload.config);
+  if (payload.modelId && selectedModel.value !== payload.modelId) {
+    await switchModel(payload.modelId);
+  } else {
+    resetResults();
   }
 }
 
@@ -313,12 +325,15 @@ onUnmounted(() => {
         :base-u-r-l="baseURL"
         :is-web-gpu-supported="isWebGpuSupported"
         :is-config-modified="isConfigModifiedSinceRun"
+        :is-custom-config="isCustomConfig"
         :has-run="activeRunConfig !== null"
-        :is-preset-active="isPresetActive"
+        :is-scanning="isScanning"
+        :is-initializing="status === 'initializing'"
         :strings="strings.settings"
         @close="isConfigOpen = false"
         @reset-defaults="handleResetDefaults"
-        @apply-preset="handleApplyPreset"
+        @select-model="handleSelectModel"
+        @import-config="handleImportConfig"
         @layout-model-changed="resetResults"
         @backend-changed="resetResults"
         @apply-and-run="handleApplyAndRun"

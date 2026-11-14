@@ -30,8 +30,11 @@ function dedupeStrings(items: (string | undefined)[]): string[] {
 export type InferenceBackend = 'rusto-nn' | 'rusto-rten' | 'rusto-webgpu';
 
 export function isModelSupportedByBackend(modelId: string, backend: InferenceBackend): boolean {
-  // FP16 weights are published in MNN/ONNX only; RTen (.rten) does not support FP16 models.
-  return !(backend === 'rusto-rten' && modelId === 'ppocrv6-tiny-fp16');
+  // RTen (.rten) supports FP32 weights only; FP16 and INT8 models require MNN/ONNX (rusto-nn or rusto-webgpu).
+  if (backend === 'rusto-rten') {
+    return !modelId.includes('fp16') && !modelId.includes('int8');
+  }
+  return true;
 }
 
 function replaceModelExtension(path: string, ext: 'mnn' | 'onnx' | 'rten'): string {

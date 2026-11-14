@@ -584,7 +584,7 @@ impl RtenOcrPipeline {
             max_side_len,
         )?;
 
-        let results = self.recognize_boxes_batched(&processed_rgba, orig_w, orig_h, &raw_boxes, 12)?;
+        let results = self.recognize_boxes_batched(&processed_rgba, orig_w, orig_h, &raw_boxes, 1)?;
 
         Ok(nanoserde::SerJson::serialize_json(&results))
     }
@@ -716,7 +716,7 @@ impl RtenOcrPipeline {
             .recognition
             .as_ref()
             .and_then(|r| r.batch_size)
-            .unwrap_or(6)
+            .unwrap_or(1)
             .max(1) as usize;
 
         let recognized: Vec<TextResult> = self

@@ -9,6 +9,7 @@ import {
 import {
   defaultProgressState,
   buildDetectTextOptions,
+  isReadingOrderEnabled,
   type ActiveRunConfig,
   type ProgressState,
   type ProgressStep,
@@ -186,10 +187,7 @@ function applyProcessedPipelineOutput(
   ctx: PipelineContext
 ) {
   state.durationMs.value = res.durationMs;
-  const isReadingOrderActive =
-    ctx.ocrConfig.value.layoutReading ||
-    ctx.ocrConfig.value.enableReadingOrder ||
-    (ctx.ocrConfig.value.layoutModel !== undefined && ctx.ocrConfig.value.layoutModel !== 'none');
+  const isReadingOrderActive = isReadingOrderEnabled(ctx.ocrConfig.value);
   const processed = processOcrOutput(
     res.output,
     ctx.ocrConfig.value.lineYThreshold,

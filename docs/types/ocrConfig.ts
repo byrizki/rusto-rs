@@ -78,7 +78,7 @@ export const defaultOcrConfig: OcrConfig = {
   layoutReading: false,
   enableReadingOrder: false,
   layoutModel: 'heuristic',
-  recBatchNum: 6,
+  recBatchNum: 1,
   autoUnwarp: false,
   lineClassification: false,
   classification: false,
@@ -89,7 +89,7 @@ export const defaultOcrConfig: OcrConfig = {
   maxSideLen: 1920,
   minSideLen: 480,
   widthHeightRatio: -1,
-  detectionLimitSideLen: 736,
+  detectionLimitSideLen: 960,
   detectionLimitType: 'min',
   postprocessThreshold: 0.3,
   postprocessBoxThreshold: 0.6,
@@ -123,11 +123,13 @@ function buildPreDetectionConfig(config: OcrConfig): Record<string, unknown> | u
   if (config.calibrationEnabled && config.descreenBackground && config.descreenStrength > 0) {
     pre.descreenStrength = config.descreenStrength;
   }
-  if (config.optimizationEnabled && config.optimizationTargetMaxSide > 0) {
-    pre.targetMaxSide = config.optimizationTargetMaxSide;
+  if (config.optimizationEnabled) {
+    if (config.optimizationTargetMaxSide > 0) {
+      pre.targetMaxSide = config.optimizationTargetMaxSide;
+    }
+    if (config.cropPaddingX > 0) pre.cropPaddingX = config.cropPaddingX;
+    if (config.cropPaddingY > 0) pre.cropPaddingY = config.cropPaddingY;
   }
-  if (config.cropPaddingX > 0) pre.cropPaddingX = config.cropPaddingX;
-  if (config.cropPaddingY > 0) pre.cropPaddingY = config.cropPaddingY;
   return Object.keys(pre).length > 0 ? pre : undefined;
 }
 
@@ -152,16 +154,19 @@ function buildPostDetectionConfig(config: OcrConfig): Record<string, unknown> {
   return post;
 }
 
+export function isReadingOrderEnabled(config: OcrConfig): boolean {
+  return (
+    config.layoutModel !== 'none' &&
+    Boolean(config.layoutReading || config.enableReadingOrder || config.layoutModel !== undefined)
+  );
+}
+
 export function buildDetectTextOptions(
   config: OcrConfig,
   outputMode: OutputGranularity
 ): DetectTextOptions {
   const isSpatial = outputMode === 'spatial';
-  const isReadingOrderActive = Boolean(
-    config.layoutReading ||
-    config.enableReadingOrder ||
-    (config.layoutModel !== undefined && config.layoutModel !== 'none')
-  );
+  const isReadingOrderActive = isReadingOrderEnabled(config);
 
   return {
     output: (isSpatial ? 'lines' : outputMode) as OutputGranularity,
@@ -176,10 +181,13 @@ export function buildDetectTextOptions(
       limitType: config.detectionLimitType,
     },
     postDetection: buildPostDetectionConfig(config),
-    preRecognition: {
-      lineYThreshold: config.lineYThreshold,
-      wordXThreshold: config.wordXThreshold,
-    },
+    preRecognition:
+      config.layoutModel === 'heuristic'
+        ? {
+            lineYThreshold: config.lineYThreshold,
+            wordXThreshold: config.wordXThreshold,
+          }
+        : undefined,
     recognition: {
       batchSize: config.recBatchNum,
     },

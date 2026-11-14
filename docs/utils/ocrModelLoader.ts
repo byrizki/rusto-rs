@@ -193,7 +193,7 @@ export async function fetchModelAssets(
 ): Promise<LoadedModelAssets> {
   if (!isModelSupportedByBackend(model.id, backend)) {
     throw new Error(
-      `${model.name} is not compatible with ${backend}. Use rusto-nn or rusto-webgpu.`
+      `${model.name} is not compatible with ${backend} (RTen supports FP32 models only; FP16 and INT8 require rusto-nn or rusto-webgpu).`
     );
   }
   const candidates = getModelCandidateUrls(model.id, baseURL, backend);

@@ -63,7 +63,7 @@ data class DetectionConfig(
  * @property scoreThresh Minimum confidence score threshold.
  * @property returnWordBox Whether to return word-level bounding boxes.
  * @property returnSingleCharBox Whether to return single-character bounding boxes.
- * @property recBatchNum Recognition batch size. Default: 6.
+ * @property recBatchNum Recognition batch size. Default: 1.
  * @property recWorkers Number of parallel worker threads for recognition (`null` = auto).
  * @property maxRecWorkers Maximum worker thread count clamp for recognition (`null` = engine default 8).
  */

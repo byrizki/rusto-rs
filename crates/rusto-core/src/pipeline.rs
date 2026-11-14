@@ -181,7 +181,7 @@ impl OcrPipeline {
             decoder,
             global,
             det_config: DetConfig::default(PathBuf::new()),
-            rec_batch_num: 6,
+            rec_batch_num: 1,
             rec_workers: None,
             max_rec_workers: 8,
             orient: None,

@@ -89,7 +89,7 @@ export const availableLayoutModels: LayoutModelOption[] = [
     category: 'PP-Structure',
     description:
       'General document layout analysis detecting text, titles, figures, captions, tables, and headers.',
-    size: '8.4 MB',
+    size: '6.9 MB',
     assetFile: 'modules/layout_cdla.mnn',
     downloadUrl: 'https://huggingface.co/byrizki/rusto-models/resolve/main/modules/layout_cdla.mnn',
   },
@@ -99,7 +99,7 @@ export const availableLayoutModels: LayoutModelOption[] = [
     category: 'PP-Structure',
     description:
       'Academic paper and publication layout model detecting text, titles, lists, tables, and figures.',
-    size: '8.4 MB',
+    size: '6.9 MB',
     assetFile: 'modules/layout_publaynet.mnn',
     downloadUrl:
       'https://huggingface.co/byrizki/rusto-models/resolve/main/modules/layout_publaynet.mnn',
@@ -114,3 +114,9 @@ export const availableLayoutModels: LayoutModelOption[] = [
 ];
 
 export { availableModels, defaultModel } from './models/ocrModelList';
+
+import { availableModels as allModels } from './models/ocrModelList';
+
+export const webDemoModels: OcrModelOption[] = allModels.filter(
+  (m) => !m.id.startsWith('ppocrv6-medium') && !m.id.includes('server')
+);

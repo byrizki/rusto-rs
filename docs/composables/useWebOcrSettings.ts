@@ -21,7 +21,7 @@ function mergeWithRuntimeConfig(
 export function useWebOcrSettings() {
   const ocrConfig = ref<OcrConfig>({ ...defaultOcrConfig });
   const isConfigOpen = ref<boolean>(false);
-  const configTab = ref<OcrSettingsTab>('detection');
+  const configTab = ref<OcrSettingsTab>('runtime');
 
   const isCustomConfig = computed<boolean>(
     () => JSON.stringify(ocrConfig.value) !== JSON.stringify(defaultOcrConfig)

@@ -11,7 +11,7 @@ export const multilingualModels: OcrModelOption[] = [
     bytes: 14594772,
     trait: 'Japanese Kanji & Kana',
     description: 'Specialized Japanese text recognition trained on Kanji, Hiragana, and Katakana.',
-    recommendedBatchSize: 6,
+    recommendedBatchSize: 1,
     tags: ['Japanese', 'Kanji'],
   },
   {
@@ -25,7 +25,7 @@ export const multilingualModels: OcrModelOption[] = [
     trait: 'Traditional Chinese (繁體中文)',
     description:
       'Specialized Traditional Chinese recognition for Taiwan, Hong Kong, and Macau texts.',
-    recommendedBatchSize: 6,
+    recommendedBatchSize: 1,
     tags: ['Traditional Chinese'],
   },
   {
@@ -38,7 +38,7 @@ export const multilingualModels: OcrModelOption[] = [
     bytes: 18411591,
     trait: 'Korean Hangul (한국어)',
     description: 'PP-OCRv5 model specialized in Korean characters and mixed Hangul-English.',
-    recommendedBatchSize: 6,
+    recommendedBatchSize: 1,
     tags: ['Korean', 'Hangul'],
   },
   {
@@ -51,7 +51,7 @@ export const multilingualModels: OcrModelOption[] = [
     bytes: 12946677,
     trait: 'Arabic (العربية)',
     description: 'PP-OCRv5 recognition model optimized for Arabic cursive text and ligatures.',
-    recommendedBatchSize: 6,
+    recommendedBatchSize: 1,
     tags: ['Arabic', 'RTL'],
   },
   {
@@ -65,7 +65,7 @@ export const multilingualModels: OcrModelOption[] = [
     trait: 'Cyrillic (Кириллица)',
     description:
       'PP-OCRv5 model for Russian, Ukrainian, Bulgarian, Serbian, and other Cyrillic scripts.',
-    recommendedBatchSize: 6,
+    recommendedBatchSize: 1,
     tags: ['Cyrillic'],
   },
   {
@@ -78,7 +78,7 @@ export const multilingualModels: OcrModelOption[] = [
     bytes: 12864063,
     trait: 'Devanagari (हिन्दी)',
     description: 'Optimized for Hindi, Sanskrit, Marathi, and Nepali Devanagari script.',
-    recommendedBatchSize: 6,
+    recommendedBatchSize: 1,
     tags: ['Devanagari', 'Hindi'],
   },
   {
@@ -91,7 +91,7 @@ export const multilingualModels: OcrModelOption[] = [
     bytes: 12827329,
     trait: 'Extended Latin Script',
     description: 'Specialized for European and global Latin scripts with diacritics and accents.',
-    recommendedBatchSize: 6,
+    recommendedBatchSize: 1,
     tags: ['Latin'],
   },
   {
@@ -104,7 +104,7 @@ export const multilingualModels: OcrModelOption[] = [
     bytes: 12838111,
     trait: 'Thai (ภาษาไทย)',
     description: 'Trained on Thai alphabet and tone marks.',
-    recommendedBatchSize: 6,
+    recommendedBatchSize: 1,
     tags: ['Thai'],
   },
 ];
