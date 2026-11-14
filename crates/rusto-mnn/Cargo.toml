@@ -1,6 +1,6 @@
 [package]
 name = "rusto-mnn"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 description = "Native C++ FFI bindings to Alibaba MNN runtime for benchmark comparison"
 license = "MIT OR Apache-2.0"
@@ -10,7 +10,7 @@ categories = ["science", "computer-vision"]
 
 [dependencies]
 thiserror = "1.0"
-rusto-core = { path = "../rusto-core", version = "0.4.0", default-features = false }
+rusto-core = { path = "../rusto-core", version = "0.4.1", default-features = false }
 
 [build-dependencies]
 cc = { version = "1.2", features = ["parallel"] }

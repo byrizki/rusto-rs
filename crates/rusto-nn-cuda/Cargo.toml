@@ -1,6 +1,6 @@
 [package]
 name = "rusto-nn-cuda"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 description = "Pluggable NVIDIA CUDA hardware acceleration backend for rusto-nn"
 license = "MIT OR Apache-2.0"
@@ -9,7 +9,7 @@ keywords = ["cuda", "nvidia", "deep-learning", "acceleration", "gpu"]
 categories = ["science", "computer-vision"]
 
 [dependencies]
-rusto-nn = { path = "../rusto-nn", version = "0.4.0" }
+rusto-nn = { path = "../rusto-nn", version = "0.4.1" }
 cudarc = { version = "0.19.10", default-features = false, features = ["std", "driver", "cublas", "fallback-dynamic-loading", "cuda-12000"] }
 libloading = "0.9"
 thiserror = "1.0"

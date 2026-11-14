@@ -38,7 +38,7 @@ yarn add @rustors/react-native
 
 ### Android Repository Setup
 
-`@rustors/react-native` resolves the native `com.github.byrizki.rusto-rs:rusto-android:v0.4.0` AAR from JitPack. Ensure JitPack is registered in your app's `android/build.gradle` (or `android/settings.gradle`):
+`@rustors/react-native` resolves the native `com.github.byrizki.rusto-rs:rusto-android:v0.4.1` AAR from JitPack. Ensure JitPack is registered in your app's `android/build.gradle` (or `android/settings.gradle`):
 
 ```groovy
 allprojects {

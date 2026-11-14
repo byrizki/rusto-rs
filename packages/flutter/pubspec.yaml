@@ -1,6 +1,6 @@
 name: rusto_flutter
 description: Flutter plugin for RustO OCR library based on RapidOCR, Indra OCR, and pure-Rust MNN (rusto-nn).
-version: 0.4.0
+version: 0.4.1
 homepage: https://github.com/byrizki/rusto-rs
 
 environment:
@@ -10,7 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  rusto: ^0.4.0
+  rusto: ^0.4.1
 
 flutter:
   plugin:

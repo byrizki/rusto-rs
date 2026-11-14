@@ -3,7 +3,7 @@ members = [".", "crates/rusto-core", "crates/rusto-cpp", "crates/rusto-nn", "cra
 
 [package]
 name = "rusto-rs"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 description = "RustO! - Pure Rust OCR library based on RapidOCR with pure-Rust MNN (rusto-nn) and PaddleOCR engine"
 license = "MIT"
@@ -30,15 +30,15 @@ clap = { version = "4.5", default-features = false, features = ["std", "derive",
 
 # Optional OpenCV / C++ backend
 opencv = { version = "0.97.2", optional = true }
-rusto-cpp = { path = "crates/rusto-cpp", version = "0.4.0", optional = true }
+rusto-cpp = { path = "crates/rusto-cpp", version = "0.4.1", optional = true }
 
 # Pure Rust inference engines
-rusto-core = { path = "crates/rusto-core", version = "0.4.0", default-features = false, features = ["parallel"] }
-rusto-nn = { path = "crates/rusto-nn", version = "0.4.0", default-features = false, features = ["std", "parallel", "onnx", "rten"] }
-rusto-rten = { path = "crates/rusto-rten", version = "0.4.0", optional = true }
-rusto-nn-webgpu = { path = "crates/rusto-nn-webgpu", version = "0.4.0", optional = true }
-rusto-nn-cuda = { path = "crates/rusto-nn-cuda", version = "0.4.0", optional = true }
-rusto-mnn = { path = "crates/rusto-mnn", version = "0.4.0", optional = true }
+rusto-core = { path = "crates/rusto-core", version = "0.4.1", default-features = false, features = ["parallel"] }
+rusto-nn = { path = "crates/rusto-nn", version = "0.4.1", default-features = false, features = ["std", "parallel", "onnx", "rten"] }
+rusto-rten = { path = "crates/rusto-rten", version = "0.4.1", optional = true }
+rusto-nn-webgpu = { path = "crates/rusto-nn-webgpu", version = "0.4.1", optional = true }
+rusto-nn-cuda = { path = "crates/rusto-nn-cuda", version = "0.4.1", optional = true }
+rusto-mnn = { path = "crates/rusto-mnn", version = "0.4.1", optional = true }
 
 # Model auto-download and caching
 nanoserde = { version = "0.2.1", default-features = false, features = ["std", "json"] }

@@ -2050,7 +2050,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-core"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "dirs",
  "image",
@@ -2061,7 +2061,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-cpp"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "clipper2-rust",
  "ndarray",
@@ -2072,7 +2072,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-mnn"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "cc",
  "rusto-core",
@@ -2081,7 +2081,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-nn"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "memmap2",
  "rten",
@@ -2094,7 +2094,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-nn-cuda"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "cudarc",
  "libloading 0.9.0",
@@ -2104,7 +2104,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-nn-webgpu"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "js-sys",
  "pollster",
@@ -2116,7 +2116,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-node"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "nanoserde",
  "napi",
@@ -2127,7 +2127,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-rs"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "cbindgen",
  "clap",
@@ -2148,7 +2148,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-rten"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "rten",
  "rten-tensor",
@@ -2158,7 +2158,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-server"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "axum",
  "base64",
@@ -2175,7 +2175,7 @@ dependencies = [
 
 [[package]]
 name = "rusto-wasm"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "console_error_panic_hook",
  "image",

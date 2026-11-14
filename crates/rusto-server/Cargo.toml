@@ -1,6 +1,6 @@
 [package]
 name = "rusto-server"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 description = "Mistral-compatible POST /v1/ocr HTTP server on top of rusto-rs (PP-OCRv6 models, per-request model choice)"
 license = "MIT"

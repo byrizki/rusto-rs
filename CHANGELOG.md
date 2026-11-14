@@ -5,6 +5,27 @@ All notable changes to RustO! will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-11-14
+
+### Added
+- **docs,core**: Enhance OCR settings UI, model defaults, and rusto-server docs (@byrizki)
+- Add rusto-server: Mistral-compatible POST /v1/ocr as a separate workspace crate (@tacman)
+- Block-level output, configurable rec workers, drop RUSTO_REC_WORKERS env (@byrizki)
+- **rusto-nn,models,docs**: Add FP16/INT8 inference, fix unreachable softmax, update benchmarks and live demo (@byrizki)
+
+### Changed
+- Fix versioning script, rust crate (@byrizki)
+- Fix flutter build (@byrizki)
+- Fix quant fp16 parity test (@byrizki)
+- **live-demo**: Update docs pages, simplify demo UI and presets, fix typecheck (@byrizki)
+- Optimize single-cpu gemm, memory footprint, and migrate concurrency benchmarks (@byrizki)
+- Fix dart/flutter publish (@byrizki)
+
+### Fixed
+- Line double softmax on line classification (@byrizki)
+- **ci**: Download PP-OCRv6 medium, FP16, and INT8 fixtures in --ci mode (@byrizki)
+- Layout reading order grouping (@byrizki)
+
 ## [0.4.0] - 2026-11-06
 
 ### Breaking Changes
@@ -287,7 +308,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Project Status
 
-**Version**: 0.4.0  
+**Version**: 0.4.1  
 **Status**: Production Ready  
 **Accuracy**: 99.3% OpenCV parity  
-**Last Updated**: November 06, 2026
+**Last Updated**: November 14, 2026

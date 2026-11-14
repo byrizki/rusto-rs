@@ -1,6 +1,6 @@
 [package]
 name = "rusto-rten"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 description = "Pluggable RTen inference engine backend for RustO!"
 license = "MIT OR Apache-2.0"
@@ -12,5 +12,5 @@ categories = ["science", "computer-vision"]
 rten = { version = "0.27.0", features = ["onnx_format", "rten_format"] }
 rten-tensor = "0.27.0"
 thiserror = "1.0"
-rusto-core = { path = "../rusto-core", version = "0.4.0", default-features = false }
+rusto-core = { path = "../rusto-core", version = "0.4.1", default-features = false }
 

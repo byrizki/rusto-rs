@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Update RustO native library and bindings to 0.4.1.
+
 ## 0.4.0
 
 ### Breaking Changes

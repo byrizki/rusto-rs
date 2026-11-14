@@ -1,13 +1,13 @@
 [package]
 name = "rusto-cpp"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 description = "Native C++ and OpenCV accelerated computer vision backends for RustO!"
 license = "MIT"
 repository = "https://github.com/byrizki/rusto-rs"
 
 [dependencies]
-rusto-core = { path = "../rusto-core", version = "0.4.0" }
+rusto-core = { path = "../rusto-core", version = "0.4.1" }
 opencv = { version = "0.97.2", optional = true }
 clipper2-rust = { version = "1.2.0", optional = true }
 ndarray = "0.16"

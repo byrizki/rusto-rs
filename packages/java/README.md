@@ -25,7 +25,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.byrizki.rusto-rs:rusto-java:0.4.0'
+    implementation 'com.github.byrizki.rusto-rs:rusto-java:0.4.1'
 }
 ```
 
@@ -43,7 +43,7 @@ dependencies {
     <dependency>
         <groupId>com.github.byrizki.rusto-rs</groupId>
         <artifactId>rusto-java</artifactId>
-        <version>0.4.0</version>
+        <version>0.4.1</version>
     </dependency>
 </dependencies>
 ```

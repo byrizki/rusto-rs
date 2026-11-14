@@ -1,6 +1,6 @@
 [package]
 name = "rusto-core"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 description = "Core pure-Rust computer vision algorithms, postprocessing, and types for RustO!"
 license = "MIT"
@@ -9,7 +9,7 @@ repository = "https://github.com/byrizki/rusto-rs"
 [dependencies]
 thiserror = "1.0"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-rusto-nn = { path = "../rusto-nn", version = "0.4.0", default-features = false, features = ["std", "parallel", "onnx", "rten"] }
+rusto-nn = { path = "../rusto-nn", version = "0.4.1", default-features = false, features = ["std", "parallel", "onnx", "rten"] }
 nanoserde = { version = "0.2.1", default-features = false, features = ["std", "json"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
