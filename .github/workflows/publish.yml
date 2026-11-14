@@ -114,6 +114,9 @@ jobs:
     if: >-
       (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v') && !startsWith(github.event.release.tag_name, 'models-')) ||
       github.event.inputs.publish_nuget == 'true'
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       
@@ -137,13 +140,21 @@ jobs:
           chmod +x scripts/verify-packed-packages.py
           python3 scripts/verify-packed-packages.py --dir packages/dotnet/
 
+      - name: NuGet Login (Trusted Publishing)
+        id: nuget_login
+        uses: NuGet/login@v1
+        with:
+          user: byrizki
+
       - name: Publish Core to NuGet
         working-directory: packages/dotnet
+        env:
+          NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
         run: |
           find . -name "RustODotnet.*.nupkg" ! -name "RustODotnet.Models.*" | while read pkg; do
             echo "Pushing $pkg to NuGet..."
             dotnet nuget push "$pkg" \
-              --api-key ${{ secrets.NUGET_API_KEY }} \
+              --api-key "$NUGET_API_KEY" \
               --source https://api.nuget.org/v3/index.json \
               --skip-duplicate || true
           done
