@@ -105,15 +105,17 @@ xychart-beta
 | **(pipe-a)** | Python Indra OCR (Official CLI Pipeline) | Python (ONNX Runtime) | 22.7 MB | 8.6 MB | 3111.6 ms | 5067.0 ms | 472.2 MB | 0.3624 | 63.76% |
 | **(pipe-b)** | Python PaddleOCR + PP-Structure (PicoDet Layout) | Python (PaddleStructure) | 120.1 MB | 23.0 MB | 20676.5 ms | 47844.8 ms | 929.6 MB | 0.4282 | 57.18% |
 | **(pipe-c)** | Python RapidOCR + RapidLayout Tiny (PubLayNet) | Python (ONNX Runtime) | 22.7 MB | 13.1 MB | 1561.7 ms | 2950.1 ms | 453.5 MB | 0.4615 | 53.85% |
-| **(pipe-d)** | RustO NN Full Pipeline + PP-OCRv6 Tiny (CDLA) | Pure-Rust MNN (rusto-nn) | **2.9 MB** | 49.8 MB | 2332.4 ms | 4748.4 ms | 503.8 MB | 0.4209 | 57.91% |
+| **(pipe-d)** | RustO NN Full Pipeline + PP-OCRv6 Tiny (CDLA) | Pure-Rust MNN (rusto-nn) | **2.9 MB** | 49.8 MB | 2485.0 ms | 5380.7 ms | **305.5 MB** | 0.4379 | 56.21% |
 | **(pipe-e)** | RustO RTen Full Pipeline + PP-OCRv6 Tiny (CDLA) | Native Rust (rusto-rten) | **6.7 MB** | 20.2 MB | 2079.7 ms | 4383.2 ms | 351.6 MB | 0.4354 | 56.46% |
-| **(pipe-f)** | RustO NN Full Pipeline + PP-OCRv6 Tiny (PubLayNet) | Pure-Rust MNN (rusto-nn) | **2.9 MB** | 19.7 MB | 2336.3 ms | 4774.9 ms | 503.5 MB | 0.4629 | 53.71% |
+| **(pipe-f)** | RustO NN Full Pipeline + PP-OCRv6 Tiny (PubLayNet) | Pure-Rust MNN (rusto-nn) | **2.9 MB** | 19.7 MB | 2472.0 ms | 5286.2 ms | **305.2 MB** | 0.4775 | 52.25% |
 | **(pipe-g)** | RustO RTen Full Pipeline + PP-OCRv6 Tiny (PubLayNet) | Native Rust (rusto-rten) | **6.7 MB** | 20.2 MB | 2188.8 ms | 4522.5 ms | 354.6 MB | 0.4753 | 52.47% |
 | **(pipe-h)** | RustO NN Full Pipeline + Indra Models (Indra Order) | Pure-Rust MNN (rusto-nn) | **2.9 MB** | 8.6 MB | 599.9 ms | 1430.2 ms | **184.6 MB** | 0.3610 | 63.90% |
 | **(pipe-i)** | RustO RTen Full Pipeline + Indra Models (Indra Order) | Native Rust (RTen) | **6.7 MB** | 8.6 MB | 735.9 ms | 2171.9 ms | **161.5 MB** | 0.3796 | 62.04% |
 | **(pipe-j)** | RustO NN + Pure-Rust Heuristic Order | Pure-Rust MNN (rusto-nn) | **2.9 MB** | 5.9 MB | 1634.8 ms | 3081.0 ms | 454.3 MB | 0.3728 | 62.72% |
 | **(pipe-k)** | RustO RTen + Pure-Rust Heuristic Order | Native Rust (RTen) | **6.7 MB** | 6.1 MB | 1529.5 ms | 2971.4 ms | **266.8 MB** | 0.3902 | 60.98% |
 | **(pipe-l)** | Tesseract OCR (v5 / PSM 3) | C++ / Leptonica (Tesseract) | 4.2 MB | 3.9 MB | 1847.7 ms | 6893.0 ms | **184.6 MB** | 0.3971 | 60.29% |
+| **(pipe-m)** | RustO NN Full Pipeline + PP-OCRv6 Tiny (CDLA + Auto-Config) | Pure-Rust MNN (rusto-nn) | **2.9 MB** | 49.8 MB | 2407.0 ms | 5704.9 ms | **304.7 MB** | 0.4379 | 56.21% |
+| **(pipe-n)** | RustO NN Full Pipeline + PP-OCRv6 Tiny (PubLayNet + Auto-Config) | Pure-Rust MNN (rusto-nn) | **2.9 MB** | 19.7 MB | 2627.0 ms | 5185.3 ms | **305.7 MB** | 0.4775 | 52.25% |
 
 ### Full Pipeline Visual Comparisons
 
@@ -122,9 +124,9 @@ xychart-beta
 ```mermaid
 xychart-beta
     title "Full Pipeline Transcription Accuracy on Multi-Column Layouts (%)"
-    x-axis ["Python Indra", "Python PP-Structure", "Python RapidLayout", "RustO CDLA", "RustO PubLayNet", "RustO Indra Order"]
+    x-axis ["Python Indra", "Python PP-Structure", "Python RapidLayout", "RustO CDLA", "RustO Auto-Config", "RustO Indra Order"]
     y-axis "Accuracy (%)" 0 --> 80
-    bar [63.8, 57.2, 53.9, 57.9, 53.7, 63.9]
+    bar [63.8, 57.2, 53.9, 56.2, 56.2, 63.9]
 ```
 
 #### Full Pipeline Execution Latency (ms) — Lower is Better
@@ -132,9 +134,9 @@ xychart-beta
 ```mermaid
 xychart-beta
     title "Full Pipeline Execution Latency (ms)"
-    x-axis ["Python RapidLayout", "RustO Indra Order", "Python Indra", "RustO PubLayNet", "RustO CDLA", "Python PP-Structure"]
+    x-axis ["RustO Indra Order", "Python RapidLayout", "RustO CDLA", "RustO Auto-Config", "Python Indra", "Python PP-Structure"]
     y-axis "Latency (ms)" 0 --> 23779
-    bar [1562, 600, 3112, 2336, 2332, 20677]
+    bar [600, 1562, 2485, 2407, 3112, 20677]
 ```
 
 ---

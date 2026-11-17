@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import type { OcrSettingsTab } from '../../composables/useWebOcrSettings';
 import { defaultOcrConfig, type OcrConfig } from '../../types/ocrConfig';
 import type { OcrDemoStrings } from '../../types/ocrDemoI18n';
@@ -52,9 +52,35 @@ const modalBodyRef = ref<HTMLElement | null>(null);
 let activeBeatEl: HTMLElement | null = null;
 let activeBeatTimer: ReturnType<typeof setTimeout> | null = null;
 
-const detectionSubTab = ref<'pre' | 'core' | 'post'>('core');
-const recognitionSubTab = ref<'pre' | 'core' | 'post'>('core');
+const detectionSubTab = ref<'pre' | 'core' | 'post'>('pre');
+const recognitionSubTab = ref<'pre' | 'core' | 'post'>('pre');
 const runtimeSubTab = ref<'engines' | 'model' | 'weights'>('engines');
+
+watch(
+  () => props.isOpen,
+  (open) => {
+    if (open) {
+      confirmReset.value = false;
+      showImport.value = false;
+      detectionSubTab.value = 'pre';
+      recognitionSubTab.value = 'pre';
+      runtimeSubTab.value = 'engines';
+    }
+  }
+);
+
+watch(
+  () => props.activeTab,
+  (tabId) => {
+    if (tabId === 'detection') {
+      detectionSubTab.value = 'pre';
+    } else if (tabId === 'recognition') {
+      recognitionSubTab.value = 'pre';
+    } else if (tabId === 'runtime') {
+      runtimeSubTab.value = 'engines';
+    }
+  }
+);
 
 const searchResults = computed<OcrSettingSearchEntry[]>(() =>
   filterSettingsIndex(searchQuery.value)
@@ -117,6 +143,17 @@ async function jumpToSearchResult(entry: OcrSettingSearchEntry) {
   focusAndBeatSetting(entry.id);
 }
 
+function selectPrimaryTab(tabId: OcrSettingsTab) {
+  if (tabId === 'detection') {
+    detectionSubTab.value = 'pre';
+  } else if (tabId === 'recognition') {
+    recognitionSubTab.value = 'pre';
+  } else if (tabId === 'runtime') {
+    runtimeSubTab.value = 'engines';
+  }
+  emit('update:activeTab', tabId);
+}
+
 function onPrimaryTabKeydown(event: KeyboardEvent, index: number) {
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
   event.preventDefault();
@@ -124,7 +161,7 @@ function onPrimaryTabKeydown(event: KeyboardEvent, index: number) {
   const nextIndex = (index + dir + tabs.value.length) % tabs.value.length;
   const nextTab = tabs.value[nextIndex];
   if (nextTab) {
-    emit('update:activeTab', nextTab.id);
+    selectPrimaryTab(nextTab.id);
   }
 }
 
@@ -451,7 +488,7 @@ function handleImportSubmit() {
               role="tab"
               :aria-selected="activeTab === tab.id"
               :tabindex="activeTab === tab.id ? 0 : -1"
-              @click="emit('update:activeTab', tab.id)"
+              @click="selectPrimaryTab(tab.id)"
               @keydown="onPrimaryTabKeydown($event, idx)"
               class="inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md text-xs font-medium transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               :class="

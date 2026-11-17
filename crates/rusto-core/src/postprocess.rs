@@ -459,13 +459,41 @@ pub fn decode_dbnet_boxes_fast(
     unclip_ratio: f32,
 ) -> Vec<([f32; 4], f32)> {
     let mut raw_boxes = Vec::new();
-    let mut visited = vec![false; target_w * target_h];
+    let total_pixels = target_w * target_h;
+    if total_pixels == 0 || heat_map.len() < total_pixels {
+        return raw_boxes;
+    }
+
+    // 1. Initial binarization threshold
+    let mut mask = vec![false; total_pixels];
+    for i in 0..total_pixels {
+        if heat_map[i] >= det_thresh {
+            mask[i] = true;
+        }
+    }
+
+    // 2. 1x2 Vertical dilation to bridge character stroke fractures without fusing horizontal neighbors
+    let mut dilated = mask.clone();
+    for y in 0..target_h {
+        let next_row_start = (y + 1) * target_w;
+        for x in 0..target_w {
+            if mask[y * target_w + x] {
+                if y + 1 < target_h {
+                    dilated[next_row_start + x] = true;
+                }
+            }
+        }
+    }
+
+    // 3. 8-connectivity BFS connected-component labeling
+    let mut visited = vec![false; total_pixels];
     let mut queue = std::collections::VecDeque::with_capacity(256);
 
     for y in 0..target_h {
+        let row_start = y * target_w;
         for x in 0..target_w {
-            let idx = y * target_w + x;
-            if visited[idx] || heat_map[idx] < det_thresh {
+            let idx = row_start + x;
+            if visited[idx] || !dilated[idx] {
                 continue;
             }
 
@@ -490,23 +518,27 @@ pub fn decode_dbnet_boxes_fast(
                 if cy < min_y { min_y = cy; }
                 if cy > max_y { max_y = cy; }
 
-                for (nx, ny) in [
-                    (cx.wrapping_sub(1), cy),
-                    (cx + 1, cy),
-                    (cx, cy.wrapping_sub(1)),
-                    (cx, cy + 1),
-                ] {
-                    if nx < target_w && ny < target_h {
-                        let nidx = ny * target_w + nx;
-                        if !visited[nidx] && heat_map[nidx] >= det_thresh {
-                            visited[nidx] = true;
-                            queue.push_back((nx, ny));
+                for dy in -1i32..=1 {
+                    for dx in -1i32..=1 {
+                        if dx == 0 && dy == 0 {
+                            continue;
+                        }
+                        let nx = cx as i32 + dx;
+                        let ny = cy as i32 + dy;
+                        if nx >= 0 && nx < target_w as i32 && ny >= 0 && ny < target_h as i32 {
+                            let (nx_u, ny_u) = (nx as usize, ny as usize);
+                            let nidx = ny_u * target_w + nx_u;
+                            if !visited[nidx] && dilated[nidx] {
+                                visited[nidx] = true;
+                                queue.push_back((nx_u, ny_u));
+                            }
                         }
                     }
                 }
             }
 
-            if count < 16 || (max_x - min_x) < 4 || (max_y - min_y) < 3 {
+            // Reject components that are too small to contain readable text
+            if count < 6 || (max_x - min_x) < 3 || (max_y - min_y) < 3 {
                 continue;
             }
 
@@ -521,10 +553,13 @@ pub fn decode_dbnet_boxes_fast(
             let area = bw * bh;
             let dist = (area * unclip_ratio) / peri.max(1.0);
 
-            let x0 = (min_x as f32 - dist).max(0.0) / scale_w;
-            let y0 = (min_y as f32 - dist).max(0.0) / scale_h;
-            let x1 = ((max_x as f32 + dist).min(target_w as f32)) / scale_w;
-            let y1 = ((max_y as f32 + dist).min(target_h as f32)) / scale_h;
+            let dist_x = dist;
+            let dist_y = dist;
+
+            let x0 = (min_x as f32 - dist_x).max(0.0) / scale_w;
+            let y0 = (min_y as f32 - dist_y).max(0.0) / scale_h;
+            let x1 = ((max_x as f32 + dist_x).min(target_w as f32)) / scale_w;
+            let y1 = ((max_y as f32 + dist_y).min(target_h as f32)) / scale_h;
 
             let clamped_x0 = x0.clamp(0.0, orig_w as f32);
             let clamped_y0 = y0.clamp(0.0, orig_h as f32);

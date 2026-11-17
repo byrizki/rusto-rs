@@ -29,7 +29,10 @@ function onInputChange(event: Event) {
   <div
     class="px-3.5 py-2 border-b border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-wrap items-center justify-between gap-2"
   >
-    <div class="flex items-center gap-1.5 overflow-x-auto max-w-full py-0.5">
+    <div
+      class="flex items-center gap-1.5 overflow-x-auto overflow-y-clip [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-w-full py-0.5"
+      style="overflow-y: clip; scrollbar-width: none"
+    >
       <span
         class="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 shrink-0 mr-1 hidden sm:inline"
       >

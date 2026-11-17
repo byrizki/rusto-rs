@@ -258,6 +258,8 @@ class DetectionRunOptions {
     required this.mean,
     /// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
     required this.std,
+    /// Enable universal adaptive resolution detection.
+    required this.adaptiveResolution,
   });
 
   /// Target side length constraint for image resizing. Default: 960.
@@ -268,6 +270,8 @@ class DetectionRunOptions {
   final List<double>? mean;
   /// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
   final List<double>? std;
+  /// Enable universal adaptive resolution detection.
+  final bool? adaptiveResolution;
 
   Map<String, dynamic> toJson() {
     return {
@@ -275,6 +279,7 @@ class DetectionRunOptions {
       'limitType': this.limitType,
       'mean': this.mean == null ? null : (() { final __tmp = this.mean!; return __tmp; })(),
       'std': this.std == null ? null : (() { final __tmp = this.std!; return __tmp; })(),
+      'adaptiveResolution': this.adaptiveResolution,
     };
   }
 
@@ -284,6 +289,7 @@ class DetectionRunOptions {
       limitType: json['limitType'] == null ? null : json['limitType'] as String,
       mean: json['mean'] == null ? null : (() { final __tmp = json['mean']; return (__tmp as List).map((item) => (item as num).toDouble()).toList(); })(),
       std: json['std'] == null ? null : (() { final __tmp = json['std']; return (__tmp as List).map((item) => (item as num).toDouble()).toList(); })(),
+      adaptiveResolution: json['adaptiveResolution'] == null ? null : json['adaptiveResolution'] as bool,
     );
   }
 
@@ -292,27 +298,29 @@ class DetectionRunOptions {
     Object? limitType = _sentinel,
     Object? mean = _sentinel,
     Object? std = _sentinel,
+    Object? adaptiveResolution = _sentinel,
   }) {
     return DetectionRunOptions(
       limitSideLen: limitSideLen == _sentinel ? this.limitSideLen : limitSideLen as int?,
       limitType: limitType == _sentinel ? this.limitType : limitType as String?,
       mean: mean == _sentinel ? this.mean : mean as List<double>?,
       std: std == _sentinel ? this.std : std as List<double>?,
+      adaptiveResolution: adaptiveResolution == _sentinel ? this.adaptiveResolution : adaptiveResolution as bool?,
     );
   }
 
   @override
   String toString() {
-    return 'DetectionRunOptions(limitSideLen: $limitSideLen, limitType: $limitType, mean: $mean, std: $std)';
+    return 'DetectionRunOptions(limitSideLen: $limitSideLen, limitType: $limitType, mean: $mean, std: $std, adaptiveResolution: $adaptiveResolution)';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is DetectionRunOptions && limitSideLen == other.limitSideLen && limitType == other.limitType && mean == other.mean && std == other.std;
+      other is DetectionRunOptions && limitSideLen == other.limitSideLen && limitType == other.limitType && mean == other.mean && std == other.std && adaptiveResolution == other.adaptiveResolution;
 
   @override
-  int get hashCode => Object.hash(limitSideLen, limitType, mean, std);
+  int get hashCode => Object.hash(limitSideLen, limitType, mean, std, adaptiveResolution);
 }
 
 /// Axis-aligned bounding box frame with position and size in pixels.
@@ -622,6 +630,8 @@ class OcrRunOptions {
     required this.orientationDetection,
     /// Enable text line orientation classifier stage.
     required this.lineClassification,
+    /// Enable automatic image-aware profiling and configuration. Default: false (opt-in).
+    required this.autoConfig,
     /// Pre-detection calibration & optimization options.
     required this.preDetection,
     /// Detection stage options.
@@ -648,6 +658,8 @@ class OcrRunOptions {
   final bool? orientationDetection;
   /// Enable text line orientation classifier stage.
   final bool? lineClassification;
+  /// Enable automatic image-aware profiling and configuration. Default: false (opt-in).
+  final bool? autoConfig;
   /// Pre-detection calibration & optimization options.
   final PreDetectionOptions? preDetection;
   /// Detection stage options.
@@ -669,6 +681,7 @@ class OcrRunOptions {
       'layoutModel': this.layoutModel,
       'orientationDetection': this.orientationDetection,
       'lineClassification': this.lineClassification,
+      'autoConfig': this.autoConfig,
       'preDetection': this.preDetection == null ? null : (() { final __tmp = this.preDetection!; return __tmp.toJson(); })(),
       'detection': this.detection == null ? null : (() { final __tmp = this.detection!; return __tmp.toJson(); })(),
       'postDetection': this.postDetection == null ? null : (() { final __tmp = this.postDetection!; return __tmp.toJson(); })(),
@@ -686,6 +699,7 @@ class OcrRunOptions {
       layoutModel: json['layoutModel'] == null ? null : json['layoutModel'] as String,
       orientationDetection: json['orientationDetection'] == null ? null : json['orientationDetection'] as bool,
       lineClassification: json['lineClassification'] == null ? null : json['lineClassification'] as bool,
+      autoConfig: json['autoConfig'] == null ? null : json['autoConfig'] as bool,
       preDetection: json['preDetection'] == null ? null : (() { final __tmp = json['preDetection']; return PreDetectionOptions.fromJson(__tmp as Map<String, dynamic>); })(),
       detection: json['detection'] == null ? null : (() { final __tmp = json['detection']; return DetectionRunOptions.fromJson(__tmp as Map<String, dynamic>); })(),
       postDetection: json['postDetection'] == null ? null : (() { final __tmp = json['postDetection']; return PostDetectionOptions.fromJson(__tmp as Map<String, dynamic>); })(),
@@ -702,6 +716,7 @@ class OcrRunOptions {
     Object? layoutModel = _sentinel,
     Object? orientationDetection = _sentinel,
     Object? lineClassification = _sentinel,
+    Object? autoConfig = _sentinel,
     Object? preDetection = _sentinel,
     Object? detection = _sentinel,
     Object? postDetection = _sentinel,
@@ -716,6 +731,7 @@ class OcrRunOptions {
       layoutModel: layoutModel == _sentinel ? this.layoutModel : layoutModel as String?,
       orientationDetection: orientationDetection == _sentinel ? this.orientationDetection : orientationDetection as bool?,
       lineClassification: lineClassification == _sentinel ? this.lineClassification : lineClassification as bool?,
+      autoConfig: autoConfig == _sentinel ? this.autoConfig : autoConfig as bool?,
       preDetection: preDetection == _sentinel ? this.preDetection : preDetection as PreDetectionOptions?,
       detection: detection == _sentinel ? this.detection : detection as DetectionRunOptions?,
       postDetection: postDetection == _sentinel ? this.postDetection : postDetection as PostDetectionOptions?,
@@ -727,16 +743,16 @@ class OcrRunOptions {
 
   @override
   String toString() {
-    return 'OcrRunOptions(output: $output, autoUnwarp: $autoUnwarp, layoutReading: $layoutReading, layoutModel: $layoutModel, orientationDetection: $orientationDetection, lineClassification: $lineClassification, preDetection: $preDetection, detection: $detection, postDetection: $postDetection, preRecognition: $preRecognition, recognition: $recognition, postRecognition: $postRecognition)';
+    return 'OcrRunOptions(output: $output, autoUnwarp: $autoUnwarp, layoutReading: $layoutReading, layoutModel: $layoutModel, orientationDetection: $orientationDetection, lineClassification: $lineClassification, autoConfig: $autoConfig, preDetection: $preDetection, detection: $detection, postDetection: $postDetection, preRecognition: $preRecognition, recognition: $recognition, postRecognition: $postRecognition)';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is OcrRunOptions && output == other.output && autoUnwarp == other.autoUnwarp && layoutReading == other.layoutReading && layoutModel == other.layoutModel && orientationDetection == other.orientationDetection && lineClassification == other.lineClassification && preDetection == other.preDetection && detection == other.detection && postDetection == other.postDetection && preRecognition == other.preRecognition && recognition == other.recognition && postRecognition == other.postRecognition;
+      other is OcrRunOptions && output == other.output && autoUnwarp == other.autoUnwarp && layoutReading == other.layoutReading && layoutModel == other.layoutModel && orientationDetection == other.orientationDetection && lineClassification == other.lineClassification && autoConfig == other.autoConfig && preDetection == other.preDetection && detection == other.detection && postDetection == other.postDetection && preRecognition == other.preRecognition && recognition == other.recognition && postRecognition == other.postRecognition;
 
   @override
-  int get hashCode => Object.hash(output, autoUnwarp, layoutReading, layoutModel, orientationDetection, lineClassification, preDetection, detection, postDetection, preRecognition, recognition, postRecognition);
+  int get hashCode => Object.hash(output, autoUnwarp, layoutReading, layoutModel, orientationDetection, lineClassification, autoConfig, preDetection, detection, postDetection, preRecognition, recognition, postRecognition);
 }
 
 /// Document orientation angle configuration (0°, 90°, 180°, 270°).
@@ -1022,6 +1038,14 @@ class PreDetectionOptions {
     required this.cropPaddingX,
     /// Vertical padding around bounding box crops in pixels.
     required this.cropPaddingY,
+    /// Enable morphological Black-Hat relief enhancement for carved/embossed text (e.g. gravestones).
+    required this.reliefEnhancement,
+    /// Groove contrast amplification strength for relief enhancement (0.5 - 2.5).
+    required this.reliefStrength,
+    /// Enable morphological stroke repair for broken/eroded characters.
+    required this.strokeRepair,
+    /// Kernel radius for morphological stroke repair in pixels (1 - 3).
+    required this.strokeRepairRadius,
   });
 
   /// Descreen filtering strength (0.0 - 1.0).
@@ -1032,6 +1056,14 @@ class PreDetectionOptions {
   final double? cropPaddingX;
   /// Vertical padding around bounding box crops in pixels.
   final double? cropPaddingY;
+  /// Enable morphological Black-Hat relief enhancement for carved/embossed text (e.g. gravestones).
+  final bool? reliefEnhancement;
+  /// Groove contrast amplification strength for relief enhancement (0.5 - 2.5).
+  final double? reliefStrength;
+  /// Enable morphological stroke repair for broken/eroded characters.
+  final bool? strokeRepair;
+  /// Kernel radius for morphological stroke repair in pixels (1 - 3).
+  final int? strokeRepairRadius;
 
   Map<String, dynamic> toJson() {
     return {
@@ -1039,6 +1071,10 @@ class PreDetectionOptions {
       'targetMaxSide': this.targetMaxSide,
       'cropPaddingX': this.cropPaddingX,
       'cropPaddingY': this.cropPaddingY,
+      'reliefEnhancement': this.reliefEnhancement,
+      'reliefStrength': this.reliefStrength,
+      'strokeRepair': this.strokeRepair,
+      'strokeRepairRadius': this.strokeRepairRadius,
     };
   }
 
@@ -1048,6 +1084,10 @@ class PreDetectionOptions {
       targetMaxSide: json['targetMaxSide'] == null ? null : (json['targetMaxSide'] as num).toInt(),
       cropPaddingX: json['cropPaddingX'] == null ? null : (json['cropPaddingX'] as num).toDouble(),
       cropPaddingY: json['cropPaddingY'] == null ? null : (json['cropPaddingY'] as num).toDouble(),
+      reliefEnhancement: json['reliefEnhancement'] == null ? null : json['reliefEnhancement'] as bool,
+      reliefStrength: json['reliefStrength'] == null ? null : (json['reliefStrength'] as num).toDouble(),
+      strokeRepair: json['strokeRepair'] == null ? null : json['strokeRepair'] as bool,
+      strokeRepairRadius: json['strokeRepairRadius'] == null ? null : (json['strokeRepairRadius'] as num).toInt(),
     );
   }
 
@@ -1056,27 +1096,35 @@ class PreDetectionOptions {
     Object? targetMaxSide = _sentinel,
     Object? cropPaddingX = _sentinel,
     Object? cropPaddingY = _sentinel,
+    Object? reliefEnhancement = _sentinel,
+    Object? reliefStrength = _sentinel,
+    Object? strokeRepair = _sentinel,
+    Object? strokeRepairRadius = _sentinel,
   }) {
     return PreDetectionOptions(
       descreenStrength: descreenStrength == _sentinel ? this.descreenStrength : descreenStrength as double?,
       targetMaxSide: targetMaxSide == _sentinel ? this.targetMaxSide : targetMaxSide as int?,
       cropPaddingX: cropPaddingX == _sentinel ? this.cropPaddingX : cropPaddingX as double?,
       cropPaddingY: cropPaddingY == _sentinel ? this.cropPaddingY : cropPaddingY as double?,
+      reliefEnhancement: reliefEnhancement == _sentinel ? this.reliefEnhancement : reliefEnhancement as bool?,
+      reliefStrength: reliefStrength == _sentinel ? this.reliefStrength : reliefStrength as double?,
+      strokeRepair: strokeRepair == _sentinel ? this.strokeRepair : strokeRepair as bool?,
+      strokeRepairRadius: strokeRepairRadius == _sentinel ? this.strokeRepairRadius : strokeRepairRadius as int?,
     );
   }
 
   @override
   String toString() {
-    return 'PreDetectionOptions(descreenStrength: $descreenStrength, targetMaxSide: $targetMaxSide, cropPaddingX: $cropPaddingX, cropPaddingY: $cropPaddingY)';
+    return 'PreDetectionOptions(descreenStrength: $descreenStrength, targetMaxSide: $targetMaxSide, cropPaddingX: $cropPaddingX, cropPaddingY: $cropPaddingY, reliefEnhancement: $reliefEnhancement, reliefStrength: $reliefStrength, strokeRepair: $strokeRepair, strokeRepairRadius: $strokeRepairRadius)';
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is PreDetectionOptions && descreenStrength == other.descreenStrength && targetMaxSide == other.targetMaxSide && cropPaddingX == other.cropPaddingX && cropPaddingY == other.cropPaddingY;
+      other is PreDetectionOptions && descreenStrength == other.descreenStrength && targetMaxSide == other.targetMaxSide && cropPaddingX == other.cropPaddingX && cropPaddingY == other.cropPaddingY && reliefEnhancement == other.reliefEnhancement && reliefStrength == other.reliefStrength && strokeRepair == other.strokeRepair && strokeRepairRadius == other.strokeRepairRadius;
 
   @override
-  int get hashCode => Object.hash(descreenStrength, targetMaxSide, cropPaddingX, cropPaddingY);
+  int get hashCode => Object.hash(descreenStrength, targetMaxSide, cropPaddingX, cropPaddingY, reliefEnhancement, reliefStrength, strokeRepair, strokeRepairRadius);
 }
 
 /// Pre-recognition text line/word clustering tolerances.
@@ -2277,6 +2325,12 @@ void _uniffiWriteDetectionRunOptions(DetectionRunOptions value, _UniFfiBinaryWri
       writer.writeF32(item);
     }
   }
+  if (value.adaptiveResolution == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeBool(value.adaptiveResolution!);
+  }
 }
 
 Uint8List _uniffiEncodeDetectionRunOptions(DetectionRunOptions value) {
@@ -2291,6 +2345,7 @@ DetectionRunOptions _uniffiReadDetectionRunOptions(_UniFfiBinaryReader reader) {
     limitType: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
     mean: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return (() { final int __len = reader.readI32(); final out = <double>[]; for (var i = 0; i < __len; i++) { out.add(reader.readF32()); } return out; })(); })(),
     std: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return (() { final int __len = reader.readI32(); final out = <double>[]; for (var i = 0; i < __len; i++) { out.add(reader.readF32()); } return out; })(); })(),
+    adaptiveResolution: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
   );
 }
 
@@ -2545,6 +2600,12 @@ void _uniffiWriteOcrRunOptions(OcrRunOptions value, _UniFfiBinaryWriter writer) 
     writer.writeI8(1);
     writer.writeBool(value.lineClassification!);
   }
+  if (value.autoConfig == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeBool(value.autoConfig!);
+  }
   if (value.preDetection == null) {
     writer.writeI8(0);
   } else {
@@ -2597,6 +2658,7 @@ OcrRunOptions _uniffiReadOcrRunOptions(_UniFfiBinaryReader reader) {
     layoutModel: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readString(); })(),
     orientationDetection: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
     lineClassification: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    autoConfig: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
     preDetection: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadPreDetectionOptions(reader); })(),
     detection: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadDetectionRunOptions(reader); })(),
     postDetection: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return _uniffiReadPostDetectionOptions(reader); })(),
@@ -2834,6 +2896,30 @@ void _uniffiWritePreDetectionOptions(PreDetectionOptions value, _UniFfiBinaryWri
     writer.writeI8(1);
     writer.writeF32(value.cropPaddingY!);
   }
+  if (value.reliefEnhancement == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeBool(value.reliefEnhancement!);
+  }
+  if (value.reliefStrength == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeF32(value.reliefStrength!);
+  }
+  if (value.strokeRepair == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeBool(value.strokeRepair!);
+  }
+  if (value.strokeRepairRadius == null) {
+    writer.writeI8(0);
+  } else {
+    writer.writeI8(1);
+    writer.writeU32(value.strokeRepairRadius!);
+  }
 }
 
 Uint8List _uniffiEncodePreDetectionOptions(PreDetectionOptions value) {
@@ -2848,6 +2934,10 @@ PreDetectionOptions _uniffiReadPreDetectionOptions(_UniFfiBinaryReader reader) {
     targetMaxSide: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readU32(); })(),
     cropPaddingX: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
     cropPaddingY: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    reliefEnhancement: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    reliefStrength: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readF32(); })(),
+    strokeRepair: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readBool(); })(),
+    strokeRepairRadius: (() { final int __tag = reader.readI8(); if (__tag == 0) return null; if (__tag != 1) throw StateError('invalid optional tag: $__tag'); return reader.readU32(); })(),
   );
 }
 

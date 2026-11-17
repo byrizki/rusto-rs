@@ -1747,6 +1747,11 @@ data class DetectionRunOptions (
      * Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
      */
     var `std`: List<kotlin.Float>?
+    , 
+    /**
+     * Enable universal adaptive resolution detection.
+     */
+    var `adaptiveResolution`: kotlin.Boolean?
     
 ){
     
@@ -1767,6 +1772,7 @@ public object FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer<Detect
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalSequenceFloat.read(buf),
             FfiConverterOptionalSequenceFloat.read(buf),
+            FfiConverterOptionalBoolean.read(buf),
         )
     }
 
@@ -1774,7 +1780,8 @@ public object FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer<Detect
             FfiConverterOptionalInt.allocationSize(value.`limitSideLen`) +
             FfiConverterOptionalString.allocationSize(value.`limitType`) +
             FfiConverterOptionalSequenceFloat.allocationSize(value.`mean`) +
-            FfiConverterOptionalSequenceFloat.allocationSize(value.`std`)
+            FfiConverterOptionalSequenceFloat.allocationSize(value.`std`) +
+            FfiConverterOptionalBoolean.allocationSize(value.`adaptiveResolution`)
     )
 
     override fun write(value: DetectionRunOptions, buf: ByteBuffer) {
@@ -1782,6 +1789,7 @@ public object FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer<Detect
             FfiConverterOptionalString.write(value.`limitType`, buf)
             FfiConverterOptionalSequenceFloat.write(value.`mean`, buf)
             FfiConverterOptionalSequenceFloat.write(value.`std`, buf)
+            FfiConverterOptionalBoolean.write(value.`adaptiveResolution`, buf)
     }
 }
 
@@ -2099,6 +2107,11 @@ data class OcrRunOptions (
     var `lineClassification`: kotlin.Boolean?
     , 
     /**
+     * Enable automatic image-aware profiling and configuration. Default: false (opt-in).
+     */
+    var `autoConfig`: kotlin.Boolean?
+    , 
+    /**
      * Pre-detection calibration & optimization options.
      */
     var `preDetection`: PreDetectionOptions?
@@ -2149,6 +2162,7 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterOptionalString.read(buf),
             FfiConverterOptionalBoolean.read(buf),
             FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalBoolean.read(buf),
             FfiConverterOptionalTypePreDetectionOptions.read(buf),
             FfiConverterOptionalTypeDetectionRunOptions.read(buf),
             FfiConverterOptionalTypePostDetectionOptions.read(buf),
@@ -2165,6 +2179,7 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterOptionalString.allocationSize(value.`layoutModel`) +
             FfiConverterOptionalBoolean.allocationSize(value.`orientationDetection`) +
             FfiConverterOptionalBoolean.allocationSize(value.`lineClassification`) +
+            FfiConverterOptionalBoolean.allocationSize(value.`autoConfig`) +
             FfiConverterOptionalTypePreDetectionOptions.allocationSize(value.`preDetection`) +
             FfiConverterOptionalTypeDetectionRunOptions.allocationSize(value.`detection`) +
             FfiConverterOptionalTypePostDetectionOptions.allocationSize(value.`postDetection`) +
@@ -2180,6 +2195,7 @@ public object FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer<OcrRunOption
             FfiConverterOptionalString.write(value.`layoutModel`, buf)
             FfiConverterOptionalBoolean.write(value.`orientationDetection`, buf)
             FfiConverterOptionalBoolean.write(value.`lineClassification`, buf)
+            FfiConverterOptionalBoolean.write(value.`autoConfig`, buf)
             FfiConverterOptionalTypePreDetectionOptions.write(value.`preDetection`, buf)
             FfiConverterOptionalTypeDetectionRunOptions.write(value.`detection`, buf)
             FfiConverterOptionalTypePostDetectionOptions.write(value.`postDetection`, buf)
@@ -2466,6 +2482,26 @@ data class PreDetectionOptions (
      * Vertical padding around bounding box crops in pixels.
      */
     var `cropPaddingY`: kotlin.Float?
+    , 
+    /**
+     * Enable morphological Black-Hat relief enhancement for carved/embossed text (e.g. gravestones).
+     */
+    var `reliefEnhancement`: kotlin.Boolean?
+    , 
+    /**
+     * Groove contrast amplification strength for relief enhancement (0.5 - 2.5).
+     */
+    var `reliefStrength`: kotlin.Float?
+    , 
+    /**
+     * Enable morphological stroke repair for broken/eroded characters.
+     */
+    var `strokeRepair`: kotlin.Boolean?
+    , 
+    /**
+     * Kernel radius for morphological stroke repair in pixels (1 - 3).
+     */
+    var `strokeRepairRadius`: kotlin.UInt?
     
 ){
     
@@ -2486,6 +2522,10 @@ public object FfiConverterTypePreDetectionOptions: FfiConverterRustBuffer<PreDet
             FfiConverterOptionalUInt.read(buf),
             FfiConverterOptionalFloat.read(buf),
             FfiConverterOptionalFloat.read(buf),
+            FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalFloat.read(buf),
+            FfiConverterOptionalBoolean.read(buf),
+            FfiConverterOptionalUInt.read(buf),
         )
     }
 
@@ -2493,7 +2533,11 @@ public object FfiConverterTypePreDetectionOptions: FfiConverterRustBuffer<PreDet
             FfiConverterOptionalFloat.allocationSize(value.`descreenStrength`) +
             FfiConverterOptionalUInt.allocationSize(value.`targetMaxSide`) +
             FfiConverterOptionalFloat.allocationSize(value.`cropPaddingX`) +
-            FfiConverterOptionalFloat.allocationSize(value.`cropPaddingY`)
+            FfiConverterOptionalFloat.allocationSize(value.`cropPaddingY`) +
+            FfiConverterOptionalBoolean.allocationSize(value.`reliefEnhancement`) +
+            FfiConverterOptionalFloat.allocationSize(value.`reliefStrength`) +
+            FfiConverterOptionalBoolean.allocationSize(value.`strokeRepair`) +
+            FfiConverterOptionalUInt.allocationSize(value.`strokeRepairRadius`)
     )
 
     override fun write(value: PreDetectionOptions, buf: ByteBuffer) {
@@ -2501,6 +2545,10 @@ public object FfiConverterTypePreDetectionOptions: FfiConverterRustBuffer<PreDet
             FfiConverterOptionalUInt.write(value.`targetMaxSide`, buf)
             FfiConverterOptionalFloat.write(value.`cropPaddingX`, buf)
             FfiConverterOptionalFloat.write(value.`cropPaddingY`, buf)
+            FfiConverterOptionalBoolean.write(value.`reliefEnhancement`, buf)
+            FfiConverterOptionalFloat.write(value.`reliefStrength`, buf)
+            FfiConverterOptionalBoolean.write(value.`strokeRepair`, buf)
+            FfiConverterOptionalUInt.write(value.`strokeRepairRadius`, buf)
     }
 }
 

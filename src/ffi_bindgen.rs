@@ -116,6 +116,14 @@ pub struct PreDetectionOptions {
     pub crop_padding_x: Option<f32>,
     /// Vertical padding around bounding box crops in pixels.
     pub crop_padding_y: Option<f32>,
+    /// Enable morphological Black-Hat relief enhancement for carved/embossed text (e.g. gravestones).
+    pub relief_enhancement: Option<bool>,
+    /// Groove contrast amplification strength for relief enhancement (0.5 - 2.5).
+    pub relief_strength: Option<f32>,
+    /// Enable morphological stroke repair for broken/eroded characters.
+    pub stroke_repair: Option<bool>,
+    /// Kernel radius for morphological stroke repair in pixels (1 - 3).
+    pub stroke_repair_radius: Option<u32>,
 }
 
 /// Image detection stage options.
@@ -129,6 +137,8 @@ pub struct DetectionRunOptions {
     pub mean: Option<Vec<f32>>,
     /// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
     pub std: Option<Vec<f32>>,
+    /// Enable universal adaptive resolution detection.
+    pub adaptive_resolution: Option<bool>,
 }
 
 /// Post-detection polygon extraction, thresholding, and box filtering options.
@@ -198,6 +208,8 @@ pub struct OcrRunOptions {
     pub orientation_detection: Option<bool>,
     /// Enable text line orientation classifier stage.
     pub line_classification: Option<bool>,
+    /// Enable automatic image-aware profiling and configuration. Default: false (opt-in).
+    pub auto_config: Option<bool>,
     /// Pre-detection calibration & optimization options.
     pub pre_detection: Option<PreDetectionOptions>,
     /// Detection stage options.
@@ -557,6 +569,10 @@ fn convert_options(opts: &OcrRunOptions) -> Result<rusto_core::types::OcrRunOpti
         target_max_side: p.target_max_side,
         crop_padding_x: p.crop_padding_x,
         crop_padding_y: p.crop_padding_y,
+        relief_enhancement: p.relief_enhancement,
+        relief_strength: p.relief_strength,
+        stroke_repair: p.stroke_repair,
+        stroke_repair_radius: p.stroke_repair_radius,
     });
     let detection = opts.detection.as_ref().map(|d| {
         let mean = d.mean.as_ref().and_then(|m| {
@@ -570,6 +586,7 @@ fn convert_options(opts: &OcrRunOptions) -> Result<rusto_core::types::OcrRunOpti
             limit_type: d.limit_type.clone(),
             mean,
             std,
+            adaptive_resolution: d.adaptive_resolution,
             postprocess: None,
         }
     });
@@ -605,6 +622,7 @@ fn convert_options(opts: &OcrRunOptions) -> Result<rusto_core::types::OcrRunOpti
         layout_model: opts.layout_model.clone(),
         orientation_detection: opts.orientation_detection,
         line_classification: opts.line_classification,
+        auto_config: opts.auto_config,
         pre_detection,
         detection,
         post_detection,
@@ -699,8 +717,14 @@ mod tests {
             target_max_side: Some(960),
             crop_padding_x: Some(0.05),
             crop_padding_y: Some(0.08),
+            relief_enhancement: Some(true),
+            relief_strength: Some(1.2),
+            stroke_repair: Some(true),
+            stroke_repair_radius: Some(2),
         });
+        options.auto_config = Some(true);
         let converted = convert_options(&options).expect("convert_options should succeed");
+        assert_eq!(converted.auto_config, Some(true));
         assert_eq!(converted.recognition.as_ref().unwrap().batch_size, Some(12));
         assert_eq!(converted.recognition.as_ref().unwrap().workers, Some(4));
         assert_eq!(converted.recognition.as_ref().unwrap().max_workers, Some(8));
@@ -708,6 +732,10 @@ mod tests {
         assert_eq!(opt.target_max_side, Some(960));
         assert_eq!(opt.crop_padding_x, Some(0.05));
         assert_eq!(opt.crop_padding_y, Some(0.08));
+        assert_eq!(opt.relief_enhancement, Some(true));
+        assert_eq!(opt.relief_strength, Some(1.2));
+        assert_eq!(opt.stroke_repair, Some(true));
+        assert_eq!(opt.stroke_repair_radius, Some(2));
 
         let config = create_initialize_config_ppv6(
             "models/det.rten".to_string(),

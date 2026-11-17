@@ -241,27 +241,51 @@ impl CtcDecoder {
                 }
             }
 
+            let space_idx = self.chars.iter().position(|s| s == " ");
             let est_size = selection.iter().filter(|&&s| s).count().max(1);
             let mut conf_list = Vec::with_capacity(est_size);
+            let mut chars = Vec::with_capacity(est_size);
+            let mut prev_selected_step: Option<usize> = None;
+            let mut prev_ch: &str = "";
+
             for (i, &sel) in selection.iter().enumerate() {
                 if sel {
-                    let mut v = token_probs[i];
-                    v = (v * 1e5).round() / 1e5;
-                    conf_list.push(v);
+                    if let Some(ch) = self.chars.get(token_indices[i]) {
+                        let ch_str = ch.as_str();
+                        if let (Some(prev_step), Some(s_idx)) = (prev_selected_step, space_idx) {
+                            let dt = i.saturating_sub(prev_step);
+                            if dt >= 2 && !prev_ch.trim().is_empty() && !ch_str.trim().is_empty() {
+                                let is_prev_lat = prev_ch.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == ',' || c == ':' || c == '-');
+                                let is_curr_lat = ch_str.chars().all(|c| c.is_ascii_alphanumeric());
+                                if is_prev_lat && is_curr_lat {
+                                    let mut max_sp = 0.0f32;
+                                    for s in (prev_step + 1)..i {
+                                        let sp = preds_slice[b_offset + s * c + s_idx];
+                                        if sp > max_sp {
+                                            max_sp = sp;
+                                        }
+                                    }
+                                    if max_sp >= 0.04 {
+                                        chars.push(" ");
+                                        let v = (max_sp * 1e5).round() / 1e5;
+                                        conf_list.push(v);
+                                    }
+                                }
+                            }
+                        }
+
+                        let mut v = token_probs[i];
+                        v = (v * 1e5).round() / 1e5;
+                        conf_list.push(v);
+                        chars.push(ch_str);
+                        prev_selected_step = Some(i);
+                        prev_ch = ch_str;
+                    }
                 }
             }
 
             if conf_list.is_empty() {
                 conf_list.push(0.0);
-            }
-
-            let mut chars = Vec::with_capacity(est_size);
-            for (i, &sel) in selection.iter().enumerate() {
-                if sel {
-                    if let Some(ch) = self.chars.get(token_indices[i]) {
-                        chars.push(ch.as_str());
-                    }
-                }
             }
 
             let text = chars.concat();
@@ -296,6 +320,9 @@ impl CtcDecoder {
         let mut text = String::new();
         let mut char_scores = Vec::new();
         let mut last_idx = 0usize;
+        let space_idx = self.chars.iter().position(|s| s == " ");
+        let mut prev_selected_step: Option<usize> = None;
+        let mut prev_ch = String::new();
 
         for step in 0..seq_len {
             let step_offset = step * num_classes;
@@ -306,8 +333,32 @@ impl CtcDecoder {
 
             if best_idx != 0 && (step == 0 || best_idx != last_idx) {
                 if let Some(ch) = self.chars.get(best_idx) {
+                    if let (Some(prev_step), Some(s_idx)) = (prev_selected_step, space_idx) {
+                        let dt = step.saturating_sub(prev_step);
+                        if dt >= 2 && !prev_ch.trim().is_empty() && !ch.trim().is_empty() {
+                            let is_prev_lat = prev_ch.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == ',' || c == ':' || c == '-');
+                            let is_curr_lat = ch.chars().all(|c| c.is_ascii_alphanumeric());
+                            if is_prev_lat && is_curr_lat {
+                                let mut max_sp = 0.0f32;
+                                for s in (prev_step + 1)..step {
+                                    let s_off = s * num_classes;
+                                    let sp = rec_data[s_off + s_idx];
+                                    if sp > max_sp {
+                                        max_sp = sp;
+                                    }
+                                }
+                                if max_sp >= 0.04 {
+                                    text.push(' ');
+                                    char_scores.push(max_sp);
+                                }
+                            }
+                        }
+                    }
+
                     text.push_str(ch);
                     char_scores.push(best_val);
+                    prev_selected_step = Some(step);
+                    prev_ch = ch.clone();
                 }
             }
             last_idx = best_idx;
@@ -487,5 +538,46 @@ mod linenet_tests {
             decoder().decode_linenet_tokens_with_positions(&ids, &confs, ids.len()).unwrap();
         assert_eq!(text, "\\in S\\in x");
         assert_eq!(positions.len(), text.chars().count());
+    }
+
+    #[test]
+    fn test_ctc_space_recovery_in_word_gap() {
+        let dec = CtcDecoder::new(
+            ["blank", "A", "B", " "]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        );
+
+        // 1 batch, 8 timesteps, 4 classes:
+        // step 1: 'A' (class 1)
+        // step 2..5: blank (class 0), with step 4 having space prob 0.06
+        // step 6: 'B' (class 2)
+        let mut preds = Array3::<f32>::zeros((1, 8, 4));
+        preds[[0, 1, 1]] = 0.95; // 'A'
+        preds[[0, 2, 0]] = 0.99; // blank
+        preds[[0, 3, 0]] = 0.98; // blank
+        preds[[0, 4, 0]] = 0.90; // blank
+        preds[[0, 4, 3]] = 0.06; // space prob
+        preds[[0, 5, 0]] = 0.99; // blank
+        preds[[0, 6, 2]] = 0.96; // 'B'
+
+        let (results, _) = dec.decode(preds, false, &[], 0.0);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "A B");
+
+        // Now test single crop decoder
+        let mut flat = vec![0.0f32; 8 * 4];
+        flat[1 * 4 + 1] = 0.95;
+        flat[2 * 4 + 0] = 0.99;
+        flat[3 * 4 + 0] = 0.98;
+        flat[4 * 4 + 0] = 0.90;
+        flat[4 * 4 + 3] = 0.06;
+        flat[5 * 4 + 0] = 0.99;
+        flat[6 * 4 + 2] = 0.96;
+
+        let single = dec.decode_single_crop(&flat, 8, 4);
+        assert!(single.is_some());
+        assert_eq!(single.unwrap().0, "A B");
     }
 }

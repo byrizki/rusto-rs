@@ -302,13 +302,14 @@ static NSError *makeValidationError(NSString *message) {
         return nil;
     }
     NSDictionary *pre = (NSDictionary *)raw;
-    NSSet *allowed = [NSSet setWithObjects:@"descreenStrength", @"targetMaxSide", @"cropPaddingX", @"cropPaddingY", nil];
+    NSSet *allowed = [NSSet setWithObjects:@"descreenStrength", @"targetMaxSide", @"cropPaddingX", @"cropPaddingY",
+                                          @"reliefEnhancement", @"reliefStrength", @"strokeRepair", @"strokeRepairRadius", nil];
     if (![[NSSet setWithArray:pre.allKeys] isSubsetOfSet:allowed]) {
         if (error) *error = makeValidationError(@"preDetection contains an unknown key");
         return nil;
     }
     NSMutableDictionary *result = [NSMutableDictionary dictionary];
-    for (NSString *key in @[@"descreenStrength", @"cropPaddingX", @"cropPaddingY"]) {
+    for (NSString *key in @[@"descreenStrength", @"cropPaddingX", @"cropPaddingY", @"reliefStrength"]) {
         if (pre[key] != nil) {
             id val = pre[key];
             if (!isJsonNumber(val) || !isfinite([val doubleValue]) || [val doubleValue] < 0.0) {
@@ -318,14 +319,25 @@ static NSError *makeValidationError(NSString *message) {
             result[key] = val;
         }
     }
-    if (pre[@"targetMaxSide"] != nil) {
-        id val = pre[@"targetMaxSide"];
-        double d = isJsonNumber(val) ? [val doubleValue] : -1.0;
-        if (!isfinite(d) || d < 1.0 || floor(d) != d) {
-            if (error) *error = makeValidationError(@"targetMaxSide is invalid");
-            return nil;
+    for (NSString *key in @[@"reliefEnhancement", @"strokeRepair"]) {
+        if (pre[key] != nil) {
+            if (!isJsonBoolean(pre[key])) {
+                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ must be a boolean", key]);
+                return nil;
+            }
+            result[key] = pre[key];
         }
-        result[@"targetMaxSide"] = val;
+    }
+    for (NSString *key in @[@"targetMaxSide", @"strokeRepairRadius"]) {
+        if (pre[key] != nil) {
+            id val = pre[key];
+            double d = isJsonNumber(val) ? [val doubleValue] : -1.0;
+            if (!isfinite(d) || d < 1.0 || floor(d) != d) {
+                if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ is invalid", key]);
+                return nil;
+            }
+            result[key] = val;
+        }
     }
     return result;
 }
@@ -336,12 +348,19 @@ static NSError *makeValidationError(NSString *message) {
         return nil;
     }
     NSDictionary *detection = (NSDictionary *)raw;
-    NSSet *allowed = [NSSet setWithObjects:@"limitSideLen", @"limitType", @"mean", @"std", nil];
+    NSSet *allowed = [NSSet setWithObjects:@"limitSideLen", @"limitType", @"mean", @"std", @"adaptiveResolution", nil];
     if (![[NSSet setWithArray:detection.allKeys] isSubsetOfSet:allowed]) {
         if (error) *error = makeValidationError(@"detection contains an unknown key");
         return nil;
     }
     NSMutableDictionary *result = [NSMutableDictionary dictionary];
+    if (detection[@"adaptiveResolution"] != nil) {
+        if (!isJsonBoolean(detection[@"adaptiveResolution"])) {
+            if (error) *error = makeValidationError(@"adaptiveResolution must be a boolean");
+            return nil;
+        }
+        result[@"adaptiveResolution"] = detection[@"adaptiveResolution"];
+    }
     if (detection[@"limitSideLen"] != nil) {
         id rawVal = detection[@"limitSideLen"];
         double val = isJsonNumber(rawVal) ? [rawVal doubleValue] : -1.0;
@@ -544,7 +563,7 @@ static NSError *makeValidationError(NSString *message) {
             return nil;
         }
     }
-    NSSet *allowed = [NSSet setWithObjects:@"output", @"autoUnwarp", @"layoutReading", @"layoutModel",
+    NSSet *allowed = [NSSet setWithObjects:@"output", @"autoConfig", @"autoUnwarp", @"layoutReading", @"layoutModel",
                                           @"orientationDetection", @"lineClassification",
                                           @"preDetection", @"detection", @"postDetection",
                                           @"preRecognition", @"recognition", @"postRecognition", nil];
@@ -564,7 +583,7 @@ static NSError *makeValidationError(NSString *message) {
         options[@"output"] = @"lines";
     }
 
-    for (NSString *key in @[@"autoUnwarp", @"layoutReading", @"orientationDetection", @"lineClassification"]) {
+    for (NSString *key in @[@"autoConfig", @"autoUnwarp", @"layoutReading", @"orientationDetection", @"lineClassification"]) {
         if (options[key] != nil && !isJsonBoolean(options[key])) {
             if (error) *error = makeValidationError([NSString stringWithFormat:@"%@ must be a boolean", key]);
             return nil;

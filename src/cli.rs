@@ -141,6 +141,10 @@ pub struct OcrArgs {
     /// Maximum image side length for preprocessing
     #[arg(long)]
     pub max_side_len: Option<f32>,
+
+    /// Enable automatic image profiling and adaptive calibration
+    #[arg(long)]
+    pub auto_config: bool,
 }
 
 #[derive(Subcommand)]
@@ -463,10 +467,16 @@ pub fn run_cli(engine: EngineKind) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(max_workers) = cli.max_rec_workers {
         config = config.with_max_rec_workers(max_workers);
     }
+    if cli.auto_config {
+        config = config.with_auto_config(true);
+    }
 
     let mut ocr = RustO::initialize(config)?;
 
     let mut options = OcrRunOptions::default();
+    if cli.auto_config {
+        options.auto_config = Some(true);
+    }
     if cli.format == OutputFormat::Spatial {
         options.output = OutputGranularity::Spatial;
     }

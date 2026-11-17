@@ -150,7 +150,8 @@ watch(
     class="lg:col-span-5 flex flex-col bg-white dark:bg-zinc-900 h-full min-h-[380px] lg:min-h-0 overflow-hidden"
   >
     <div
-      class="flex items-center border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/60 px-2 text-xs overflow-x-auto shrink-0"
+      class="flex items-center border-b border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/60 px-2 text-xs overflow-x-auto overflow-y-clip [scrollbar-width:none] [&::-webkit-scrollbar]:hidden shrink-0"
+      style="overflow-y: clip; scrollbar-width: none"
       role="tablist"
     >
       <button

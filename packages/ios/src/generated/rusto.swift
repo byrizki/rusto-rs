@@ -1012,6 +1012,10 @@ public struct DetectionRunOptions: Equatable, Hashable {
      * Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
      */
     public var std: [Float]?
+    /**
+     * Enable universal adaptive resolution detection.
+     */
+    public var adaptiveResolution: Bool?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1027,11 +1031,15 @@ public struct DetectionRunOptions: Equatable, Hashable {
          */mean: [Float]?, 
         /**
          * Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
-         */std: [Float]?) {
+         */std: [Float]?, 
+        /**
+         * Enable universal adaptive resolution detection.
+         */adaptiveResolution: Bool?) {
         self.limitSideLen = limitSideLen
         self.limitType = limitType
         self.mean = mean
         self.std = std
+        self.adaptiveResolution = adaptiveResolution
     }
 
     
@@ -1053,7 +1061,8 @@ public struct FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer {
                 limitSideLen: FfiConverterOptionInt32.read(from: &buf), 
                 limitType: FfiConverterOptionString.read(from: &buf), 
                 mean: FfiConverterOptionSequenceFloat.read(from: &buf), 
-                std: FfiConverterOptionSequenceFloat.read(from: &buf)
+                std: FfiConverterOptionSequenceFloat.read(from: &buf), 
+                adaptiveResolution: FfiConverterOptionBool.read(from: &buf)
         )
     }
 
@@ -1062,6 +1071,7 @@ public struct FfiConverterTypeDetectionRunOptions: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.limitType, into: &buf)
         FfiConverterOptionSequenceFloat.write(value.mean, into: &buf)
         FfiConverterOptionSequenceFloat.write(value.std, into: &buf)
+        FfiConverterOptionBool.write(value.adaptiveResolution, into: &buf)
     }
 }
 
@@ -1487,6 +1497,10 @@ public struct OcrRunOptions: Equatable, Hashable {
      */
     public var lineClassification: Bool?
     /**
+     * Enable automatic image-aware profiling and configuration. Default: false (opt-in).
+     */
+    public var autoConfig: Bool?
+    /**
      * Pre-detection calibration & optimization options.
      */
     public var preDetection: PreDetectionOptions?
@@ -1533,6 +1547,9 @@ public struct OcrRunOptions: Equatable, Hashable {
          * Enable text line orientation classifier stage.
          */lineClassification: Bool?, 
         /**
+         * Enable automatic image-aware profiling and configuration. Default: false (opt-in).
+         */autoConfig: Bool?, 
+        /**
          * Pre-detection calibration & optimization options.
          */preDetection: PreDetectionOptions?, 
         /**
@@ -1556,6 +1573,7 @@ public struct OcrRunOptions: Equatable, Hashable {
         self.layoutModel = layoutModel
         self.orientationDetection = orientationDetection
         self.lineClassification = lineClassification
+        self.autoConfig = autoConfig
         self.preDetection = preDetection
         self.detection = detection
         self.postDetection = postDetection
@@ -1586,6 +1604,7 @@ public struct FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer {
                 layoutModel: FfiConverterOptionString.read(from: &buf), 
                 orientationDetection: FfiConverterOptionBool.read(from: &buf), 
                 lineClassification: FfiConverterOptionBool.read(from: &buf), 
+                autoConfig: FfiConverterOptionBool.read(from: &buf), 
                 preDetection: FfiConverterOptionTypePreDetectionOptions.read(from: &buf), 
                 detection: FfiConverterOptionTypeDetectionRunOptions.read(from: &buf), 
                 postDetection: FfiConverterOptionTypePostDetectionOptions.read(from: &buf), 
@@ -1602,6 +1621,7 @@ public struct FfiConverterTypeOcrRunOptions: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.layoutModel, into: &buf)
         FfiConverterOptionBool.write(value.orientationDetection, into: &buf)
         FfiConverterOptionBool.write(value.lineClassification, into: &buf)
+        FfiConverterOptionBool.write(value.autoConfig, into: &buf)
         FfiConverterOptionTypePreDetectionOptions.write(value.preDetection, into: &buf)
         FfiConverterOptionTypeDetectionRunOptions.write(value.detection, into: &buf)
         FfiConverterOptionTypePostDetectionOptions.write(value.postDetection, into: &buf)
@@ -2003,6 +2023,22 @@ public struct PreDetectionOptions: Equatable, Hashable {
      * Vertical padding around bounding box crops in pixels.
      */
     public var cropPaddingY: Float?
+    /**
+     * Enable morphological Black-Hat relief enhancement for carved/embossed text (e.g. gravestones).
+     */
+    public var reliefEnhancement: Bool?
+    /**
+     * Groove contrast amplification strength for relief enhancement (0.5 - 2.5).
+     */
+    public var reliefStrength: Float?
+    /**
+     * Enable morphological stroke repair for broken/eroded characters.
+     */
+    public var strokeRepair: Bool?
+    /**
+     * Kernel radius for morphological stroke repair in pixels (1 - 3).
+     */
+    public var strokeRepairRadius: UInt32?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -2018,11 +2054,27 @@ public struct PreDetectionOptions: Equatable, Hashable {
          */cropPaddingX: Float?, 
         /**
          * Vertical padding around bounding box crops in pixels.
-         */cropPaddingY: Float?) {
+         */cropPaddingY: Float?, 
+        /**
+         * Enable morphological Black-Hat relief enhancement for carved/embossed text (e.g. gravestones).
+         */reliefEnhancement: Bool?, 
+        /**
+         * Groove contrast amplification strength for relief enhancement (0.5 - 2.5).
+         */reliefStrength: Float?, 
+        /**
+         * Enable morphological stroke repair for broken/eroded characters.
+         */strokeRepair: Bool?, 
+        /**
+         * Kernel radius for morphological stroke repair in pixels (1 - 3).
+         */strokeRepairRadius: UInt32?) {
         self.descreenStrength = descreenStrength
         self.targetMaxSide = targetMaxSide
         self.cropPaddingX = cropPaddingX
         self.cropPaddingY = cropPaddingY
+        self.reliefEnhancement = reliefEnhancement
+        self.reliefStrength = reliefStrength
+        self.strokeRepair = strokeRepair
+        self.strokeRepairRadius = strokeRepairRadius
     }
 
     
@@ -2044,7 +2096,11 @@ public struct FfiConverterTypePreDetectionOptions: FfiConverterRustBuffer {
                 descreenStrength: FfiConverterOptionFloat.read(from: &buf), 
                 targetMaxSide: FfiConverterOptionUInt32.read(from: &buf), 
                 cropPaddingX: FfiConverterOptionFloat.read(from: &buf), 
-                cropPaddingY: FfiConverterOptionFloat.read(from: &buf)
+                cropPaddingY: FfiConverterOptionFloat.read(from: &buf), 
+                reliefEnhancement: FfiConverterOptionBool.read(from: &buf), 
+                reliefStrength: FfiConverterOptionFloat.read(from: &buf), 
+                strokeRepair: FfiConverterOptionBool.read(from: &buf), 
+                strokeRepairRadius: FfiConverterOptionUInt32.read(from: &buf)
         )
     }
 
@@ -2053,6 +2109,10 @@ public struct FfiConverterTypePreDetectionOptions: FfiConverterRustBuffer {
         FfiConverterOptionUInt32.write(value.targetMaxSide, into: &buf)
         FfiConverterOptionFloat.write(value.cropPaddingX, into: &buf)
         FfiConverterOptionFloat.write(value.cropPaddingY, into: &buf)
+        FfiConverterOptionBool.write(value.reliefEnhancement, into: &buf)
+        FfiConverterOptionFloat.write(value.reliefStrength, into: &buf)
+        FfiConverterOptionBool.write(value.strokeRepair, into: &buf)
+        FfiConverterOptionUInt32.write(value.strokeRepairRadius, into: &buf)
     }
 }
 

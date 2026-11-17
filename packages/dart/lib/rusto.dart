@@ -241,6 +241,7 @@ class DetectTextBuilder {
   int _rgbHeight = 0;
   int _rgbStride = 0;
   generated.OutputGranularity _output = generated.OutputGranularity.lines;
+  bool? _autoConfig;
   bool? _autoUnwarp;
   bool? _layoutReading;
   String? _layoutModel;
@@ -298,6 +299,11 @@ class DetectTextBuilder {
     return this;
   }
 
+  DetectTextBuilder withAutoConfig([bool enabled = true]) {
+    _autoConfig = enabled;
+    return this;
+  }
+
   DetectTextBuilder withAutoUnwarp([bool enabled = true]) {
     _autoUnwarp = enabled;
     return this;
@@ -328,6 +334,10 @@ class DetectTextBuilder {
     int? targetMaxSide,
     double? cropPaddingX,
     double? cropPaddingY,
+    bool? reliefEnhancement,
+    double? reliefStrength,
+    bool? strokeRepair,
+    int? strokeRepairRadius,
     generated.PreDetectionOptions? options,
   }) {
     _preDetection = options ??
@@ -336,6 +346,10 @@ class DetectTextBuilder {
           targetMaxSide: targetMaxSide,
           cropPaddingX: cropPaddingX,
           cropPaddingY: cropPaddingY,
+          reliefEnhancement: reliefEnhancement,
+          reliefStrength: reliefStrength,
+          strokeRepair: strokeRepair,
+          strokeRepairRadius: strokeRepairRadius,
         );
     return this;
   }
@@ -345,6 +359,7 @@ class DetectTextBuilder {
     String? limitType,
     Float32List? mean,
     Float32List? std,
+    bool? adaptiveResolution,
     generated.DetectionRunOptions? options,
   }) {
     _detection = options ??
@@ -353,6 +368,7 @@ class DetectTextBuilder {
           limitType: limitType,
           mean: mean,
           std: std,
+          adaptiveResolution: adaptiveResolution,
         );
     return this;
   }
@@ -439,6 +455,7 @@ class DetectTextBuilder {
   generated.OcrRunOptions buildOptions() {
     return generated.OcrRunOptions(
       output: _output,
+      autoConfig: _autoConfig,
       autoUnwarp: _autoUnwarp,
       layoutReading: _layoutReading,
       layoutModel: _layoutModel,

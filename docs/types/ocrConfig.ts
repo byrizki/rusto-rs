@@ -26,6 +26,15 @@ export const defaultProgressState: ProgressState = {
 export interface OcrConfig {
   // Phase 6: Post-recognition filtering
   textScore: number;
+  // Auto-Configuration & Optical Profiling
+  autoConfig: boolean;
+  // Stage manual override checklist when autoConfig is active
+  overridePreDetection: boolean;
+  overrideDetection: boolean;
+  overridePostDetection: boolean;
+  overridePreRecognition: boolean;
+  overrideRecognition: boolean;
+  overridePostRecognition: boolean;
   // Phase 4: Pre-recognition grouping
   lineYThreshold: number;
   wordXThreshold: number;
@@ -72,6 +81,13 @@ export interface OcrConfig {
 
 export const defaultOcrConfig: OcrConfig = {
   inferenceBackend: 'rusto-nn',
+  autoConfig: false,
+  overridePreDetection: false,
+  overrideDetection: false,
+  overridePostDetection: false,
+  overridePreRecognition: false,
+  overrideRecognition: false,
+  overridePostRecognition: false,
   textScore: 0.5,
   lineYThreshold: 0.5,
   wordXThreshold: 0.4,
@@ -161,38 +177,73 @@ export function isReadingOrderEnabled(config: OcrConfig): boolean {
   );
 }
 
+interface StageToggles {
+  isAuto: boolean;
+  preDet: boolean;
+  det: boolean;
+  postDet: boolean;
+  preRec: boolean;
+  rec: boolean;
+  postRec: boolean;
+}
+
+function resolveStageToggles(config: OcrConfig): StageToggles {
+  const isAuto = Boolean(config.autoConfig);
+  return {
+    isAuto,
+    preDet: !isAuto || Boolean(config.overridePreDetection),
+    det: !isAuto || Boolean(config.overrideDetection),
+    postDet: !isAuto || Boolean(config.overridePostDetection),
+    preRec: !isAuto || Boolean(config.overridePreRecognition),
+    rec: !isAuto || Boolean(config.overrideRecognition),
+    postRec: !isAuto || Boolean(config.overridePostRecognition),
+  };
+}
+
 export function buildDetectTextOptions(
   config: OcrConfig,
   outputMode: OutputGranularity
 ): DetectTextOptions {
   const isSpatial = outputMode === 'spatial';
   const isReadingOrderActive = isReadingOrderEnabled(config);
+  const inc = resolveStageToggles(config);
 
   return {
     output: (isSpatial ? 'lines' : outputMode) as OutputGranularity,
-    autoUnwarp: Boolean(config.autoUnwarp),
-    layoutReading: isReadingOrderActive,
-    layoutModel: config.layoutModel,
-    orientationDetection: Boolean(config.orientationDetection ?? config.orientation),
-    lineClassification: Boolean(config.lineClassification ?? config.classification),
-    preDetection: buildPreDetectionConfig(config),
-    detection: {
-      limitSideLen: config.detectionLimitSideLen,
-      limitType: config.detectionLimitType,
-    },
-    postDetection: buildPostDetectionConfig(config),
+    autoConfig: inc.isAuto,
+    autoUnwarp: inc.preDet ? Boolean(config.autoUnwarp) : undefined,
+    layoutReading: inc.preRec ? isReadingOrderActive : undefined,
+    layoutModel: inc.preRec ? config.layoutModel : undefined,
+    orientationDetection: inc.preDet
+      ? Boolean(config.orientationDetection ?? config.orientation)
+      : undefined,
+    lineClassification: inc.preRec
+      ? Boolean(config.lineClassification ?? config.classification)
+      : undefined,
+    preDetection: inc.preDet ? buildPreDetectionConfig(config) : undefined,
+    detection: inc.det
+      ? {
+          limitSideLen: config.detectionLimitSideLen,
+          limitType: config.detectionLimitType,
+        }
+      : undefined,
+    postDetection: inc.postDet ? buildPostDetectionConfig(config) : undefined,
     preRecognition:
-      config.layoutModel === 'heuristic'
+      inc.preRec && config.layoutModel === 'heuristic'
         ? {
             lineYThreshold: config.lineYThreshold,
             wordXThreshold: config.wordXThreshold,
           }
         : undefined,
-    recognition: {
-      batchSize: config.recBatchNum,
-    },
-    postRecognition: {
-      scoreThreshold: config.textScore,
-    },
+    recognition: inc.rec
+      ? {
+          batchSize: config.recBatchNum,
+        }
+      : undefined,
+    postRecognition: inc.postRec
+      ? {
+          scoreThreshold: config.textScore,
+        }
+      : undefined,
   };
 }

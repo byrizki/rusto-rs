@@ -83,6 +83,14 @@ export interface PreDetectionOptions {
   cropPaddingX?: number;
   /** Vertical crop padding expansion ratio applied to bounding boxes (e.g. 0.05 = 5%). */
   cropPaddingY?: number;
+  /** Enhance engraved, embossed, or low-contrast relief text features. */
+  reliefEnhancement?: boolean;
+  /** Strength multiplier for relief enhancement filtering (0.0 - 1.0). Default: 0.5. */
+  reliefStrength?: number;
+  /** Connect and heal eroded, cracked, or broken character strokes via morphological closing. */
+  strokeRepair?: boolean;
+  /** Radius in pixels for morphological stroke repair kernel (1 - 5). Default: 1. */
+  strokeRepairRadius?: number;
 }
 
 /**
@@ -97,6 +105,8 @@ export interface DetectionRunOptions {
   mean?: [number, number, number];
   /** Standard deviation RGB normalization values. */
   std?: [number, number, number];
+  /** Dynamically upscale detection resolution for small text or high-resolution images. */
+  adaptiveResolution?: boolean;
 }
 
 export type DetectionOptions = DetectionRunOptions;
@@ -165,6 +175,8 @@ export interface PostRecognitionOptions {
 export interface OcrRunOptions {
   /** Output formatting: 'lines' (default), 'words', or 'spatial' 2D layout. */
   output?: OutputGranularity;
+  /** Automatically configure optical preprocessing, filters, and resolution limits based on image characteristics. */
+  autoConfig?: boolean;
   /** Enable document unwarping stage before detection. */
   autoUnwarp?: boolean;
   /** Enable document layout reading order analysis. */
@@ -197,6 +209,8 @@ export class DetectTextBuilder<TResult = TextResult[]> {
   image(source: ImageSource): this;
   /** Specify a raw interleaved 24-bit RGB pixel buffer. */
   rgb(pixels: Buffer | Uint8Array, width: number, height: number, stride?: number): this;
+  /** Automatically configure optical preprocessing, filters, and resolution limits based on image characteristics. */
+  withAutoConfig(enabled?: boolean): this;
   /** Enable or disable document unwarping. */
   withAutoUnwarp(enabled?: boolean): this;
   /** Enable or disable document layout reading order analysis. */

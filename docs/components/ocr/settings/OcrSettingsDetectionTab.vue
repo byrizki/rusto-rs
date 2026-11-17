@@ -18,7 +18,7 @@ const emit = defineEmits<{
 
 const sidePresets = [640, 736, 960, 1536, 1920] as const;
 
-const activeSection = ref<DetectionSection>(props.subTab ?? 'core');
+const activeSection = ref<DetectionSection>(props.subTab ?? 'pre');
 
 watch(
   () => props.subTab,
@@ -31,8 +31,22 @@ watch(activeSection, (val) => {
   emit('update:subTab', val);
 });
 
+const isPreDisabled = computed<boolean>(
+  () => props.config.autoConfig && !props.config.overridePreDetection
+);
+const isDetectionDisabled = computed<boolean>(
+  () => props.config.autoConfig && !props.config.overrideDetection
+);
+const isPostDisabled = computed<boolean>(
+  () => props.config.autoConfig && !props.config.overridePostDetection
+);
+
+const autoConfigReason = 'Managed by Auto-Config (check override above to edit)';
+
 const preDetectionActiveCount = computed<number>(() => {
+  if (isPreDisabled.value) return 0;
   let count = 0;
+  if (props.config.overridePreDetection) count++;
   if (props.config.autoUnwarp) count++;
   if (props.config.orientationDetection) count++;
   if (props.config.calibrationEnabled) {
@@ -53,14 +67,18 @@ const preDetectionActiveCount = computed<number>(() => {
 });
 
 const detectionActiveCount = computed<number>(() => {
+  if (isDetectionDisabled.value) return 0;
   let count = 0;
+  if (props.config.overrideDetection) count++;
   if (props.config.detectionLimitSideLen !== defaultOcrConfig.detectionLimitSideLen) count++;
   if (props.config.detectionLimitType !== defaultOcrConfig.detectionLimitType) count++;
   return count;
 });
 
 const postDetectionActiveCount = computed<number>(() => {
+  if (isPostDisabled.value) return 0;
   let count = 0;
+  if (props.config.overridePostDetection) count++;
   if (props.config.enableResize) count++;
   if (props.config.postprocessUseDilation !== defaultOcrConfig.postprocessUseDilation) count++;
   if (props.config.postprocessThreshold !== defaultOcrConfig.postprocessThreshold) count++;
@@ -74,21 +92,27 @@ const subTabs = computed<SettingsSubTab[]>(() => [
   {
     id: 'pre',
     label: 'Pre-Detection',
-    badge: '.withPreDetection()',
+    badge:
+      props.config.autoConfig && !props.config.overridePreDetection
+        ? 'Auto'
+        : '.withPreDetection()',
     description: 'Document auto-unwarp, orientation, descreening & downscaling',
     activeCount: preDetectionActiveCount.value,
   },
   {
     id: 'core',
     label: 'Text Detection',
-    badge: '.withDetection()',
+    badge: props.config.autoConfig && !props.config.overrideDetection ? 'Auto' : '.withDetection()',
     description: 'Input resolution limit (limitSideLen) & detection constraints',
     activeCount: detectionActiveCount.value,
   },
   {
     id: 'post',
     label: 'Post-Detection',
-    badge: '.withPostDetection()',
+    badge:
+      props.config.autoConfig && !props.config.overridePostDetection
+        ? 'Auto'
+        : '.withPostDetection()',
     description: 'DBNet binarization, box confidence, unclip ratio & geometry filters',
     activeCount: postDetectionActiveCount.value,
   },
@@ -96,6 +120,7 @@ const subTabs = computed<SettingsSubTab[]>(() => [
 
 function resetGroup(group: 'pre' | 'core' | 'post') {
   if (group === 'pre') {
+    props.config.overridePreDetection = defaultOcrConfig.overridePreDetection;
     props.config.autoUnwarp = defaultOcrConfig.autoUnwarp;
     props.config.orientationDetection = defaultOcrConfig.orientationDetection;
     props.config.calibrationEnabled = defaultOcrConfig.calibrationEnabled;
@@ -106,9 +131,11 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
     props.config.cropPaddingX = defaultOcrConfig.cropPaddingX;
     props.config.cropPaddingY = defaultOcrConfig.cropPaddingY;
   } else if (group === 'core') {
+    props.config.overrideDetection = defaultOcrConfig.overrideDetection;
     props.config.detectionLimitSideLen = defaultOcrConfig.detectionLimitSideLen;
     props.config.detectionLimitType = defaultOcrConfig.detectionLimitType;
   } else {
+    props.config.overridePostDetection = defaultOcrConfig.overridePostDetection;
     props.config.postprocessThreshold = defaultOcrConfig.postprocessThreshold;
     props.config.postprocessBoxThreshold = defaultOcrConfig.postprocessBoxThreshold;
     props.config.postprocessUnclipRatio = defaultOcrConfig.postprocessUnclipRatio;
@@ -128,6 +155,47 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
     <!-- Phase 1: Pre-Detection -->
     <template v-if="activeSection === 'pre'">
       <div class="space-y-3">
+        <!-- Stage Override Banner when Auto-Config is Active -->
+        <div
+          v-if="config.autoConfig"
+          class="p-2.5 rounded-lg border text-xs transition-colors"
+          :class="[
+            config.overridePreDetection
+              ? 'border-primary/50 bg-primary/5 dark:bg-primary/10'
+              : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/40',
+          ]"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <label
+              class="flex items-center gap-2 cursor-pointer font-medium text-zinc-800 dark:text-zinc-200"
+            >
+              <input
+                v-model="config.overridePreDetection"
+                type="checkbox"
+                class="rounded accent-primary w-4 h-4 cursor-pointer"
+              />
+              <span>Override Pre-Detection</span>
+            </label>
+            <code
+              class="text-[10px] font-mono px-1.5 py-0.5 rounded"
+              :class="
+                config.overridePreDetection
+                  ? 'text-primary bg-primary/10 font-medium'
+                  : 'text-zinc-400 bg-zinc-100 dark:bg-zinc-800'
+              "
+            >
+              .withPreDetection()
+            </code>
+          </div>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+            {{
+              config.overridePreDetection
+                ? 'Manual pre-detection options are unlocked and will be passed to .withPreDetection().'
+                : 'Auto-Config currently manages unwarping, orientation, descreening, and downscaling automatically. Check to override manually.'
+            }}
+          </p>
+        </div>
+
         <!-- Document Transforms & Rectification -->
         <div>
           <div class="flex items-center justify-between mb-1">
@@ -152,13 +220,16 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
             tooltip="Runs UVDoc geometric unwarping prior to DBNet text detection. Enabling downloads an extra uvdoc.mnn neural model (+31 MB)."
             model-badge="+31 MB model"
             model-help="Adds ~31 MB UVDoc neural model (uvdoc.mnn) download when enabled."
+            :disabled="isPreDisabled"
+            :disabled-reason="isPreDisabled ? autoConfigReason : undefined"
             :is-modified="config.autoUnwarp !== defaultOcrConfig.autoUnwarp"
           >
             <input
               v-model="config.autoUnwarp"
               type="checkbox"
+              :disabled="isPreDisabled"
               aria-label="3D Document Auto-Unwarp"
-              class="rounded accent-primary w-4 h-4 cursor-pointer"
+              class="rounded accent-primary w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
             />
           </OcrSettingRow>
 
@@ -170,13 +241,16 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
             tooltip="Classifies full-page orientation before text detection. Enabling downloads an extra orient.mnn neural classifier (+6.5 MB)."
             model-badge="+6.5 MB model"
             model-help="Adds ~6.5 MB page orientation neural model (orient.mnn) download when enabled."
+            :disabled="isPreDisabled"
+            :disabled-reason="isPreDisabled ? autoConfigReason : undefined"
             :is-modified="config.orientationDetection !== defaultOcrConfig.orientationDetection"
           >
             <input
               v-model="config.orientationDetection"
               type="checkbox"
+              :disabled="isPreDisabled"
               aria-label="Page Orientation Correction"
-              class="rounded accent-primary w-4 h-4 cursor-pointer"
+              class="rounded accent-primary w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
             />
           </OcrSettingRow>
         </div>
@@ -193,13 +267,16 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
             identifier="calibrationEnabled"
             description="Normalizes uneven illumination, flash glare, and shadow gradients."
             tooltip="Enables pre-detection illumination normalization and optional descreening."
+            :disabled="isPreDisabled"
+            :disabled-reason="isPreDisabled ? autoConfigReason : undefined"
             :is-modified="config.calibrationEnabled !== defaultOcrConfig.calibrationEnabled"
           >
             <input
               v-model="config.calibrationEnabled"
               type="checkbox"
+              :disabled="isPreDisabled"
               aria-label="Adaptive Lighting Calibration"
-              class="rounded accent-primary w-4 h-4 cursor-pointer"
+              class="rounded accent-primary w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
             />
           </OcrSettingRow>
 
@@ -209,14 +286,16 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
             identifier="descreenBackground"
             description="Suppresses guilloche security patterns and halftone dots on IDs & passports."
             tooltip="Applies Gaussian & median descreening passes when calibration is active."
-            :disabled="!config.calibrationEnabled"
-            disabled-reason="Requires Adaptive Lighting Calibration"
+            :disabled="isPreDisabled || !config.calibrationEnabled"
+            :disabled-reason="
+              isPreDisabled ? autoConfigReason : 'Requires Adaptive Lighting Calibration'
+            "
             :is-modified="config.descreenBackground !== defaultOcrConfig.descreenBackground"
           >
             <input
               v-model="config.descreenBackground"
               type="checkbox"
-              :disabled="!config.calibrationEnabled"
+              :disabled="isPreDisabled || !config.calibrationEnabled"
               aria-label="Descreen Patterned Backgrounds"
               class="rounded accent-primary w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
             />
@@ -233,8 +312,10 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
             :step="0.05"
             :decimals="2"
             :default-value="defaultOcrConfig.descreenStrength"
-            :disabled="!config.calibrationEnabled || !config.descreenBackground"
-            disabled-reason="Requires Calibration and Descreen enabled"
+            :disabled="isPreDisabled || !config.calibrationEnabled || !config.descreenBackground"
+            :disabled-reason="
+              isPreDisabled ? autoConfigReason : 'Requires Calibration and Descreen enabled'
+            "
           />
         </div>
 
@@ -250,19 +331,24 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
             identifier="optimizationEnabled"
             description="Pre-scales high-resolution camera photos to reduce memory and latency."
             tooltip="Downscales input images whose longest side exceeds targetMaxSide before detection."
+            :disabled="isPreDisabled"
+            :disabled-reason="isPreDisabled ? autoConfigReason : undefined"
             :is-modified="config.optimizationEnabled !== defaultOcrConfig.optimizationEnabled"
           >
             <input
               v-model="config.optimizationEnabled"
               type="checkbox"
+              :disabled="isPreDisabled"
               aria-label="SIMD Fast Downscale & Crop"
-              class="rounded accent-primary w-4 h-4 cursor-pointer"
+              class="rounded accent-primary w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
             />
           </OcrSettingRow>
 
           <div
             class="grid grid-cols-3 gap-2 pt-2 transition-opacity"
-            :class="{ 'opacity-45 pointer-events-none': !config.optimizationEnabled }"
+            :class="{
+              'opacity-45 pointer-events-none': isPreDisabled || !config.optimizationEnabled,
+            }"
           >
             <div data-setting-id="optimizationTargetMaxSide" class="space-y-1">
               <label class="block text-[11px] text-zinc-600 dark:text-zinc-400">
@@ -274,8 +360,8 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
                 min="640"
                 max="2560"
                 step="128"
-                :disabled="!config.optimizationEnabled"
-                class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary"
+                :disabled="isPreDisabled || !config.optimizationEnabled"
+                class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <div data-setting-id="cropPadding" class="col-span-2 grid grid-cols-2 gap-2">
@@ -289,8 +375,8 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
                   min="0"
                   max="50"
                   step="2"
-                  :disabled="!config.optimizationEnabled"
-                  class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary"
+                  :disabled="isPreDisabled || !config.optimizationEnabled"
+                  class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
               <div class="space-y-1">
@@ -303,13 +389,16 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
                   min="0"
                   max="0.2"
                   step="0.01"
-                  :disabled="!config.optimizationEnabled"
-                  class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary"
+                  :disabled="isPreDisabled || !config.optimizationEnabled"
+                  class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
           </div>
-          <p v-if="!config.optimizationEnabled" class="mt-1 text-[10px] font-mono text-zinc-400">
+          <p
+            v-if="!config.optimizationEnabled && !isPreDisabled"
+            class="mt-1 text-[10px] font-mono text-zinc-400"
+          >
             Enable SIMD Fast Downscale &amp; Crop above to send targetMaxSide and crop padding.
           </p>
         </div>
@@ -319,6 +408,47 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
     <!-- Phase 2: Core Text Detection -->
     <template v-else-if="activeSection === 'core'">
       <div class="space-y-3">
+        <!-- Stage Override Banner when Auto-Config is Active -->
+        <div
+          v-if="config.autoConfig"
+          class="p-2.5 rounded-lg border text-xs transition-colors"
+          :class="[
+            config.overrideDetection
+              ? 'border-primary/50 bg-primary/5 dark:bg-primary/10'
+              : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/40',
+          ]"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <label
+              class="flex items-center gap-2 cursor-pointer font-medium text-zinc-800 dark:text-zinc-200"
+            >
+              <input
+                v-model="config.overrideDetection"
+                type="checkbox"
+                class="rounded accent-primary w-4 h-4 cursor-pointer"
+              />
+              <span>Override Text Detection</span>
+            </label>
+            <code
+              class="text-[10px] font-mono px-1.5 py-0.5 rounded"
+              :class="
+                config.overrideDetection
+                  ? 'text-primary bg-primary/10 font-medium'
+                  : 'text-zinc-400 bg-zinc-100 dark:bg-zinc-800'
+              "
+            >
+              .withDetection()
+            </code>
+          </div>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+            {{
+              config.overrideDetection
+                ? 'Manual detection limits are unlocked and will be passed to .withDetection().'
+                : 'Auto-Config dynamically calculates optimal limitSideLen based on image resolution. Check to override manually.'
+            }}
+          </p>
+        </div>
+
         <div class="flex items-center justify-between">
           <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
             DBNet Input Resolution
@@ -339,23 +469,30 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
           identifier="limitSideLen / limitType"
           description="Constrains input dimensions fed into DBNet detection model."
           tooltip="Higher values detect smaller text at higher memory and inference cost. 'min' scales the shorter side up; 'max' caps the longer side."
+          :disabled="isDetectionDisabled"
+          :disabled-reason="isDetectionDisabled ? autoConfigReason : undefined"
           :is-modified="detectionActiveCount > 0"
         >
-          <div class="flex items-center gap-1.5">
+          <div
+            class="flex items-center gap-1.5"
+            :class="{ 'opacity-50 pointer-events-none': isDetectionDisabled }"
+          >
             <input
               v-model.number="config.detectionLimitSideLen"
               type="number"
               min="320"
               max="3840"
               step="160"
+              :disabled="isDetectionDisabled"
               aria-label="Detector Input Limit Side Length"
-              class="w-20 px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-right tabular-nums focus:outline-none focus:border-primary"
+              class="w-20 px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-right tabular-nums focus:outline-none focus:border-primary disabled:cursor-not-allowed"
             />
             <span class="text-[10px] font-mono text-zinc-400">px</span>
             <select
               v-model="config.detectionLimitType"
+              :disabled="isDetectionDisabled"
               aria-label="Detector Limit Type"
-              class="px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 cursor-pointer focus:outline-none focus:border-primary"
+              class="px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 cursor-pointer focus:outline-none focus:border-primary disabled:cursor-not-allowed"
             >
               <option value="max">max</option>
               <option value="min">min</option>
@@ -363,15 +500,19 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
           </div>
         </OcrSettingRow>
 
-        <div class="flex items-center justify-between gap-2 pt-1">
+        <div
+          class="flex items-center justify-between gap-2 pt-1 transition-opacity"
+          :class="{ 'opacity-50 pointer-events-none': isDetectionDisabled }"
+        >
           <span class="text-[11px] text-zinc-500 dark:text-zinc-400">Quick Presets:</span>
           <div class="flex items-center gap-1.5 flex-wrap">
             <button
               v-for="side in sidePresets"
               :key="side"
               type="button"
+              :disabled="isDetectionDisabled"
               @click="config.detectionLimitSideLen = side"
-              class="px-2 py-0.5 text-[11px] font-mono rounded border transition-colors cursor-pointer tabular-nums"
+              class="px-2 py-0.5 text-[11px] font-mono rounded border transition-colors cursor-pointer tabular-nums disabled:cursor-not-allowed"
               :class="
                 config.detectionLimitSideLen === side
                   ? 'bg-primary text-white border-primary font-semibold'
@@ -388,6 +529,47 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
     <!-- Phase 3: Post-Detection Filtering -->
     <template v-else>
       <div class="space-y-3">
+        <!-- Stage Override Banner when Auto-Config is Active -->
+        <div
+          v-if="config.autoConfig"
+          class="p-2.5 rounded-lg border text-xs transition-colors"
+          :class="[
+            config.overridePostDetection
+              ? 'border-primary/50 bg-primary/5 dark:bg-primary/10'
+              : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/40',
+          ]"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <label
+              class="flex items-center gap-2 cursor-pointer font-medium text-zinc-800 dark:text-zinc-200"
+            >
+              <input
+                v-model="config.overridePostDetection"
+                type="checkbox"
+                class="rounded accent-primary w-4 h-4 cursor-pointer"
+              />
+              <span>Override Post-Detection</span>
+            </label>
+            <code
+              class="text-[10px] font-mono px-1.5 py-0.5 rounded"
+              :class="
+                config.overridePostDetection
+                  ? 'text-primary bg-primary/10 font-medium'
+                  : 'text-zinc-400 bg-zinc-100 dark:bg-zinc-800'
+              "
+            >
+              .withPostDetection()
+            </code>
+          </div>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+            {{
+              config.overridePostDetection
+                ? 'Manual post-detection parameters are unlocked and will be passed to .withPostDetection().'
+                : 'Auto-Config tunes binarization and polygon extraction thresholds automatically. Check to override manually.'
+            }}
+          </p>
+        </div>
+
         <!-- DBNet Contours & Thresholding -->
         <div>
           <div class="flex items-center justify-between mb-1">
@@ -415,6 +597,8 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
             :step="0.05"
             :decimals="2"
             :default-value="defaultOcrConfig.postprocessThreshold"
+            :disabled="isPostDisabled"
+            :disabled-reason="isPostDisabled ? autoConfigReason : undefined"
           />
 
           <OcrRangeParam
@@ -428,6 +612,8 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
             :step="0.05"
             :decimals="2"
             :default-value="defaultOcrConfig.postprocessBoxThreshold"
+            :disabled="isPostDisabled"
+            :disabled-reason="isPostDisabled ? autoConfigReason : undefined"
           />
 
           <OcrRangeParam
@@ -441,6 +627,8 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
             :step="0.1"
             :decimals="1"
             :default-value="defaultOcrConfig.postprocessUnclipRatio"
+            :disabled="isPostDisabled"
+            :disabled-reason="isPostDisabled ? autoConfigReason : undefined"
           />
 
           <OcrSettingRow
@@ -448,6 +636,8 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
             label="Max Candidates"
             identifier="maxCandidates"
             description="Maximum number of candidate polygons evaluated per page."
+            :disabled="isPostDisabled"
+            :disabled-reason="isPostDisabled ? autoConfigReason : undefined"
             :is-modified="
               config.postprocessMaxCandidates !== defaultOcrConfig.postprocessMaxCandidates
             "
@@ -458,8 +648,9 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
               min="100"
               max="3000"
               step="100"
+              :disabled="isPostDisabled"
               aria-label="Max Candidates"
-              class="w-20 px-2 py-1 text-xs font-mono text-right rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary"
+              class="w-20 px-2 py-1 text-xs font-mono text-right rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </OcrSettingRow>
 
@@ -468,13 +659,16 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
             label="Morphological Dilation"
             identifier="useDilation"
             description="Applies 2x2 morphological dilation to connect broken character fragments."
+            :disabled="isPostDisabled"
+            :disabled-reason="isPostDisabled ? autoConfigReason : undefined"
             :is-modified="config.postprocessUseDilation !== defaultOcrConfig.postprocessUseDilation"
           >
             <input
               v-model="config.postprocessUseDilation"
               type="checkbox"
+              :disabled="isPostDisabled"
               aria-label="Morphological Dilation"
-              class="rounded accent-primary w-4 h-4 cursor-pointer"
+              class="rounded accent-primary w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
             />
           </OcrSettingRow>
         </div>
@@ -486,19 +680,22 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
             label="Custom Bounding Box Geometry Filters"
             identifier="enableResize"
             description="Filter out candidate boxes outside specific pixel dimensions or aspect ratios."
+            :disabled="isPostDisabled"
+            :disabled-reason="isPostDisabled ? autoConfigReason : undefined"
             :is-modified="config.enableResize !== defaultOcrConfig.enableResize"
           >
             <input
               v-model="config.enableResize"
               type="checkbox"
+              :disabled="isPostDisabled"
               aria-label="Custom Bounding Box Geometry Filters"
-              class="rounded accent-primary w-4 h-4 cursor-pointer"
+              class="rounded accent-primary w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
             />
           </OcrSettingRow>
 
           <div
             class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 transition-opacity"
-            :class="{ 'opacity-45 pointer-events-none': !config.enableResize }"
+            :class="{ 'opacity-45 pointer-events-none': isPostDisabled || !config.enableResize }"
           >
             <div class="space-y-1">
               <label class="block text-[10px] text-zinc-500">Max Side (px)</label>
@@ -508,8 +705,8 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
                 min="320"
                 max="4096"
                 step="128"
-                :disabled="!config.enableResize"
-                class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary"
+                :disabled="isPostDisabled || !config.enableResize"
+                class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <div class="space-y-1">
@@ -520,8 +717,8 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
                 min="100"
                 max="2048"
                 step="64"
-                :disabled="!config.enableResize"
-                class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary"
+                :disabled="isPostDisabled || !config.enableResize"
+                class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <div class="space-y-1">
@@ -532,8 +729,8 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
                 min="16"
                 max="512"
                 step="16"
-                :disabled="!config.enableResize"
-                class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary"
+                :disabled="isPostDisabled || !config.enableResize"
+                class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <div class="space-y-1">
@@ -544,12 +741,15 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
                 min="-1"
                 max="10"
                 step="0.1"
-                :disabled="!config.enableResize"
-                class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary"
+                :disabled="isPostDisabled || !config.enableResize"
+                class="w-full px-2 py-1 text-xs font-mono rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 tabular-nums focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           </div>
-          <p v-if="!config.enableResize" class="mt-1 text-[10px] font-mono text-zinc-400">
+          <p
+            v-if="!config.enableResize && !isPostDisabled"
+            class="mt-1 text-[10px] font-mono text-zinc-400"
+          >
             Enable Custom Bounding Box Geometry Filters above to override default box bounds.
           </p>
         </div>

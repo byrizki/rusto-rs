@@ -1074,6 +1074,8 @@ type DetectionRunOptions struct {
 	Mean *[]float32
 	// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
 	Std *[]float32
+	// Enable universal adaptive resolution detection.
+	AdaptiveResolution *bool
 }
 
 func (r *DetectionRunOptions) Destroy() {
@@ -1081,6 +1083,7 @@ func (r *DetectionRunOptions) Destroy() {
 	FfiDestroyerOptionalString{}.Destroy(r.LimitType)
 	FfiDestroyerOptionalSequenceFloat32{}.Destroy(r.Mean)
 	FfiDestroyerOptionalSequenceFloat32{}.Destroy(r.Std)
+	FfiDestroyerOptionalBool{}.Destroy(r.AdaptiveResolution)
 }
 
 type FfiConverterDetectionRunOptions struct{}
@@ -1097,6 +1100,7 @@ func (c FfiConverterDetectionRunOptions) Read(reader io.Reader) DetectionRunOpti
 		FfiConverterOptionalStringINSTANCE.Read(reader),
 		FfiConverterOptionalSequenceFloat32INSTANCE.Read(reader),
 		FfiConverterOptionalSequenceFloat32INSTANCE.Read(reader),
+		FfiConverterOptionalBoolINSTANCE.Read(reader),
 	}
 }
 
@@ -1113,6 +1117,7 @@ func (c FfiConverterDetectionRunOptions) Write(writer io.Writer, value Detection
 	FfiConverterOptionalStringINSTANCE.Write(writer, value.LimitType)
 	FfiConverterOptionalSequenceFloat32INSTANCE.Write(writer, value.Mean)
 	FfiConverterOptionalSequenceFloat32INSTANCE.Write(writer, value.Std)
+	FfiConverterOptionalBoolINSTANCE.Write(writer, value.AdaptiveResolution)
 }
 
 type FfiDestroyerDetectionRunOptions struct{}
@@ -1361,6 +1366,8 @@ type OcrRunOptions struct {
 	OrientationDetection *bool
 	// Enable text line orientation classifier stage.
 	LineClassification *bool
+	// Enable automatic image-aware profiling and configuration. Default: false (opt-in).
+	AutoConfig *bool
 	// Pre-detection calibration & optimization options.
 	PreDetection *PreDetectionOptions
 	// Detection stage options.
@@ -1382,6 +1389,7 @@ func (r *OcrRunOptions) Destroy() {
 	FfiDestroyerOptionalString{}.Destroy(r.LayoutModel)
 	FfiDestroyerOptionalBool{}.Destroy(r.OrientationDetection)
 	FfiDestroyerOptionalBool{}.Destroy(r.LineClassification)
+	FfiDestroyerOptionalBool{}.Destroy(r.AutoConfig)
 	FfiDestroyerOptionalPreDetectionOptions{}.Destroy(r.PreDetection)
 	FfiDestroyerOptionalDetectionRunOptions{}.Destroy(r.Detection)
 	FfiDestroyerOptionalPostDetectionOptions{}.Destroy(r.PostDetection)
@@ -1404,6 +1412,7 @@ func (c FfiConverterOcrRunOptions) Read(reader io.Reader) OcrRunOptions {
 		FfiConverterOptionalBoolINSTANCE.Read(reader),
 		FfiConverterOptionalBoolINSTANCE.Read(reader),
 		FfiConverterOptionalStringINSTANCE.Read(reader),
+		FfiConverterOptionalBoolINSTANCE.Read(reader),
 		FfiConverterOptionalBoolINSTANCE.Read(reader),
 		FfiConverterOptionalBoolINSTANCE.Read(reader),
 		FfiConverterOptionalPreDetectionOptionsINSTANCE.Read(reader),
@@ -1430,6 +1439,7 @@ func (c FfiConverterOcrRunOptions) Write(writer io.Writer, value OcrRunOptions) 
 	FfiConverterOptionalStringINSTANCE.Write(writer, value.LayoutModel)
 	FfiConverterOptionalBoolINSTANCE.Write(writer, value.OrientationDetection)
 	FfiConverterOptionalBoolINSTANCE.Write(writer, value.LineClassification)
+	FfiConverterOptionalBoolINSTANCE.Write(writer, value.AutoConfig)
 	FfiConverterOptionalPreDetectionOptionsINSTANCE.Write(writer, value.PreDetection)
 	FfiConverterOptionalDetectionRunOptionsINSTANCE.Write(writer, value.Detection)
 	FfiConverterOptionalPostDetectionOptionsINSTANCE.Write(writer, value.PostDetection)
@@ -1682,6 +1692,14 @@ type PreDetectionOptions struct {
 	CropPaddingX *float32
 	// Vertical padding around bounding box crops in pixels.
 	CropPaddingY *float32
+	// Enable morphological Black-Hat relief enhancement for carved/embossed text (e.g. gravestones).
+	ReliefEnhancement *bool
+	// Groove contrast amplification strength for relief enhancement (0.5 - 2.5).
+	ReliefStrength *float32
+	// Enable morphological stroke repair for broken/eroded characters.
+	StrokeRepair *bool
+	// Kernel radius for morphological stroke repair in pixels (1 - 3).
+	StrokeRepairRadius *uint32
 }
 
 func (r *PreDetectionOptions) Destroy() {
@@ -1689,6 +1707,10 @@ func (r *PreDetectionOptions) Destroy() {
 	FfiDestroyerOptionalUint32{}.Destroy(r.TargetMaxSide)
 	FfiDestroyerOptionalFloat32{}.Destroy(r.CropPaddingX)
 	FfiDestroyerOptionalFloat32{}.Destroy(r.CropPaddingY)
+	FfiDestroyerOptionalBool{}.Destroy(r.ReliefEnhancement)
+	FfiDestroyerOptionalFloat32{}.Destroy(r.ReliefStrength)
+	FfiDestroyerOptionalBool{}.Destroy(r.StrokeRepair)
+	FfiDestroyerOptionalUint32{}.Destroy(r.StrokeRepairRadius)
 }
 
 type FfiConverterPreDetectionOptions struct{}
@@ -1705,6 +1727,10 @@ func (c FfiConverterPreDetectionOptions) Read(reader io.Reader) PreDetectionOpti
 		FfiConverterOptionalUint32INSTANCE.Read(reader),
 		FfiConverterOptionalFloat32INSTANCE.Read(reader),
 		FfiConverterOptionalFloat32INSTANCE.Read(reader),
+		FfiConverterOptionalBoolINSTANCE.Read(reader),
+		FfiConverterOptionalFloat32INSTANCE.Read(reader),
+		FfiConverterOptionalBoolINSTANCE.Read(reader),
+		FfiConverterOptionalUint32INSTANCE.Read(reader),
 	}
 }
 
@@ -1721,6 +1747,10 @@ func (c FfiConverterPreDetectionOptions) Write(writer io.Writer, value PreDetect
 	FfiConverterOptionalUint32INSTANCE.Write(writer, value.TargetMaxSide)
 	FfiConverterOptionalFloat32INSTANCE.Write(writer, value.CropPaddingX)
 	FfiConverterOptionalFloat32INSTANCE.Write(writer, value.CropPaddingY)
+	FfiConverterOptionalBoolINSTANCE.Write(writer, value.ReliefEnhancement)
+	FfiConverterOptionalFloat32INSTANCE.Write(writer, value.ReliefStrength)
+	FfiConverterOptionalBoolINSTANCE.Write(writer, value.StrokeRepair)
+	FfiConverterOptionalUint32INSTANCE.Write(writer, value.StrokeRepairRadius)
 }
 
 type FfiDestroyerPreDetectionOptions struct{}

@@ -461,18 +461,23 @@ func (e *Engine) detectTextRGBTsv(pixels []byte, width, height uint32, stride ui
 
 // PreDetectionOptions contains conditioning and downscale parameters.
 type PreDetectionOptions struct {
-	DescreenStrength *float32 `json:"descreenStrength,omitempty"`
-	TargetMaxSide    *uint32  `json:"targetMaxSide,omitempty"`
-	CropPaddingX     *float32 `json:"cropPaddingX,omitempty"`
-	CropPaddingY     *float32 `json:"cropPaddingY,omitempty"`
+	DescreenStrength    *float32 `json:"descreenStrength,omitempty"`
+	TargetMaxSide       *uint32  `json:"targetMaxSide,omitempty"`
+	CropPaddingX        *float32 `json:"cropPaddingX,omitempty"`
+	CropPaddingY        *float32 `json:"cropPaddingY,omitempty"`
+	ReliefEnhancement   *bool    `json:"reliefEnhancement,omitempty"`
+	ReliefStrength      *float32 `json:"reliefStrength,omitempty"`
+	StrokeRepair        *bool    `json:"strokeRepair,omitempty"`
+	StrokeRepairRadius  *uint32  `json:"strokeRepairRadius,omitempty"`
 }
 
 // DetectionRunOptions contains DBNet detection parameters.
 type DetectionRunOptions struct {
-	LimitSideLen *int32      `json:"limitSideLen,omitempty"`
-	LimitType    *string     `json:"limitType,omitempty"`
-	Mean         *[3]float32 `json:"mean,omitempty"`
-	Std          *[3]float32 `json:"std,omitempty"`
+	LimitSideLen       *int32      `json:"limitSideLen,omitempty"`
+	LimitType          *string     `json:"limitType,omitempty"`
+	Mean               *[3]float32 `json:"mean,omitempty"`
+	Std                *[3]float32 `json:"std,omitempty"`
+	AdaptiveResolution *bool       `json:"adaptiveResolution,omitempty"`
 }
 
 // PostDetectionOptions contains polygon filtering parameters.
@@ -513,6 +518,7 @@ type PostRecognitionOptions struct {
 // OcrRunOptions encapsulates all detection and recognition options across 6 phases and 4 toggles.
 type OcrRunOptions struct {
 	Output               string                  `json:"output,omitempty"`
+	AutoConfig           *bool                   `json:"autoConfig,omitempty"`
 	AutoUnwarp           *bool                   `json:"autoUnwarp,omitempty"`
 	LayoutReading        *bool                   `json:"layoutReading,omitempty"`
 	LayoutModel          *string                 `json:"layoutModel,omitempty"`
@@ -584,6 +590,12 @@ func (b *DetectTextBuilder) RGB(pixels []byte, width, height uint32, stride uint
 	}
 	b.filePath = ""
 	b.hasData = false
+	return b
+}
+
+// WithAutoConfig enables or disables automatic parameter inference based on image characteristics.
+func (b *DetectTextBuilder) WithAutoConfig(enabled bool) *DetectTextBuilder {
+	b.options.AutoConfig = &enabled
 	return b
 }
 

@@ -23,7 +23,7 @@ const emit = defineEmits<{
   'update:subTab': [tab: RecognitionSection];
 }>();
 
-const activeSection = ref<RecognitionSection>(props.subTab ?? 'core');
+const activeSection = ref<RecognitionSection>(props.subTab ?? 'pre');
 
 watch(
   () => props.subTab,
@@ -56,8 +56,22 @@ const layoutModelHelp = computed<string>(() => {
   return `Downloads extra neural layout weights (+${selectedLayoutMeta.value.size}, ${selectedLayoutMeta.value.assetFile ?? 'neural model'}) on first run.`;
 });
 
+const isPreRecDisabled = computed<boolean>(
+  () => props.config.autoConfig && !props.config.overridePreRecognition
+);
+const isRecDisabled = computed<boolean>(
+  () => props.config.autoConfig && !props.config.overrideRecognition
+);
+const isPostRecDisabled = computed<boolean>(
+  () => props.config.autoConfig && !props.config.overridePostRecognition
+);
+
+const autoConfigReason = 'Managed by Auto-Config (check override above to edit)';
+
 const preRecognitionActiveCount = computed<number>(() => {
+  if (isPreRecDisabled.value) return 0;
   let count = 0;
+  if (props.config.overridePreRecognition) count++;
   if (props.config.layoutModel !== defaultOcrConfig.layoutModel) count++;
   if (props.config.lineClassification !== defaultOcrConfig.lineClassification) count++;
   if (props.config.layoutModel === 'heuristic') {
@@ -67,13 +81,21 @@ const preRecognitionActiveCount = computed<number>(() => {
   return count;
 });
 
-const recognitionActiveCount = computed<number>(() =>
-  props.config.recBatchNum === props.currentModel.recommendedBatchSize ? 0 : 1
-);
+const recognitionActiveCount = computed<number>(() => {
+  if (isRecDisabled.value) return 0;
+  let count = 0;
+  if (props.config.overrideRecognition) count++;
+  if (props.config.recBatchNum !== props.currentModel.recommendedBatchSize) count++;
+  return count;
+});
 
-const postRecognitionActiveCount = computed<number>(() =>
-  props.config.textScore === defaultOcrConfig.textScore ? 0 : 1
-);
+const postRecognitionActiveCount = computed<number>(() => {
+  if (isPostRecDisabled.value) return 0;
+  let count = 0;
+  if (props.config.overridePostRecognition) count++;
+  if (props.config.textScore !== defaultOcrConfig.textScore) count++;
+  return count;
+});
 
 function handleLayoutChange() {
   props.config.enableReadingOrder = props.config.layoutModel !== 'none';
@@ -82,6 +104,7 @@ function handleLayoutChange() {
 
 function resetGroup(group: 'pre' | 'core' | 'post') {
   if (group === 'pre') {
+    props.config.overridePreRecognition = defaultOcrConfig.overridePreRecognition;
     const prevLayout = props.config.layoutModel;
     props.config.layoutModel = defaultOcrConfig.layoutModel;
     props.config.enableReadingOrder = defaultOcrConfig.enableReadingOrder;
@@ -92,8 +115,10 @@ function resetGroup(group: 'pre' | 'core' | 'post') {
       emit('layoutModelChanged');
     }
   } else if (group === 'core') {
+    props.config.overrideRecognition = defaultOcrConfig.overrideRecognition;
     props.config.recBatchNum = props.currentModel.recommendedBatchSize;
   } else {
+    props.config.overridePostRecognition = defaultOcrConfig.overridePostRecognition;
     props.config.textScore = defaultOcrConfig.textScore;
   }
 }
@@ -102,21 +127,28 @@ const subTabs = computed<SettingsSubTab[]>(() => [
   {
     id: 'pre',
     label: 'Pre-Recognition',
-    badge: '.withPreRecognition()',
+    badge:
+      props.config.autoConfig && !props.config.overridePreRecognition
+        ? 'Auto'
+        : '.withPreRecognition()',
     description: 'Document layout, reading order, line grouping & 180° classifier',
     activeCount: preRecognitionActiveCount.value,
   },
   {
     id: 'core',
     label: 'Text Recognition',
-    badge: '.withRecognition()',
+    badge:
+      props.config.autoConfig && !props.config.overrideRecognition ? 'Auto' : '.withRecognition()',
     description: 'Character recognition batch size and execution tuning',
     activeCount: recognitionActiveCount.value,
   },
   {
     id: 'post',
     label: 'Post-Recognition',
-    badge: '.withPostRecognition()',
+    badge:
+      props.config.autoConfig && !props.config.overridePostRecognition
+        ? 'Auto'
+        : '.withPostRecognition()',
     description: 'Minimum confidence score cutoff filtering',
     activeCount: postRecognitionActiveCount.value,
   },
@@ -128,6 +160,47 @@ const subTabs = computed<SettingsSubTab[]>(() => [
     <!-- Phase 4: Pre-Recognition & Reading Order -->
     <template v-if="activeSection === 'pre'">
       <div class="space-y-3">
+        <!-- Stage Override Banner when Auto-Config is Active -->
+        <div
+          v-if="config.autoConfig"
+          class="p-2.5 rounded-lg border text-xs transition-colors"
+          :class="[
+            config.overridePreRecognition
+              ? 'border-primary/50 bg-primary/5 dark:bg-primary/10'
+              : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/40',
+          ]"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <label
+              class="flex items-center gap-2 cursor-pointer font-medium text-zinc-800 dark:text-zinc-200"
+            >
+              <input
+                v-model="config.overridePreRecognition"
+                type="checkbox"
+                class="rounded accent-primary w-4 h-4 cursor-pointer"
+              />
+              <span>Override Pre-Recognition</span>
+            </label>
+            <code
+              class="text-[10px] font-mono px-1.5 py-0.5 rounded"
+              :class="
+                config.overridePreRecognition
+                  ? 'text-primary bg-primary/10 font-medium'
+                  : 'text-zinc-400 bg-zinc-100 dark:bg-zinc-800'
+              "
+            >
+              .withPreRecognition()
+            </code>
+          </div>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+            {{
+              config.overridePreRecognition
+                ? 'Manual layout, line grouping, and line classifier options will be passed to .withPreRecognition().'
+                : 'Auto-Config automatically optimizes reading order and line grouping parameters. Check to override manually.'
+            }}
+          </p>
+        </div>
+
         <div class="flex items-center justify-between">
           <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
             Layout &amp; Reading Order
@@ -150,14 +223,17 @@ const subTabs = computed<SettingsSubTab[]>(() => [
             tooltip="Selects geometric heuristic column flow (0 KB), neural layout models (+2.9 MB Indra or +6.9 MB CDLA/PubLayNet), or linear raster scan."
             :model-badge="layoutModelBadge"
             :model-help="layoutModelHelp"
+            :disabled="isPreRecDisabled"
+            :disabled-reason="isPreRecDisabled ? autoConfigReason : undefined"
             :is-modified="config.layoutModel !== defaultOcrConfig.layoutModel"
           />
 
           <select
             v-model="config.layoutModel"
+            :disabled="isPreRecDisabled"
             @change="handleLayoutChange"
             aria-label="Document Layout and Reading Order"
-            class="w-full text-xs font-medium rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 py-1.5 px-2.5 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-primary cursor-pointer"
+            class="w-full text-xs font-medium rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 py-1.5 px-2.5 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:border-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <optgroup label="Built-in / Zero Download">
               <option value="heuristic">Geometric Column Flow (0 KB)</option>
@@ -185,6 +261,8 @@ const subTabs = computed<SettingsSubTab[]>(() => [
               :step="0.05"
               :decimals="2"
               :default-value="defaultOcrConfig.lineYThreshold"
+              :disabled="isPreRecDisabled"
+              :disabled-reason="isPreRecDisabled ? autoConfigReason : undefined"
             />
             <OcrRangeParam
               v-model="config.wordXThreshold"
@@ -196,6 +274,8 @@ const subTabs = computed<SettingsSubTab[]>(() => [
               :step="0.05"
               :decimals="2"
               :default-value="defaultOcrConfig.wordXThreshold"
+              :disabled="isPreRecDisabled"
+              :disabled-reason="isPreRecDisabled ? autoConfigReason : undefined"
             />
           </div>
 
@@ -225,13 +305,16 @@ const subTabs = computed<SettingsSubTab[]>(() => [
             tooltip="Runs PP-OCR line orientation classifier on each cropped text line. Enabling downloads an extra cls.mnn neural model (+0.5 MB / 519 KB)."
             model-badge="+0.5 MB model"
             model-help="Adds ~0.5 MB (519 KB) line orientation classifier (cls.mnn) download when enabled."
+            :disabled="isPreRecDisabled"
+            :disabled-reason="isPreRecDisabled ? autoConfigReason : undefined"
             :is-modified="config.lineClassification !== defaultOcrConfig.lineClassification"
           >
             <input
               v-model="config.lineClassification"
               type="checkbox"
+              :disabled="isPreRecDisabled"
               aria-label="Upside-Down Line Classifier"
-              class="rounded accent-primary w-4 h-4 cursor-pointer"
+              class="rounded accent-primary w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
             />
           </OcrSettingRow>
         </div>
@@ -240,7 +323,48 @@ const subTabs = computed<SettingsSubTab[]>(() => [
 
     <!-- Phase 5: Core Text Recognition -->
     <template v-else-if="activeSection === 'core'">
-      <div class="space-y-2">
+      <div class="space-y-3">
+        <!-- Stage Override Banner when Auto-Config is Active -->
+        <div
+          v-if="config.autoConfig"
+          class="p-2.5 rounded-lg border text-xs transition-colors"
+          :class="[
+            config.overrideRecognition
+              ? 'border-primary/50 bg-primary/5 dark:bg-primary/10'
+              : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/40',
+          ]"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <label
+              class="flex items-center gap-2 cursor-pointer font-medium text-zinc-800 dark:text-zinc-200"
+            >
+              <input
+                v-model="config.overrideRecognition"
+                type="checkbox"
+                class="rounded accent-primary w-4 h-4 cursor-pointer"
+              />
+              <span>Override Text Recognition</span>
+            </label>
+            <code
+              class="text-[10px] font-mono px-1.5 py-0.5 rounded"
+              :class="
+                config.overrideRecognition
+                  ? 'text-primary bg-primary/10 font-medium'
+                  : 'text-zinc-400 bg-zinc-100 dark:bg-zinc-800'
+              "
+            >
+              .withRecognition()
+            </code>
+          </div>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+            {{
+              config.overrideRecognition
+                ? 'Manual batch size and recognition tuning options will be passed to .withRecognition().'
+                : 'Auto-Config selects optimal batch size based on active engine backend. Check to override manually.'
+            }}
+          </p>
+        </div>
+
         <div class="flex items-center justify-between">
           <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
             Batched Sequence Decoding
@@ -265,13 +389,56 @@ const subTabs = computed<SettingsSubTab[]>(() => [
           :step="1"
           :decimals="0"
           :default-value="currentModel.recommendedBatchSize"
+          :disabled="isRecDisabled"
+          :disabled-reason="isRecDisabled ? autoConfigReason : undefined"
         />
       </div>
     </template>
 
     <!-- Phase 6: Post-Recognition Filtering -->
     <template v-else>
-      <div class="space-y-2">
+      <div class="space-y-3">
+        <!-- Stage Override Banner when Auto-Config is Active -->
+        <div
+          v-if="config.autoConfig"
+          class="p-2.5 rounded-lg border text-xs transition-colors"
+          :class="[
+            config.overridePostRecognition
+              ? 'border-primary/50 bg-primary/5 dark:bg-primary/10'
+              : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/40',
+          ]"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <label
+              class="flex items-center gap-2 cursor-pointer font-medium text-zinc-800 dark:text-zinc-200"
+            >
+              <input
+                v-model="config.overridePostRecognition"
+                type="checkbox"
+                class="rounded accent-primary w-4 h-4 cursor-pointer"
+              />
+              <span>Override Post-Recognition</span>
+            </label>
+            <code
+              class="text-[10px] font-mono px-1.5 py-0.5 rounded"
+              :class="
+                config.overridePostRecognition
+                  ? 'text-primary bg-primary/10 font-medium'
+                  : 'text-zinc-400 bg-zinc-100 dark:bg-zinc-800'
+              "
+            >
+              .withPostRecognition()
+            </code>
+          </div>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
+            {{
+              config.overridePostRecognition
+                ? 'Manual score threshold will be passed to .withPostRecognition().'
+                : 'Auto-Config automatically sets confidence threshold based on profile clarity. Check to override manually.'
+            }}
+          </p>
+        </div>
+
         <div class="flex items-center justify-between">
           <span class="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
             Confidence Filtering
@@ -297,6 +464,8 @@ const subTabs = computed<SettingsSubTab[]>(() => [
           :step="0.05"
           :decimals="2"
           :default-value="defaultOcrConfig.textScore"
+          :disabled="isPostRecDisabled"
+          :disabled-reason="isPostRecDisabled ? autoConfigReason : undefined"
         />
       </div>
     </template>

@@ -27,6 +27,7 @@ pub mod order_blocks;
 pub mod lines;
 pub mod resample;
 pub mod block;
+pub mod auto;
 pub use pipeline as pipelines;
 
 pub use error::CoreError;
@@ -34,6 +35,7 @@ pub use image::{Mat, Point2f, Rect, Size, sample_bilinear};
 pub use types::*;
 pub use config::*;
 pub use calibration::*;
+pub use auto::*;
 pub use contours::*;
 pub use geometry::*;
 pub use preprocess::*;

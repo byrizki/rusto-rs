@@ -294,6 +294,10 @@ data class PreDetectionOptions(
     val targetMaxSide: UInt? = null,
     val cropPaddingX: Float? = null,
     val cropPaddingY: Float? = null,
+    val reliefEnhancement: Boolean? = null,
+    val reliefStrength: Float? = null,
+    val strokeRepair: Boolean? = null,
+    val strokeRepairRadius: UInt? = null,
 )
 
 /**
@@ -304,6 +308,7 @@ data class DetectionRunOptions(
     val limitType: String? = null,
     val mean: FloatArray? = null,
     val std: FloatArray? = null,
+    val adaptiveResolution: Boolean? = null,
 )
 
 /**
@@ -355,6 +360,7 @@ data class PostRecognitionOptions(
  */
 data class OcrRunOptions(
     val output: OutputGranularity = OutputGranularity.LINES,
+    val autoConfig: Boolean? = null,
     val autoUnwarp: Boolean? = null,
     val layoutReading: Boolean? = null,
     val layoutModel: String? = null,
@@ -370,6 +376,7 @@ data class OcrRunOptions(
     internal fun toJson(): String {
         return JSONObject().apply {
             put("output", output.wireValue)
+            autoConfig?.let { put("autoConfig", it) }
             autoUnwarp?.let { put("autoUnwarp", it) }
             layoutReading?.let { put("layoutReading", it) }
             layoutModel?.let { put("layoutModel", it) }
@@ -381,6 +388,10 @@ data class OcrRunOptions(
                     p.targetMaxSide?.let { put("targetMaxSide", it.toLong()) }
                     p.cropPaddingX?.let { put("cropPaddingX", it.toDouble()) }
                     p.cropPaddingY?.let { put("cropPaddingY", it.toDouble()) }
+                    p.reliefEnhancement?.let { put("reliefEnhancement", it) }
+                    p.reliefStrength?.let { put("reliefStrength", it.toDouble()) }
+                    p.strokeRepair?.let { put("strokeRepair", it) }
+                    p.strokeRepairRadius?.let { put("strokeRepairRadius", it.toLong()) }
                 })
             }
             detection?.let { d ->
@@ -389,6 +400,7 @@ data class OcrRunOptions(
                     d.limitType?.let { put("limitType", it) }
                     d.mean?.let { put("mean", it.toList()) }
                     d.std?.let { put("std", it.toList()) }
+                    d.adaptiveResolution?.let { put("adaptiveResolution", it) }
                 })
             }
             postDetection?.let { pd ->
@@ -638,6 +650,7 @@ class RustO private constructor(
                 OutputGranularity.SPATIAL -> uniffi.rusto.OutputGranularity.SPATIAL
                 OutputGranularity.TSV -> uniffi.rusto.OutputGranularity.TSV
             },
+            autoConfig = options.autoConfig,
             autoUnwarp = options.autoUnwarp,
             layoutReading = options.layoutReading,
             layoutModel = options.layoutModel,
@@ -649,6 +662,10 @@ class RustO private constructor(
                     targetMaxSide = p.targetMaxSide,
                     cropPaddingX = p.cropPaddingX,
                     cropPaddingY = p.cropPaddingY,
+                    reliefEnhancement = p.reliefEnhancement,
+                    reliefStrength = p.reliefStrength,
+                    strokeRepair = p.strokeRepair,
+                    strokeRepairRadius = p.strokeRepairRadius,
                 )
             },
             detection = options.detection?.let { d ->
@@ -657,6 +674,7 @@ class RustO private constructor(
                     limitType = d.limitType,
                     mean = d.mean?.toList(),
                     std = d.std?.toList(),
+                    adaptiveResolution = d.adaptiveResolution,
                 )
             },
             postDetection = options.postDetection?.let { pd ->
@@ -788,6 +806,13 @@ class DetectTextBuilder(
      */
     fun withOptions(options: OcrRunOptions): DetectTextBuilder = apply {
         this.options = options
+    }
+
+    /**
+     * Enables or disables automatic configuration based on image characteristics.
+     */
+    fun withAutoConfig(enabled: Boolean = true): DetectTextBuilder = apply {
+        options = options.copy(autoConfig = enabled)
     }
 
     /**

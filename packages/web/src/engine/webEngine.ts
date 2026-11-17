@@ -61,6 +61,12 @@ export class DetectTextBuilder<TResult = TextResult[]> {
     return this;
   }
 
+  /** Automatically configure optical preprocessing, filters, and resolution limits based on image characteristics. */
+  withAutoConfig(enabled = true): this {
+    this._options.autoConfig = enabled;
+    return this;
+  }
+
   /** Enable or disable document unwarping. */
   withAutoUnwarp(enabled = true): this {
     this._options.autoUnwarp = enabled;

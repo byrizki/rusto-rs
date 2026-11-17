@@ -192,6 +192,12 @@ public final class DetectTextBuilder {
     }
 
     @discardableResult
+    public func withAutoConfig(_ enabled: Bool = true) -> DetectTextBuilder {
+        self.options.autoConfig = enabled
+        return self
+    }
+
+    @discardableResult
     public func withAutoUnwarp(_ enabled: Bool = true) -> DetectTextBuilder {
         self.options.autoUnwarp = enabled
         return self
@@ -510,7 +516,11 @@ extension PreDetectionOptions {
             descreenStrength: nil,
             targetMaxSide: nil,
             cropPaddingX: nil,
-            cropPaddingY: nil
+            cropPaddingY: nil,
+            reliefEnhancement: nil,
+            reliefStrength: nil,
+            strokeRepair: nil,
+            strokeRepairRadius: nil
         )
     }
 }
@@ -521,7 +531,8 @@ extension DetectionRunOptions {
             limitSideLen: nil,
             limitType: nil,
             mean: nil,
-            std: nil
+            std: nil,
+            adaptiveResolution: nil
         )
     }
 }
@@ -574,6 +585,7 @@ extension OcrRunOptions {
     public init() {
         self.init(
             output: .lines,
+            autoConfig: nil,
             autoUnwarp: nil,
             layoutReading: nil,
             layoutModel: nil,

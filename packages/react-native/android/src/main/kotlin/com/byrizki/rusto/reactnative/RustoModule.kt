@@ -212,6 +212,7 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
             options,
             setOf(
                 "output",
+                "autoConfig",
                 "autoUnwarp",
                 "layoutReading",
                 "layoutModel",
@@ -252,6 +253,7 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
 
         return OcrRunOptions(
             output = OutputGranularity.entries.first { it.wireValue == output },
+            autoConfig = boolean("autoConfig"),
             autoUnwarp = boolean("autoUnwarp"),
             layoutReading = boolean("layoutReading"),
             layoutModel = string("layoutModel"),
@@ -267,26 +269,52 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
     }
 
     private fun parsePreDetection(map: ReadableMap): PreDetectionOptions {
-        requireOnlyKeys(map, setOf("descreenStrength", "targetMaxSide", "cropPaddingX", "cropPaddingY"), "OcrRunOptions.preDetection contains an unknown key.")
+        requireOnlyKeys(
+            map,
+            setOf(
+                "descreenStrength",
+                "targetMaxSide",
+                "cropPaddingX",
+                "cropPaddingY",
+                "reliefEnhancement",
+                "reliefStrength",
+                "strokeRepair",
+                "strokeRepairRadius"
+            ),
+            "OcrRunOptions.preDetection contains an unknown key."
+        )
         fun nonNegFloat(key: String): Float? {
             if (!map.hasKey(key) || map.isNull(key)) return null
             require(map.getType(key) == ReadableType.Number) { "OcrRunOptions.preDetection.$key must be a number." }
             return map.getDouble(key).also { require(it.isFinite() && it >= 0.0) { "OcrRunOptions.preDetection.$key must be >= 0." } }.toFloat()
         }
+        fun optBool(key: String): Boolean? {
+            if (!map.hasKey(key) || map.isNull(key)) return null
+            require(map.getType(key) == ReadableType.Boolean) { "OcrRunOptions.preDetection.$key must be a boolean." }
+            return map.getBoolean(key)
+        }
         val targetMaxSide = if (!map.hasKey("targetMaxSide") || map.isNull("targetMaxSide")) null else {
             require(map.getType("targetMaxSide") == ReadableType.Number) { "OcrRunOptions.preDetection.targetMaxSide must be a number." }
             map.getDouble("targetMaxSide").also { require(it.isFinite() && it >= 1.0 && it % 1.0 == 0.0) { "OcrRunOptions.preDetection.targetMaxSide must be >= 1." } }.toLong().toUInt()
+        }
+        val strokeRepairRadius = if (!map.hasKey("strokeRepairRadius") || map.isNull("strokeRepairRadius")) null else {
+            require(map.getType("strokeRepairRadius") == ReadableType.Number) { "OcrRunOptions.preDetection.strokeRepairRadius must be a number." }
+            map.getDouble("strokeRepairRadius").also { require(it.isFinite() && it >= 1.0 && it % 1.0 == 0.0) { "OcrRunOptions.preDetection.strokeRepairRadius must be >= 1." } }.toLong().toUInt()
         }
         return PreDetectionOptions(
             descreenStrength = nonNegFloat("descreenStrength"),
             targetMaxSide = targetMaxSide,
             cropPaddingX = nonNegFloat("cropPaddingX"),
             cropPaddingY = nonNegFloat("cropPaddingY"),
+            reliefEnhancement = optBool("reliefEnhancement"),
+            reliefStrength = nonNegFloat("reliefStrength"),
+            strokeRepair = optBool("strokeRepair"),
+            strokeRepairRadius = strokeRepairRadius,
         )
     }
 
     private fun parseRuntimeDetection(map: ReadableMap): DetectionRunOptions {
-        requireOnlyKeys(map, setOf("limitSideLen", "limitType", "mean", "std"), "OcrRunOptions.detection contains an unknown key.")
+        requireOnlyKeys(map, setOf("limitSideLen", "limitType", "mean", "std", "adaptiveResolution"), "OcrRunOptions.detection contains an unknown key.")
         val side = if (!map.hasKey("limitSideLen") || map.isNull("limitSideLen")) null else {
             require(map.getType("limitSideLen") == ReadableType.Number) { "limitSideLen must be a number." }
             map.getDouble("limitSideLen").also { require(it.isFinite() && it in 1.0..32767.0 && it % 1.0 == 0.0) { "limitSideLen must be an integer between 1 and 32767." } }.toInt()
@@ -302,7 +330,11 @@ class RustoModule(private val reactContext: ReactApplicationContext) : ReactCont
                 a.getDouble(i).also { require(it.isFinite() && (!nonzero || it != 0.0)) { "$name contains invalid value." } }.toFloat()
             }
         }
-        return DetectionRunOptions(side, type, vector("mean", false), vector("std", true))
+        val adaptiveResolution = if (!map.hasKey("adaptiveResolution") || map.isNull("adaptiveResolution")) null else {
+            require(map.getType("adaptiveResolution") == ReadableType.Boolean) { "adaptiveResolution must be a boolean." }
+            map.getBoolean("adaptiveResolution")
+        }
+        return DetectionRunOptions(side, type, vector("mean", false), vector("std", true), adaptiveResolution)
     }
 
     private fun parsePostDetection(p: ReadableMap): PostDetectionOptions {

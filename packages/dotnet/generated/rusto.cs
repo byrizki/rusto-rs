@@ -2660,6 +2660,9 @@ class FfiConverterTypeDetectionConfig : FfiConverterRustBuffer<DetectionConfig>
 /// <param name="Std">
 /// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
 /// </param>
+/// <param name="AdaptiveResolution">
+/// Enable universal adaptive resolution detection.
+/// </param>
 public record DetectionRunOptions(
     /// <summary>
     /// Target side length constraint for image resizing. Default: 960.
@@ -2676,7 +2679,11 @@ public record DetectionRunOptions(
     /// <summary>
     /// Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225].
     /// </summary>
-    float[]? Std
+    float[]? Std,
+    /// <summary>
+    /// Enable universal adaptive resolution detection.
+    /// </summary>
+    bool? AdaptiveResolution
 ) { }
 
 class FfiConverterTypeDetectionRunOptions : FfiConverterRustBuffer<DetectionRunOptions>
@@ -2690,7 +2697,8 @@ class FfiConverterTypeDetectionRunOptions : FfiConverterRustBuffer<DetectionRunO
             LimitSideLen: FfiConverterOptionalInt32.INSTANCE.Read(stream),
             LimitType: FfiConverterOptionalString.INSTANCE.Read(stream),
             Mean: FfiConverterOptionalSequenceFloat.INSTANCE.Read(stream),
-            Std: FfiConverterOptionalSequenceFloat.INSTANCE.Read(stream)
+            Std: FfiConverterOptionalSequenceFloat.INSTANCE.Read(stream),
+            AdaptiveResolution: FfiConverterOptionalBoolean.INSTANCE.Read(stream)
         );
     }
 
@@ -2700,7 +2708,8 @@ class FfiConverterTypeDetectionRunOptions : FfiConverterRustBuffer<DetectionRunO
             + FfiConverterOptionalInt32.INSTANCE.AllocationSize(value.LimitSideLen)
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.LimitType)
             + FfiConverterOptionalSequenceFloat.INSTANCE.AllocationSize(value.Mean)
-            + FfiConverterOptionalSequenceFloat.INSTANCE.AllocationSize(value.Std);
+            + FfiConverterOptionalSequenceFloat.INSTANCE.AllocationSize(value.Std)
+            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.AdaptiveResolution);
     }
 
     public override void Write(DetectionRunOptions value, BigEndianStream stream)
@@ -2709,6 +2718,7 @@ class FfiConverterTypeDetectionRunOptions : FfiConverterRustBuffer<DetectionRunO
         FfiConverterOptionalString.INSTANCE.Write(value.LimitType, stream);
         FfiConverterOptionalSequenceFloat.INSTANCE.Write(value.Mean, stream);
         FfiConverterOptionalSequenceFloat.INSTANCE.Write(value.Std, stream);
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.AdaptiveResolution, stream);
     }
 }
 
@@ -3044,6 +3054,9 @@ class FfiConverterTypeLayoutConfig : FfiConverterRustBuffer<LayoutConfig>
 /// <param name="LineClassification">
 /// Enable text line orientation classifier stage.
 /// </param>
+/// <param name="AutoConfig">
+/// Enable automatic image-aware profiling and configuration. Default: false (opt-in).
+/// </param>
 /// <param name="PreDetection">
 /// Pre-detection calibration & optimization options.
 /// </param>
@@ -3088,6 +3101,10 @@ public record OcrRunOptions(
     /// </summary>
     bool? LineClassification,
     /// <summary>
+    /// Enable automatic image-aware profiling and configuration. Default: false (opt-in).
+    /// </summary>
+    bool? AutoConfig,
+    /// <summary>
     /// Pre-detection calibration & optimization options.
     /// </summary>
     PreDetectionOptions? PreDetection,
@@ -3126,6 +3143,7 @@ class FfiConverterTypeOcrRunOptions : FfiConverterRustBuffer<OcrRunOptions>
             LayoutModel: FfiConverterOptionalString.INSTANCE.Read(stream),
             OrientationDetection: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             LineClassification: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
+            AutoConfig: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
             PreDetection: FfiConverterOptionalTypePreDetectionOptions.INSTANCE.Read(stream),
             Detection: FfiConverterOptionalTypeDetectionRunOptions.INSTANCE.Read(stream),
             PostDetection: FfiConverterOptionalTypePostDetectionOptions.INSTANCE.Read(stream),
@@ -3144,6 +3162,7 @@ class FfiConverterTypeOcrRunOptions : FfiConverterRustBuffer<OcrRunOptions>
             + FfiConverterOptionalString.INSTANCE.AllocationSize(value.LayoutModel)
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.OrientationDetection)
             + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.LineClassification)
+            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.AutoConfig)
             + FfiConverterOptionalTypePreDetectionOptions.INSTANCE.AllocationSize(
                 value.PreDetection
             )
@@ -3170,6 +3189,7 @@ class FfiConverterTypeOcrRunOptions : FfiConverterRustBuffer<OcrRunOptions>
         FfiConverterOptionalString.INSTANCE.Write(value.LayoutModel, stream);
         FfiConverterOptionalBoolean.INSTANCE.Write(value.OrientationDetection, stream);
         FfiConverterOptionalBoolean.INSTANCE.Write(value.LineClassification, stream);
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.AutoConfig, stream);
         FfiConverterOptionalTypePreDetectionOptions.INSTANCE.Write(value.PreDetection, stream);
         FfiConverterOptionalTypeDetectionRunOptions.INSTANCE.Write(value.Detection, stream);
         FfiConverterOptionalTypePostDetectionOptions.INSTANCE.Write(value.PostDetection, stream);
@@ -3463,6 +3483,18 @@ class FfiConverterTypePostRecognitionOptions : FfiConverterRustBuffer<PostRecogn
 /// <param name="CropPaddingY">
 /// Vertical padding around bounding box crops in pixels.
 /// </param>
+/// <param name="ReliefEnhancement">
+/// Enable morphological Black-Hat relief enhancement for carved/embossed text (e.g. gravestones).
+/// </param>
+/// <param name="ReliefStrength">
+/// Groove contrast amplification strength for relief enhancement (0.5 - 2.5).
+/// </param>
+/// <param name="StrokeRepair">
+/// Enable morphological stroke repair for broken/eroded characters.
+/// </param>
+/// <param name="StrokeRepairRadius">
+/// Kernel radius for morphological stroke repair in pixels (1 - 3).
+/// </param>
 public record PreDetectionOptions(
     /// <summary>
     /// Descreen filtering strength (0.0 - 1.0).
@@ -3479,7 +3511,23 @@ public record PreDetectionOptions(
     /// <summary>
     /// Vertical padding around bounding box crops in pixels.
     /// </summary>
-    float? CropPaddingY
+    float? CropPaddingY,
+    /// <summary>
+    /// Enable morphological Black-Hat relief enhancement for carved/embossed text (e.g. gravestones).
+    /// </summary>
+    bool? ReliefEnhancement,
+    /// <summary>
+    /// Groove contrast amplification strength for relief enhancement (0.5 - 2.5).
+    /// </summary>
+    float? ReliefStrength,
+    /// <summary>
+    /// Enable morphological stroke repair for broken/eroded characters.
+    /// </summary>
+    bool? StrokeRepair,
+    /// <summary>
+    /// Kernel radius for morphological stroke repair in pixels (1 - 3).
+    /// </summary>
+    uint? StrokeRepairRadius
 ) { }
 
 class FfiConverterTypePreDetectionOptions : FfiConverterRustBuffer<PreDetectionOptions>
@@ -3493,7 +3541,11 @@ class FfiConverterTypePreDetectionOptions : FfiConverterRustBuffer<PreDetectionO
             DescreenStrength: FfiConverterOptionalFloat.INSTANCE.Read(stream),
             TargetMaxSide: FfiConverterOptionalUInt32.INSTANCE.Read(stream),
             CropPaddingX: FfiConverterOptionalFloat.INSTANCE.Read(stream),
-            CropPaddingY: FfiConverterOptionalFloat.INSTANCE.Read(stream)
+            CropPaddingY: FfiConverterOptionalFloat.INSTANCE.Read(stream),
+            ReliefEnhancement: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
+            ReliefStrength: FfiConverterOptionalFloat.INSTANCE.Read(stream),
+            StrokeRepair: FfiConverterOptionalBoolean.INSTANCE.Read(stream),
+            StrokeRepairRadius: FfiConverterOptionalUInt32.INSTANCE.Read(stream)
         );
     }
 
@@ -3503,7 +3555,11 @@ class FfiConverterTypePreDetectionOptions : FfiConverterRustBuffer<PreDetectionO
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.DescreenStrength)
             + FfiConverterOptionalUInt32.INSTANCE.AllocationSize(value.TargetMaxSide)
             + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.CropPaddingX)
-            + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.CropPaddingY);
+            + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.CropPaddingY)
+            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.ReliefEnhancement)
+            + FfiConverterOptionalFloat.INSTANCE.AllocationSize(value.ReliefStrength)
+            + FfiConverterOptionalBoolean.INSTANCE.AllocationSize(value.StrokeRepair)
+            + FfiConverterOptionalUInt32.INSTANCE.AllocationSize(value.StrokeRepairRadius);
     }
 
     public override void Write(PreDetectionOptions value, BigEndianStream stream)
@@ -3512,6 +3568,10 @@ class FfiConverterTypePreDetectionOptions : FfiConverterRustBuffer<PreDetectionO
         FfiConverterOptionalUInt32.INSTANCE.Write(value.TargetMaxSide, stream);
         FfiConverterOptionalFloat.INSTANCE.Write(value.CropPaddingX, stream);
         FfiConverterOptionalFloat.INSTANCE.Write(value.CropPaddingY, stream);
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.ReliefEnhancement, stream);
+        FfiConverterOptionalFloat.INSTANCE.Write(value.ReliefStrength, stream);
+        FfiConverterOptionalBoolean.INSTANCE.Write(value.StrokeRepair, stream);
+        FfiConverterOptionalUInt32.INSTANCE.Write(value.StrokeRepairRadius, stream);
     }
 }
 

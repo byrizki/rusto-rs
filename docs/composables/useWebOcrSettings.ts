@@ -28,6 +28,9 @@ export function useWebOcrSettings() {
   );
 
   function toggleConfigPopover() {
+    if (!isConfigOpen.value) {
+      configTab.value = 'runtime';
+    }
     isConfigOpen.value = !isConfigOpen.value;
   }
 

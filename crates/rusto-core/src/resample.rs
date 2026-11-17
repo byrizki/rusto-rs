@@ -55,9 +55,76 @@ pub fn area_resize_gray(src: &[f32], src_w: usize, src_h: usize, dst_w: usize, d
     out
 }
 
+/// Resizes a row-major 3-channel RGB byte buffer (interleaved RGB8) by area-averaging.
+pub fn area_resize_rgb8(src: &[u8], src_w: usize, src_h: usize, dst_w: usize, dst_h: usize) -> Vec<u8> {
+    if src_w == 0 || src_h == 0 || dst_w == 0 || dst_h == 0 || src.len() < src_w * src_h * 3 {
+        return vec![0u8; dst_w * dst_h * 3];
+    }
+    let x_taps = area_weights(src_w, dst_w);
+    let y_taps = area_weights(src_h, dst_h);
+
+    let mut horizontal = vec![0.0f32; src_h * dst_w * 3];
+    for y in 0..src_h {
+        let src_row = &src[y * src_w * 3..(y + 1) * src_w * 3];
+        let out_row = &mut horizontal[y * dst_w * 3..(y + 1) * dst_w * 3];
+        for (x, taps) in x_taps.iter().enumerate() {
+            let mut r = 0.0f32;
+            let mut g = 0.0f32;
+            let mut b = 0.0f32;
+            for &(s, w) in taps {
+                let px = s * 3;
+                r += src_row[px] as f32 * w;
+                g += src_row[px + 1] as f32 * w;
+                b += src_row[px + 2] as f32 * w;
+            }
+            let out_px = x * 3;
+            out_row[out_px] = r;
+            out_row[out_px + 1] = g;
+            out_row[out_px + 2] = b;
+        }
+    }
+
+    let mut out = vec![0u8; dst_h * dst_w * 3];
+    for (y, taps) in y_taps.iter().enumerate() {
+        let out_row = &mut out[y * dst_w * 3..(y + 1) * dst_w * 3];
+        for x in 0..dst_w {
+            let mut r = 0.0f32;
+            let mut g = 0.0f32;
+            let mut b = 0.0f32;
+            for &(s, w) in taps {
+                let in_px = (s * dst_w + x) * 3;
+                r += horizontal[in_px] * w;
+                g += horizontal[in_px + 1] * w;
+                b += horizontal[in_px + 2] * w;
+            }
+            let out_px = x * 3;
+            out_row[out_px] = (r.round() as u32).min(255) as u8;
+            out_row[out_px + 1] = (g.round() as u32).min(255) as u8;
+            out_row[out_px + 2] = (b.round() as u32).min(255) as u8;
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_area_resize_rgb8_averages_channels() {
+        let src = vec![
+            100, 150, 200, 50, 70, 90,
+            200, 100, 50,  30, 40, 50,
+        ];
+        let out = area_resize_rgb8(&src, 2, 2, 1, 1);
+        assert_eq!(out.len(), 3);
+        let expected_r = ((100 + 50 + 200 + 30) as f32 / 4.0).round() as u8;
+        let expected_g = ((150 + 70 + 100 + 40) as f32 / 4.0).round() as u8;
+        let expected_b = ((200 + 90 + 50 + 50) as f32 / 4.0).round() as u8;
+        assert_eq!(out[0], expected_r);
+        assert_eq!(out[1], expected_g);
+        assert_eq!(out[2], expected_b);
+    }
 
     #[test]
     fn test_area_resize_averages_blocks() {

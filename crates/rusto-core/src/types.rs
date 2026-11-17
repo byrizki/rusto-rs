@@ -120,6 +120,8 @@ pub struct DetectionRunOptions {
     pub limit_type: Option<String>,
     pub mean: Option<[f32; 3]>,
     pub std: Option<[f32; 3]>,
+    #[nserde(rename = "adaptiveResolution")]
+    pub adaptive_resolution: Option<bool>,
     pub postprocess: Option<PostprocessRunOptions>,
 }
 
@@ -462,6 +464,7 @@ pub struct GlobalConfig {
     pub x_threshold_multiplier: Option<f32>,
     pub calibration: Option<CalibrationOptions>,
     pub optimization: Option<OptimizationOptions>,
+    pub auto_config: bool,
 }
 
 impl GlobalConfig {
@@ -508,6 +511,7 @@ impl Default for GlobalConfig {
             x_threshold_multiplier: None,
             calibration: None,
             optimization: None,
+            auto_config: false,
         }
     }
 }
@@ -592,15 +596,37 @@ pub struct PreDetectionOptions {
     pub crop_padding_x: Option<f32>,
     #[nserde(rename = "cropPaddingY")]
     pub crop_padding_y: Option<f32>,
+    #[nserde(rename = "reliefEnhancement")]
+    pub relief_enhancement: Option<bool>,
+    #[nserde(rename = "reliefStrength")]
+    pub relief_strength: Option<f32>,
+    #[nserde(rename = "strokeRepair")]
+    pub stroke_repair: Option<bool>,
+    #[nserde(rename = "strokeRepairRadius")]
+    pub stroke_repair_radius: Option<u32>,
 }
 
 impl PreDetectionOptions {
     pub fn to_calibration_options(&self) -> Option<CalibrationOptions> {
-        self.descreen_strength.map(|strength| CalibrationOptions {
-            enabled: Some(true),
-            descreen_strength: Some(strength),
-            ..Default::default()
-        })
+        if self.descreen_strength.is_some()
+            || self.relief_enhancement.is_some()
+            || self.relief_strength.is_some()
+            || self.stroke_repair.is_some()
+            || self.stroke_repair_radius.is_some()
+        {
+            Some(CalibrationOptions {
+                enabled: Some(true),
+                descreen_background: self.descreen_strength.map(|s| s > 0.0),
+                descreen_strength: self.descreen_strength,
+                relief_enhancement: self.relief_enhancement,
+                relief_strength: self.relief_strength,
+                stroke_repair: self.stroke_repair,
+                stroke_repair_radius: self.stroke_repair_radius,
+                ..Default::default()
+            })
+        } else {
+            None
+        }
     }
 
     pub fn to_optimization_options(&self) -> Option<OptimizationOptions> {
@@ -698,6 +724,8 @@ pub struct OcrRunOptions {
     pub orientation_detection: Option<bool>,
     #[nserde(rename = "lineClassification")]
     pub line_classification: Option<bool>,
+    #[nserde(rename = "autoConfig")]
+    pub auto_config: Option<bool>,
     #[nserde(rename = "preDetection")]
     pub pre_detection: Option<PreDetectionOptions>,
     pub detection: Option<DetectionRunOptions>,
@@ -737,6 +765,11 @@ impl OcrRunOptions {
 
     pub fn with_line_classification(mut self, enabled: bool) -> Self {
         self.line_classification = Some(enabled);
+        self
+    }
+
+    pub fn with_auto_config(mut self, enabled: bool) -> Self {
+        self.auto_config = Some(enabled);
         self
     }
 

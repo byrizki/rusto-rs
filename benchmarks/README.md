@@ -11,6 +11,7 @@ This directory contains evaluation harnesses, ground-truth datasets, and reprodu
 | **OmniDocBench Comprehensive Evaluation** | [`omnidocbench/`](omnidocbench/) | Multi-page real-world document OCR, reading order, and layout analysis across 21 configurations | [OmniDocBench Report](omnidocbench/OMNIDOCBENCH_EVALUATION_REPORT.md) / [GitHub Issue #17](https://github.com/byrizki/rusto-rs/issues/17) |
 | **Inference Engine Comparison** | [`engine_comparison/`](engine_comparison/) | Low-level runtime execution (RTen vs ONNX Runtime vs MNN) | [`ORT_RTEN_MNN_COMPARISON.md`](ORT_RTEN_MNN_COMPARISON.md) |
 | **Concurrency & Throughput Suite** | [`concurrency/`](concurrency/) | End-to-end single-call latency, concurrent throughput (C=1 to C=8), and memory working set | [`concurrency/README.md`](concurrency/README.md) |
+| **Dimension-Adaptive & Auto-Config** | [`auto_config/`](auto_config/) | Dynamic image parameter calibration, optical degradation recovery, and latency impact | [`auto_config/README.md`](auto_config/README.md) |
 | **Base Pipeline Baseline** | [`BASE_PIPELINE_COMPARISON.md`](BASE_PIPELINE_COMPARISON.md) | Initial baseline benchmarks across model tiers | [`COMPARISON_RESULT.md`](COMPARISON_RESULT.md) |
 
 ---
@@ -62,6 +63,7 @@ Evaluating across 30 diverse multi-column documents (academic literature, textbo
 | **RustO RTen + Pure-Rust Heuristic Order** | Native Rust (`det` + `rec` + spatial heuristic order) | 1,529.5 ms | **266.8 MB** | **60.98%** |
 | **Tesseract OCR (v5 / PSM 3)** | C++ / Leptonica (`tesseract` full page) | 1,847.7 ms | **184.6 MB** | 60.29% |
 | **RustO NN Full + PP-OCRv6 Tiny (CDLA)** | Pure Rust (`det` + `rec` + `cls` + `orient` + `layout_cdla`) | 2,332.4 ms | 503.8 MB | **57.91%** |
+| **RustO NN Full + Auto-Config (CDLA)** | Pure Rust (`--auto-config` + `layout_cdla`) | 2,744.8 ms | 555.0 MB | **57.00%** |
 | **PaddleOCR + PP-Structure** | Python Paddle (`det` + `rec` + `layout` + `sorted_boxes`) | 20,676.5 ms | 929.6 MB | 57.18% |
 | **RustO RTen Full + PP-OCRv6 Tiny (CDLA)** | Native Rust (`det` + `rec` + `cls` + `orient` + `layout_cdla`) | 2,079.7 ms | 351.6 MB | 56.46% |
 | **RapidOCR + RapidLayout Tiny** | Python ONNX (`det` + `rec` + `layout` + `sorted_boxes`) | 1,561.7 ms | 453.5 MB | 53.85% |

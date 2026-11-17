@@ -55,6 +55,14 @@ export interface PreDetectionOptions {
   cropPaddingX?: number;
   /** Vertical crop padding expansion ratio applied to bounding boxes (e.g. 0.05 = 5%). */
   cropPaddingY?: number;
+  /** Enhance engraved, embossed, or low-contrast relief text features. */
+  reliefEnhancement?: boolean;
+  /** Strength multiplier for relief enhancement filtering (0.0 - 1.0). Default: 0.5. */
+  reliefStrength?: number;
+  /** Connect and heal eroded, cracked, or broken character strokes via morphological closing. */
+  strokeRepair?: boolean;
+  /** Radius in pixels for morphological stroke repair kernel (1 - 5). Default: 1. */
+  strokeRepairRadius?: number;
 }
 
 /**
@@ -69,6 +77,8 @@ export interface DetectionRunOptions {
   mean?: [number, number, number];
   /** Standard deviation RGB normalization values. Default: [0.229, 0.224, 0.225]. */
   std?: [number, number, number];
+  /** Dynamically upscale detection resolution for small text or high-resolution images. */
+  adaptiveResolution?: boolean;
 }
 
 export type DetectionOptions = DetectionRunOptions;
@@ -137,6 +147,8 @@ export interface PostRecognitionOptions {
 export interface OcrRunOptions {
   /** Output granularity: 'lines' (default), 'words', or 'spatial'. */
   output?: OutputGranularity;
+  /** Automatically configure optical preprocessing, filters, and resolution limits based on image characteristics. */
+  autoConfig?: boolean;
   /** Enable document unwarping stage before detection. */
   autoUnwarp?: boolean;
   /** Enable document layout reading order analysis. */
@@ -241,6 +253,7 @@ export interface InitializeConfig {
 const SOURCE_KEYS = ['uri', 'base64', 'bytes'] as const;
 const OPTION_KEYS = [
   'output',
+  'autoConfig',
   'autoUnwarp',
   'layoutReading',
   'layoutModel',
@@ -267,8 +280,12 @@ const PRE_DETECTION_KEYS = [
   'targetMaxSide',
   'cropPaddingX',
   'cropPaddingY',
+  'reliefEnhancement',
+  'reliefStrength',
+  'strokeRepair',
+  'strokeRepairRadius',
 ] as const;
-const DETECTION_KEYS = ['limitSideLen', 'limitType', 'mean', 'std'] as const;
+const DETECTION_KEYS = ['limitSideLen', 'limitType', 'mean', 'std', 'adaptiveResolution'] as const;
 const POST_DETECTION_KEYS = [
   'threshold',
   'boxThreshold',
@@ -354,6 +371,17 @@ function normalizePreDetectionOptions(preDetection: unknown): void {
     if (pad !== undefined && (typeof pad !== 'number' || !Number.isFinite(pad) || pad < 0))
       throw new TypeError(`OcrRunOptions.preDetection.${key} must be a non-negative number.`);
   }
+  for (const key of ['reliefEnhancement', 'strokeRepair'] as const) {
+    const flag = preDetection[key];
+    if (flag !== undefined && typeof flag !== 'boolean')
+      throw new TypeError(`OcrRunOptions.preDetection.${key} must be a boolean.`);
+  }
+  const reliefStrength = preDetection.reliefStrength;
+  if (reliefStrength !== undefined && (typeof reliefStrength !== 'number' || !Number.isFinite(reliefStrength) || reliefStrength < 0))
+    throw new TypeError('OcrRunOptions.preDetection.reliefStrength must be a non-negative number.');
+  const strokeRepairRadius = preDetection.strokeRepairRadius;
+  if (strokeRepairRadius !== undefined && (typeof strokeRepairRadius !== 'number' || !Number.isInteger(strokeRepairRadius) || strokeRepairRadius < 1))
+    throw new TypeError('OcrRunOptions.preDetection.strokeRepairRadius must be an integer >= 1.');
 }
 
 function normalizeDetectionOptions(detection: unknown): void {
@@ -364,6 +392,9 @@ function normalizeDetectionOptions(detection: unknown): void {
     DETECTION_KEYS,
     'OcrRunOptions.detection contains an unknown key.'
   );
+  if (detection.adaptiveResolution !== undefined && typeof detection.adaptiveResolution !== 'boolean') {
+    throw new TypeError('OcrRunOptions.detection.adaptiveResolution must be a boolean.');
+  }
   const limitSideLen = detection.limitSideLen;
   if (
     limitSideLen !== undefined &&
@@ -500,6 +531,7 @@ function normalizeOptions(options: OcrRunOptions | undefined): OcrRunOptions {
   if (output !== undefined && !['lines', 'words', 'spatial'].includes(output as string))
     throw new TypeError('OcrRunOptions.output is invalid.');
   for (const key of [
+    'autoConfig',
     'autoUnwarp',
     'layoutReading',
     'orientationDetection',
@@ -591,6 +623,12 @@ export class DetectTextBuilder<TResult = TextResult[]> {
   /** Specify the image source. */
   image(source: ImageSource): this {
     this._source = normalizeSource(source);
+    return this;
+  }
+
+  /** Automatically configure optical preprocessing, filters, and resolution limits based on image characteristics. */
+  withAutoConfig(enabled = true): this {
+    this._options.autoConfig = enabled;
     return this;
   }
 

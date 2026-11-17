@@ -21,6 +21,7 @@ const STAGES = {
   recCore: { tab: 'recognition', subTab: 'core', breadcrumb: 'Recognition › Text Recognition' },
   recPost: { tab: 'recognition', subTab: 'post', breadcrumb: 'Recognition › Post-Recognition' },
   rtEngines: { tab: 'runtime', subTab: 'engines', breadcrumb: 'Runtime › Engine Backend' },
+  rtAutoConfig: { tab: 'runtime', subTab: 'engines', breadcrumb: 'Runtime › Auto-Config' },
   rtModelSelect: { tab: 'runtime', subTab: 'engines', breadcrumb: 'Runtime › Model Selection' },
   rtModel: { tab: 'runtime', subTab: 'model', breadcrumb: 'Runtime › Model Info' },
   rtWeights: { tab: 'runtime', subTab: 'weights', breadcrumb: 'Runtime › Weights & Assets' },
@@ -43,6 +44,15 @@ function entry(
 const toggleText = (enabled: boolean) => (enabled ? 'Enabled' : 'Disabled');
 
 export const ocrSettingsSearchIndex: OcrSettingSearchEntry[] = [
+  entry(
+    STAGES.rtAutoConfig,
+    'autoConfig',
+    'Auto-Config (Adaptive Profiling)',
+    '.withAutoConfig()',
+    'Sub-millisecond optical profiling to dynamically calibrate resolution and filter params.',
+    ['auto', 'autoconfig', 'adaptive', 'profile', 'lighting', 'contrast', 'descreen'],
+    (c) => toggleText(c.autoConfig)
+  ),
   entry(
     STAGES.detPre,
     'autoUnwarp',

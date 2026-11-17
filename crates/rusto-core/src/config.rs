@@ -1526,6 +1526,12 @@ impl InitializeConfig {
         self.global.optimization = Some(optimization);
         self
     }
+
+    /// Enable or disable automatic image-aware configuration
+    pub fn with_auto_config(mut self, enabled: bool) -> Self {
+        self.global.auto_config = enabled;
+        self
+    }
 }
 
 #[cfg(test)]

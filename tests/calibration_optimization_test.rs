@@ -1,7 +1,7 @@
 use rusto_core::calibration::{expand_box_padding, CalibrationOptions, OptimizationOptions};
 use rusto_core::image::Point2f;
 use rusto::{DetectTextResult, ImageSource, InitializeConfig, OcrRunOptions, RustO};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn test_calibration_options_serde() {
@@ -47,6 +47,7 @@ fn test_runtime_options_with_calibration_and_optimization() {
             target_max_side: Some(800),
             crop_padding_x: Some(0.05),
             crop_padding_y: Some(0.05),
+            ..Default::default()
         }),
         ..Default::default()
     };

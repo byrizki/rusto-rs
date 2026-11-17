@@ -16,6 +16,14 @@ pub struct CalibrationOptions {
     pub sharpen: Option<bool>,
     #[nserde(rename = "redChannelContrast")]
     pub red_channel_contrast: Option<bool>,
+    #[nserde(rename = "reliefEnhancement")]
+    pub relief_enhancement: Option<bool>,
+    #[nserde(rename = "reliefStrength")]
+    pub relief_strength: Option<f32>,
+    #[nserde(rename = "strokeRepair")]
+    pub stroke_repair: Option<bool>,
+    #[nserde(rename = "strokeRepairRadius")]
+    pub stroke_repair_radius: Option<u32>,
 }
 
 impl CalibrationOptions {
@@ -32,6 +40,7 @@ impl CalibrationOptions {
             auto_levels: Some(false),
             sharpen: Some(false),
             red_channel_contrast: Some(false),
+            ..Default::default()
         }
     }
 
@@ -44,6 +53,7 @@ impl CalibrationOptions {
             auto_levels: Some(false),
             sharpen: Some(true),
             red_channel_contrast: Some(false),
+            ..Default::default()
         }
     }
 
@@ -74,6 +84,26 @@ impl CalibrationOptions {
 
     pub fn with_red_channel(mut self, enabled: bool) -> Self {
         self.red_channel_contrast = Some(enabled);
+        self
+    }
+
+    pub fn with_relief_enhancement(mut self, enabled: bool) -> Self {
+        self.relief_enhancement = Some(enabled);
+        self
+    }
+
+    pub fn with_relief_strength(mut self, strength: f32) -> Self {
+        self.relief_strength = Some(strength);
+        self
+    }
+
+    pub fn with_stroke_repair(mut self, enabled: bool) -> Self {
+        self.stroke_repair = Some(enabled);
+        self
+    }
+
+    pub fn with_stroke_repair_radius(mut self, radius: u32) -> Self {
+        self.stroke_repair_radius = Some(radius);
         self
     }
 }
@@ -139,6 +169,16 @@ pub fn apply_calibration(mat: &Mat, options: &CalibrationOptions) -> Result<Mat,
         current = thresholded_sharpen(&current, 1.0, 4, 1.2);
     }
 
+    if options.relief_enhancement.unwrap_or(false) {
+        let strength = options.relief_strength.unwrap_or(1.2);
+        current = black_hat_relief(&current, strength, 3);
+    }
+
+    if options.stroke_repair.unwrap_or(false) {
+        let radius = options.stroke_repair_radius.unwrap_or(1);
+        current = repair_strokes(&current, radius);
+    }
+
     if options.red_channel_contrast.unwrap_or(false) {
         current = red_channel_contrast(&current);
     }
@@ -156,11 +196,6 @@ pub fn descreen_background(img: &mut image::RgbImage, strength: f32) {
         let g = p[1] as f32;
         let b = p[2] as f32;
 
-        let lum = 0.299 * r + 0.587 * g + 0.114 * b;
-        if lum < 70.0 {
-            continue;
-        }
-
         let max_c = r.max(g.max(b));
         let min_c = r.min(g.min(b));
         let chroma = max_c - min_c;
@@ -168,14 +203,35 @@ pub fn descreen_background(img: &mut image::RgbImage, strength: f32) {
             continue;
         }
 
-        let weight = ((lum - 70.0) / 50.0).clamp(0.0, 1.0);
+        let lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        // Protect true black text ink from being lifted: text ink absorbs red strongly
+        if r < 28.0 && lum < 60.0 {
+            continue;
+        }
+
+        let min_lum = if chroma > 15.0 { 35.0 } else { 85.0 };
+        if lum < min_lum {
+            continue;
+        }
+
+        let weight = if chroma > 20.0 {
+            ((chroma - 20.0) / 30.0).clamp(0.4, 1.0)
+        } else {
+            ((lum - 85.0) / 50.0).clamp(0.0, 1.0)
+        };
         let factor = (strength * weight).clamp(0.0, 2.0);
 
         let r_lift = (max_c - r) * factor;
         let g_lift = (max_c - g) * factor;
         let b_lift = (max_c - b) * factor;
 
-        let white_lift = (255.0 - max_c) * (chroma / 255.0) * (factor * 0.25);
+        let white_lift = if chroma > 15.0 {
+            (255.0 - max_c) * (chroma / 255.0) * (factor * 0.40)
+        } else if lum >= 130.0 {
+            (255.0 - max_c) * (chroma / 255.0) * (factor * 0.20)
+        } else {
+            0.0
+        };
 
         p[0] = (r + r_lift + white_lift).clamp(0.0, 255.0) as u8;
         p[1] = (g + g_lift + white_lift).clamp(0.0, 255.0) as u8;
@@ -193,11 +249,6 @@ pub fn descreen_background_rgba(rgba: &mut [u8], strength: f32) {
         let g = chunk[1] as f32;
         let b = chunk[2] as f32;
 
-        let lum = 0.299 * r + 0.587 * g + 0.114 * b;
-        if lum < 70.0 {
-            continue;
-        }
-
         let max_c = r.max(g.max(b));
         let min_c = r.min(g.min(b));
         let chroma = max_c - min_c;
@@ -205,14 +256,35 @@ pub fn descreen_background_rgba(rgba: &mut [u8], strength: f32) {
             continue;
         }
 
-        let weight = ((lum - 70.0) / 50.0).clamp(0.0, 1.0);
+        let lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        // Protect true black text ink from being lifted: text ink absorbs red strongly
+        if r < 28.0 && lum < 60.0 {
+            continue;
+        }
+
+        let min_lum = if chroma > 15.0 { 35.0 } else { 85.0 };
+        if lum < min_lum {
+            continue;
+        }
+
+        let weight = if chroma > 20.0 {
+            ((chroma - 20.0) / 30.0).clamp(0.4, 1.0)
+        } else {
+            ((lum - 85.0) / 50.0).clamp(0.0, 1.0)
+        };
         let factor = (strength * weight).clamp(0.0, 2.0);
 
         let r_lift = (max_c - r) * factor;
         let g_lift = (max_c - g) * factor;
         let b_lift = (max_c - b) * factor;
 
-        let white_lift = (255.0 - max_c) * (chroma / 255.0) * (factor * 0.25);
+        let white_lift = if chroma > 15.0 {
+            (255.0 - max_c) * (chroma / 255.0) * (factor * 0.40)
+        } else if lum >= 130.0 {
+            (255.0 - max_c) * (chroma / 255.0) * (factor * 0.20)
+        } else {
+            0.0
+        };
 
         chunk[0] = (r + r_lift + white_lift).clamp(0.0, 255.0) as u8;
         chunk[1] = (g + g_lift + white_lift).clamp(0.0, 255.0) as u8;
@@ -377,6 +449,164 @@ pub fn expand_box_padding(
     out[3].y = (b[3].y + off_y3).clamp(0.0, img_h);
 
     out
+}
+
+fn min_filter_1d(src: &[u8], width: usize, height: usize, radius: usize) -> Vec<u8> {
+    let mut temp = vec![0u8; width * height];
+    for y in 0..height {
+        let row = &src[y * width..(y + 1) * width];
+        let out_row = &mut temp[y * width..(y + 1) * width];
+        for x in 0..width {
+            let start = x.saturating_sub(radius);
+            let end = (x + radius + 1).min(width);
+            let mut m = 255u8;
+            for k in start..end {
+                m = m.min(row[k]);
+            }
+            out_row[x] = m;
+        }
+    }
+
+    let mut out = vec![0u8; width * height];
+    for y in 0..height {
+        let start_y = y.saturating_sub(radius);
+        let end_y = (y + radius + 1).min(height);
+        for x in 0..width {
+            let mut m = 255u8;
+            for ky in start_y..end_y {
+                m = m.min(temp[ky * width + x]);
+            }
+            out[y * width + x] = m;
+        }
+    }
+    out
+}
+
+fn max_filter_1d(src: &[u8], width: usize, height: usize, radius: usize) -> Vec<u8> {
+    let mut temp = vec![0u8; width * height];
+    for y in 0..height {
+        let row = &src[y * width..(y + 1) * width];
+        let out_row = &mut temp[y * width..(y + 1) * width];
+        for x in 0..width {
+            let start = x.saturating_sub(radius);
+            let end = (x + radius + 1).min(width);
+            let mut m = 0u8;
+            for k in start..end {
+                m = m.max(row[k]);
+            }
+            out_row[x] = m;
+        }
+    }
+
+    let mut out = vec![0u8; width * height];
+    for y in 0..height {
+        let start_y = y.saturating_sub(radius);
+        let end_y = (y + radius + 1).min(height);
+        for x in 0..width {
+            let mut m = 0u8;
+            for ky in start_y..end_y {
+                m = m.max(temp[ky * width + x]);
+            }
+            out[y * width + x] = m;
+        }
+    }
+    out
+}
+
+/// Applies a morphological Black-Hat transform to isolate dark shadow grooves of carved text
+/// on stone, gravestones, or embossed surfaces and render them as high-contrast dark text.
+pub fn black_hat_relief(img: &image::RgbImage, strength: f32, kernel_size: usize) -> image::RgbImage {
+    let (w, h) = (img.width() as usize, img.height() as usize);
+    if w == 0 || h == 0 {
+        return img.clone();
+    }
+    let radius = (kernel_size / 2).clamp(1, 8);
+
+    // Compute grayscale luma
+    let mut luma = vec![0u8; w * h];
+    for (i, p) in img.pixels().enumerate() {
+        luma[i] = (0.299 * p[0] as f32 + 0.587 * p[1] as f32 + 0.114 * p[2] as f32).round() as u8;
+    }
+
+    // Morphological closing: Dilation (max) followed by Erosion (min)
+    let dilated = max_filter_1d(&luma, w, h, radius);
+    let closed = min_filter_1d(&dilated, w, h, radius);
+
+    let mut out = image::RgbImage::new(w as u32, h as u32);
+    let factor = strength.clamp(0.1, 5.0) * 3.0;
+
+    for y in 0..h {
+        for x in 0..w {
+            let idx = y * w + x;
+            let diff = closed[idx].saturating_sub(luma[idx]) as f32;
+            let v = (255.0 - diff * factor).clamp(0.0, 255.0) as u8;
+            out.put_pixel(x as u32, y as u32, image::Rgb([v, v, v]));
+        }
+    }
+    out
+}
+
+/// Applies morphological stroke repair to bridge small fractures and eroded gaps in characters.
+pub fn repair_strokes(img: &image::RgbImage, radius: u32) -> image::RgbImage {
+    let (w, h) = (img.width() as usize, img.height() as usize);
+    if w == 0 || h == 0 {
+        return img.clone();
+    }
+    let r = radius.clamp(1, 4) as usize;
+
+    let mut luma = vec![0u8; w * h];
+    for (i, p) in img.pixels().enumerate() {
+        luma[i] = (0.299 * p[0] as f32 + 0.587 * p[1] as f32 + 0.114 * p[2] as f32).round() as u8;
+    }
+
+    // Closing on dark text: Erosion (min) expands dark strokes, Dilation (max) restores stroke width
+    let eroded_dark = min_filter_1d(&luma, w, h, r);
+    let closed_dark = max_filter_1d(&eroded_dark, w, h, r);
+
+    let mut out = image::RgbImage::new(w as u32, h as u32);
+    for y in 0..h {
+        for x in 0..w {
+            let idx = y * w + x;
+            let v = closed_dark[idx];
+            out.put_pixel(x as u32, y as u32, image::Rgb([v, v, v]));
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_black_hat_relief_enhances_grooves() {
+        let mut img = image::RgbImage::from_pixel(10, 10, image::Rgb([240, 240, 240]));
+        // Add a faint carved groove (shadow) at center column
+        for y in 2..8 {
+            img.put_pixel(5, y, image::Rgb([225, 225, 225]));
+        }
+        let enhanced = black_hat_relief(&img, 1.5, 3);
+        // The background should remain close to 255 (white)
+        let bg_pixel = enhanced.get_pixel(1, 1)[0];
+        assert!(bg_pixel >= 250, "Background should be clean white: {}", bg_pixel);
+        // The groove should be substantially darkened
+        let groove_pixel = enhanced.get_pixel(5, 4)[0];
+        assert!(groove_pixel < 200, "Groove should be significantly darkened: {}", groove_pixel);
+    }
+
+    #[test]
+    fn test_repair_strokes_bridges_fracture() {
+        let mut img = image::RgbImage::from_pixel(10, 10, image::Rgb([255, 255, 255]));
+        // A black vertical stroke with a 1-pixel gap at y=5
+        for y in 1..9 {
+            if y != 5 {
+                img.put_pixel(5, y, image::Rgb([0, 0, 0]));
+            }
+        }
+        let repaired = repair_strokes(&img, 1);
+        let bridge_pixel = repaired.get_pixel(5, 5)[0];
+        assert!(bridge_pixel < 128, "Broken stroke gap should be bridged by morphological closing: {}", bridge_pixel);
+    }
 }
 
 

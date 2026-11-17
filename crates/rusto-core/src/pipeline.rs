@@ -235,6 +235,9 @@ impl OcrPipeline {
         options: &OcrRunOptions,
     ) -> Result<PipelineOutput, CoreError> {
         let mut effective = self.global.clone();
+        if let Some(auto) = options.auto_config {
+            effective.auto_config = auto;
+        }
         effective.return_word_box = options.output == OutputGranularity::Words;
         effective.return_single_char_box = false;
         effective.use_cls = options.line_classification.unwrap_or(self.global.use_cls) && self.cls.is_some();
@@ -314,8 +317,25 @@ impl OcrPipeline {
         let mut debug_unwarped_image = None;
         let mut layout_regions = None;
 
-        // Step 0: Image calibration (if configured)
-        let calibrated_img = if let Some(calib) = &global.calibration {
+        // Step 0: Auto profiling & Image calibration (if configured)
+        let (auto_det, auto_opt, auto_calib) = if global.auto_config {
+            let profile = crate::auto::profile_image(img);
+            let (d, o, c) = crate::auto::resolve_auto_params(
+                &profile,
+                &self.det_config,
+                global.optimization.as_ref(),
+                global.calibration.as_ref(),
+            );
+            (Some(d), Some(o), Some(c))
+        } else {
+            (None, None, None)
+        };
+
+        let effective_calib = auto_calib.as_ref().or(global.calibration.as_ref());
+        let effective_opt = auto_opt.as_ref().or(global.optimization.as_ref());
+        let effective_det_config = auto_det.as_ref().unwrap_or(&self.det_config);
+
+        let calibrated_img = if let Some(calib) = effective_calib {
             if calib.enabled.unwrap_or(true) {
                 apply_calibration(img, calib)?
             } else {
@@ -327,6 +347,7 @@ impl OcrPipeline {
 
         // Step 1: Orientation classification & rotation
         let mut working_img = calibrated_img;
+        let mut rec_source_img = img.clone();
         let mut active_orientation = None;
         if global.use_orient && self.orient.is_some() {
             if let Some(orient_session) = &mut self.orient {
@@ -361,6 +382,9 @@ impl OcrPipeline {
                             debug_oriented_image = Some(rotated.clone());
                         }
                         working_img = rotated;
+                        if let Ok(rec_rotated) = det_orientation.rotate_image(&rec_source_img) {
+                            rec_source_img = rec_rotated;
+                        }
                         active_orientation = Some(det_orientation);
                     }
                 } else if det_orientation.degrees() == 0 {
@@ -377,6 +401,9 @@ impl OcrPipeline {
                 let input_tensor = preprocess_unwarp(&working_img, 512, 512)?;
                 let output = unwarp_session.run(input_tensor.into_dyn())?;
                 working_img = postprocess_unwarp(&working_img, &output, orig_w, orig_h)?;
+                if let Ok(rec_unwarped) = postprocess_unwarp(&rec_source_img, &output, orig_w, orig_h) {
+                    rec_source_img = rec_unwarped;
+                }
                 if global.debug_images {
                     debug_unwarped_image = Some(working_img.clone());
                 }
@@ -395,6 +422,9 @@ impl OcrPipeline {
                         debug_oriented_image = Some(rotated.clone());
                     }
                     working_img = rotated;
+                    if let Ok(rec_rotated) = crate::preprocess::rotate_skew(&rec_source_img, skew) {
+                        rec_source_img = rec_rotated;
+                    }
                     active_skew = Some(skew);
                 }
             }
@@ -414,7 +444,7 @@ impl OcrPipeline {
                     layout_cfg.target_size,
                 );
                 let (input_tensor, scale_w, scale_h) = preprocess_layout_image(
-                    &working_img,
+                    &rec_source_img,
                     new_w,
                     new_h,
                     layout_cfg.mean,
@@ -461,7 +491,7 @@ impl OcrPipeline {
         }
 
         let mut op_record = OpRecord::new();
-        let effective_max_side = if let Some(opt) = &global.optimization {
+        let effective_max_side = if let Some(opt) = &effective_opt {
             if opt.enabled.unwrap_or(true) {
                 if let Some(target) = opt.target_max_side {
                     (target as f32).min(global.max_side_len)
@@ -496,7 +526,7 @@ impl OcrPipeline {
         let start_det = Instant::now();
         let (ori_h, ori_w) = (padded.rows(), padded.cols());
         let mut params = resolve_det_params(
-            &self.det_config,
+            effective_det_config,
             detection,
             postprocess,
             ori_w,
@@ -521,7 +551,11 @@ impl OcrPipeline {
         )?;
         drop(preds);
 
-        if is_linenet_det && boxes.len() >= ADAPTIVE_MIN_BOXES {
+        let allow_adaptive = detection
+            .and_then(|d| d.adaptive_resolution)
+            .unwrap_or(global.auto_config || is_linenet_det);
+
+        if allow_adaptive && boxes.len() >= ADAPTIVE_MIN_BOXES {
             let mut heights: Vec<f32> = boxes
                 .iter()
                 .map(|b| {
@@ -598,7 +632,7 @@ impl OcrPipeline {
 
         // Step 5: Crop text regions
         let is_linenet_rec = self.rec.is_linenet();
-        let (pad_x, pad_y) = if let Some(opt) = &global.optimization {
+        let (pad_x, pad_y) = if let Some(opt) = &effective_opt {
             if opt.enabled.unwrap_or(true) {
                 (opt.crop_padding_x.unwrap_or(0.0), opt.crop_padding_y.unwrap_or(0.0))
             } else {
@@ -608,11 +642,13 @@ impl OcrPipeline {
             (0.0, 0.0)
         };
 
-        let (pad_x_factor, pad_y_factor) = if let Some(opt) = &global.optimization {
+        let (pad_x_factor, pad_y_factor) = if let Some(opt) = &effective_opt {
             (opt.crop_padding_x.unwrap_or(0.3), opt.crop_padding_y.unwrap_or(1.6))
         } else {
             (0.3, 1.6)
         };
+
+        let crop_source = &rec_source_img;
 
         #[cfg(not(target_arch = "wasm32"))]
         let mut crop_imgs: Vec<Mat> = if boxes.len() >= 4 {
@@ -620,7 +656,7 @@ impl OcrPipeline {
                 .par_iter()
                 .map(|b| {
                     if is_linenet_rec {
-                        crop_linenet_line_image(&working_img, b, pad_x_factor, pad_y_factor)
+                        crop_linenet_line_image(crop_source, b, pad_x_factor, pad_y_factor)
                     } else {
                         let crop_box = calculate_crop_box(
                             b,
@@ -632,7 +668,7 @@ impl OcrPipeline {
                             working_w_f32,
                             working_h_f32,
                         );
-                        get_rotate_crop_image(&working_img, &crop_box)
+                        get_rotate_crop_image(crop_source, &crop_box)
                     }
                 })
                 .collect::<Result<Vec<Mat>, CoreError>>()?
@@ -640,7 +676,7 @@ impl OcrPipeline {
             let mut crops = Vec::with_capacity(boxes.len());
             for b in &boxes {
                 if is_linenet_rec {
-                    crops.push(crop_linenet_line_image(&working_img, b, pad_x_factor, pad_y_factor)?);
+                    crops.push(crop_linenet_line_image(crop_source, b, pad_x_factor, pad_y_factor)?);
                 } else {
                     let crop_box = calculate_crop_box(
                         b,
@@ -652,7 +688,7 @@ impl OcrPipeline {
                         working_w_f32,
                         working_h_f32,
                     );
-                    crops.push(get_rotate_crop_image(&working_img, &crop_box)?);
+                    crops.push(get_rotate_crop_image(crop_source, &crop_box)?);
                 }
             }
             crops
@@ -663,7 +699,7 @@ impl OcrPipeline {
             let mut crops = Vec::with_capacity(boxes.len());
             for b in &boxes {
                 if is_linenet_rec {
-                    crops.push(crop_linenet_line_image(&working_img, b, pad_x_factor, pad_y_factor)?);
+                    crops.push(crop_linenet_line_image(crop_source, b, pad_x_factor, pad_y_factor)?);
                 } else {
                     let crop_box = calculate_crop_box(
                         b,
@@ -675,7 +711,7 @@ impl OcrPipeline {
                         working_w_f32,
                         working_h_f32,
                     );
-                    crops.push(get_rotate_crop_image(&working_img, &crop_box)?);
+                    crops.push(get_rotate_crop_image(crop_source, &crop_box)?);
                 }
             }
             crops

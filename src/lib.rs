@@ -330,6 +330,7 @@ mod tests {
                 target_max_side: Some(1024),
                 crop_padding_x: Some(0.05),
                 crop_padding_y: Some(0.05),
+                ..Default::default()
             })
             .with_detection(DetectionRunOptions {
                 limit_side_len: Some(960),

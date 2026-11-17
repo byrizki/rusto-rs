@@ -260,6 +260,18 @@ namespace RustODotnet
 
         [JsonPropertyName("cropPaddingY")]
         public float? CropPaddingY { get; set; }
+
+        [JsonPropertyName("reliefEnhancement")]
+        public bool? ReliefEnhancement { get; set; }
+
+        [JsonPropertyName("reliefStrength")]
+        public float? ReliefStrength { get; set; }
+
+        [JsonPropertyName("strokeRepair")]
+        public bool? StrokeRepair { get; set; }
+
+        [JsonPropertyName("strokeRepairRadius")]
+        public uint? StrokeRepairRadius { get; set; }
     }
 
     /// <summary>
@@ -278,6 +290,9 @@ namespace RustODotnet
 
         [JsonPropertyName("std")]
         public float[] Std { get; set; }
+
+        [JsonPropertyName("adaptiveResolution")]
+        public bool? AdaptiveResolution { get; set; }
     }
 
     /// <summary>
@@ -365,6 +380,9 @@ namespace RustODotnet
 
         [JsonPropertyName("output")]
         public string OutputWireValue => Output.ToString().ToLowerInvariant();
+
+        [JsonPropertyName("autoConfig")]
+        public bool? AutoConfig { get; set; }
 
         [JsonPropertyName("autoUnwarp")]
         public bool? AutoUnwarp { get; set; }
@@ -516,6 +534,12 @@ namespace RustODotnet
         public DetectTextBuilder WithOptions(OcrRunOptions options)
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
+            return this;
+        }
+
+        public DetectTextBuilder WithAutoConfig(bool enabled = true)
+        {
+            _options.AutoConfig = enabled;
             return this;
         }
 
@@ -975,6 +999,7 @@ namespace RustODotnet
             return defaultOpts with
             {
                 Output = uniffiOutput,
+                AutoConfig = options.AutoConfig,
                 AutoUnwarp = options.AutoUnwarp,
                 LayoutReading = options.LayoutReading,
                 LayoutModel = options.LayoutModel,
@@ -984,13 +1009,18 @@ namespace RustODotnet
                     options.PreDetection.DescreenStrength,
                     options.PreDetection.TargetMaxSide,
                     options.PreDetection.CropPaddingX,
-                    options.PreDetection.CropPaddingY
+                    options.PreDetection.CropPaddingY,
+                    options.PreDetection.ReliefEnhancement,
+                    options.PreDetection.ReliefStrength,
+                    options.PreDetection.StrokeRepair,
+                    options.PreDetection.StrokeRepairRadius
                 ) : defaultOpts.PreDetection,
                 Detection = options.Detection != null ? new RustODotnet.Generated.DetectionRunOptions(
                     options.Detection.LimitSideLen,
                     options.Detection.LimitType,
                     options.Detection.Mean,
-                    options.Detection.Std
+                    options.Detection.Std,
+                    options.Detection.AdaptiveResolution
                 ) : defaultOpts.Detection,
                 PostDetection = options.PostDetection != null ? new RustODotnet.Generated.PostDetectionOptions(
                     options.PostDetection.Threshold,

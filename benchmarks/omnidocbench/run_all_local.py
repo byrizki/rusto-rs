@@ -48,6 +48,8 @@ FULL_PIPELINE_TARGETS = [
     ("rusto_rten_indra_full", "(pipe-i) RustO RTen Full Pipeline + Indra Models (Indra Order)"),
     ("rusto_order_heuristic", "(pipe-j) RustO NN + Pure-Rust Heuristic Order"),
     ("rusto_rten_order_heuristic", "(pipe-k) RustO RTen + Pure-Rust Heuristic Order"),
+    ("rusto_full_auto", "(pipe-m) RustO NN Full Pipeline + PP-OCRv6 (CDLA + Auto-Config)"),
+    ("rusto_full_publaynet_auto", "(pipe-n) RustO NN Full Pipeline + PP-OCRv6 (PubLayNet + Auto-Config)"),
 ]
 
 def main():

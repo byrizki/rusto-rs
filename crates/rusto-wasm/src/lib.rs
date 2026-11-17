@@ -308,6 +308,8 @@ impl RtenOcrPipeline {
         orig_h: usize,
         raw_boxes: &[([f32; 4], f32)],
         batch_size: usize,
+        pad_x: f32,
+        pad_y: f32,
     ) -> Result<Vec<TextResult>, String> {
         if raw_boxes.is_empty() {
             return Ok(Vec::new());
@@ -401,7 +403,7 @@ impl RtenOcrPipeline {
             let mut crops = Vec::with_capacity(raw_boxes.len());
             for (orig_idx, &(box_coords, det_score)) in raw_boxes.iter().enumerate() {
                 if let Some((rec_w, rec_h)) =
-                    compute_ppocr_rec_crop_dims(orig_w, orig_h, box_coords)
+                    compute_ppocr_rec_crop_dims(orig_w, orig_h, box_coords, pad_x, pad_y)
                 {
                     crops.push(CropMeta {
                         orig_idx,
@@ -432,7 +434,7 @@ impl RtenOcrPipeline {
 
                 for item in &crops[i..end] {
                     if let Some((crop_data, _w, _h)) =
-                        prepare_ppocr_rec_crop_rgba(processed_rgba, orig_w, orig_h, item.box_coords)
+                        prepare_ppocr_rec_crop_rgba(processed_rgba, orig_w, orig_h, item.box_coords, pad_x, pad_y)
                     {
                         batch_data.extend_from_slice(&crop_data);
                     } else {
@@ -568,7 +570,8 @@ impl RtenOcrPipeline {
         let orig_w = width as usize;
         let orig_h = height as usize;
 
-        let mut processed_rgba = image_rgba[..orig_w * orig_h * 4].to_vec();
+        let raw_slice = &image_rgba[..orig_w * orig_h * 4];
+        let mut processed_rgba = raw_slice.to_vec();
         if apply_calibration {
             let strength = descreen_strength.unwrap_or(1.15);
             descreen_background_rgba(&mut processed_rgba, strength);
@@ -584,7 +587,7 @@ impl RtenOcrPipeline {
             max_side_len,
         )?;
 
-        let results = self.recognize_boxes_batched(&processed_rgba, orig_w, orig_h, &raw_boxes, 1)?;
+        let results = self.recognize_boxes_batched(raw_slice, orig_w, orig_h, &raw_boxes, 1, 0.0, 0.0)?;
 
         Ok(nanoserde::SerJson::serialize_json(&results))
     }
@@ -654,40 +657,68 @@ impl RtenOcrPipeline {
             }
         };
 
-        let apply_calibration = options
-            .pre_detection
-            .as_ref()
-            .and_then(|p| p.descreen_strength)
-            .map(|s| s > 0.0)
-            .unwrap_or(true);
-        if apply_calibration {
-            let strength = options
+        let is_auto_config = options.auto_config.unwrap_or(false);
+        let (auto_det, auto_opt, auto_calib) = if is_auto_config {
+            if let Ok(mat) = rusto_core::image::Mat::from_rgba8(width, height, processed_rgba.clone()) {
+                let profile = rusto_core::auto::profile_image(&mat);
+                let det_base = rusto_core::types::DetConfig::default(std::path::PathBuf::new());
+                let (d, o, c) = rusto_core::auto::resolve_auto_params(&profile, &det_base, None, None);
+                (Some(d), Some(o), Some(c))
+            } else {
+                (None, None, None)
+            }
+        } else {
+            (None, None, None)
+        };
+
+        let rec_source_rgba = processed_rgba.clone();
+
+        if let Some(calib) = &auto_calib {
+            if calib.enabled.unwrap_or(false) && calib.descreen_background.unwrap_or(false) {
+                let strength = calib.descreen_strength.unwrap_or(0.25);
+                descreen_background_rgba(&mut processed_rgba, strength);
+            }
+        } else {
+            let apply_calibration = options
                 .pre_detection
                 .as_ref()
                 .and_then(|p| p.descreen_strength)
-                .unwrap_or(1.15);
-            descreen_background_rgba(&mut processed_rgba, strength);
+                .map(|s| s > 0.0)
+                .unwrap_or(false);
+            if apply_calibration {
+                let strength = options
+                    .pre_detection
+                    .as_ref()
+                    .and_then(|p| p.descreen_strength)
+                    .unwrap_or(0.25);
+                descreen_background_rgba(&mut processed_rgba, strength);
+            }
         }
 
-        let det_thresh = options
-            .post_detection
+        let det_thresh = auto_det
             .as_ref()
-            .and_then(|p| p.threshold)
+            .map(|d| d.thresh)
+            .or_else(|| options.post_detection.as_ref().and_then(|p| p.threshold))
             .unwrap_or(0.3);
-        let box_thresh = options
-            .post_detection
+        let box_thresh = auto_det
             .as_ref()
-            .and_then(|p| p.box_threshold)
+            .map(|d| d.box_thresh)
+            .or_else(|| options.post_detection.as_ref().and_then(|p| p.box_threshold))
             .unwrap_or(0.5);
-        let unclip_ratio = options
-            .post_detection
+        let unclip_ratio = auto_det
             .as_ref()
-            .and_then(|p| p.unclip_ratio)
-            .unwrap_or(1.8);
-        let max_side_len = options
-            .detection
+            .map(|d| d.unclip_ratio)
+            .or_else(|| options.post_detection.as_ref().and_then(|p| p.unclip_ratio))
+            .unwrap_or(1.5);
+        let max_side_len = auto_det
             .as_ref()
-            .and_then(|d| d.limit_side_len.map(|l| l as u32))
+            .map(|d| d.limit_side_len as u32)
+            .or_else(|| {
+                options
+                    .detection
+                    .as_ref()
+                    .and_then(|d| d.limit_side_len.map(|l| l as u32))
+            })
             .or_else(|| {
                 options
                     .post_detection
@@ -696,7 +727,7 @@ impl RtenOcrPipeline {
             })
             .unwrap_or(960);
 
-        let raw_boxes = self.detect_boxes(
+        let mut raw_boxes = self.detect_boxes(
             &processed_rgba,
             orig_w,
             orig_h,
@@ -705,6 +736,44 @@ impl RtenOcrPipeline {
             unclip_ratio,
             Some(max_side_len),
         )?;
+
+        // Adaptive resolution escalation if text height is small (parity with native pipeline)
+        let allow_adaptive = is_auto_config
+            || options
+                .detection
+                .as_ref()
+                .and_then(|d| d.adaptive_resolution)
+                .unwrap_or(false);
+        if allow_adaptive && raw_boxes.len() >= 8 {
+            let scale_h = max_side_len as f32 / (orig_h.max(orig_w) as f32).max(1.0);
+            let mut heights: Vec<f32> = raw_boxes
+                .iter()
+                .map(|&(b, _)| (b[3] - b[1]).abs())
+                .collect();
+            heights.sort_by(|a, b| a.total_cmp(b));
+            let median = heights[heights.len() / 2];
+            let med_h = median * scale_h;
+            // If median line height in detector tensor is tiny (< 9px), upscale detection resolution up to 1440
+            if med_h < 9.0 && max_side_len < 1440 {
+                let adaptive_limit =
+                    ((max_side_len as f32 * 12.0 / med_h.max(1.0)) as u32).min(1440) / 32 * 32;
+                if adaptive_limit > max_side_len {
+                    if let Ok(re_boxes) = self.detect_boxes(
+                        &processed_rgba,
+                        orig_w,
+                        orig_h,
+                        det_thresh,
+                        box_thresh,
+                        unclip_ratio,
+                        Some(adaptive_limit),
+                    ) {
+                        if !re_boxes.is_empty() {
+                            raw_boxes = re_boxes;
+                        }
+                    }
+                }
+            }
+        }
 
         let score_thresh = options
             .post_recognition
@@ -719,8 +788,32 @@ impl RtenOcrPipeline {
             .unwrap_or(1)
             .max(1) as usize;
 
+        let (pad_x, pad_y) = auto_opt
+            .as_ref()
+            .and_then(|o| {
+                if o.enabled.unwrap_or(true) {
+                    Some((o.crop_padding_x.unwrap_or(0.0), o.crop_padding_y.unwrap_or(0.0)))
+                } else {
+                    None
+                }
+            })
+            .or_else(|| {
+                options.pre_detection.as_ref().map(|p| {
+                    (p.crop_padding_x.unwrap_or(0.0), p.crop_padding_y.unwrap_or(0.0))
+                })
+            })
+            .unwrap_or((0.0, 0.0));
+
         let recognized: Vec<TextResult> = self
-            .recognize_boxes_batched(&processed_rgba, orig_w, orig_h, &raw_boxes, batch_size)?
+            .recognize_boxes_batched(
+                &rec_source_rgba,
+                orig_w,
+                orig_h,
+                &raw_boxes,
+                batch_size,
+                pad_x,
+                pad_y,
+            )?
             .into_iter()
             .filter(|res| res.score >= score_thresh)
             .collect();

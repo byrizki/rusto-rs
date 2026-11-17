@@ -97,12 +97,20 @@ class PreDetectionOptions(_GeneratedPreDetectionOptions):
         target_max_side: int | None = None,
         crop_padding_x: float | None = None,
         crop_padding_y: float | None = None,
+        relief_enhancement: bool | None = None,
+        relief_strength: float | None = None,
+        stroke_repair: bool | None = None,
+        stroke_repair_radius: int | None = None,
     ):
         super().__init__(
             descreen_strength=descreen_strength,
             target_max_side=target_max_side,
             crop_padding_x=crop_padding_x,
             crop_padding_y=crop_padding_y,
+            relief_enhancement=relief_enhancement,
+            relief_strength=relief_strength,
+            stroke_repair=stroke_repair,
+            stroke_repair_radius=stroke_repair_radius,
         )
 
 
@@ -115,12 +123,14 @@ class DetectionRunOptions(_GeneratedDetectionRunOptions):
         limit_type: str | None = None,
         mean: list[float] | None = None,
         std: list[float] | None = None,
+        adaptive_resolution: bool | None = None,
     ):
         super().__init__(
             limit_side_len=limit_side_len,
             limit_type=limit_type,
             mean=mean,
             std=std,
+            adaptive_resolution=adaptive_resolution,
         )
 
 
@@ -479,6 +489,7 @@ class OcrRunOptions(_GeneratedOcrRunOptions):
     def __init__(
         self,
         output: OutputGranularity = OutputGranularity.LINES,
+        auto_config: bool | None = None,
         auto_unwarp: bool | None = None,
         layout_reading: bool | None = None,
         layout_model: str | None = None,
@@ -493,6 +504,7 @@ class OcrRunOptions(_GeneratedOcrRunOptions):
     ):
         super().__init__(
             output=output,
+            auto_config=auto_config,
             auto_unwarp=auto_unwarp,
             layout_reading=layout_reading,
             layout_model=layout_model,
@@ -514,6 +526,7 @@ class DetectTextBuilder:
         self._source = self._normalize_source(source) if source is not None else None
         self._rgb: tuple[bytes, int, int, int] | None = None
         self._output: OutputGranularity = OutputGranularity.LINES
+        self._auto_config: bool | None = None
         self._auto_unwarp: bool | None = None
         self._layout_reading: bool | None = None
         self._layout_model: str | None = None
@@ -561,6 +574,11 @@ class DetectTextBuilder:
         self._source = None
         return self
 
+    def with_auto_config(self, enabled: bool = True) -> DetectTextBuilder:
+        """Enable or disable automatic configuration based on image characteristics."""
+        self._auto_config = enabled
+        return self
+
     def with_auto_unwarp(self, enabled: bool = True) -> DetectTextBuilder:
         """Enable or disable document unwarping."""
         self._auto_unwarp = enabled
@@ -594,6 +612,10 @@ class DetectTextBuilder:
         target_max_side: int | None = None,
         crop_padding_x: float | None = None,
         crop_padding_y: float | None = None,
+        relief_enhancement: bool | None = None,
+        relief_strength: float | None = None,
+        stroke_repair: bool | None = None,
+        stroke_repair_radius: int | None = None,
     ) -> DetectTextBuilder:
         """Configure pre-detection options."""
         if options is not None:
@@ -604,6 +626,10 @@ class DetectTextBuilder:
                 target_max_side=target_max_side,
                 crop_padding_x=crop_padding_x,
                 crop_padding_y=crop_padding_y,
+                relief_enhancement=relief_enhancement,
+                relief_strength=relief_strength,
+                stroke_repair=stroke_repair,
+                stroke_repair_radius=stroke_repair_radius,
             )
         return self
 
@@ -615,6 +641,7 @@ class DetectTextBuilder:
         limit_type: str | None = None,
         mean: list[float] | None = None,
         std: list[float] | None = None,
+        adaptive_resolution: bool | None = None,
     ) -> DetectTextBuilder:
         """Configure detection inference options."""
         if options is not None:
@@ -625,6 +652,7 @@ class DetectTextBuilder:
                 limit_type=limit_type,
                 mean=mean,
                 std=std,
+                adaptive_resolution=adaptive_resolution,
             )
         return self
 
@@ -738,6 +766,7 @@ class DetectTextBuilder:
     def with_options(self, options: OcrRunOptions) -> DetectTextBuilder:
         """Merge options from an OcrRunOptions instance."""
         self._output = options.output
+        self._auto_config = options.auto_config
         self._auto_unwarp = options.auto_unwarp
         self._layout_reading = options.layout_reading
         self._layout_model = options.layout_model
@@ -755,6 +784,7 @@ class DetectTextBuilder:
         """Execute OCR detection with chained options."""
         options = OcrRunOptions(
             output=self._output,
+            auto_config=self._auto_config,
             auto_unwarp=self._auto_unwarp,
             layout_reading=self._layout_reading,
             layout_model=self._layout_model,

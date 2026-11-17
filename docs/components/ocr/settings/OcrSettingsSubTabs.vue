@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import OcrInfoPopover from './OcrInfoPopover.vue';
 
 export interface SettingsSubTab {
@@ -19,8 +19,30 @@ const emit = defineEmits<{
   'update:modelValue': [id: string];
 }>();
 
-const activeTabMeta = computed<SettingsSubTab | undefined>(() =>
-  props.tabs.find((t) => t.id === props.modelValue)
+// Ensure the first subtab is always selected if not currently set or invalid
+onMounted(() => {
+  if (
+    props.tabs.length > 0 &&
+    (!props.modelValue || !props.tabs.some((t) => t.id === props.modelValue))
+  ) {
+    emit('update:modelValue', props.tabs[0].id);
+  }
+});
+
+watch(
+  () => props.tabs,
+  (newTabs) => {
+    if (
+      newTabs.length > 0 &&
+      (!props.modelValue || !newTabs.some((t) => t.id === props.modelValue))
+    ) {
+      emit('update:modelValue', newTabs[0].id);
+    }
+  }
+);
+
+const activeTabMeta = computed<SettingsSubTab | undefined>(
+  () => props.tabs.find((t) => t.id === props.modelValue) ?? props.tabs[0]
 );
 
 function onTabKeydown(event: KeyboardEvent, index: number) {
@@ -38,7 +60,8 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
 <template>
   <div class="space-y-3">
     <div
-      class="flex items-center gap-4 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto"
+      class="flex items-center gap-4 border-b border-zinc-200 dark:border-zinc-800 overflow-x-auto overflow-y-clip [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      style="overflow-y: clip; scrollbar-width: none"
       role="tablist"
     >
       <button
@@ -50,7 +73,7 @@ function onTabKeydown(event: KeyboardEvent, index: number) {
         :tabindex="modelValue === tab.id ? 0 : -1"
         @click="emit('update:modelValue', tab.id)"
         @keydown="onTabKeydown($event, idx)"
-        class="relative inline-flex items-center gap-1.5 pb-2 pt-0.5 text-[11px] font-medium border-b-2 -mb-px transition-colors cursor-pointer whitespace-nowrap focus-visible:outline-none focus-visible:text-primary"
+        class="relative inline-flex items-center gap-1.5 pb-2 pt-0.5 text-[11px] font-medium border-b-2 transition-colors cursor-pointer whitespace-nowrap focus-visible:outline-none focus-visible:text-primary"
         :class="
           modelValue === tab.id
             ? 'border-primary text-zinc-900 dark:text-zinc-100 font-semibold'

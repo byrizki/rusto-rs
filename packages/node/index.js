@@ -53,6 +53,11 @@ class DetectTextBuilder {
     return this;
   }
 
+  withAutoConfig(enabled = true) {
+    this._options.autoConfig = enabled;
+    return this;
+  }
+
   withAutoUnwarp(enabled = true) {
     this._options.autoUnwarp = enabled;
     return this;

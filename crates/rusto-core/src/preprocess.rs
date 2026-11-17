@@ -3,7 +3,7 @@ use crate::error::CoreError;
 use crate::image::{self, Mat, Size, INTER_LINEAR};
 
 #[inline]
-fn build_bilinear_table(
+pub fn build_bilinear_table(
     out_len: usize,
     start: f32,
     step: f32,
@@ -339,18 +339,20 @@ pub fn compute_ppocr_rec_crop_dims(
     orig_w: usize,
     orig_h: usize,
     box_coords: [f32; 4],
+    pad_x: f32,
+    pad_y: f32,
 ) -> Option<(usize, usize)> {
     let [x0, y0, x1, y1] = box_coords;
     let box_w = x1 - x0;
     let box_h = y1 - y0;
 
-    let pad_x_ratio = 0.035f32;
-    let pad_y_ratio = 0.045f32;
+    let pad_x_px = (box_w * pad_x).max(if pad_x > 0.0 { box_h * 0.30 } else { 0.0 });
+    let pad_y_px = (box_h * pad_y).max(0.0);
 
-    let exp_x0 = (x0 - box_w * pad_x_ratio).max(0.0);
-    let exp_x1 = (x1 + box_w * pad_x_ratio).min(orig_w as f32);
-    let exp_y0 = (y0 - box_h * pad_y_ratio).max(0.0);
-    let exp_y1 = (y1 + box_h * pad_y_ratio).min(orig_h as f32);
+    let exp_x0 = (x0 - pad_x_px).max(0.0);
+    let exp_x1 = (x1 + pad_x_px).min(orig_w as f32);
+    let exp_y0 = (y0 - pad_y_px).max(0.0);
+    let exp_y1 = (y1 + pad_y_px).min(orig_h as f32);
 
     let crop_w = exp_x1 - exp_x0;
     let crop_h = exp_y1 - exp_y0;
@@ -418,8 +420,10 @@ pub fn prepare_ppocr_rec_crop_rgba(
     orig_w: usize,
     orig_h: usize,
     box_coords: [f32; 4],
+    pad_x: f32,
+    pad_y: f32,
 ) -> Option<(Vec<f32>, usize, usize)> {
-    let (rec_w, rec_h) = compute_ppocr_rec_crop_dims(orig_w, orig_h, box_coords)?;
+    let (rec_w, rec_h) = compute_ppocr_rec_crop_dims(orig_w, orig_h, box_coords, pad_x, pad_y)?;
     if rgba.len() < orig_w * orig_h * 4 {
         return None;
     }
@@ -428,24 +432,26 @@ pub fn prepare_ppocr_rec_crop_rgba(
     let box_w = x1 - x0;
     let box_h = y1 - y0;
 
-    let pad_x_ratio = 0.035f32;
-    let pad_y_ratio = 0.045f32;
+    let pad_x_px = (box_w * pad_x).max(if pad_x > 0.0 { box_h * 0.30 } else { 0.0 });
+    let pad_y_px = (box_h * pad_y).max(0.0);
 
-    let exp_x0 = (x0 - box_w * pad_x_ratio).max(0.0);
-    let exp_x1 = (x1 + box_w * pad_x_ratio).min(orig_w as f32);
-    let exp_y0 = (y0 - box_h * pad_y_ratio).max(0.0);
-    let exp_y1 = (y1 + box_h * pad_y_ratio).min(orig_h as f32);
+    let exp_x0 = (x0 - pad_x_px).max(0.0);
+    let exp_x1 = (x1 + pad_x_px).min(orig_w as f32);
+    let exp_y0 = (y0 - pad_y_px).max(0.0);
+    let exp_y1 = (y1 + pad_y_px).min(orig_h as f32);
 
     let crop_w = exp_x1 - exp_x0;
     let crop_h = exp_y1 - exp_y0;
 
-    let x_tab = build_bilinear_table(rec_w, exp_x0, crop_w / rec_w as f32, orig_w, 4);
+    let valid_w = ((48.0 * (crop_w / crop_h)).round() as usize).clamp(1, rec_w);
+    let x_tab = build_bilinear_table(valid_w, exp_x0, crop_w / valid_w as f32, orig_w, 4);
     let y_tab = build_bilinear_table(rec_h, exp_y0, crop_h / rec_h as f32, orig_h, orig_w * 4);
 
     const SCALE: f32 = 2.0 / 255.0;
     let plane_size = rec_h * rec_w;
     let row_bytes = orig_w * 4;
-    let mut rec_input = vec![0.0f32; plane_size * 3];
+    // PP-OCR normalized background is -1.0 ((0/255)*2 - 1)
+    let mut rec_input = vec![-1.0f32; plane_size * 3];
     let (b_plane, rest) = rec_input.split_at_mut(plane_size);
     let (g_plane, r_plane) = rest.split_at_mut(plane_size);
 
@@ -453,9 +459,9 @@ pub fn prepare_ppocr_rec_crop_rgba(
         let row0 = &rgba[ry0..ry0 + row_bytes];
         let row1 = &rgba[ry1..ry1 + row_bytes];
         let dst_off = ry * rec_w;
-        let b_row = &mut b_plane[dst_off..dst_off + rec_w];
-        let g_row = &mut g_plane[dst_off..dst_off + rec_w];
-        let r_row = &mut r_plane[dst_off..dst_off + rec_w];
+        let b_row = &mut b_plane[dst_off..dst_off + valid_w];
+        let g_row = &mut g_plane[dst_off..dst_off + valid_w];
+        let r_row = &mut r_plane[dst_off..dst_off + valid_w];
 
         for (rx, &(ox0, ox1, wx0, wx1)) in x_tab.iter().enumerate() {
             let r = (row0[ox0] as f32 * wx0 + row0[ox1] as f32 * wx1) * wy0
@@ -676,12 +682,33 @@ pub fn resize_norm_rec_img_to_slice(
     };
 
     let mut resized = Mat::default();
-    image::resize(
-        img,
-        &mut resized,
-        Size::new(resized_w, img_h as i32),
-        INTER_LINEAR,
-    )?;
+    if h as usize > (img_h * 6) / 5 && img_c == 3 {
+        let owned_rgb;
+        let (raw, ow, oh) = if let Some(rgb) = img.as_dynamic().as_rgb8() {
+            (rgb.as_raw().as_slice(), rgb.width() as usize, rgb.height() as usize)
+        } else {
+            owned_rgb = img.to_rgb8();
+            (owned_rgb.as_raw().as_slice(), owned_rgb.width() as usize, owned_rgb.height() as usize)
+        };
+        let downsampled = crate::resample::area_resize_rgb8(raw, ow, oh, resized_w as usize, img_h);
+        if let Some(buf) = ::image::RgbImage::from_raw(resized_w as u32, img_h as u32, downsampled) {
+            resized = Mat::new(::image::DynamicImage::ImageRgb8(buf));
+        } else {
+            image::resize(
+                img,
+                &mut resized,
+                Size::new(resized_w, img_h as i32),
+                INTER_LINEAR,
+            )?;
+        }
+    } else {
+        image::resize(
+            img,
+            &mut resized,
+            Size::new(resized_w, img_h as i32),
+            INTER_LINEAR,
+        )?;
+    }
 
     let size = resized.size()?;
     let h2 = size.height as usize;

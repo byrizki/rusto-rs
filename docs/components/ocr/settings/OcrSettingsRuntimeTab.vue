@@ -150,8 +150,52 @@ async function copyUrl(key: string, url?: string) {
         :selected-model-id="selectedModelId"
         :current-model="currentModel"
         :inference-backend="config.inferenceBackend"
+        :auto-config="config.autoConfig"
         @select="(modelId) => emit('selectModel', modelId)"
       />
+    </div>
+
+    <!-- Dimension-Adaptive Auto-Configuration -->
+    <div
+      data-setting-id="autoConfig"
+      class="p-2.5 rounded-lg border transition-all"
+      :class="[
+        config.autoConfig
+          ? 'border-primary/50 bg-primary/5 dark:bg-primary/10'
+          : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900',
+      ]"
+    >
+      <div class="flex items-center justify-between gap-3">
+        <div class="space-y-0.5">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold text-xs text-zinc-900 dark:text-zinc-100">
+              Dimension-Adaptive Auto-Config
+            </span>
+            <code class="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+              .withAutoConfig()
+            </code>
+            <span class="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-medium">
+              ~0.5ms profiling
+            </span>
+          </div>
+          <p class="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+            Analyzes image dimensions, contrast, noise, and background patterns in &lt;1ms to
+            automatically calibrate optimal detection limits, preprocessing filters, and recognition
+            parameters.
+          </p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+          <input
+            v-model="config.autoConfig"
+            type="checkbox"
+            class="sr-only peer"
+            aria-label="Auto-Config (Adaptive Profiling)"
+          />
+          <div
+            class="w-9 h-5 bg-zinc-200 peer-focus:outline-none rounded-full peer dark:bg-zinc-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-zinc-600 peer-checked:bg-primary"
+          ></div>
+        </label>
+      </div>
     </div>
 
     <OcrSettingsSubTabs v-model="activeSection" :tabs="subTabs" class="text-xs">

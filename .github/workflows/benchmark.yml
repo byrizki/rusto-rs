@@ -159,7 +159,9 @@ jobs:
               {'target': 'rusto_indra_full', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-h) RustO NN Full Pipeline + Indra Order'},
               {'target': 'rusto_rten_indra_full', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-i) RustO RTen Full Pipeline + Indra Order'},
               {'target': 'rusto_order_heuristic', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-j) RustO NN + PP-OCRv6 + Pure-Rust Heuristic Order'},
-              {'target': 'rusto_rten_order_heuristic', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-k) RustO RTen + PP-OCRv6 + Pure-Rust Heuristic Order'}
+              {'target': 'rusto_rten_order_heuristic', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-k) RustO RTen + PP-OCRv6 + Pure-Rust Heuristic Order'},
+              {'target': 'rusto_full_auto', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-m) RustO NN Full Pipeline + Auto-Config (CDLA)'},
+              {'target': 'rusto_full_publaynet_auto', 'suite': 'full_pipeline', 'name': 'Full Pipeline: (pipe-n) RustO NN Full Pipeline + Auto-Config (PubLayNet)'}
           ]
 
           aliases = {
@@ -177,16 +179,22 @@ jobs:
               'p6': 'rusto_full_publaynet', 'p7': 'rusto_rten_full_publaynet',
               'p8': 'rusto_indra_full', 'p9': 'rusto_rten_indra_full',
               'p10': 'rusto_order_heuristic', 'p11': 'rusto_rten_order_heuristic',
+              'p12': 'tesseract3', 'p13': 'rusto_full_auto', 'p14': 'rusto_full_publaynet_auto',
               'pipe_a': 'indra_ocr', 'pipe_b': 'paddle_structure', 'pipe_c': 'rapid_structure_tiny',
               'pipe_d': 'rusto_full_tiny', 'pipe_e': 'rusto_rten_full_tiny',
               'pipe_f': 'rusto_full_publaynet', 'pipe_g': 'rusto_rten_full_publaynet',
               'pipe_h': 'rusto_indra_full', 'pipe_i': 'rusto_rten_indra_full',
               'pipe_j': 'rusto_order_heuristic', 'pipe_k': 'rusto_rten_order_heuristic',
+              'pipe_l': 'tesseract3', 'pipe_m': 'rusto_full_auto', 'pipe_n': 'rusto_full_publaynet_auto',
               'pipe_heuristic': 'rusto_order_heuristic', 'rusto_heuristic_order': 'rusto_order_heuristic',
               'pipe_cdla': 'rusto_full_tiny', 'pipe_publaynet': 'rusto_full_publaynet',
-              'pipe_order': 'rusto_indra_full',
+              'pipe_order': 'rusto_indra_full', 'pipe_auto': 'rusto_full_auto',
               'rusto_full_cdla': 'rusto_full_tiny', 'rusto_full_publaynet': 'rusto_full_publaynet',
               'rusto_rten_full_cdla': 'rusto_rten_full_tiny', 'rusto_rten_full_publaynet': 'rusto_rten_full_publaynet',
+              'rusto_full_auto': 'rusto_full_auto', 'rusto_nn_full_auto': 'rusto_full_auto',
+              'rusto_full_tiny_auto': 'rusto_full_auto',
+              'rusto_full_publaynet_auto': 'rusto_full_publaynet_auto',
+              'rusto_nn_full_publaynet_auto': 'rusto_full_publaynet_auto',
               'rusto_tiny': 'rusto_nn_ppocr', 'rusto_indra_base': 'rusto_nn_indra',
               'rusto_nn_full_tiny': 'rusto_full_tiny', 'rusto_nn_full_cdla': 'rusto_full_tiny',
               'rusto_nn_full_publaynet': 'rusto_full_publaynet', 'rusto_nn_indra_full': 'rusto_indra_full',

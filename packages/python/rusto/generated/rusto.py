@@ -1250,17 +1250,18 @@ class DetectionRunOptions:
     """
     Image detection stage options.
 """
-    def __init__(self, *, limit_side_len:typing.Optional[int], limit_type:typing.Optional[str], mean:typing.Optional[typing.List[float]], std:typing.Optional[typing.List[float]]):
+    def __init__(self, *, limit_side_len:typing.Optional[int], limit_type:typing.Optional[str], mean:typing.Optional[typing.List[float]], std:typing.Optional[typing.List[float]], adaptive_resolution:typing.Optional[bool]):
         self.limit_side_len = limit_side_len
         self.limit_type = limit_type
         self.mean = mean
         self.std = std
+        self.adaptive_resolution = adaptive_resolution
         
         
 
     
     def __str__(self):
-        return "DetectionRunOptions(limit_side_len={}, limit_type={}, mean={}, std={})".format(self.limit_side_len, self.limit_type, self.mean, self.std)
+        return "DetectionRunOptions(limit_side_len={}, limit_type={}, mean={}, std={}, adaptive_resolution={})".format(self.limit_side_len, self.limit_type, self.mean, self.std, self.adaptive_resolution)
     def __eq__(self, other):
         if self.limit_side_len != other.limit_side_len:
             return False
@@ -1269,6 +1270,8 @@ class DetectionRunOptions:
         if self.mean != other.mean:
             return False
         if self.std != other.std:
+            return False
+        if self.adaptive_resolution != other.adaptive_resolution:
             return False
         return True
 
@@ -1280,6 +1283,7 @@ class _UniffiFfiConverterTypeDetectionRunOptions(_UniffiConverterRustBuffer):
             limit_type=_UniffiFfiConverterOptionalString.read(buf),
             mean=_UniffiFfiConverterOptionalSequenceFloat32.read(buf),
             std=_UniffiFfiConverterOptionalSequenceFloat32.read(buf),
+            adaptive_resolution=_UniffiFfiConverterOptionalBoolean.read(buf),
         )
 
     @staticmethod
@@ -1288,6 +1292,7 @@ class _UniffiFfiConverterTypeDetectionRunOptions(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalString.check_lower(value.limit_type)
         _UniffiFfiConverterOptionalSequenceFloat32.check_lower(value.mean)
         _UniffiFfiConverterOptionalSequenceFloat32.check_lower(value.std)
+        _UniffiFfiConverterOptionalBoolean.check_lower(value.adaptive_resolution)
 
     @staticmethod
     def write(value, buf):
@@ -1295,6 +1300,7 @@ class _UniffiFfiConverterTypeDetectionRunOptions(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalString.write(value.limit_type, buf)
         _UniffiFfiConverterOptionalSequenceFloat32.write(value.mean, buf)
         _UniffiFfiConverterOptionalSequenceFloat32.write(value.std, buf)
+        _UniffiFfiConverterOptionalBoolean.write(value.adaptive_resolution, buf)
 
 @dataclass
 class Frame:
@@ -1926,17 +1932,21 @@ class PreDetectionOptions:
     """
     Pre-detection image conditioning and resolution optimization options.
 """
-    def __init__(self, *, descreen_strength:typing.Optional[float], target_max_side:typing.Optional[int], crop_padding_x:typing.Optional[float], crop_padding_y:typing.Optional[float]):
+    def __init__(self, *, descreen_strength:typing.Optional[float], target_max_side:typing.Optional[int], crop_padding_x:typing.Optional[float], crop_padding_y:typing.Optional[float], relief_enhancement:typing.Optional[bool], relief_strength:typing.Optional[float], stroke_repair:typing.Optional[bool], stroke_repair_radius:typing.Optional[int]):
         self.descreen_strength = descreen_strength
         self.target_max_side = target_max_side
         self.crop_padding_x = crop_padding_x
         self.crop_padding_y = crop_padding_y
+        self.relief_enhancement = relief_enhancement
+        self.relief_strength = relief_strength
+        self.stroke_repair = stroke_repair
+        self.stroke_repair_radius = stroke_repair_radius
         
         
 
     
     def __str__(self):
-        return "PreDetectionOptions(descreen_strength={}, target_max_side={}, crop_padding_x={}, crop_padding_y={})".format(self.descreen_strength, self.target_max_side, self.crop_padding_x, self.crop_padding_y)
+        return "PreDetectionOptions(descreen_strength={}, target_max_side={}, crop_padding_x={}, crop_padding_y={}, relief_enhancement={}, relief_strength={}, stroke_repair={}, stroke_repair_radius={})".format(self.descreen_strength, self.target_max_side, self.crop_padding_x, self.crop_padding_y, self.relief_enhancement, self.relief_strength, self.stroke_repair, self.stroke_repair_radius)
     def __eq__(self, other):
         if self.descreen_strength != other.descreen_strength:
             return False
@@ -1945,6 +1955,14 @@ class PreDetectionOptions:
         if self.crop_padding_x != other.crop_padding_x:
             return False
         if self.crop_padding_y != other.crop_padding_y:
+            return False
+        if self.relief_enhancement != other.relief_enhancement:
+            return False
+        if self.relief_strength != other.relief_strength:
+            return False
+        if self.stroke_repair != other.stroke_repair:
+            return False
+        if self.stroke_repair_radius != other.stroke_repair_radius:
             return False
         return True
 
@@ -1956,6 +1974,10 @@ class _UniffiFfiConverterTypePreDetectionOptions(_UniffiConverterRustBuffer):
             target_max_side=_UniffiFfiConverterOptionalUInt32.read(buf),
             crop_padding_x=_UniffiFfiConverterOptionalFloat32.read(buf),
             crop_padding_y=_UniffiFfiConverterOptionalFloat32.read(buf),
+            relief_enhancement=_UniffiFfiConverterOptionalBoolean.read(buf),
+            relief_strength=_UniffiFfiConverterOptionalFloat32.read(buf),
+            stroke_repair=_UniffiFfiConverterOptionalBoolean.read(buf),
+            stroke_repair_radius=_UniffiFfiConverterOptionalUInt32.read(buf),
         )
 
     @staticmethod
@@ -1964,6 +1986,10 @@ class _UniffiFfiConverterTypePreDetectionOptions(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalUInt32.check_lower(value.target_max_side)
         _UniffiFfiConverterOptionalFloat32.check_lower(value.crop_padding_x)
         _UniffiFfiConverterOptionalFloat32.check_lower(value.crop_padding_y)
+        _UniffiFfiConverterOptionalBoolean.check_lower(value.relief_enhancement)
+        _UniffiFfiConverterOptionalFloat32.check_lower(value.relief_strength)
+        _UniffiFfiConverterOptionalBoolean.check_lower(value.stroke_repair)
+        _UniffiFfiConverterOptionalUInt32.check_lower(value.stroke_repair_radius)
 
     @staticmethod
     def write(value, buf):
@@ -1971,6 +1997,10 @@ class _UniffiFfiConverterTypePreDetectionOptions(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalUInt32.write(value.target_max_side, buf)
         _UniffiFfiConverterOptionalFloat32.write(value.crop_padding_x, buf)
         _UniffiFfiConverterOptionalFloat32.write(value.crop_padding_y, buf)
+        _UniffiFfiConverterOptionalBoolean.write(value.relief_enhancement, buf)
+        _UniffiFfiConverterOptionalFloat32.write(value.relief_strength, buf)
+        _UniffiFfiConverterOptionalBoolean.write(value.stroke_repair, buf)
+        _UniffiFfiConverterOptionalUInt32.write(value.stroke_repair_radius, buf)
 
 class _UniffiFfiConverterOptionalTypePreDetectionOptions(_UniffiConverterRustBuffer):
     @classmethod
@@ -2331,13 +2361,14 @@ class OcrRunOptions:
     """
     Per-request execution options for text detection.
 """
-    def __init__(self, *, output:OutputGranularity, auto_unwarp:typing.Optional[bool], layout_reading:typing.Optional[bool], layout_model:typing.Optional[str], orientation_detection:typing.Optional[bool], line_classification:typing.Optional[bool], pre_detection:typing.Optional[PreDetectionOptions], detection:typing.Optional[DetectionRunOptions], post_detection:typing.Optional[PostDetectionOptions], pre_recognition:typing.Optional[PreRecognitionOptions], recognition:typing.Optional[RecognitionRunOptions], post_recognition:typing.Optional[PostRecognitionOptions]):
+    def __init__(self, *, output:OutputGranularity, auto_unwarp:typing.Optional[bool], layout_reading:typing.Optional[bool], layout_model:typing.Optional[str], orientation_detection:typing.Optional[bool], line_classification:typing.Optional[bool], auto_config:typing.Optional[bool], pre_detection:typing.Optional[PreDetectionOptions], detection:typing.Optional[DetectionRunOptions], post_detection:typing.Optional[PostDetectionOptions], pre_recognition:typing.Optional[PreRecognitionOptions], recognition:typing.Optional[RecognitionRunOptions], post_recognition:typing.Optional[PostRecognitionOptions]):
         self.output = output
         self.auto_unwarp = auto_unwarp
         self.layout_reading = layout_reading
         self.layout_model = layout_model
         self.orientation_detection = orientation_detection
         self.line_classification = line_classification
+        self.auto_config = auto_config
         self.pre_detection = pre_detection
         self.detection = detection
         self.post_detection = post_detection
@@ -2349,7 +2380,7 @@ class OcrRunOptions:
 
     
     def __str__(self):
-        return "OcrRunOptions(output={}, auto_unwarp={}, layout_reading={}, layout_model={}, orientation_detection={}, line_classification={}, pre_detection={}, detection={}, post_detection={}, pre_recognition={}, recognition={}, post_recognition={})".format(self.output, self.auto_unwarp, self.layout_reading, self.layout_model, self.orientation_detection, self.line_classification, self.pre_detection, self.detection, self.post_detection, self.pre_recognition, self.recognition, self.post_recognition)
+        return "OcrRunOptions(output={}, auto_unwarp={}, layout_reading={}, layout_model={}, orientation_detection={}, line_classification={}, auto_config={}, pre_detection={}, detection={}, post_detection={}, pre_recognition={}, recognition={}, post_recognition={})".format(self.output, self.auto_unwarp, self.layout_reading, self.layout_model, self.orientation_detection, self.line_classification, self.auto_config, self.pre_detection, self.detection, self.post_detection, self.pre_recognition, self.recognition, self.post_recognition)
     def __eq__(self, other):
         if self.output != other.output:
             return False
@@ -2362,6 +2393,8 @@ class OcrRunOptions:
         if self.orientation_detection != other.orientation_detection:
             return False
         if self.line_classification != other.line_classification:
+            return False
+        if self.auto_config != other.auto_config:
             return False
         if self.pre_detection != other.pre_detection:
             return False
@@ -2387,6 +2420,7 @@ class _UniffiFfiConverterTypeOcrRunOptions(_UniffiConverterRustBuffer):
             layout_model=_UniffiFfiConverterOptionalString.read(buf),
             orientation_detection=_UniffiFfiConverterOptionalBoolean.read(buf),
             line_classification=_UniffiFfiConverterOptionalBoolean.read(buf),
+            auto_config=_UniffiFfiConverterOptionalBoolean.read(buf),
             pre_detection=_UniffiFfiConverterOptionalTypePreDetectionOptions.read(buf),
             detection=_UniffiFfiConverterOptionalTypeDetectionRunOptions.read(buf),
             post_detection=_UniffiFfiConverterOptionalTypePostDetectionOptions.read(buf),
@@ -2403,6 +2437,7 @@ class _UniffiFfiConverterTypeOcrRunOptions(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalString.check_lower(value.layout_model)
         _UniffiFfiConverterOptionalBoolean.check_lower(value.orientation_detection)
         _UniffiFfiConverterOptionalBoolean.check_lower(value.line_classification)
+        _UniffiFfiConverterOptionalBoolean.check_lower(value.auto_config)
         _UniffiFfiConverterOptionalTypePreDetectionOptions.check_lower(value.pre_detection)
         _UniffiFfiConverterOptionalTypeDetectionRunOptions.check_lower(value.detection)
         _UniffiFfiConverterOptionalTypePostDetectionOptions.check_lower(value.post_detection)
@@ -2418,6 +2453,7 @@ class _UniffiFfiConverterTypeOcrRunOptions(_UniffiConverterRustBuffer):
         _UniffiFfiConverterOptionalString.write(value.layout_model, buf)
         _UniffiFfiConverterOptionalBoolean.write(value.orientation_detection, buf)
         _UniffiFfiConverterOptionalBoolean.write(value.line_classification, buf)
+        _UniffiFfiConverterOptionalBoolean.write(value.auto_config, buf)
         _UniffiFfiConverterOptionalTypePreDetectionOptions.write(value.pre_detection, buf)
         _UniffiFfiConverterOptionalTypeDetectionRunOptions.write(value.detection, buf)
         _UniffiFfiConverterOptionalTypePostDetectionOptions.write(value.post_detection, buf)

@@ -160,6 +160,7 @@ export function formatActiveConfigJson(
 }
 
 function appendBuilderStages(lines: string[], options: DetectTextOptions): void {
+  if (options.autoConfig) lines.push(`  .withAutoConfig()`);
   if (options.autoUnwarp) lines.push(`  .withAutoUnwarp()`);
   if (options.layoutReading) lines.push(`  .withLayoutReading()`);
   if (options.layoutModel) lines.push(`  .withLayoutModel('${options.layoutModel}')`);
