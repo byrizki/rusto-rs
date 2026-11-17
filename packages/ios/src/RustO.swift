@@ -585,12 +585,12 @@ extension OcrRunOptions {
     public init() {
         self.init(
             output: .lines,
-            autoConfig: nil,
             autoUnwarp: nil,
             layoutReading: nil,
             layoutModel: nil,
             orientationDetection: nil,
             lineClassification: nil,
+            autoConfig: nil,
             preDetection: nil,
             detection: nil,
             postDetection: nil,
