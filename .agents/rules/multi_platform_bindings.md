@@ -110,4 +110,13 @@ Whenever the UniFFI interface definition in Rust (`src/ffi_bindgen.rs`) changes:
 - Models must have a single canonical source of truth: root `models/` directory managed via centralized download scripts (`scripts/download_models.sh`) or cloud releases (Hugging Face / GitHub Releases).
 - Avoid per-package duplicated model distributions (such as `packages/models/`). When packaging schemes evolve, clean up untracked or gitignored legacy model directories to prevent repository disk bloat.
 
+## 13. UniFFI Struct Field Order & Swift Memberwise Initializer Parity
+When authoring or modifying UniFFI struct definitions in Rust (`src/ffi_bindgen.rs`):
+- UniFFI generates Swift memberwise initializers where parameter labels strictly follow the declaration order of the Rust struct fields.
+- Swift strictly enforces argument label order at compile-time (`error: incorrect argument labels in call`). Unlike Kotlin, Dart, or C#, arguments cannot be reordered in Swift initializer calls.
+- When updating or extending structs (such as `OcrRunOptions`):
+  1. Inspect the generated Swift binding (`packages/ios/src/generated/rusto.swift`) to verify the exact memberwise initializer parameter order.
+  2. Ensure all manual Swift wrapper initializers (e.g. `extension OcrRunOptions { public init() { ... } }` in `packages/ios/src/RustO.swift`) match this exact argument order.
+  3. Never assume Swift compilation will succeed just because Android Kotlin, Dart, or .NET builds passed.
+
 
