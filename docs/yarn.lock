@@ -8476,15 +8476,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"dompurify@npm:^3.4.12":
-  version: 3.4.17
-  resolution: "dompurify@npm:3.4.17"
+"dompurify@npm:^3.4.17":
+  version: 3.5.0
+  resolution: "dompurify@npm:3.5.0"
   dependencies:
-    "@types/trusted-types": "npm:^2.0.7"
+    "@types/trusted-types": ^2.0.7
   dependenciesMeta:
     "@types/trusted-types":
       optional: true
-  checksum: ae03c068bd351d1201a24a9667cb302c65939f45a0c357edec8b84133108e19ac74f355c2d8b0f30baadadd7f0be2db300d269aa80d3ee15872712ca9ff4e1a8
+  checksum: 8/9478584bd7b9bfb8cb3784d290043cc5212d7726683cd105d128626140685d365020c4f6dce0756771bc1b763f66cc410f34a0259191780c9d471eaa0127f919
   languageName: node
   linkType: hard
 
@@ -8561,10 +8561,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"elkjs@npm:^0.9.3":
-  version: 0.9.3
-  resolution: "elkjs@npm:0.9.3"
-  checksum: 397986e271827a5e13d2722b1883aea3557006d2777be8c34568f8fe743e81f4f71210e4e81b9958f597b0af8e96afaa883d2705eba84a3d5d0973bcb02fa59e
+"elkjs@npm:^0.12.0":
+  version: 0.12.1
+  resolution: "elkjs@npm:0.12.1"
+  checksum: 8/9e558f392c2dcbed30726293937b6d57824085d608aa82d2040a4bb2c46f52ed28e975d5d93f3ae031e1e5b74fc396768657705fcbd97f0b707d0dcfbf612054
   languageName: node
   linkType: hard
 
@@ -9452,7 +9452,7 @@ __metadata:
 
 "fsevents@patch:fsevents@npm%3A~2.3.3#~builtin<compat/fsevents>, fsevents@patch:fsevents@~2.3.2#~builtin<compat/fsevents>, fsevents@patch:fsevents@~2.3.3#~builtin<compat/fsevents>":
   version: 2.3.3
-  resolution: "fsevents@patch:fsevents@npm%3A2.3.3#~builtin<compat/fsevents>::version=2.3.3&hash=df0bf1"
+  resolution: "fsevents@patch:fsevents@npm%3A2.3.3#~builtin<compat/fsevents>::version=2.3.3&hash=18f3a7"
   dependencies:
     node-gyp: "npm:latest"
   conditions: os=darwin
@@ -11626,34 +11626,33 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mermaid@npm:^12.2.0":
-  version: 12.2.0
-  resolution: "mermaid@npm:12.2.0"
+"mermaid@npm:^12.3.0":
+  version: 12.3.0
+  resolution: "mermaid@npm:12.3.0"
   dependencies:
-    "@braintree/sanitize-url": "npm:^7.1.2"
-    "@iconify/utils": "npm:^3.0.2"
-    "@mermaid-js/parser": "npm:^2.0.1"
-    "@types/d3": "npm:^7.4.3"
-    "@upsetjs/venn.js": "npm:^2.0.0"
-    chevrotain: "npm:~13.2.0"
-    cytoscape: "npm:^3.34.0"
-    cytoscape-cose-bilkent: "npm:^4.1.0"
-    cytoscape-fcose: "npm:^2.2.0"
-    d3: "npm:^7.9.0"
-    d3-sankey: "npm:^0.12.3"
-    dagre-d3-es: "npm:7.0.14"
-    dayjs: "npm:^1.11.21"
-    dompurify: "npm:^3.4.12"
-    elkjs: "npm:^0.9.3"
-    es-toolkit: "npm:^1.45.1"
-    katex: "npm:^0.18.0"
-    khroma: "npm:^2.1.0"
-    marked: "npm:^16.3.0"
-    roughjs: "npm:^4.6.6"
-    stylis: "npm:^4.3.6"
-    ts-dedent: "npm:^2.2.0"
-    uuid: "npm:^11.1.0 || ^12 || ^13 || ^14.0.0"
-  checksum: 1455be6bdd83826b1b70925998bcc6ed85e915de90b49ee9758e7644a88fd16bf78f84ac1a209435089e7ca21d6b5926c18077b4183fb219541102f43da34584
+    "@braintree/sanitize-url": ^7.1.2
+    "@iconify/utils": ^3.0.2
+    "@mermaid-js/parser": ^2.0.1
+    "@types/d3": ^7.4.3
+    "@upsetjs/venn.js": ^2.0.0
+    chevrotain: ~13.2.0
+    cytoscape: ^3.34.0
+    cytoscape-cose-bilkent: ^4.1.0
+    cytoscape-fcose: ^2.2.0
+    d3: ^7.9.0
+    d3-sankey: ^0.12.3
+    dagre-d3-es: 7.0.14
+    dayjs: ^1.11.21
+    dompurify: ^3.4.17
+    elkjs: ^0.12.0
+    es-toolkit: ^1.45.1
+    katex: ^0.18.0
+    khroma: ^2.1.0
+    marked: ^16.3.0
+    roughjs: ^4.6.6
+    stylis: ^4.3.6
+    ts-dedent: ^2.2.0
+  checksum: 8/3a64e903b52b753ab79f228e467521bab8a402d397cbd4e623a6d47373a7b04168a31446f4ab54421f74daa279f6da1f0150d16b4cc6da8e424ec48ddbd1cb13
   languageName: node
   linkType: hard
 
@@ -14652,7 +14651,7 @@ __metadata:
 
 "resolve@patch:resolve@npm%3A^1.22.1#~builtin<compat/resolve>":
   version: 1.22.11
-  resolution: "resolve@patch:resolve@npm%3A1.22.11#~builtin<compat/resolve>::version=1.22.11&hash=c3c19d"
+  resolution: "resolve@patch:resolve@npm%3A1.22.11#~builtin<compat/resolve>::version=1.22.11&hash=07638b"
   dependencies:
     is-core-module: "npm:^2.16.1"
     path-parse: "npm:^1.0.7"
@@ -15000,7 +14999,7 @@ __metadata:
   dependencies:
     better-sqlite3: ^12.11.1
     docus: 5.15.0
-    mermaid: ^12.2.0
+    mermaid: ^12.3.0
     nuxt: ^4.6.3
     oxfmt: ^0.64.0
     oxlint: ^1.79.0
@@ -16104,7 +16103,7 @@ __metadata:
 
 "typescript@patch:typescript@npm%3A^5.9.3#~builtin<compat/typescript>":
   version: 5.9.3
-  resolution: "typescript@patch:typescript@npm%3A5.9.3#~builtin<compat/typescript>::version=5.9.3&hash=d73830"
+  resolution: "typescript@patch:typescript@npm%3A5.9.3#~builtin<compat/typescript>::version=5.9.3&hash=701156"
   bin:
     tsc: bin/tsc
     tsserver: bin/tsserver
@@ -16951,15 +16950,6 @@ __metadata:
   version: 1.0.2
   resolution: "util-deprecate@npm:1.0.2"
   checksum: 474acf1146cb2701fe3b074892217553dfcf9a031280919ba1b8d651a068c9b15d863b7303cb15bd00a862b498e6cf4ad7b4a08fb134edd5a6f7641681cb54a2
-  languageName: node
-  linkType: hard
-
-"uuid@npm:^11.1.0 || ^12 || ^13 || ^14.0.0":
-  version: 14.0.2
-  resolution: "uuid@npm:14.0.2"
-  bin:
-    uuid: dist-node/bin/uuid
-  checksum: e8263a76ad7b2d1f246df5a48a5bdf30d886eedbb1d3d74c75356d02b2966f5fffd7790b85afdb3682e4e732d13fca7974626419814f45de6847f78ce03c745e
   languageName: node
   linkType: hard
 
